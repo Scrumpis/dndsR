@@ -2,7 +2,7 @@
 A scalable dN/dS analysis R package. dndsR was designed with non-computational scientists in mind, aimed to be easy to run with a single command.
 
 ## Installation
-Docker? Conda? Both? Need orthofinder in conda env
+Docker? Conda? Both? Need orthofinder and diamond2 in conda env
 
 ## Usage
 Start-up
