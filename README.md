@@ -1,12 +1,16 @@
 # dndsR
-A scalable dN/dS analysis R package. dndsR was designed with non-computational scientists in mind, aimed to be easy to run with a single command.
+A scalable dN/dS analysis R package. For single or multiple pairwise comparisons of genomes, dndsR...
+- Extracts CDS or proteins using input genome FASTAs and gene annotation GFF3s
+- Calculates dN/dS
+- Visualizes selection pressures across the genomes through an ideogram
+- Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 
 ## Installation
 Docker? Conda? Both? Need orthofinder and diamond2 in conda env
 
 ## Data preparation
 Separate subgenomes or phased haplotypes into their own genome, protein, or CDS fastas prior to calculating dN/dS. [Orthologr](https://github.com/drostlab/orthologr), which calculates dN/dS, outputs the best match for every query/subject CDS/protein comparison. If subgenomes or haplotypes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons, leading to spurious results. We have had success using [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) to phase subgenomes of allopolyploids with unavalaiable diploid progenitor genomes.
-
+For subgenome-phased genome FASTAs, a BASH command can be used to extract each into their own FASTAs. This also works to separate haplotypes in phased genomes.
 provide a BASH script () and R helper function () to assist in subgenome or haplotype FASTA seperation.
 
 ## Usage
