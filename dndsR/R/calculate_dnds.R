@@ -1,24 +1,12 @@
-#' Calculate dN/dS values using orthologr
+#' Run dN/dS with orthologr from pre-extracted CDS FASTAs
 #'
-#' This function calculates dN/dS values using the \code{orthologr} package.
-#' It can be run in batch mode (via a file-of-file-names) or in single mode
-#' using individual file paths.
-#'
-#' @param file_of_file_names A data.frame or path to a TSV/space-delimited file
-#'        with columns: comparison_name, subject FASTA, query FASTA, subject GFF, query GFF.
-#'        If NULL, must provide individual file paths below.
-#' @param comparison_name Name for the comparison folder/output file (for single mode).
-#' @param query_fasta,query_gff,subject_fasta,subject_gff Individual file paths (for single mode).
-#' @param output_dir Base working directory (default: current working directory).
-#' @param comp_cores Number of compute cores to use (default: 10).
-#' @param aligner Alignment tool (default: "diamond").
-#' @param sensitivity_mode Sensitivity mode for alignment (default: "fast").
-#' @param dnds_method Method for dN/dS calculation (default: "Comeron").
-#' @param ... Additional parameters passed to orthologr::dNdS().
-#'
-#' @return Writes TSV files with dN/dS results to respective comparison folders.
+#' @param comparison_file Path to a whitespace-delimited (tab or space) file
+#'   OR a data.frame with columns:
+#'   comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
+#'   A single row is fine.
+#' @return (Invisibly) a character vector of output .tsv paths (one per run).
 #' @export
-calculate_dnds <- function(file_of_file_names = NULL,
+calculate_dnds <- function(comparison_file = NULL,
                            comparison_name = NULL,
                            subject_fasta = NULL,
                            query_fasta = NULL,
@@ -30,21 +18,54 @@ calculate_dnds <- function(file_of_file_names = NULL,
                            sensitivity_mode = "fast",
                            dnds_method = "Comeron",
                            ...) {
+
   if (!requireNamespace("orthologr", quietly = TRUE)) {
     stop("The orthologr package is required but not installed.")
   }
 
-  run_dnds <- function(comparison_basename, subject_fa, query_fa, subject_gff, query_gff) {
+  # ---- helper: read comparison_file with ANY whitespace as delimiter ----
+  .read_comparisons <- function(x) {
+    req <- c("comparison_name","query_fasta","query_gff","subject_fasta","subject_gff")
+    if (is.data.frame(x)) {
+      stopifnot(all(req %in% names(x)))
+      return(x[, req, drop = FALSE])
+    }
+    read_ws <- function(hdr) {
+      utils::read.table(x,
+                        header = hdr,
+                        sep = "",               # any whitespace (tabs OR spaces)
+                        quote = "\"",           # allow quoting paths if they contain spaces
+                        stringsAsFactors = FALSE,
+                        comment.char = "",
+                        strip.white = TRUE,
+                        blank.lines.skip = TRUE,
+                        check.names = FALSE)
+    }
+    # Try headered first
+    df1 <- try(read_ws(TRUE), silent = TRUE)
+    if (!inherits(df1, "try-error") && all(req %in% names(df1))) {
+      return(df1[, req, drop = FALSE])
+    }
+    # Fallback: headerless
+    df2 <- read_ws(FALSE)
+    if (ncol(df2) < 5) {
+      stop("comparison_file must have 5 columns or a header with: ",
+           paste(req, collapse = ", "))
+    }
+    names(df2)[1:5] <- req
+    df2[, req, drop = FALSE]
+  }
+
+  # ---- helper: one comparison ----
+  run_dnds <- function(comparison_basename, query_fa, subject_fa, query_gff, subject_gff, ...) {
     comp_dir <- file.path(output_dir, comparison_basename)
     dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
 
-    # Derive CDS filenames based on base names of FASTA files
-    query_base <- tools::file_path_sans_ext(basename(query_fa))
-    subject_base <- tools::file_path_sans_ext(basename(subject_fa))
-
-    query_CDS <- file.path(comp_dir, paste0(query_base, "_CDS.fasta"))
-    subject_CDS <- file.path(comp_dir, paste0(subject_base, "_CDS.fasta"))
-    output_file <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
+    q_base <- tools::file_path_sans_ext(basename(query_fa))
+    s_base <- tools::file_path_sans_ext(basename(subject_fa))
+    query_CDS   <- file.path(comp_dir, paste0(q_base, "_CDS.fasta"))
+    subject_CDS <- file.path(comp_dir, paste0(s_base, "_CDS.fasta"))
+    out_tsv     <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
 
     if (!file.exists(query_CDS) || !file.exists(subject_CDS)) {
       warning("CDS files not found in ", comp_dir, ". Expected: ",
@@ -52,68 +73,80 @@ calculate_dnds <- function(file_of_file_names = NULL,
               ". Skipping ", comparison_basename, ".")
       return(NULL)
     }
-
-    if (file.exists(output_file)) {
-      message("Skipping ", comparison_basename, " as output file already exists.")
-      return(NULL)
+    if (file.exists(out_tsv)) {
+      message("Skipping ", comparison_basename, " (exists).")
+      return(out_tsv)
     }
 
-    message("Running dNdS for: ", comparison_basename)
-
-    result <- orthologr::dNdS(
-      query_file = query_CDS,
-      subject_file = subject_CDS,
-      aligner = aligner,
-      sensitivity_mode = sensitivity_mode,
-      seq_type = "cds",
-      format = "fasta",
-      ortho_detection = "RBH",
+    # defaults you provide
+    args <- list(
+      query_file         = normalizePath(query_CDS),
+      subject_file       = normalizePath(subject_CDS),
+      aligner            = aligner,
+      sensitivity_mode   = sensitivity_mode,
+      seq_type           = "cds",
+      format             = "fasta",
+      ortho_detection    = "RBH",
       delete_corrupt_cds = TRUE,
-      eval = "1E-5",
-      aa_aln_type = "pairwise",
-      aa_aln_tool = "NW",
-      codon_aln_tool = "pal2nal",
-      dnds_est.method = dnds_method,
-      comp_cores = comp_cores,
-      quiet = TRUE,
-      clean_folders = FALSE,
-      print_citation = FALSE,
-      ...
+      eval               = "1E-5",
+      aa_aln_type        = "pairwise",
+      aa_aln_tool        = "NW",
+      codon_aln_tool     = "pal2nal",
+      dnds_est.method    = dnds_method,
+      comp_cores         = comp_cores,
+      quiet              = TRUE,
+      clean_folders      = FALSE,
+      print_citation     = FALSE
     )
 
-    write.table(result, file = output_file, sep = "\t", quote = FALSE, row.names = FALSE)
+    # user-supplied overrides / additions
+    user <- list(...)
+    if (length(user)) {
+      overlap <- intersect(names(user), names(args))
+      if (length(overlap)) message("Overriding defaults: ", paste(overlap, collapse = ", "))
+      args[overlap] <- user[overlap]                              # override defaults
+      extra <- setdiff(names(user), names(args))
+      if (length(extra)) args <- c(args, user[extra])             # add any other dNdS args
+    }
+
+    message("Running dN/dS for: ", comparison_basename)
+    res <- do.call(orthologr::dNdS, args)
+    utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
     message("Finished: ", comparison_basename)
+    out_tsv
   }
 
-  # Batch mode
-  if (!is.null(file_of_file_names)) {
-    if (is.character(file_of_file_names)) {
-      file_of_file_names <- read.table(file_of_file_names, header = FALSE, stringsAsFactors = FALSE)
-    }
 
-    for (i in seq_len(nrow(file_of_file_names))) {
-      run_dnds(
-        comparison_basename = file_of_file_names[i, 1],
-        query_fa = normalizePath(file_of_file_names[i, 2]),
-        query_gff   = normalizePath(file_of_file_names[i, 3]),
-        subject_fa = normalizePath(file_of_file_names[i, 4]),
-        subject_gff   = normalizePath(file_of_file_names[i, 5])
+  # ---- batch vs single ----
+  out_paths <- character(0)
+
+  if (!is.null(comparison_file)) {
+    df <- .read_comparisons(comparison_file)
+    for (i in seq_len(nrow(df))) {
+      out <- run_dnds(
+        comparison_basename = df$comparison_name[i],
+        query_fa   = normalizePath(df$query_fasta[i]),
+        subject_fa = normalizePath(df$subject_fasta[i]),
+        query_gff  = normalizePath(df$query_gff[i]),
+        subject_gff= normalizePath(df$subject_gff[i])
       )
+      if (!is.null(out)) out_paths <- c(out_paths, out)
     }
-  } else {
-    # Single mode
-    if (any(sapply(list(comparison_name, subject_fasta, query_fasta, subject_gff, query_gff), is.null))) {
-      stop("In single mode, please supply comparison_name, subject_fasta, query_fasta, subject_gff, and query_gff.")
-    }
-
-    run_dnds(
-      comparison_basename = comparison_name,
-      subject_fa = normalizePath(subject_fasta),
-      query_fa   = normalizePath(query_fasta),
-      subject_gff = normalizePath(subject_gff),
-      query_gff   = normalizePath(query_gff)
-    )
+    message("All dN/dS calculations complete.")
+    return(invisible(out_paths))
   }
 
+  # Single mode
+  if (any(sapply(list(comparison_name, subject_fasta, query_fasta, subject_gff, query_gff), is.null))) {
+    stop("In single mode, supply comparison_name, subject_fasta, query_fasta, subject_gff, and query_gff.")
+  }
+  out <- run_dnds(
+    comparison_basename = comparison_name,
+    query_fa   = normalizePath(query_fasta),
+    subject_fa = normalizePath(subject_fasta),
+    query_gff  = normalizePath(query_gff),
+    subject_gff= normalizePath(subject_gff)
+  )
   message("All dN/dS calculations complete.")
+  invisible(out)
 }
