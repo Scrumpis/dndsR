@@ -1,0 +1,84 @@
+---
+title: 'dndsR Test Workflow: Minimal Example with 6 Genes'
+author: "Nicholas A. Johnson"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{dndsR Test Workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 4
+)
+library(dndsR)
+```
+
+## Introduction
+
+dndsR was developed for use as a complete pipeline, however, we thought it was important in this vignette to demonstrate, piecewise, the workflow of dndsR through a minimal, end-to-end test using four chromosomes from two subgenomes (Chr01B, Chr04B, Chr02D, Chr07D) of the International Weed Genomics Consortium assemblies and annotations of Chenopodium album and C. formosanum. This subset can be used to test ideogram visualization, enrichment analysis, and annotation pipelines without running the full genome.
+
+## Extract CDS or Proteins
+```{r}
+split_comparisons_by_label(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn.txt",
+  mode = "subgenome"   # Chr1A / chr03_b → labels A,B,...
+)
+```
+
+## Extract CDS or Proteins
+```{r}
+extract_cds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full/")
+```
+
+## Run Orthologr to Calculate dN/dS
+```{r}
+calculate_dnds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full/", comp_cores = 10)
+```
+
+## Append Annotations
+```{r}
+append_annotations(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+                   output_dir = "./tests/full/")
+```
+
+## Term Enrichment
+```{r}
+term_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  terms = NULL,                 # auto-detect
+  sides = c("query","subject"),
+  pos_threshold = 1,
+  drop_rows_without_term = TRUE,
+  min_total = 10,
+  min_pos   = 2
+)
+
+```
+
+## GO Enrichment
+```{r}
+go_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  sides = c("query","subject"),
+  ontologies = c("BP","MF","CC"),
+  algorithm  = "weight01",     # good default
+  statistic  = "fisher",
+  pos_threshold = 1,
+  drop_rows_without_go = TRUE, # annotation-aware universe
+  node_min = 10,               # drop ultra-rare terms
+  node_max = 2000,             # optional upper cap
+  p_adjust = "BH",
+  make_plots = TRUE,
+  top_n = 20
+)
+
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
