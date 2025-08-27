@@ -21,6 +21,16 @@ BiocManager::install(
   ask = FALSE, update = FALSE
 )
 
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("qvalue")
+
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("IHW")
+
 ## Now do your dev loop
 #devtools::document()
 #devtools::load_all()
