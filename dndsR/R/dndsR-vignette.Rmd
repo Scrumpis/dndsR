@@ -81,4 +81,19 @@ go_enrichment(
 )
 
 ```
+
+## IPR Enrichment
+```{r}
+ipr_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  #universe = universe_ids,
+  stratify_by_type = TRUE,
+  #types = c("Domain","Homologous_superfamily"),   # or leave NULL to auto-infer
+  adjust_scope = "global",
+  min_pos = 2,
+  min_total = 10
+)
+
+```
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
