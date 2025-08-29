@@ -38,6 +38,7 @@ extract_cds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
 
 ## Run Orthologr to Calculate dN/dS
 ```{r}
+# Runs very slow on markdown - Use small test dataset
 calculate_dnds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full/", comp_cores = 10)
 ```
 
@@ -93,6 +94,16 @@ ipr_enrichment(
   adjust_scope = "global",
   min_pos = 2,
   min_total = 10
+)
+
+```
+
+
+## dN/dS Ideogram
+```{r}
+dnds_ideogram(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/"
 )
 
 ```
