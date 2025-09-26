@@ -196,7 +196,41 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     if (!any(ex)) return(NA_character_)
     candidates[which(ex)[1]]
   }
+  # Crop output SVG to remove bottom white space
+  crop_svg_by_bottom_margin <- function(svg, cut_px) {
+    root <- xml2::xml_root(svg)
 
+    vb <- xml2::xml_attr(root, "viewBox")
+    if (is.na(vb) || !nzchar(vb)) {
+      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
+      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+      if (!is.finite(w) || !is.finite(h)) { w <- 1200; h <- 800 }
+      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
+      vb <- xml2::xml_attr(root, "viewBox")
+    }
+
+    nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
+    minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
+
+    new_vh <- max(10, vh - cut_px)
+
+    xml2::xml_attr(root, "viewBox") <- sprintf("%g %g %g %g", minX, minY, vw, new_vh)
+
+    old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+    if (is.finite(old_h) && vh > 0) {
+      xml2::xml_attr(root, "height") <- paste0(old_h * (new_vh / vh), "px")
+    }
+
+    bg <- xml2::xml_find_first(root, ".//rect[@id='svg-bg-rect']")
+    if (!inherits(bg, "xml_missing")) {
+      xml2::xml_set_attr(bg, "x", as.character(minX))
+      xml2::xml_set_attr(bg, "y", as.character(minY))
+      xml2::xml_set_attr(bg, "width",  as.character(vw))
+      xml2::xml_set_attr(bg, "height", as.character(new_vh))
+    }
+
+    svg
+  }
   # ---------- rendering worker (per side) ----------
   .one_side <- function(merged_path, side, fasta, window_size, max_dnds, filter_expr,
                         make_png, overwrite,
@@ -410,7 +444,7 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     }
 
     # === Add top padding by shifting the viewBox (no reparenting) ===
-    y_pad <- 140  # px; increase if your header still touches the top
+    y_pad <- 80  # px; increase if your header still touches the top 140
 
     root <- xml2::xml_root(svg)
 
@@ -477,7 +511,7 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       # No drawable children? Just append under <svg>; it will be the only child anyway
       xml2::xml_add_child(root, bg_node)
     }
-
+    svg <- crop_svg_by_bottom_margin(svg, cut_px = 350)
     # --- save & return ---
     xml2::write_xml(svg, "chromosome.svg")
     file.rename("chromosome.svg", out_svg)
