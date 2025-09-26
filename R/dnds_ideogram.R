@@ -339,16 +339,158 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       xml2::xml_set_attr(hdr, "font-size", "14"); xml2::xml_set_attr(hdr, "font-weight", "bold")
       xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
     }
+
+    # === Center chromosome labels around their current placement ===
+    chr_names <- karyotype$Chr
+    lab_nodes <- tn[xml2::xml_text(tn) %in% chr_names]
+    if (length(lab_nodes)) {
+
+      # helpers: parse translate(...) and compute absolute X
+      parse_tx <- function(tr) {
+        if (is.na(tr) || !nzchar(tr)) return(0)
+        m <- regmatches(tr, regexpr("translate\\s*\\(([^)]*)\\)", tr))
+        if (!length(m)) return(0)
+        nums <- as.numeric(strsplit(sub(".*\\(([^)]*)\\).*", "\\1", m), "[ ,]+")[[1]])
+        if (length(nums) >= 1 && is.finite(nums[1])) nums[1] else 0
+      }
+      abs_x <- function(node) {
+        x <- suppressWarnings(as.numeric(xml2::xml_attr(node, "x"))); if (is.na(x)) x <- 0
+        cur <- node
+        repeat {
+          x <- x + parse_tx(xml2::xml_attr(cur, "transform"))
+          par <- xml2::xml_parent(cur)
+          if (inherits(par, "xml_missing")) break
+          cur <- par
+        }
+        x
+      }
+
+      # average glyph width in em for Arial-ish fonts; adjust if needed
+      char_width_em <- 0.56
+
+      for (i in seq_along(lab_nodes)) {
+        node <- lab_nodes[i]
+        txt   <- xml2::xml_text(node)
+        nchar_txt <- nchar(txt)
+
+        # current styling
+        fs <- suppressWarnings(as.numeric(xml2::xml_attr(node, "font-size")))
+        if (is.na(fs)) fs <- 14  # your code sets 14; keep in sync
+        old_anchor <- xml2::xml_attr(node, "text-anchor")
+        if (is.na(old_anchor) || !nzchar(old_anchor)) old_anchor <- "start"
+
+        # we always want center anchoring going forward
+        xml2::xml_attr(node, "text-anchor") <- "middle"
+        xml2::xml_attr(node, "dx") <- NULL  # avoid compounding shifts
+
+        # compute an adjustment so the label is centered *around its current placement*
+        # If RIdeogram used left-edge (start), shift right by ~half text width.
+        # If it used right-edge (end), shift left by ~half text width.
+        # If it already used middle, no shift needed.
+        half_px <- 0.5 * nchar_txt * fs * char_width_em
+        dx <- switch(tolower(old_anchor),
+                     "start"  =  +half_px,
+                     "end"    =  -half_px,
+                     "middle" =  0,
+                     # unknown -> assume start
+                     +half_px
+        )
+
+        dx <- dx - 4
+
+        # Apply dx via a local translate that preserves Y and all ancestors.
+        old_tr <- xml2::xml_attr(node, "transform")
+        new_tr <- if (!is.na(old_tr) && nzchar(old_tr)) {
+          sprintf("translate(%g,0) %s", dx, old_tr)
+        } else {
+          sprintf("translate(%g,0)", dx)
+        }
+        xml2::xml_attr(node, "transform") <- new_tr
+      }
+    }
+
+    # === Add top padding by shifting the viewBox (no reparenting) ===
+    y_pad <- 140  # px; increase if your header still touches the top
+
+    root <- xml2::xml_root(svg)
+
+    # Ensure viewBox exists; if not, synthesize from width/height
+    vb <- xml2::xml_attr(root, "viewBox")
+    if (is.na(vb) || !nzchar(vb)) {
+      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
+      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+      if (is.na(w) || is.na(h)) {
+        # fallback to a reasonable default if dimensions are missing
+        w <- 1200; h <- 800
+      }
+      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
+      vb <- xml2::xml_attr(root, "viewBox")
+    }
+
+    # Shift min-y up by y_pad and extend height by y_pad
+    nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
+    if (length(nums) == 4) {
+      nums[2] <- nums[2] - y_pad   # minY becomes negative -> adds top space
+      nums[4] <- nums[4] + y_pad   # increase viewBox height
+      xml2::xml_attr(root, "viewBox") <- paste(nums, collapse = " ")
+    }
+
+    # If explicit pixel height is set, bump it so nothing is clipped when exporting
+    old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+    if (!is.na(old_h)) {
+      xml2::xml_attr(root, "height") <- paste0(old_h + y_pad, "px")
+    }
+
+    # === Solid white background behind everything (robust) ===
+    root <- xml2::xml_root(svg)
+
+    # 1) Ensure viewBox exists, then parse it
+    vb <- xml2::xml_attr(root, "viewBox")
+    if (is.na(vb) || !nzchar(vb)) {
+      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
+      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+      if (is.na(w) || is.na(h)) { w <- 1200; h <- 800 }
+      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
+      vb <- xml2::xml_attr(root, "viewBox")
+    }
+    nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
+    stopifnot(length(nums) == 4)
+    minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
+
+    # 2) Remove any previous bg rect(s)
+    xml2::xml_find_all(root, ".//rect[@id='svg-bg-rect']") |> xml2::xml_remove()
+
+    # 3) Find the FIRST non-<defs> child directly under <svg>
+    first_draw <- xml2::xml_find_first(root, "./*[not(self::defs)][1]")  # <-- always defined
+
+    # 4) Build the background node as a tiny fragment and insert it
+    bg_markup <- sprintf(
+      "<rect id='svg-bg-rect' x='%g' y='%g' width='%g' height='%g' fill='#ffffff' fill-opacity='1' stroke='none' pointer-events='none'/>",
+      minX, minY, vw, vh
+    )
+    bg_node <- xml2::read_xml(bg_markup)
+
+    if (!inherits(first_draw, "xml_missing")) {
+      # Insert BEFORE the first drawable child so it paints underneath everything else
+      xml2::xml_add_sibling(first_draw, bg_node, .where = "before")
+    } else {
+      # No drawable children? Just append under <svg>; it will be the only child anyway
+      xml2::xml_add_child(root, bg_node)
+    }
+
+    # --- save & return ---
     xml2::write_xml(svg, "chromosome.svg")
     file.rename("chromosome.svg", out_svg)
+
     if (make_png) {
       RIdeogram::convertSVG(out_svg, device = "png")
       if (file.exists("chromosome.png")) file.rename("chromosome.png", out_png)
     }
+
     if (verbose) message("[dndsR::dnds_ideogram] Wrote: ", out_svg,
                          if (make_png && file.exists(out_png)) paste0(" and ", out_png) else "")
     out_svg
-  }
+  }  # <- this closes .one_side()
 
   # ---------- batch vs single ----------
   outs <- character(0)
