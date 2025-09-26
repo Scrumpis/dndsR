@@ -1,0 +1,36 @@
+Package: dndsR
+Type: Package
+Title: dN/dS Pipeline Utilities for Comparative Genomics
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Nick", family = "Johnson", 
+           email = "john7932@msu.edu", role = c("aut","cre"))
+Description: Utilities to extract CDS and proteins from FASTA/GFF, 
+    orchestrate ortholog discovery, and run dN/dS analyses at scale. 
+    Includes helpers for batch comparisons, annotation joins, and QC.
+License: MIT + file LICENSE
+URL: https://github.com/Scrumpis/dndsR
+BugReports: https://github.com/Scrumpis/dndsR/issues
+Encoding: UTF-8
+Depends: 
+    R (>= 4.3)
+Imports:
+    BiocGenerics,
+    Biostrings,
+    GenomicFeatures,
+    GenomeInfoDb,
+    IRanges,
+    Rsamtools,
+    S4Vectors,
+    utils,
+    stats
+Suggests:
+    testthat,
+    knitr,
+    rmarkdown,
+    dplyr,
+    readr
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+ByteCompile: true
+RoxygenNote: 7.3.2
