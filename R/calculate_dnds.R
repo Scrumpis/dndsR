@@ -1,0 +1,152 @@
+#' Run dN/dS with orthologr from pre-extracted CDS FASTAs
+#'
+#' @param comparison_file Path to a whitespace-delimited (tab or space) file
+#'   OR a data.frame with columns:
+#'   comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
+#'   A single row is fine.
+#' @return (Invisibly) a character vector of output .tsv paths (one per run).
+#' @export
+calculate_dnds <- function(comparison_file = NULL,
+                           comparison_name = NULL,
+                           subject_fasta = NULL,
+                           query_fasta = NULL,
+                           subject_gff = NULL,
+                           query_gff = NULL,
+                           output_dir = getwd(),
+                           comp_cores = 4,
+                           aligner = "diamond",
+                           sensitivity_mode = "fast",
+                           dnds_method = "Comeron",
+                           ...) {
+
+  if (!requireNamespace("orthologr", quietly = TRUE)) {
+    stop("The orthologr package is required but not installed.")
+  }
+
+  # ---- helper: read comparison_file with ANY whitespace as delimiter ----
+  .read_comparisons <- function(x) {
+    req <- c("comparison_name","query_fasta","query_gff","subject_fasta","subject_gff")
+    if (is.data.frame(x)) {
+      stopifnot(all(req %in% names(x)))
+      return(x[, req, drop = FALSE])
+    }
+    read_ws <- function(hdr) {
+      utils::read.table(x,
+                        header = hdr,
+                        sep = "",               # any whitespace (tabs OR spaces)
+                        quote = "\"",           # allow quoting paths if they contain spaces
+                        stringsAsFactors = FALSE,
+                        comment.char = "",
+                        strip.white = TRUE,
+                        blank.lines.skip = TRUE,
+                        check.names = FALSE)
+    }
+    # Try headered first
+    df1 <- try(read_ws(TRUE), silent = TRUE)
+    if (!inherits(df1, "try-error") && all(req %in% names(df1))) {
+      return(df1[, req, drop = FALSE])
+    }
+    # Fallback: headerless
+    df2 <- read_ws(FALSE)
+    if (ncol(df2) < 5) {
+      stop("comparison_file must have 5 columns or a header with: ",
+           paste(req, collapse = ", "))
+    }
+    names(df2)[1:5] <- req
+    df2[, req, drop = FALSE]
+  }
+
+  # ---- helper: one comparison ----
+  run_dnds <- function(comparison_basename, query_fa, subject_fa, query_gff, subject_gff, ...) {
+    comp_dir <- file.path(output_dir, comparison_basename)
+    dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
+
+    q_base <- tools::file_path_sans_ext(basename(query_fa))
+    s_base <- tools::file_path_sans_ext(basename(subject_fa))
+    query_CDS   <- file.path(comp_dir, paste0(q_base, "_CDS.fasta"))
+    subject_CDS <- file.path(comp_dir, paste0(s_base, "_CDS.fasta"))
+    out_tsv     <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
+
+    if (!file.exists(query_CDS) || !file.exists(subject_CDS)) {
+      warning("CDS files not found in ", comp_dir, ". Expected: ",
+              basename(query_CDS), " and ", basename(subject_CDS),
+              ". Skipping ", comparison_basename, ".")
+      return(NULL)
+    }
+    if (file.exists(out_tsv)) {
+      message("Skipping ", comparison_basename, " (exists).")
+      return(out_tsv)
+    }
+
+    # defaults you provide
+    args <- list(
+      query_file         = normalizePath(query_CDS),
+      subject_file       = normalizePath(subject_CDS),
+      aligner            = aligner,
+      sensitivity_mode   = sensitivity_mode,
+      seq_type           = "cds",
+      format             = "fasta",
+      ortho_detection    = "RBH",
+      delete_corrupt_cds = TRUE,
+      eval               = "1E-5",
+      aa_aln_type        = "pairwise",
+      aa_aln_tool        = "NW",
+      codon_aln_tool     = "pal2nal",
+      dnds_est.method    = dnds_method,
+      comp_cores         = comp_cores,
+      quiet              = TRUE,
+      clean_folders      = FALSE,
+      print_citation     = FALSE
+    )
+
+    # user-supplied overrides / additions
+    user <- list(...)
+    if (length(user)) {
+      overlap <- intersect(names(user), names(args))
+      if (length(overlap)) message("Overriding defaults: ", paste(overlap, collapse = ", "))
+      args[overlap] <- user[overlap]                              # override defaults
+      extra <- setdiff(names(user), names(args))
+      if (length(extra)) args <- c(args, user[extra])             # add any other dNdS args
+    }
+
+    message("Running dN/dS for: ", comparison_basename)
+    res <- do.call(orthologr::dNdS, args)
+    utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
+    message("Finished: ", comparison_basename)
+    out_tsv
+  }
+
+
+  # ---- batch vs single ----
+  out_paths <- character(0)
+
+  if (!is.null(comparison_file)) {
+    df <- .read_comparisons(comparison_file)
+    for (i in seq_len(nrow(df))) {
+      out <- run_dnds(
+        comparison_basename = df$comparison_name[i],
+        query_fa   = normalizePath(df$query_fasta[i]),
+        subject_fa = normalizePath(df$subject_fasta[i]),
+        query_gff  = normalizePath(df$query_gff[i]),
+        subject_gff= normalizePath(df$subject_gff[i])
+      )
+      if (!is.null(out)) out_paths <- c(out_paths, out)
+    }
+    message("All dN/dS calculations complete.")
+    return(invisible(out_paths))
+  }
+
+  # Single mode
+  if (any(sapply(list(comparison_name, subject_fasta, query_fasta, subject_gff, query_gff), is.null))) {
+    stop("In single mode, supply comparison_name, subject_fasta, query_fasta, subject_gff, and query_gff.")
+  }
+  out <- run_dnds(
+    comparison_basename = comparison_name,
+    query_fa   = normalizePath(query_fasta),
+    subject_fa = normalizePath(subject_fasta),
+    query_gff  = normalizePath(query_gff),
+    subject_gff= normalizePath(subject_gff)
+  )
+  message("All dN/dS calculations complete.")
+  invisible(out)
+}
