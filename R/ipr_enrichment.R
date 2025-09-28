@@ -42,6 +42,10 @@
 #' @param entries_timeout_s Numeric timeout (seconds) for remote fetch (default 20).
 #' @param keep_unmatched Keep IPRs not found in entry.list when filtering (default TRUE).
 #'
+#' @param exclude_iprs Optional character vector of IPR accessions (e.g. "IPR000123")
+#'   to exclude globally from both positives and background before enrichment.
+#'   Useful to remove over-annotated terms like some TE-related entries.
+#'
 #' @return In single mode: (invisibly) list of output TSV paths.
 #'         In batch mode:  (invisibly) vector of output TSV paths across comparisons.
 #'         Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
@@ -70,7 +74,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            entries_path   = NULL,
                            entries_url    = "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list",
                            entries_timeout_s = 20,
-                           keep_unmatched = TRUE) {
+                           keep_unmatched = TRUE,
+                           exclude_iprs = NULL) {
 
   # ---- arg setup ----
   sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
@@ -221,18 +226,31 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
          name_by_ipr = stats::setNames(nm, ac))
   }
 
-  .filter_terms_string_by_types <- function(s, allowed_types, type_by_ipr, keep_unmatched = TRUE) {
+  # ---- NEW: generic term filter (types + exclusions) ----
+  .filter_terms_string <- function(s,
+                                   allowed_types = NULL,
+                                   type_by_ipr = NULL,
+                                   exclude_set = NULL,
+                                   keep_unmatched = TRUE) {
     if (is.na(s) || !nzchar(s)) return(s)
     parts <- unique(strsplit(s, ";", fixed = TRUE)[[1]])
     if (!length(parts)) return("")
     keep <- logical(length(parts))
     for (i in seq_along(parts)) {
       ipr <- parts[i]
-      ty  <- if (!is.null(type_by_ipr)) type_by_ipr[[ipr]] else NA_character_
-      if (is.na(ty)) {
-        keep[i] <- isTRUE(keep_unmatched) # optionally keep if unknown
+      if (!is.null(exclude_set) && isTRUE(exclude_set[ipr])) {
+        keep[i] <- FALSE
+        next
+      }
+      if (!is.null(allowed_types)) {
+        ty <- if (!is.null(type_by_ipr)) type_by_ipr[ipr] else NA_character_
+        if (is.na(ty)) {
+          keep[i] <- isTRUE(keep_unmatched)
+        } else {
+          keep[i] <- ty %in% allowed_types
+        }
       } else {
-        keep[i] <- ty %in% allowed_types
+        keep[i] <- TRUE
       }
     }
     parts2 <- parts[keep]
@@ -304,6 +322,20 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res
   }
 
+  # ---- NEW: build exclusion set once ----
+  .build_exclude_set <- function(excl) {
+    if (is.null(excl) || !length(excl)) return(NULL)
+    x <- unique(as.character(excl))
+    stats::setNames(rep(TRUE, length(x)), x)
+  }
+
+  # ---- entries + maps ----
+  entries <- .load_entries()
+  maps <- .build_ipr_maps(entries)
+  type_by_ipr <- maps$type_by_ipr
+  name_by_ipr <- maps$name_by_ipr
+  exclude_set <- .build_exclude_set(exclude_iprs)
+
   # ---- one side, one (possibly filtered) IPR vector ----
   .enrich_side_ipr <- function(d, side, comp, comp_dir,
                                type_by_ipr, name_by_ipr,
@@ -321,31 +353,29 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     # --- STRATIFIED mode: per ENTRY_TYPE with type-specific background
     if (!is.null(stratified_types)) {
       out_paths <- character(0)
-      # Prepare a filtered copy per type
       for (tp in stratified_types) {
-        # Filter each row's term-string to only this type
-        vec_all <- vapply(df[[col]], .filter_terms_string_by_types,
+        vec_all <- vapply(df[[col]], .filter_terms_string,
                           FUN.VALUE = character(1),
-                          allowed_types = tp, type_by_ipr = type_by_ipr,
+                          allowed_types = tp,
+                          type_by_ipr = type_by_ipr,
+                          exclude_set = exclude_set,
                           keep_unmatched = keep_unmatched)
-        vec_pos <- vapply(pos[[col]], .filter_terms_string_by_types,
+        vec_pos <- vapply(pos[[col]], .filter_terms_string,
                           FUN.VALUE = character(1),
-                          allowed_types = tp, type_by_ipr = type_by_ipr,
+                          allowed_types = tp,
+                          type_by_ipr = type_by_ipr,
+                          exclude_set = exclude_set,
                           keep_unmatched = keep_unmatched)
 
         res <- .fisher_from_vectors(vec_all, vec_pos, drop_rows_without_term)
         if (is.null(res) || !nrow(res)) next
 
-        # rare-term prefilters
         keep <- (res$total_count >= min_total) & (res$pos_count >= min_pos)
         res <- res[keep, , drop = FALSE]
         if (!nrow(res)) next
 
         res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
         res$ENTRY_TYPE <- tp
-
-        # We'll set p_adj later (global/per_type) in the caller
-        # stash the slice by type
         out_paths <- c(out_paths, list(res))
       }
       return(out_paths)  # list of data.frames to be merged at caller
@@ -353,19 +383,32 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     # --- POOLED mode (optionally filter to a set of types)
     if (!is.null(pooled_allowed_types)) {
-      vec_all <- vapply(df[[col]], .filter_terms_string_by_types,
+      vec_all <- vapply(df[[col]], .filter_terms_string,
                         FUN.VALUE = character(1),
                         allowed_types = pooled_allowed_types,
                         type_by_ipr = type_by_ipr,
+                        exclude_set = exclude_set,
                         keep_unmatched = keep_unmatched)
-      vec_pos <- vapply(pos[[col]], .filter_terms_string_by_types,
+      vec_pos <- vapply(pos[[col]], .filter_terms_string,
                         FUN.VALUE = character(1),
                         allowed_types = pooled_allowed_types,
                         type_by_ipr = type_by_ipr,
+                        exclude_set = exclude_set,
                         keep_unmatched = keep_unmatched)
     } else {
-      vec_all <- as.character(df[[col]])
-      vec_pos <- as.character(pos[[col]])
+      # Even without allowed types, still apply global exclusions
+      vec_all <- vapply(df[[col]], .filter_terms_string,
+                        FUN.VALUE = character(1),
+                        allowed_types = NULL,
+                        type_by_ipr = type_by_ipr,
+                        exclude_set = exclude_set,
+                        keep_unmatched = keep_unmatched)
+      vec_pos <- vapply(pos[[col]], .filter_terms_string,
+                        FUN.VALUE = character(1),
+                        allowed_types = NULL,
+                        type_by_ipr = type_by_ipr,
+                        exclude_set = exclude_set,
+                        keep_unmatched = keep_unmatched)
     }
 
     res <- .fisher_from_vectors(vec_all, vec_pos, drop_rows_without_term)
@@ -378,12 +421,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
     res
   }
-
-  # ---- entries + maps ----
-  entries <- .load_entries()
-  maps <- .build_ipr_maps(entries)
-  type_by_ipr <- maps$type_by_ipr
-  name_by_ipr <- maps$name_by_ipr
 
   # ---- runner per comparison ----
   .run_one_comparison <- function(comp_name, comp_dir) {
@@ -407,6 +444,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
           all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$s_ipr)), ";", fixed = TRUE)))
         }
         all_terms <- unique(all_terms[nzchar(all_terms)])
+        # drop excluded terms before mapping to types
+        if (!is.null(exclude_set)) {
+          all_terms <- setdiff(all_terms, names(exclude_set))
+        }
         strat_types <- sort(unique(type_by_ipr[all_terms]))
         strat_types <- strat_types[!is.na(strat_types)]
       } else {
