@@ -20,11 +20,15 @@
 #' @param node_min Minimum term size (topGO nodeSize) to keep (default 10).
 #' @param node_max Maximum term size (filtered after test; default Inf).
 #' @param p_adjust "BH"|"none" for multiple-testing correction across tested nodes.
-#'   (Note: topGO already de-correlates via its algorithm; BH is still common.)
 #' @param make_plots If TRUE, writes a top-N bubble plot per result.
 #' @param top_n Number of rows to plot.
-#' @param exclude_gos Optional character vector of GO IDs to exclude globally
-#'   from both positives and background before enrichment (e.g., over-broad terms).
+#' @param exclude_gos Character vector of GO IDs to exclude globally
+#'   from positives/background and from tested nodes (default NULL).
+#' @param exclude_descendants If TRUE, also exclude descendants of each GO ID (default FALSE).
+#' @param exclude_descendants_depth Integer depth limit for descendant exclusion;
+#'   1 = direct children only, Inf = entire subtree (default Inf).
+#' @param exclude_descendants_limit Hard cap on total excluded nodes per (side,ontology)
+#'   run to avoid accidentally nuking huge swaths (default 5000).
 #' @param include_definition If TRUE (default), append TERM definition from GO.db.
 #'
 #' @return Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
@@ -46,12 +50,14 @@ go_enrichment <- function(dnds_annot_file = NULL,
                           make_plots = TRUE,
                           top_n = 20,
                           exclude_gos = NULL,
+                          exclude_descendants = FALSE,
+                          exclude_descendants_depth = Inf,
+                          exclude_descendants_limit = 5000,
                           include_definition = TRUE) {
 
   if (!requireNamespace("topGO", quietly = TRUE) || !requireNamespace("GO.db", quietly = TRUE)) {
     stop("Please install Bioconductor packages 'topGO' and 'GO.db'.")
   }
-  # Ensure GO.db is ATTACHED (topGO sometimes expects term envs on search path)
   if (!("package:GO.db" %in% search())) {
     suppressPackageStartupMessages(require("GO.db"))
   }
@@ -88,16 +94,41 @@ go_enrichment <- function(dnds_annot_file = NULL,
     d[keep, , drop = FALSE]
   }
 
-  # Build an exclusion set: named logical vector (GOID=TRUE)
+  # Named logical vector (GOID = TRUE) for fast membership checks
   .build_exclude_set <- function(excl) {
     if (is.null(excl) || !length(excl)) return(NULL)
     x <- unique(as.character(excl))
     stats::setNames(rep(TRUE, length(x)), x)
   }
-  exclude_set <- .build_exclude_set(exclude_gos)
 
-  # Split a vector of "GO:xxxxxxx;GO:yyyyyyy" strings into unique GO IDs,
-  # dropping excluded GO IDs if provided.
+  # Depth-/limit-aware descendant expansion using CHILDREN maps
+  .expand_descendants <- function(seeds, ontology, depth = Inf, limit = Inf) {
+    if (!length(seeds)) return(seeds)
+    child_map <- switch(ontology,
+                        BP = GO.db::GOBPCHILDREN,
+                        MF = GO.db::GOMFCHILDREN,
+                        CC = GO.db::GOCCCHILDREN)
+    seen <- unique(seeds)
+    frontier <- unique(seeds)
+    cur_depth <- 0L
+    while (length(frontier) && cur_depth < depth) {
+      kids <- unique(unlist(AnnotationDbi::mget(frontier, child_map, ifnotfound = NA), use.names = FALSE))
+      kids <- kids[!is.na(kids)]
+      kids <- setdiff(kids, seen)
+      if (!length(kids)) break
+      seen <- c(seen, kids)
+      if (is.finite(limit) && length(seen) > limit) {
+        warning(sprintf("Descendant exclusion capped at %d nodes for ontology %s.", limit, ontology))
+        seen <- unique(seen)[seq_len(limit)]
+        break
+      }
+      frontier <- kids
+      cur_depth <- cur_depth + 1L
+    }
+    unique(seen)
+  }
+
+  # Vectorized split + exclusion of GO IDs
   .split_go_vec <- function(x, exclude_set = NULL) {
     x <- as.character(x)
     x <- x[!is.na(x) & nzchar(x)]
@@ -106,16 +137,13 @@ go_enrichment <- function(dnds_annot_file = NULL,
     lapply(toks, function(v) {
       ids <- unique(grep("^GO:\\d{7}$", v, value = TRUE))
       if (!is.null(exclude_set) && length(ids)) {
-        # OLD (buggy): ids <- ids[!isTRUE(exclude_set[ids])]
-        ex <- as.logical(exclude_set[ids])
-        ex[is.na(ex)] <- FALSE
+        ex <- as.logical(exclude_set[ids]); ex[is.na(ex)] <- FALSE
         ids <- ids[!ex]
       }
       ids
     })
   }
 
-  # Build gene2GO mapping after optional exclusion
   .make_gene2go <- function(ids, go_col, exclude_set = NULL) {
     spl <- .split_go_vec(go_col, exclude_set)
     keep <- lengths(spl) > 0L
@@ -125,13 +153,11 @@ go_enrichment <- function(dnds_annot_file = NULL,
     list(mapping = mapping, genes = genes)
   }
 
-  # Some setups of topGO look for envs like GOBPTerm; ensure stubs exist so runTest() is happy
+  # Ensure term envs to keep some topGO code paths happy
   .ensure_GOdb_term_envs <- function() {
-    pkg_env <- as.environment("package:GO.db")
     mk_env <- function(onto) {
-      nm <- paste0("GO", onto, "Term")  # e.g., GOBPTerm
+      nm <- paste0("GO", onto, "Term")
       if (exists(nm, inherits = TRUE)) return(invisible())
-      # Provide a minimal env that declares IDs for this ontology
       all_keys <- AnnotationDbi::keys(GO.db::GO.db, keytype = "GOID")
       ont_map  <- AnnotationDbi::select(GO.db::GO.db, keys = all_keys,
                                         columns = "ONTOLOGY", keytype = "GOID")
@@ -144,6 +170,8 @@ go_enrichment <- function(dnds_annot_file = NULL,
   }
   .ensure_GOdb_term_envs()
 
+  base_exclude_set <- .build_exclude_set(exclude_gos)
+
   .run_one <- function(d, side, ont, comp, comp_dir) {
     prefix <- if (side == "query") "q_" else "s_"
     id_col <- if (side == "query") "query_id" else "subject_id"
@@ -155,12 +183,21 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
     pos_ids <- d[[id_col]][d$dNdS > pos_threshold]
 
-    # Keep rows that have at least *some* GO text; precise empties are filtered in mapping too
     if (drop_rows_without_go) d <- d[!is.na(d[[go_col]]) & d[[go_col]] != "", , drop = FALSE]
     if (!nrow(d)) return(NULL)
 
+    # Build per-run exclude set (optionally expand by descendants for this ontology)
+    exclude_set_run <- base_exclude_set
+    if (isTRUE(exclude_descendants) && !is.null(exclude_set_run) && length(exclude_set_run)) {
+      seeds <- names(exclude_set_run)
+      seeds_exp <- .expand_descendants(seeds, ont,
+                                       depth = exclude_descendants_depth,
+                                       limit = exclude_descendants_limit)
+      exclude_set_run <- .build_exclude_set(seeds_exp)
+    }
+
     # Build mapping with exclusions applied
-    g2 <- .make_gene2go(d[[id_col]], d[[go_col]], exclude_set = exclude_set)
+    g2 <- .make_gene2go(d[[id_col]], d[[go_col]], exclude_set = exclude_set_run)
     gene2GO <- g2$mapping
     if (!length(gene2GO)) return(NULL)
 
@@ -177,15 +214,18 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
     res <- topGO::runTest(tgd, algorithm = algorithm, statistic = statistic)
 
-    # All tested terms & raw p-values
+    # Tested nodes & raw p-values
     raw_scores <- topGO::score(res)
     all_terms  <- names(raw_scores)
-    if (!is.null(exclude_set) && length(all_terms)) {
-      all_terms <- setdiff(all_terms, names(exclude_set))
+    if (!length(all_terms)) return(NULL)
+
+    # Drop excluded nodes themselves (even if they'd appear via DAG)
+    if (!is.null(exclude_set_run) && length(all_terms)) {
+      all_terms <- setdiff(all_terms, names(exclude_set_run))
     }
     if (!length(all_terms)) return(NULL)
 
-    # Compute Annotated & Significant without GenTable()
+    # Annotated & Significant
     term_genes <- topGO::genesInTerm(tgd, all_terms)
     annotated  <- vapply(term_genes, length, integer(1))
     sig_counts <- vapply(term_genes, function(gs) sum(as.integer(as.character(geneList[gs])) == 1L, na.rm = TRUE),
@@ -199,23 +239,19 @@ go_enrichment <- function(dnds_annot_file = NULL,
     raw_p <- unname(raw_scores[all_terms])
 
     # Term name (+ definition if requested)
-    cols_want <- c("TERM")
-    if (isTRUE(include_definition)) cols_want <- c("TERM","DEFINITION")
-    term_map <- try(
-      AnnotationDbi::select(GO.db::GO.db, keys = all_terms, keytype = "GOID", columns = cols_want),
-      silent = TRUE
-    )
+    cols_want <- c("TERM"); if (isTRUE(include_definition)) cols_want <- c("TERM","DEFINITION")
+    term_map <- try(AnnotationDbi::select(GO.db::GO.db, keys = all_terms, keytype = "GOID", columns = cols_want),
+                    silent = TRUE)
     if (inherits(term_map, "try-error")) {
       term_name <- rep(NA_character_, length(all_terms))
       term_def  <- rep(NA_character_, length(all_terms))
     } else {
-      # Ensure 1:1 in GOID order
       term_map <- term_map[match(all_terms, term_map$GOID), , drop = FALSE]
       term_name <- term_map$TERM
       term_def  <- if ("DEFINITION" %in% names(term_map)) term_map$DEFINITION else NA_character_
     }
 
-    # BH (optional) and enrichment
+    # Adjust & enrichment
     p_adj <- if (p_adjust == "BH") stats::p.adjust(raw_p, method = "BH") else raw_p
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
     n_all <- length(geneList)
