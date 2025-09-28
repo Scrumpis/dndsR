@@ -23,33 +23,38 @@
 #'   (Note: topGO already de-correlates via its algorithm; BH is still common.)
 #' @param make_plots If TRUE, writes a top-N bubble plot per result.
 #' @param top_n Number of rows to plot.
+#' @param exclude_gos Optional character vector of GO IDs to exclude globally
+#'   from both positives and background before enrichment (e.g., over-broad terms).
+#' @param include_definition If TRUE (default), append TERM definition from GO.db.
+#'
 #' @return Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
 #' @export
 go_enrichment <- function(dnds_annot_file = NULL,
-                                comparison_file = NULL,
-                                output_dir = getwd(),
-                                sides = c("query","subject"),
-                                ontologies = c("BP","MF","CC"),
-                                algorithm = c("weight01","elim","classic","weight"),
-                                statistic = c("fisher","ks"),
-                                pos_threshold = 1,
-                                max_dnds = 10,
-                                filter_expr = NULL,
-                                drop_rows_without_go = TRUE,
-                                node_min = 10,
-                                node_max = Inf,
-                                p_adjust = c("BH","none"),
-                                make_plots = TRUE,
-                                top_n = 20) {
+                          comparison_file = NULL,
+                          output_dir = getwd(),
+                          sides = c("query","subject"),
+                          ontologies = c("BP","MF","CC"),
+                          algorithm = c("weight01","elim","classic","weight"),
+                          statistic = c("fisher","ks"),
+                          pos_threshold = 1,
+                          max_dnds = 10,
+                          filter_expr = NULL,
+                          drop_rows_without_go = TRUE,
+                          node_min = 10,
+                          node_max = Inf,
+                          p_adjust = c("BH","none"),
+                          make_plots = TRUE,
+                          top_n = 20,
+                          exclude_gos = NULL,
+                          include_definition = TRUE) {
+
   if (!requireNamespace("topGO", quietly = TRUE) || !requireNamespace("GO.db", quietly = TRUE)) {
     stop("Please install Bioconductor packages 'topGO' and 'GO.db'.")
   }
-
-  # Ensure GO.db is ATTACHED (topGO uses get("GOBPTerm") etc.)
+  # Ensure GO.db is ATTACHED (topGO sometimes expects term envs on search path)
   if (!("package:GO.db" %in% search())) {
     suppressPackageStartupMessages(require("GO.db"))
   }
-
   if (!requireNamespace("AnnotationDbi", quietly = TRUE)) {
     stop("Please install Bioconductor package 'AnnotationDbi'.")
   }
@@ -60,6 +65,7 @@ go_enrichment <- function(dnds_annot_file = NULL,
   statistic  <- match.arg(statistic)
   p_adjust   <- match.arg(p_adjust)
 
+  # --- helpers ---
   .read_ws <- function(path, header_try = TRUE) {
     utils::read.table(path, header = header_try, sep = "", quote = "\"",
                       stringsAsFactors = FALSE, comment.char = "",
@@ -81,52 +87,61 @@ go_enrichment <- function(dnds_annot_file = NULL,
     }
     d[keep, , drop = FALSE]
   }
-  .split_go <- function(x) {
+
+  # Build an exclusion set: named logical vector (GOID=TRUE)
+  .build_exclude_set <- function(excl) {
+    if (is.null(excl) || !length(excl)) return(NULL)
+    x <- unique(as.character(excl))
+    stats::setNames(rep(TRUE, length(x)), x)
+  }
+  exclude_set <- .build_exclude_set(exclude_gos)
+
+  # Split a vector of "GO:xxxxxxx;GO:yyyyyyy" strings into unique GO IDs,
+  # dropping excluded GO IDs if provided.
+  .split_go_vec <- function(x, exclude_set = NULL) {
     x <- as.character(x)
     x <- x[!is.na(x) & nzchar(x)]
     if (!length(x)) return(list())
     toks <- strsplit(x, ";", fixed = TRUE)
-    lapply(toks, function(v) unique(grep("^GO:\\d{7}$", v, value = TRUE)))
+    lapply(toks, function(v) {
+      ids <- unique(grep("^GO:\\d{7}$", v, value = TRUE))
+      if (!is.null(exclude_set) && length(ids)) {
+        # OLD (buggy): ids <- ids[!isTRUE(exclude_set[ids])]
+        ex <- as.logical(exclude_set[ids])
+        ex[is.na(ex)] <- FALSE
+        ids <- ids[!ex]
+      }
+      ids
+    })
   }
-  .make_gene2go <- function(ids, go_col) {
-    # ids and go_col must be the same length (per row). go_col may have NA/""
-    spl <- .split_go(go_col)
+
+  # Build gene2GO mapping after optional exclusion
+  .make_gene2go <- function(ids, go_col, exclude_set = NULL) {
+    spl <- .split_go_vec(go_col, exclude_set)
     keep <- lengths(spl) > 0L
     if (!any(keep)) return(list(mapping = list(), genes = character(0)))
     genes   <- ids[keep]
     mapping <- setNames(spl[keep], genes)
     list(mapping = mapping, genes = genes)
   }
-  # After requireNamespace("topGO"), require("GO.db"), requireNamespace("AnnotationDbi")
+
+  # Some setups of topGO look for envs like GOBPTerm; ensure stubs exist so runTest() is happy
   .ensure_GOdb_term_envs <- function() {
     pkg_env <- as.environment("package:GO.db")
-
     mk_env <- function(onto) {
-      nm      <- paste0("GO", onto, "Term")   # e.g., "GOBPTerm"
-      nm_up   <- paste0("GO", onto, "TERM")   # e.g., "GOBPTERM" (if it exists)
+      nm <- paste0("GO", onto, "Term")  # e.g., GOBPTerm
       if (exists(nm, inherits = TRUE)) return(invisible())
-
-      # If an uppercase variant exists, alias it
-      if (exists(nm_up, envir = pkg_env, inherits = FALSE)) {
-        assign(nm, get(nm_up, envir = pkg_env, inherits = FALSE), envir = .GlobalEnv)
-        return(invisible())
-      }
-
-      # Otherwise, build a minimal environment of GO IDs for this ontology
+      # Provide a minimal env that declares IDs for this ontology
       all_keys <- AnnotationDbi::keys(GO.db::GO.db, keytype = "GOID")
       ont_map  <- AnnotationDbi::select(GO.db::GO.db, keys = all_keys,
                                         columns = "ONTOLOGY", keytype = "GOID")
       ids <- unique(ont_map$GOID[ont_map$ONTOLOGY == onto])
-
       e <- new.env(hash = TRUE, parent = emptyenv())
       for (id in ids) assign(id, TRUE, envir = e)
       assign(nm, e, envir = .GlobalEnv)
     }
-
     mk_env("BP"); mk_env("MF"); mk_env("CC")
   }
-
-  # call once before you create any topGO objects
   .ensure_GOdb_term_envs()
 
   .run_one <- function(d, side, ont, comp, comp_dir) {
@@ -140,10 +155,12 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
     pos_ids <- d[[id_col]][d$dNdS > pos_threshold]
 
+    # Keep rows that have at least *some* GO text; precise empties are filtered in mapping too
     if (drop_rows_without_go) d <- d[!is.na(d[[go_col]]) & d[[go_col]] != "", , drop = FALSE]
     if (!nrow(d)) return(NULL)
 
-    g2 <- .make_gene2go(d[[id_col]], d[[go_col]])
+    # Build mapping with exclusions applied
+    g2 <- .make_gene2go(d[[id_col]], d[[go_col]], exclude_set = exclude_set)
     gene2GO <- g2$mapping
     if (!length(gene2GO)) return(NULL)
 
@@ -163,6 +180,9 @@ go_enrichment <- function(dnds_annot_file = NULL,
     # All tested terms & raw p-values
     raw_scores <- topGO::score(res)
     all_terms  <- names(raw_scores)
+    if (!is.null(exclude_set) && length(all_terms)) {
+      all_terms <- setdiff(all_terms, names(exclude_set))
+    }
     if (!length(all_terms)) return(NULL)
 
     # Compute Annotated & Significant without GenTable()
@@ -178,22 +198,25 @@ go_enrichment <- function(dnds_annot_file = NULL,
     sig_counts <- sig_counts[keep_idx]
     raw_p <- unname(raw_scores[all_terms])
 
-    # Map GO IDs -> TERM names via AnnotationDbi (no need for GOBPTerm)
+    # Term name (+ definition if requested)
+    cols_want <- c("TERM")
+    if (isTRUE(include_definition)) cols_want <- c("TERM","DEFINITION")
     term_map <- try(
-      AnnotationDbi::select(GO.db::GO.db, keys = all_terms, keytype = "GOID", columns = "TERM"),
+      AnnotationDbi::select(GO.db::GO.db, keys = all_terms, keytype = "GOID", columns = cols_want),
       silent = TRUE
     )
     if (inherits(term_map, "try-error")) {
       term_name <- rep(NA_character_, length(all_terms))
+      term_def  <- rep(NA_character_, length(all_terms))
     } else {
-      # ensure 1:1 in GOID order
+      # Ensure 1:1 in GOID order
       term_map <- term_map[match(all_terms, term_map$GOID), , drop = FALSE]
       term_name <- term_map$TERM
+      term_def  <- if ("DEFINITION" %in% names(term_map)) term_map$DEFINITION else NA_character_
     }
 
-    # Adjust p-values and enrichment metric
+    # BH (optional) and enrichment
     p_adj <- if (p_adjust == "BH") stats::p.adjust(raw_p, method = "BH") else raw_p
-
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
     n_all <- length(geneList)
     enrichment <- (sig_counts / n_pos) / (annotated / n_all)
@@ -201,11 +224,14 @@ go_enrichment <- function(dnds_annot_file = NULL,
     out <- data.frame(
       GO_ID       = all_terms,
       term_name   = term_name,
+      term_def    = if (isTRUE(include_definition)) term_def else NULL,
       annotated   = annotated,
       significant = sig_counts,
       raw_p       = raw_p,
       p_adj       = p_adj,
       enrichment  = enrichment,
+      label       = ifelse(is.na(term_name) | !nzchar(term_name),
+                           all_terms, paste0(all_terms, " — ", term_name)),
       side        = side,
       ontology    = ont,
       comparison  = comp,
@@ -222,7 +248,7 @@ go_enrichment <- function(dnds_annot_file = NULL,
       plt <- out[order(out$p_adj, -out$enrichment), ]
       plt <- utils::head(plt, top_n)
       gg <- ggplot2::ggplot(plt, ggplot2::aes(x = enrichment,
-                                              y = stats::reorder(term_name, -p_adj),
+                                              y = stats::reorder(label, -p_adj),
                                               size = significant,
                                               color = p_adj)) +
         ggplot2::geom_point() +
@@ -248,6 +274,7 @@ go_enrichment <- function(dnds_annot_file = NULL,
     paths
   }
 
+  # ---- batch vs single ----
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
     outs <- character(0)
