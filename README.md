@@ -14,7 +14,15 @@ For subgenome-phased genome FASTAs, a BASH command can be used to extract each i
 provide a BASH script () and R helper function () to assist in subgenome or haplotype FASTA seperation.
 
 ## Usage
+The below documents the command line interface (CLI) workflow, which is recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who would prefer to work in Rstudio or similar.  
+
+
+
+
+
 Start-up
+
+
 To run, open Rstudio from a conda env containing OrthoFinder
 
 dndsR has a wrapper script () to run batches of comparisons which takes as input a space or tab separated text file containing: comparison_basename, query_fasta, query_gff3, subject_fasta, subject_gff3. 
