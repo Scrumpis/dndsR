@@ -79,9 +79,29 @@ go_enrichment(
   node_max = 2000,             # optional upper cap
   p_adjust = "BH",
   make_plots = TRUE,
-  top_n = 20
+  top_n = 20,
+  exclude_gos = "GO:0015074"
 )
 
+
+# Exclude a subtree
+go_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  sides = c("query","subject"),
+  ontologies = c("BP","MF","CC"),
+  algorithm  = "weight01",     # good default
+  statistic  = "fisher",
+  pos_threshold = 1,
+  drop_rows_without_go = TRUE, # annotation-aware universe
+  node_min = 10,               # drop ultra-rare terms
+  node_max = 2000,             # optional upper cap
+  p_adjust = "BH",
+  make_plots = TRUE,
+  top_n = 20,
+  exclude_gos = "GO:0015074",
+  exclude_descendants = TRUE)
+)
 ```
 
 ## IPR Enrichment
@@ -95,7 +115,8 @@ ipr_enrichment(
   #types = c("Domain","Homologous_superfamily"),   # or leave NULL to auto-infer
   adjust_scope = "global",
   min_pos = 2,
-  min_total = 10
+  min_total = 10,
+  exclude_iprs = "IPR000109"
 )
 
 ```
