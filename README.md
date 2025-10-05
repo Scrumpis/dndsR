@@ -8,7 +8,7 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Visualizes selection pressures across the genomes through an ideogram
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 
-## Installation
+## Setup
 Docker? Conda? Both? Need orthofinder and diamond2 in conda env
 
 ## Data preparation
@@ -19,7 +19,11 @@ provide a BASH script () and R helper function () to assist in subgenome or hapl
 ## Usage
 The below documents the command line interface (CLI) workflow, which is recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who would to work in Rstudio or similar.  
 
-
+### 1. Extract CDS or Proteins (optional)
+### 2. Calculate dNdS
+### 3. Append annotations
+### 4. Annotation term enrichment
+### 5. Selection pressure ideogram
 
 
 
