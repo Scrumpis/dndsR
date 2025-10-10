@@ -103,7 +103,7 @@ base_opts <- list(
 }
 
 # =========================
-# split_by_label
+# split_comparisons
 # =========================
 opts_split <- list(
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
@@ -116,9 +116,9 @@ opts_split <- list(
               help="Case-insensitive label matching [default: %default]")
 )
 run_split <- function(o){
-  .dump_opts("split_by_label", o)
+  .dump_opts("split_comparisons", o)
   stopifnot(!is.null(o$comparison_file))
-  p <- dndsR::split_comparisons_by_label(
+  p <- dndsR::split_comparisons(
     comparison_file = o$comparison_file,
     mode            = o$mode,
     custom_regex    = o$`custom-regex`,
@@ -748,8 +748,8 @@ run_dnds_ideogram <- function(o){
 # Subcommands registry
 # =========================
 subcommands <- list(
-  split_by_label = list(opts = c(base_opts, opts_split),      fun = run_split,
-                        help = "Split genomes by label and emit a new comparison file"),
+  split_comparisons = list(opts = c(base_opts, opts_split),      fun = run_split,
+                        help = "Split genomes by label (subgenome or haplotype) and emit a new comparison file"),
   extract_cds    = list(opts = c(base_opts, opts_extract_cds), fun = run_extract_cds,
                         help = "Extract CDS (and optionally proteins) from genome+GFF"),
   calculate_dnds = list(opts = c(base_opts, opts_calculate_dnds), fun = run_calculate_dnds,
