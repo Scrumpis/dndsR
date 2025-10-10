@@ -18,28 +18,68 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------
-# Micromamba for OrthoFinder/DIAMOND toolchain
+# Micromamba (multi-arch safe)
 # ------------------------------------------------------------
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -L https://micro.mamba.pm/api/micromamba/linux-64/latest \
- | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba
+
+RUN apt-get update && apt-get install -y --no-install-recommends bzip2 && rm -rf /var/lib/apt/lists/*
+
+ARG TARGETPLATFORM
+ARG MAMBA_VER=latest
+RUN set -eux; \
+  case "${TARGETPLATFORM}" in \
+    linux/amd64)  MAMBA_ARCH=linux-64 ;; \
+    linux/arm64)  MAMBA_ARCH=linux-aarch64 ;; \
+    *) echo "Unsupported platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
+  esac; \
+  curl -fsSL "https://micro.mamba.pm/api/micromamba/${MAMBA_ARCH}/${MAMBA_VER}" -o /tmp/micromamba.tar.bz2; \
+  tar -xvjf /tmp/micromamba.tar.bz2 -C /usr/local/bin --strip-components=1 bin/micromamba; \
+  rm -f /tmp/micromamba.tar.bz2
+
+# ------------------------------------------------------------
+# Tools env (NO diamond here to avoid old 0.9 pulls)
+# ------------------------------------------------------------
 RUN micromamba create -y -n tools -c conda-forge -c bioconda \
       python=3.10 \
       orthofinder=2.5.4 \
-      diamond=2.1.8 \
       mafft \
       mcl \
       fasttree \
   && micromamba clean -a -y
-ENV PATH=$MAMBA_ROOT_PREFIX/envs/tools/bin:$PATH
+
+# ------------------------------------------------------------
+# DIAMOND v2.x per-arch:
+#  - amd64: official GitHub binary (flat tarball -> single 'diamond' file)
+#  - arm64: Bioconda (>=2.1.12) since GitHub doesn’t publish arm64 tarballs
+# ------------------------------------------------------------
+ARG DIAMOND_VER=2.1.14
+RUN set -eux; \
+  case "${TARGETPLATFORM}" in \
+    linux/amd64) \
+      curl -fsSL -o /tmp/diamond.tgz \
+        "https://github.com/bbuchfink/diamond/releases/download/v${DIAMOND_VER}/diamond-linux64.tar.gz"; \
+      # tarball contains a single file named 'diamond' at top level
+      tar -xvzf /tmp/diamond.tgz -C /usr/local/bin diamond; \
+      chmod 0755 /usr/local/bin/diamond; \
+      rm -f /tmp/diamond.tgz; \
+      /usr/local/bin/diamond version \
+    ;; \
+    linux/arm64) \
+      micromamba install -y -n tools -c bioconda -c conda-forge "diamond>=2.1.12"; \
+      micromamba clean -a -y; \
+      micromamba run -n tools diamond version \
+    ;; \
+    *) echo "Unsupported platform for DIAMOND: ${TARGETPLATFORM}" >&2; exit 1 ;; \
+  esac
+
+ENV PATH=/usr/local/bin:$MAMBA_ROOT_PREFIX/envs/tools/bin:$PATH
 
 # ------------------------------------------------------------
 # R dependencies (CRAN + Bioconductor)
 # ------------------------------------------------------------
 RUN R -q -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','BiocManager'))"
 
-# Pin Bioconductor release compatible with R 4.3
 RUN R -q -e "BiocManager::install(version = '3.18'); \
   BiocManager::install(c( \
     'AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures', \
@@ -47,25 +87,19 @@ RUN R -q -e "BiocManager::install(version = '3.18'); \
     'IHW','qvalue','rtracklayer','pwalign' \
   ), update=FALSE, ask=FALSE)"
 
-# CRAN packages used broadly
 RUN R -q -e "install.packages(c('cli','data.table','optparse','xml2','ggplot2','dplyr'))"
-
-# Optional but nice for docs/tests
 RUN R -q -e "install.packages(c('testthat','knitr','rmarkdown'))"
-
-# RIdeogram (optional; guarded in code)
 RUN R -q -e "install.packages('RIdeogram')"
 
-# orthologr + its GitHub deps
+# orthologr + deps
 RUN R -q -e "install.packages(c('doParallel','foreach','ape','Rdpack','benchmarkme','devtools'))"
 RUN R -q -e "remotes::install_github(c('drostlab/metablastr','drostlab/rdiamond','drostlab/orthologr'), upgrade='never')"
 
 # ------------------------------------------------------------
-# Build & install dndsR from source with cached deps
+# Build & install dndsR
 # ------------------------------------------------------------
 WORKDIR /usr/local/src/dndsR
 COPY DESCRIPTION ./
-# COPY NAMESPACE ./   # uncomment if present for better caching
 RUN R -q -e "remotes::install_deps('.', dependencies=TRUE, upgrade='never')"
 
 COPY . .
