@@ -46,7 +46,7 @@ RUN R -q -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packa
 # Install CRAN packages (Imports + runtime)
 # Note: 'stats' and 'utils' are base; 'RIdeogram' spelling matches CRAN.
 RUN R -q -e "install.packages(c( \
-  'cli','data.table','optparse','readr','xml2','ggplot2','dplyr','orthologr' \
+  'cli','data.table','optparse','readr','xml2','ggplot2','dplyr' \
 ))"
 
 # Install Bioconductor packages (Imports + optional)
@@ -62,6 +62,20 @@ RUN R -q -e "install.packages('RIdeogram')"
 
 # Suggested packages (nice to have; harmless on HPC)
 RUN R -q -e "install.packages(c('testthat','knitr','rmarkdown'))"
+
+# CRAN helpers
+RUN R -q -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','BiocManager'))"
+
+# Bioconductor dependencies used by orthologr chain
+RUN R -q -e "BiocManager::install(c( \
+  'Biostrings','GenomicRanges','GenomicFeatures','Rsamtools','rtracklayer','pwalign' \
+), update=FALSE, ask=FALSE)"
+
+# CRAN deps used by orthologr
+RUN R -q -e "install.packages(c('doParallel','foreach','ape','Rdpack','benchmarkme','devtools'))"
+
+# GitHub deps for orthologr
+RUN R -q -e "remotes::install_github(c('drostlab/metablastr','drostlab/rdiamond','drostlab/orthologr'), upgrade='never')"
 
 # ------------------------------------------------------------
 # Build and install your package from source
@@ -87,7 +101,7 @@ RUN R CMD build . && \
 # Prefer installing a tiny wrapper that loads package and calls the script.
 # If your repo already has tools/dndsR.R as the exact CLI we finalized, copy it in:
 RUN mkdir -p /usr/local/bin
-COPY tools/dndsR.R /usr/local/bin/dndsR
+COPY cli/dndsR.R /usr/local/bin/dndsR
 RUN chmod +x /usr/local/bin/dndsR
 
 # ------------------------------------------------------------
