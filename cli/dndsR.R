@@ -1,8 +1,13 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({
-  library(optparse); library(cli); library(dndsR)
+  library(optparse)
+  library(cli)
+  library(dndsR)
 })
 
+# =========================
+# Global/base options
+# =========================
 base_opts <- list(
   make_option(c("-t","--threads"), type="integer", default=8,
               help="CPUs/threads [default: %default]"),
@@ -10,11 +15,30 @@ base_opts <- list(
               help="Verbose logging")
 )
 
-# ---- helpers ----
+# =========================
+# Helpers
+# =========================
+
+# pretty dump of parsed options when --verbose
+.dump_opts <- function(cmd, o) {
+  if (isTRUE(o$verbose)) {
+    cli::cli_h2(paste0("Running: ", cmd))
+    # keep it compact; show scalar-ish bits first
+    lst <- as.list(o)
+    # optparse sometimes stores names with backticks in $ access; this makes a clean print:
+    safe_names <- names(lst)
+    names(lst) <- ifelse(nzchar(safe_names), safe_names, paste0("V", seq_along(lst)))
+    utils::str(lst, vec.len = 6)
+  }
+}
+
 # parse --oa key=value pairs with light type casting
 .cast_scalar <- function(x) {
   if (x %in% c("TRUE","FALSE")) return(as.logical(x))
   if (x == "NULL") return(NULL)
+  if (x == "NA") return(NA)
+  if (x %in% c("Inf","+Inf")) return(Inf)
+  if (x == "-Inf") return(-Inf)
   if (grepl("^\\d+$", x)) return(as.integer(x))
   if (grepl("^\\d*\\.?\\d+(e[+-]?\\d+)?$", x, ignore.case = TRUE)) return(as.numeric(x))
   x
@@ -32,7 +56,9 @@ base_opts <- list(
     # support comma-separated vectors: a,b,c
     if (grepl(",", val, fixed = TRUE)) {
       parts <- strsplit(val, ",", fixed = TRUE)[[1]]
-      out[[key]] <- vapply(parts, .cast_scalar, FUN.VALUE = NA, USE.NAMES = FALSE)
+      vec_chr <- vapply(parts, .cast_scalar, FUN.VALUE = character(1), USE.NAMES = FALSE)
+      # cast again to best common type
+      out[[key]] <- type.convert(vec_chr, as.is = TRUE)
     } else {
       out[[key]] <- .cast_scalar(val)
     }
@@ -47,6 +73,7 @@ base_opts <- list(
 .parse_csv_required <- function(x) {
   v <- .parse_csv(x); if (is.null(v)) character(0) else v
 }
+
 .parse_kv_list <- function(v) {
   # v: character vector like c("pfam=/p.tsv","kegg=/k.tsv") or c("pfam=A,B","kegg=C")
   if (is.null(v)) return(NULL)
@@ -66,7 +93,18 @@ base_opts <- list(
   lapply(raw, .parse_csv_required)
 }
 
-# ---- split_by_label ----
+# normalizer for separator lists
+.parse_seps <- function(x) {
+  v <- .parse_csv_required(x)
+  if (!length(v)) return(c(";", "|", ","))
+  v <- v[nzchar(v)]
+  v[v %in% c("comma", "<comma>")] <- ","
+  v
+}
+
+# =========================
+# split_by_label
+# =========================
 opts_split <- list(
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
               help="TSV with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff"),
@@ -78,6 +116,7 @@ opts_split <- list(
               help="Case-insensitive label matching [default: %default]")
 )
 run_split <- function(o){
+  .dump_opts("split_by_label", o)
   stopifnot(!is.null(o$comparison_file))
   p <- dndsR::split_comparisons_by_label(
     comparison_file = o$comparison_file,
@@ -88,7 +127,9 @@ run_split <- function(o){
   cli_alert_success("Wrote: {p}")
 }
 
-# ---- extract_cds ----
+# =========================
+# extract_cds
+# =========================
 opts_extract_cds <- list(
   make_option(c("--comparison-name"), type = "character", dest = "comparison_name",
               help = "Unique identifier for a comparison (e.g., 'CheAl_v_CheFo')"),
@@ -104,7 +145,6 @@ opts_extract_cds <- list(
               help = "Output directory; one subdir per comparison [default: %default]"),
   make_option(c("--overwrite"), action = "store_true", default = FALSE,
               help = "Overwrite existing outputs"),
-  # note: --verbose is global via base_opts
   make_option(c("-C","--comparison-file"), type = "character", dest = "comparison_file",
               help = "TSV with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff"),
   make_option(c("--group-by"), type = "character", default = "gene",
@@ -118,7 +158,7 @@ opts_extract_cds <- list(
 )
 
 run_extract_cds <- function(o) {
-  # Let the R function enforce its own required-arg rules.
+  .dump_opts("extract_cds", o)
   res <- dndsR::extract_cds(
     comparison_name      = o$comparison_name,
     query_fasta          = o$query_fasta,
@@ -138,7 +178,9 @@ run_extract_cds <- function(o) {
   invisible(res)
 }
 
-# ---- calculate_dnds ----
+# =========================
+# calculate_dnds
+# =========================
 opts_calculate_dnds <- list(
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
               help="TSV (or data.frame via R) with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff"),
@@ -154,8 +196,8 @@ opts_calculate_dnds <- list(
               help="Query GFF3 (single mode)"),
   make_option(c("-O","--output-dir"), type="character", default=getwd(),
               help="Output directory [default: %default]"),
-  make_option(c("--comp-cores"), type="integer", default=4,
-              help="Cores passed to orthologr::dNdS via comp_cores [default: %default]"),
+  make_option(c("--comp-cores"), type="integer", default=NULL,
+              help="Cores passed to orthologr::dNdS via comp_cores [default: --threads]"),
   make_option(c("--aligner"), type="character", default="diamond",
               help="orthologr aligner [default: %default]"),
   make_option(c("--sensitivity-mode"), type="character", default="fast",
@@ -163,14 +205,17 @@ opts_calculate_dnds <- list(
   make_option(c("--dnds-method"), type="character", default="Comeron",
               help="orthologr dnds_est.method [default: %default]"),
   make_option(c("--oa"), type = "character", action = "append", default = NULL,
-              help = "Pass through to orthologr::dNdS as key=value (repeatable). Examples: --oa eval=1E-6 --oa ortho_detection=RBH --oa clean_folders=TRUE")
-
-  # NOTE: your function accepts ...; if you want CLI passthrough later,
-  # we can add a --orthologr-args JSON or key=val repeatable flag.
+              help = paste0(
+                "Pass through to orthologr::dNdS as key=value (repeatable). ",
+                "Examples: --oa eval=1E-6 --oa ortho_detection=RBH --oa clean_folders=TRUE ",
+                "--oa include_only_chr=1,2,3"
+              ))
 )
 
 run_calculate_dnds <- function(o){
+  .dump_opts("calculate_dnds", o)
   extra <- .parse_oa(o$oa)
+  cores <- if (!is.null(o$`comp-cores`)) as.integer(o$`comp-cores`) else as.integer(o$threads)
   base <- list(
     comparison_file = o$comparison_file,
     comparison_name = o$comparison_name,
@@ -179,12 +224,11 @@ run_calculate_dnds <- function(o){
     subject_gff     = o$subject_gff,
     query_gff       = o$query_gff,
     output_dir      = o$`output-dir`,
-    comp_cores      = as.integer(o$`comp-cores`),
+    comp_cores      = cores,
     aligner         = o$aligner,
     sensitivity_mode= o$`sensitivity-mode`,
     dnds_method     = o$`dnds-method`
   )
-  # Forward everything, letting your R function handle defaults + merges
   paths <- do.call(dndsR::calculate_dnds, c(base, extra))
 
   if (is.character(paths) && length(paths)) {
@@ -196,7 +240,9 @@ run_calculate_dnds <- function(o){
   invisible(paths)
 }
 
-# ---- append_annotations ----
+# =========================
+# append_annotations
+# =========================
 opts_append_annotations <- list(
   make_option(c("--dnds-file"), type = "character", dest = "dnds_file",
               help = "Path to a dN/dS TSV (single mode)"),
@@ -212,10 +258,10 @@ opts_append_annotations <- list(
               help = "Root directory containing per-comparison folders (batch mode) [default: %default]"),
   make_option(c("--custom"), type = "character", default = NULL,
               help = "Comma patterns like 'REX{5},TOM{8}' → q_prefix/s_prefix columns")
-  # --verbose comes from base_opts
 )
 
 run_append_annotations <- function(o) {
+  .dump_opts("append_annotations", o)
   res <- dndsR::append_annotations(
     dnds_file       = o$dnds_file,
     query_gff       = o$query_gff,
@@ -234,7 +280,9 @@ run_append_annotations <- function(o) {
   invisible(res)
 }
 
-# ---- ipr_enrichment ----
+# =========================
+# ipr_enrichment
+# =========================
 opts_ipr_enrichment <- list(
   make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Path to <comp>_dnds_annot.tsv (single mode)"),
@@ -306,14 +354,13 @@ opts_ipr_enrichment <- list(
 )
 
 run_ipr_enrichment <- function(o){
-  # vector toggles
+  .dump_opts("ipr_enrichment", o)
   sides_vec <- .parse_csv_required(o$sides)
   include_types_vec <- .parse_csv(o$`include-types`)
   types_vec <- .parse_csv(o$types)
   exclude_ids_vec <- .parse_csv(o$`exclude-ids`)
   exclude_iprs_vec <- .parse_csv(o$`exclude-iprs`)
 
-  # boolean overrides
   make_plots <- if (isTRUE(o$`no-plots`)) FALSE else isTRUE(o$`make-plots`)
   drop_rows_without_term <- if (isTRUE(o$`keep-rows-without-term`)) FALSE else isTRUE(o$`drop-rows-without-term`)
   keep_unmatched <- if (isTRUE(o$`drop-unmatched`)) FALSE else isTRUE(o$`keep-unmatched`)
@@ -351,7 +398,6 @@ run_ipr_enrichment <- function(o){
     exclude_descendants_limit  = as.integer(o$`exclude-descendants-limit`)
   )
 
-  # res is invisible vector of output TSVs (batch) or list/vector (single)
   if (is.character(res) && length(res)) {
     cli::cli_alert_success("ipr_enrichment completed. Wrote {length(res)} file{?s}.")
     for (p in res) cli::cli_bullets(c(v = paste0("<", p, ">")))
@@ -361,7 +407,9 @@ run_ipr_enrichment <- function(o){
   invisible(res)
 }
 
-# ---- go_enrichment ----
+# =========================
+# go_enrichment
+# =========================
 opts_go_enrichment <- list(
   make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Path to <comp>_dnds_annot.tsv (single mode)"),
@@ -421,6 +469,7 @@ opts_go_enrichment <- list(
 )
 
 run_go_enrichment <- function(o){
+  .dump_opts("go_enrichment", o)
   sides_vec <- .parse_csv_required(o$sides)
   onts_vec  <- .parse_csv_required(o$ontologies)
   exclude_vec <- .parse_csv(o$`exclude-gos`)
@@ -462,7 +511,9 @@ run_go_enrichment <- function(o){
   invisible(res)
 }
 
-# ---- term_enrichment (generic) ----
+# =========================
+# term_enrichment (generic)
+# =========================
 opts_term_enrichment <- list(
   make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Path to <comp>_dnds_annot.tsv (single mode)"),
@@ -509,7 +560,8 @@ opts_term_enrichment <- list(
   make_option(c("--term-sep"), type="character", default=";",
               help="Default separator for term strings [default: %default]"),
   make_option(c("--term-seps"), type="character", default=";,|,,",
-              help='Candidate separators for auto-detect per column [default: ";;|;,"]'),
+              help='Candidate separators for auto-detect per column (comma-separated). Default string is ";,|,," which resolves to c(";", "|", ",").'),
+
   make_option(c("--term-blocklist"), type="character",
               default="attributes,attribute,attr,notes,note,description,product,name,id,gene_id,transcript_id,parent,dbxref,source,target,type,seqname,seqid,start,end,strand,phase,biotype,class,len",
               help="Comma list of suffixes to ignore as term families [default: a built-in list]"),
@@ -541,30 +593,24 @@ opts_term_enrichment <- list(
 )
 
 run_term_enrichment <- function(o){
-  # list/csv parsing
+  .dump_opts("term_enrichment", o)
   terms_vec          <- .parse_csv(o$terms)
   exclude_terms_vec  <- .parse_csv(o$`exclude-terms`)
   sides_vec          <- .parse_csv_required(o$sides)
-  term_seps_vec      <- .parse_csv_required(o$`term-seps`)
+  term_seps_vec      <- .parse_seps(o$`term-seps`)
   term_blocklist_vec <- .parse_csv_required(o$`term-blocklist`)
   exclude_ids_global <- .parse_csv(o$`exclude-ids`)
   exclude_ids_per    <- .parse_kv_list_of_csv(o$eid)
   trees_per          <- .parse_kv_list(o$tt)
   meta_per           <- .parse_kv_list(o$tm)
 
-  # single-path fallbacks
   term_trees_val <- if (!is.null(o$`term-trees-path`)) o$`term-trees-path` else NULL
   term_meta_val  <- if (!is.null(o$`term-metadata-path`)) o$`term-metadata-path` else NULL
 
-  # build exclude_ids final shape:
-  # - character vector if only global provided
-  # - named list if per-type provided (optionally with a global we’ll pass alongside)
   exclude_ids_final <- NULL
   if (!is.null(exclude_ids_per)) {
     exclude_ids_final <- exclude_ids_per
     if (!is.null(exclude_ids_global)) {
-      # carry global too; your function accepts character OR named list. We pass both by merging with a reserved key ""? Better: pass named list only and also include globals under every type on the R side—but to keep exact behavior, pass BOTH:
-      # Here we wrap both: when both exist, we pass the named list and keep the global separately via ...not possible. So merge globals into each provided type to approximate expected behavior.
       for (k in names(exclude_ids_final)) {
         exclude_ids_final[[k]] <- unique(c(exclude_ids_global, exclude_ids_final[[k]]))
       }
@@ -573,11 +619,9 @@ run_term_enrichment <- function(o){
     exclude_ids_final <- exclude_ids_global
   }
 
-  # term_trees final: prefer per-type if provided; else single path; else NULL
   term_trees_final <- if (!is.null(trees_per)) trees_per else term_trees_val
   term_meta_final  <- if (!is.null(meta_per))  meta_per  else term_meta_val
 
-  # boolean selections honoring overrides
   make_plots <- if (isTRUE(o$`no-plots`)) FALSE else isTRUE(o$`make-plots`)
   drop_rows_without_term <- if (isTRUE(o$`keep-rows-without-term`)) FALSE else isTRUE(o$`drop-rows-without-term`)
   keep_unmatched_ids <- if (isTRUE(o$`drop-unmatched-ids`)) FALSE else isTRUE(o$`keep-unmatched-ids`)
@@ -620,7 +664,9 @@ run_term_enrichment <- function(o){
   invisible(res)
 }
 
-# ---- dnds_ideogram ----
+# =========================
+# dnds_ideogram
+# =========================
 opts_dnds_ideogram <- list(
   make_option(c("--dnds-merged-file"), type="character", dest="dnds_merged_file",
               help="Single prebuilt table with q_/s_ coords (single mode; function mainly intended for batch)"),
@@ -665,14 +711,11 @@ opts_dnds_ideogram <- list(
 )
 
 run_dnds_ideogram <- function(o){
-  # simple comma list
+  .dump_opts("dnds_ideogram", o)
   sides_vec <- .parse_csv_required(o$sides)
-
-  # boolean overrides
   make_png <- if (isTRUE(o$`no-png`)) FALSE else isTRUE(o$`make-png`)
   chr_case_insensitive <- if (isTRUE(o$`chr-case-sensitive`)) FALSE else isTRUE(o$`chr-case-insensitive`)
 
-  # Call through (single mode will error by design unless you pass a prebuilt + provide FASTA in your own wrapper)
   res <- dndsR::dnds_ideogram(
     dnds_merged_file        = o$`dnds-merged-file`,
     comparison_file         = o$`comparison-file`,
@@ -701,7 +744,9 @@ run_dnds_ideogram <- function(o){
   invisible(res)
 }
 
-# ---- Subcommands ----
+# =========================
+# Subcommands registry
+# =========================
 subcommands <- list(
   split_by_label = list(opts = c(base_opts, opts_split),      fun = run_split,
                         help = "Split genomes by label and emit a new comparison file"),
@@ -731,6 +776,9 @@ usage <- function(){
   cat("\nUse: dndsR.R <subcommand> --help   for subcommand options\n\n")
 }
 
+# =========================
+# Entry point
+# =========================
 argv <- commandArgs(trailingOnly = TRUE)
 if (length(argv) == 0 || argv[1] %in% c("-h","--help")) { usage(); quit(status=0) }
 cmd <- argv[1]; args <- argv[-1]
