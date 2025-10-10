@@ -23,9 +23,7 @@ base_opts <- list(
 .dump_opts <- function(cmd, o) {
   if (isTRUE(o$verbose)) {
     cli::cli_h2(paste0("Running: ", cmd))
-    # keep it compact; show scalar-ish bits first
     lst <- as.list(o)
-    # optparse sometimes stores names with backticks in $ access; this makes a clean print:
     safe_names <- names(lst)
     names(lst) <- ifelse(nzchar(safe_names), safe_names, paste0("V", seq_along(lst)))
     utils::str(lst, vec.len = 6)
@@ -34,30 +32,34 @@ base_opts <- list(
 
 # parse --oa key=value pairs with light type casting
 .cast_scalar <- function(x) {
-  if (x %in% c("TRUE","FALSE")) return(as.logical(x))
-  if (x == "NULL") return(NULL)
-  if (x == "NA") return(NA)
-  if (x %in% c("Inf","+Inf")) return(Inf)
-  if (x == "-Inf") return(-Inf)
-  if (grepl("^\\d+$", x)) return(as.integer(x))
-  if (grepl("^\\d*\\.?\\d+(e[+-]?\\d+)?$", x, ignore.case = TRUE)) return(as.numeric(x))
-  x
+  x_trim <- trimws(x)
+  xl <- tolower(x_trim)
+  if (xl %in% c("true","false")) return(as.logical(xl))
+  if (xl == "null") return(NULL)       # scalar path returns NULL
+  if (xl == "na") return(NA)
+  if (xl %in% c("inf","+inf")) return(Inf)
+  if (xl == "-inf") return(-Inf)
+  if (grepl("^\\d+$", x_trim)) return(as.integer(x_trim))
+  if (grepl("^\\d*\\.?\\d+(e[+-]?\\d+)?$", x_trim, ignore.case = TRUE)) return(as.numeric(x_trim))
+  x_trim
 }
 
 .parse_oa <- function(v) {
   if (is.null(v)) return(list())
   out <- list()
   for (kv in v) {
-    # split only on the first '='
     sp <- regexpr("=", kv, fixed = TRUE)
     if (sp < 1) stop("Invalid --oa argument (expected key=value): ", kv)
     key <- substr(kv, 1, sp - 1)
     val <- substr(kv, sp + 1, nchar(kv))
-    # support comma-separated vectors: a,b,c
     if (grepl(",", val, fixed = TRUE)) {
       parts <- strsplit(val, ",", fixed = TRUE)[[1]]
-      vec_chr <- vapply(parts, .cast_scalar, FUN.VALUE = character(1), USE.NAMES = FALSE)
-      # cast again to best common type
+      casted <- lapply(parts, .cast_scalar)
+      # For vector context, treat NULL tokens as NA
+      casted[vapply(casted, is.null, logical(1))] <- list(NA)
+      vec_chr <- vapply(casted, function(y) {
+        if (length(y) == 0) NA_character_ else as.character(y)
+      }, FUN.VALUE = character(1), USE.NAMES = FALSE)
       out[[key]] <- type.convert(vec_chr, as.is = TRUE)
     } else {
       out[[key]] <- .cast_scalar(val)
@@ -75,7 +77,6 @@ base_opts <- list(
 }
 
 .parse_kv_list <- function(v) {
-  # v: character vector like c("pfam=/p.tsv","kegg=/k.tsv") or c("pfam=A,B","kegg=C")
   if (is.null(v)) return(NULL)
   out <- list()
   for (kv in v) {
@@ -88,7 +89,6 @@ base_opts <- list(
   out
 }
 .parse_kv_list_of_csv <- function(v) {
-  # like --eid pfam=PF00001,PF00002 (repeatable)
   raw <- .parse_kv_list(v); if (is.null(raw)) return(NULL)
   lapply(raw, .parse_csv_required)
 }
@@ -96,9 +96,9 @@ base_opts <- list(
 # normalizer for separator lists
 .parse_seps <- function(x) {
   v <- .parse_csv_required(x)
-  if (!length(v)) return(c(";", "|", ","))
-  v <- v[nzchar(v)]
-  v[v %in% c("comma", "<comma>")] <- ","
+  if (!length(v)) return(c(";", "|", ","))  # hard default
+  v <- trimws(v[nzchar(v)])
+  v[v %in% c("comma", "<comma>", "\\,")] <- ","
   v
 }
 
@@ -107,22 +107,25 @@ base_opts <- list(
 # =========================
 opts_split <- list(
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
-              help="TSV with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff"),
+              help="TSV with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff"),
   make_option(c("-m","--mode"), type="character", default="subgenome",
               help="subgenome|haplotype|custom [default: %default]"),
   make_option(c("-r","--custom-regex"), type="character", default=NULL,
               help="Regex with exactly one capture group when --mode=custom"),
   make_option(NULL, "--case-insensitive", action="store_true", default=TRUE,
-              help="Case-insensitive label matching [default: %default]")
+              help="Case-insensitive label matching [default: %default]"),
+  make_option(NULL, "--case-sensitive", action="store_true", default=FALSE,
+              help="Override to make matching case-sensitive")
 )
 run_split <- function(o){
   .dump_opts("split_comparisons", o)
   stopifnot(!is.null(o$comparison_file))
+  case_insensitive <- if (isTRUE(o$`case-sensitive`)) FALSE else isTRUE(o$`case-insensitive`)
   p <- dndsR::split_comparisons(
     comparison_file = o$comparison_file,
     mode            = o$mode,
     custom_regex    = o$`custom-regex`,
-    case_insensitive= o$`case-insensitive`
+    case_insensitive= case_insensitive
   )
   cli_alert_success("Wrote: {p}")
 }
@@ -253,7 +256,7 @@ opts_append_annotations <- list(
   make_option(c("-o","--output-file"), type = "character", dest = "output_file", default = NULL,
               help = "Optional output path (single mode)"),
   make_option(c("-C","--comparison-file"), type = "character", dest = "comparison_file",
-              help = "Whitespace-delimited file with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
+              help = "TSV with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
   make_option(c("-O","--output-dir"), type = "character", dest = "output_dir", default = getwd(),
               help = "Root directory containing per-comparison folders (batch mode) [default: %default]"),
   make_option(c("--custom"), type = "character", default = NULL,
@@ -287,7 +290,7 @@ opts_ipr_enrichment <- list(
   make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Path to <comp>_dnds_annot.tsv (single mode)"),
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
-              help="Whitespace-delimited file with comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
+              help="TSV with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
   make_option(c("-O","--output-dir"), type="character", dest="output_dir", default=getwd(),
               help="Root directory of per-comparison folders [default: %default]"),
   make_option(c("--sides"), type="character", default="query,subject",
@@ -414,7 +417,7 @@ opts_go_enrichment <- list(
   make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Path to <comp>_dnds_annot.tsv (single mode)"),
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
-              help="Whitespace-delimited file with comparison_name,... (batch mode)"),
+              help="TSV with comparison_name,... (batch mode)"),
   make_option(c("-O","--output-dir"), type="character", dest="output_dir", default=getwd(),
               help="Root directory of per-comparison folders [default: %default]"),
 
@@ -518,7 +521,7 @@ opts_term_enrichment <- list(
   make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Path to <comp>_dnds_annot.tsv (single mode)"),
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
-              help="Whitespace-delimited file with comparison_name,... (batch mode)"),
+              help="TSV with comparison_name,... (batch mode)"),
   make_option(c("-O","--output-dir"), type="character", dest="output_dir", default=getwd(),
               help="Root directory of per-comparison folders [default: %default]"),
 
@@ -559,8 +562,8 @@ opts_term_enrichment <- list(
 
   make_option(c("--term-sep"), type="character", default=";",
               help="Default separator for term strings [default: %default]"),
-  make_option(c("--term-seps"), type="character", default=";,|,,",
-              help='Candidate separators for auto-detect per column (comma-separated). Default string is ";,|,," which resolves to c(";", "|", ",").'),
+  make_option(c("--term-seps"), type="character", default=";,|,<comma>",
+              help='Candidate separators for auto-detect per column (comma-separated). Use "<comma>" for ",". Default resolves to c(";", "|", ",").'),
 
   make_option(c("--term-blocklist"), type="character",
               default="attributes,attribute,attr,notes,note,description,product,name,id,gene_id,transcript_id,parent,dbxref,source,target,type,seqname,seqid,start,end,strand,phase,biotype,class,len",
@@ -627,7 +630,7 @@ run_term_enrichment <- function(o){
   keep_unmatched_ids <- if (isTRUE(o$`drop-unmatched-ids`)) FALSE else isTRUE(o$`keep-unmatched-ids`)
 
   res <- dndsR::term_enrichment(
-    dnds_annot_file          = o$dnds_annot_file,
+    dnds_annot_file          = o$`dnds-annot_file`,
     comparison_file          = o$comparison_file,
     output_dir               = o$output_dir,
     terms                    = terms_vec,
@@ -671,7 +674,7 @@ opts_dnds_ideogram <- list(
   make_option(c("--dnds-merged-file"), type="character", dest="dnds_merged_file",
               help="Single prebuilt table with q_/s_ coords (single mode; function mainly intended for batch)"),
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
-              help="Whitespace-delimited file: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
+              help="TSV: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
   make_option(c("-O","--output-dir"), type="character", dest="output_dir", default=getwd(),
               help="Root directory of per-comparison folders [default: %default]"),
 
@@ -748,8 +751,10 @@ run_dnds_ideogram <- function(o){
 # Subcommands registry
 # =========================
 subcommands <- list(
-  split_comparisons = list(opts = c(base_opts, opts_split),      fun = run_split,
-                        help = "Split genomes by label (subgenome or haplotype) and emit a new comparison file"),
+  split_comparisons = list(
+    opts = c(base_opts, opts_split),      fun = run_split,
+    help = "Split genomes by label (subgenome or haplotype) and emit a new comparison file"
+  ),
   extract_cds    = list(opts = c(base_opts, opts_extract_cds), fun = run_extract_cds,
                         help = "Extract CDS (and optionally proteins) from genome+GFF"),
   calculate_dnds = list(opts = c(base_opts, opts_calculate_dnds), fun = run_calculate_dnds,
@@ -770,10 +775,10 @@ subcommands <- list(
 )
 
 usage <- function(){
-  cat("\nUsage: dndsR.R <subcommand> [options]\n\nSubcommands:\n")
+  cat("\nUsage: dndsR <subcommand> [options]\n\nSubcommands:\n")
   for (nm in names(subcommands))
     cat(sprintf("  %-14s %s\n", nm, subcommands[[nm]]$help))
-  cat("\nUse: dndsR.R <subcommand> --help   for subcommand options\n\n")
+  cat("\nUse: dndsR <subcommand> --help   for subcommand options\n\n")
 }
 
 # =========================
