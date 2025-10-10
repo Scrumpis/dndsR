@@ -10,6 +10,9 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 
 ## Setup
 Docker? Conda? Both? Need orthofinder and diamond2 in conda env
+```
+git clone https://github.com/Scrumpis/dndsR
+```
 
 ## Data preparation
 Separate subgenomes or phased haplotypes into their own genome, protein, or CDS fastas prior to calculating dN/dS. [Orthologr](https://github.com/drostlab/orthologr), which calculates dN/dS, outputs the best match for every query/subject CDS/protein comparison. If subgenomes or haplotypes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons, leading to spurious results. We have had success using [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) to phase subgenomes of allopolyploids with unavalaiable diploid progenitor genomes.
