@@ -8,6 +8,10 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Visualizes selection pressures across the genomes through an ideogram
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 
+Improvements:
+Rebuild container with biomartr
+
+
 ## Setup
 ### Clone the Repo
 ```
