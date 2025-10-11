@@ -1,4 +1,4 @@
-#' Extract CDS or proteins from genome+GFF using Bioconductor
+#' Extract CDS (and optionally proteins) from genome+GFF using Bioconductor
 #'
 #' @param comparison_name Unique identifier for a comparison (e.g., "CheAl_v_CheFo").
 #' @param query_fasta Path to the query genome FASTA (required unless using comparison_file).
@@ -185,4 +185,3 @@ extract_cds <- function(comparison_name = NULL,
 
   return(run_extraction(comparison_name, query_fasta, subject_fasta, query_gff, subject_gff))
 }
-
