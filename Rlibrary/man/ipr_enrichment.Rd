@@ -19,6 +19,7 @@ ipr_enrichment(
   min_pos = 0,
   fdr_method = c("BH", "IHW", "qvalue", "none"),
   alpha = 0.05,
+  term_sep = ";",
   include_types = NULL,
   stratify_by_type = FALSE,
   types = NULL,
@@ -27,7 +28,13 @@ ipr_enrichment(
   entries_path = NULL,
   entries_url = "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list",
   entries_timeout_s = 20,
-  keep_unmatched = TRUE
+  keep_unmatched = TRUE,
+  exclude_ids = NULL,
+  exclude_iprs = NULL,
+  term_trees = NULL,
+  exclude_descendants = FALSE,
+  exclude_descendants_depth = Inf,
+  exclude_descendants_limit = 5000
 )
 }
 \arguments{
@@ -65,14 +72,16 @@ If "IHW"/"qvalue" is chosen but the package is missing, falls back to "BH".}
 
 \item{alpha}{FDR level for IHW weighting (default 0.05).}
 
+\item{term_sep}{Separator used in q_ipr/s_ipr strings (default ";").}
+
 \item{include_types}{Optional character vector of InterPro ENTRY_TYPE values to keep
 in pooled mode (e.g., c("Domain","Homologous_superfamily")). Ignored if stratified.}
 
 \item{stratify_by_type}{Logical. If TRUE, run separate analyses per ENTRY_TYPE with
-type-specific backgrounds (recommended for apples-to-apples). Default FALSE.}
+type-specific backgrounds (recommended). Default FALSE.}
 
 \item{types}{Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
-= infer from data present in q_ipr/s_ipr.}
+= infer from data present in q_ipr/s_ipr (after exclusions).}
 
 \item{adjust_scope}{When stratified, "global" (one BH across all tests) or "per_type".}
 
@@ -88,16 +97,35 @@ type-specific backgrounds (recommended for apples-to-apples). Default FALSE.}
 \item{entries_timeout_s}{Numeric timeout (seconds) for remote fetch (default 20).}
 
 \item{keep_unmatched}{Keep IPRs not found in entry.list when filtering (default TRUE).}
+
+\item{exclude_ids}{Character vector of IPR accessions (e.g. "IPR000123") to exclude
+globally from both positives and background before enrichment. Preferred name.}
+
+\item{exclude_iprs}{Deprecated alias of `exclude_ids` for backward compatibility.}
+
+\item{term_trees}{Optional path or data.frame of a parent/child edgelist for IPRs
+(two columns). Only used if you want to expand `exclude_ids` to their descendants.}
+
+\item{exclude_descendants}{If TRUE, expand `exclude_ids` using `term_trees`. Default FALSE.}
+
+\item{exclude_descendants_depth}{Integer depth limit for descendant exclusion;
+1 = direct children only, Inf = entire subtree (default Inf).}
+
+\item{exclude_descendants_limit}{Hard cap on the number of excluded IPRs to avoid
+accidental mass exclusion (default 5000).}
 }
 \value{
 In single mode: (invisibly) list of output TSV paths.
         In batch mode:  (invisibly) vector of output TSV paths across comparisons.
         Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
-        pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, label,
-        side, comparison.
+        pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment,
+        label, side, comparison.
 }
 \description{
 Reads <comp>/<comp>_dnds_annot.tsv and tests enrichment of IPR terms (q_ipr / s_ipr)
 among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
 Adds InterPro metadata (ENTRY_TYPE/ENTRY_NAME) and supports pooled vs per-type analyses.
+}
+\details{
+Plotting is harmonized with GO/term: x = Enrichment (pos/bg), size = # pos, color = adj p.
 }
