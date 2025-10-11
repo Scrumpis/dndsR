@@ -305,8 +305,9 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     win$End <- win$Start + window_size
 
     # Karyotype (RAW names), then optional normalization for both karyotype & win
-    fai <- .ensure_fai(fasta)
-    karyotype <- .read_karyotype(fai)
+    #fai <- .ensure_fai(fasta)
+    #karyotype <- .read_karyotype(fai)
+    karyotype <- .fasta_karyotype(fasta)
 
     # Optional normalization (opt-in; default no change)
     karyotype$Chr <- .normalize_chr(
