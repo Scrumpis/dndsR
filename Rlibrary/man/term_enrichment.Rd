@@ -21,6 +21,19 @@ term_enrichment(
   min_pos = 0,
   fdr_method = c("BH", "IHW", "qvalue", "none"),
   alpha = 0.05,
+  term_sep = ";",
+  term_seps = c(";", "|", ","),
+  term_blocklist = c("attributes", "attribute", "attr", "notes", "note", "description",
+    "product", "name", "id", "gene_id", "transcript_id", "parent", "dbxref", "source",
+    "target", "type", "seqname", "seqid", "start", "end", "strand", "phase", "biotype",
+    "class", "len"),
+  exclude_ids = NULL,
+  term_trees = NULL,
+  exclude_descendants = FALSE,
+  exclude_descendants_depth = Inf,
+  exclude_descendants_limit = 5000,
+  term_metadata = NULL,
+  keep_unmatched_ids = TRUE,
   dnds_file = NULL
 )
 }
@@ -38,7 +51,7 @@ file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv"
 Default NULL = auto-detect among {kegg, panther, pfam, tigrfam, cog} and any custom
 q_*/s_* term columns present. IPR/GO are excluded by default (see `exclude_terms`).}
 
-\item{exclude_terms}{Character vector of term types to exclude everywhere
+\item{exclude_terms}{Character vector of term **types** to exclude entirely from testing
 (auto-detect and explicit `terms=`). Default c("ipr","go"). Set to NULL to allow them.}
 
 \item{sides}{Character vector among c("query","subject"). Default both.}
@@ -47,8 +60,7 @@ q_*/s_* term columns present. IPR/GO are excluded by default (see `exclude_terms
 
 \item{max_dnds}{Numeric. Drop rows with dNdS >= max_dnds (default 10) or NA dNdS.}
 
-\item{filter_expr}{Optional character with a logical expression evaluated in the data
-(e.g., "q_seqname == s_seqname").}
+\item{filter_expr}{Optional character with a logical expression evaluated in the data.}
 
 \item{make_plots}{Logical; if TRUE, write a top-N bubble plot per result (default TRUE).}
 
@@ -61,16 +73,43 @@ type are removed from BOTH positives and background (annotation-aware universe).
 
 \item{min_pos}{Minimum positive occurrences required for a term (default 0).}
 
-\item{fdr_method}{One of "BH","IHW","qvalue","none". Defaults to "BH".
-If "IHW"/"qvalue" is chosen but the package is missing, falls back to "BH".}
+\item{fdr_method}{One of "BH","IHW","qvalue","none". Defaults to "BH".}
 
 \item{alpha}{FDR level for IHW weighting (default 0.05).}
+
+\item{term_sep}{Default separator for term strings in q_*/s_* columns (default ";").}
+
+\item{term_seps}{Candidate separators to auto-detect per column (default c(";","|",",")).}
+
+\item{term_blocklist}{Character vector of suffixes to ignore as term families.}
+
+\item{exclude_ids}{Either a character vector of term IDs (applies to *all* term types),
+or a named list mapping term_type -> character vector of IDs to exclude. Default NULL.}
+
+\item{term_trees}{Optional named list mapping term_type -> path or data.frame of a
+parent/child edgelist (two columns). Enables descendant exclusion for that type.}
+
+\item{exclude_descendants}{Logical; if TRUE, expand `exclude_ids` per type using
+descendants from `term_trees[[type]]`. Default FALSE.}
+
+\item{exclude_descendants_depth}{Integer depth limit when expanding descendants.}
+
+\item{exclude_descendants_limit}{Hard cap on number of excluded nodes per (type).}
+
+\item{term_metadata}{Optional named list mapping term_type -> (path or data.frame)
+with columns: ID, NAME (optional: DEFINITION). Joined to results to add names/defs.}
+
+\item{keep_unmatched_ids}{Logical; if TRUE (default), keep terms lacking metadata.}
 }
 \value{
-In single mode: (invisibly) list of data.frames by side_term.
-        In batch mode: (invisibly) vector of output TSV paths.
+In single mode: (invisibly) list of data.frames by side_term (if make_plots=FALSE)
+        or vector of output TSV paths (if make_plots=TRUE). In batch mode: vector of paths.
 }
 \description{
 Reads <comp>/<comp>_dnds_annot.tsv and tests enrichment of terms (q_* / s_* columns)
 among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
+}
+\details{
+Supports optional per-term-type ID exclusion, subtree (descendant) exclusion using a
+provided parent->child edgelist, and metadata joins to append names/definitions.
 }
