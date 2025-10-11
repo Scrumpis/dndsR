@@ -9,9 +9,18 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 
 ## Setup
-Docker? Conda? Both? Need orthofinder and diamond2 in conda env
+### Clone the Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
+```
+### Pull the Image
+Singularity
+```
+singularity pull dndsr.sif docker://scrumpis/dndsr:latest
+```
+Docker
+```
+docker pull scrumpis/dndsr:latest
 ```
 
 ## Data preparation
