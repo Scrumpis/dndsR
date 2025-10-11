@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------
+# Config (edit as needed)
+# -----------------------------
+SIF_DEFAULT="${SIF_DEFAULT:-dndsr.sif}"         # path to your SIF
+REPO_DIR_DEFAULT="${REPO_DIR_DEFAULT:-$PWD}"    # repo root containing Rlibrary/
+PKG_DIR_REL="Rlibrary"                          # package source relative to REPO_DIR
+HOST_LIB_DEFAULT="${HOST_LIB_DEFAULT:-$HOME/.dndsr/rlib}"  # host-persisted R lib
+ENGINE_DEFAULT="${ENGINE_DEFAULT:-auto}"        # auto | singularity | apptainer
+
+# -----------------------------
+# Helpers
+# -----------------------------
+die() { echo "Error: $*" >&2; exit 1; }
+
+detect_engine() {
+  case "${ENGINE_DEFAULT}" in
+    singularity|apptainer) echo "${ENGINE_DEFAULT}";;
+    auto)
+      command -v singularity >/dev/null 2>&1 && { echo singularity; return; }
+      command -v apptainer  >/dev/null 2>&1 && { echo apptainer;  return; }
+      die "No singularity/apptainer found. Install one or set ENGINE_DEFAULT."
+      ;;
+    *) die "ENGINE_DEFAULT='${ENGINE_DEFAULT}' not recognized";;
+  esac
+}
+
+engine_exec() {
+  local engine="$1"; shift
+  case "$engine" in
+    singularity) singularity exec "$@" ;;
+    apptainer)   apptainer  exec "$@" ;;
+  esac
+}
+
+# $1: SIF, $2: REPO_DIR, $3: HOST_LIB
+install_pkg_if_needed() {
+  local SIF="$1" REPO_DIR="$2" HOST_LIB="$3"
+  local engine; engine=$(detect_engine)
+
+  mkdir -p "${HOST_LIB}"
+
+  local pkg_desc="${REPO_DIR}/${PKG_DIR_REL}/DESCRIPTION"
+  [[ -f "$pkg_desc" ]] || die "No DESCRIPTION at ${pkg_desc}"
+  local src_version; src_version=$(awk -F': *' '$1=="Version"{print $2}' "$pkg_desc")
+  local vfile="${HOST_LIB}/.dndsR.version"
+
+  if [[ -f "${vfile}" ]]; then
+    local installed_v; installed_v=$(cat "${vfile}" || true)
+    if [[ "${installed_v}" == "${src_version}" ]]; then
+      return 0
+    fi
+  fi
+
+  engine_exec "${engine}" \
+    -B "${REPO_DIR}":/work \
+    -B "${HOST_LIB}":/r-lib \
+    -e "${SIF}" \
+    bash -lc 'R CMD INSTALL --library=/r-lib /work/'"${PKG_DIR_REL}"
+
+  echo "${src_version}" > "${vfile}"
+}
+
+usage() {
+  cat <<EOF
+dndsR-launcher – run dndsR via container with host-installed R library
+
+USAGE:
+  dndsR-launcher install        [--sif SIF] [--repo DIR] [--lib DIR]
+  dndsR-launcher run <args...>  [--sif SIF] [--repo DIR] [--lib DIR] [--bind HOST[:/data]]
+
+Examples:
+  dndsR-launcher install
+  dndsR-launcher run split_comparisons --help
+  dndsR-launcher run calculate_dnds --comparison_file /data/comp.tsv --threads 16 --out /data/out --bind /path/to/data
+EOF
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  install|run) ;;
+  -h|--help|"") usage; exit 0 ;;
+  *) echo "Unknown command: $cmd"; usage; exit 1 ;;
+esac
+
+SIF="${SIF_DEFAULT}"
+REPO_DIR="${REPO_DIR_DEFAULT}"
+HOST_LIB="${HOST_LIB_DEFAULT}"
+BIND_DATA=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --sif)   SIF="$2"; shift 2 ;;
+    --repo)  REPO_DIR="$2"; shift 2 ;;
+    --lib)   HOST_LIB="$2"; shift 2 ;;
+    --bind)  BIND_DATA="$2"; shift 2 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+
+[[ -f "${SIF}" ]] || die "SIF not found at ${SIF}"
+[[ -d "${REPO_DIR}/${PKG_DIR_REL}" ]] || die "Package dir ${REPO_DIR}/${PKG_DIR_REL} not found"
+engine=$(detect_engine)
+
+case "$cmd" in
+  install)
+    install_pkg_if_needed "${SIF}" "${REPO_DIR}" "${HOST_LIB}"
+    echo "dndsR installed into ${HOST_LIB}"
+    ;;
+
+  run)
+    install_pkg_if_needed "${SIF}" "${REPO_DIR}" "${HOST_LIB}"
+
+    binds=(-B "${REPO_DIR}":/work -B "${HOST_LIB}":/r-lib)
+    if [[ -n "${BIND_DATA}" ]]; then
+      if [[ "${BIND_DATA}" == *:* ]]; then
+        binds+=(-B "${BIND_DATA}")
+      else
+        binds+=(-B "${BIND_DATA}":/data)
+      fi
+    fi
+
+    engine_exec "${engine}" "${binds[@]}" -e "${SIF}" \
+      bash -lc 'R_LIBS_USER=/r-lib Rscript /work/'"${PKG_DIR_REL}"'/cli/dndsR.R '"$*"
+    ;;
+esac
