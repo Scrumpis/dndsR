@@ -39,7 +39,6 @@ Separate subgenomes, haplotypes, or other patterns into their own fastas and gff
 ```
 ```
 ### 3. Calculate dN/dS
-Run [Orthologr](https://github.com/drostlab/orthologr).
 ```
 ```
 ### 4. Append annotations
