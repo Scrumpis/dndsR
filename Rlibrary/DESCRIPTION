@@ -15,21 +15,38 @@ Encoding: UTF-8
 Depends: 
     R (>= 4.3)
 Imports:
+    AnnotationDbi,
     BiocGenerics,
     Biostrings,
+    cli,
+    data.table,
     GenomicFeatures,
     GenomeInfoDb,
+    GO.db,
     IRanges,
+    optparse,
     Rsamtools,
+    readr,
     S4Vectors,
+    stats,
+    topGO,
     utils,
-    stats
+    xml2
+Remotes:
+    drostlab/orthologr,
+    drostlab/rdiamond,
+    drostlab/metablastr
 Suggests:
-    testthat,
-    knitr,
-    rmarkdown,
     dplyr,
-    readr
+    knitr,
+    metablastr,
+    orthologr,
+    RIdeogram,
+    rdiamond,
+    rmarkdown,
+    testthat
+SystemRequirements:
+    DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 ByteCompile: true
