@@ -19,8 +19,37 @@ calculate_dnds <- function(comparison_file = NULL,
                            dnds_method = "Comeron",
                            ...) {
 
-  if (!requireNamespace("orthologr", quietly = TRUE)) {
-    stop("The orthologr package is required but not installed.")
+  # ---- dependency guards ----
+  .need_pkg <- function(pkg, msg = NULL) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      if (is.null(msg)) {
+        msg <- sprintf(
+          "Package '%s' is required for this step. Install it or run inside the dndsR container.",
+          pkg
+        )
+      }
+      stop(msg, call. = FALSE)
+    }
+  }
+  .need_pkg(
+    "orthologr",
+    "This step needs 'orthologr'. Install via remotes::install_github('drostlab/orthologr') "
+    |> paste0("or run inside the dndsR container (recommended).")
+  )
+
+  # Optional but helpful: if using DIAMOND, confirm the binary is on PATH
+  if (identical(tolower(aligner), "diamond")) {
+    ok <- trySuppressWarnings(system2("diamond", "--version", stdout = TRUE, stderr = TRUE))
+    if (inherits(ok, "try-error")) {
+      stop(
+        paste0(
+          "aligner='diamond' but the DIAMOND binary was not found on PATH.\n",
+          "• If you are using the container, this should already be installed and on PATH.\n",
+          "• Otherwise, install DIAMOND >= 2.1.8 and ensure 'diamond' is callable from your shell."
+        ),
+        call. = FALSE
+      )
+    }
   }
 
   # ---- helper: read comparison_file with ANY whitespace as delimiter ----
@@ -50,7 +79,7 @@ calculate_dnds <- function(comparison_file = NULL,
     df2 <- read_ws(FALSE)
     if (ncol(df2) < 5) {
       stop("comparison_file must have 5 columns or a header with: ",
-           paste(req, collapse = ", "))
+           paste(req, collapse = ", "), call. = FALSE)
     }
     names(df2)[1:5] <- req
     df2[, req, drop = FALSE]
@@ -93,7 +122,7 @@ calculate_dnds <- function(comparison_file = NULL,
       aa_aln_tool        = "NW",
       codon_aln_tool     = "pal2nal",
       dnds_est.method    = dnds_method,
-      comp_cores         = comp_cores,
+      comp_cores         = as.integer(comp_cores),
       quiet              = TRUE,
       clean_folders      = FALSE,
       print_citation     = FALSE
@@ -116,7 +145,6 @@ calculate_dnds <- function(comparison_file = NULL,
     out_tsv
   }
 
-
   # ---- batch vs single ----
   out_paths <- character(0)
 
@@ -137,8 +165,9 @@ calculate_dnds <- function(comparison_file = NULL,
   }
 
   # Single mode
-  if (any(sapply(list(comparison_name, subject_fasta, query_fasta, subject_gff, query_gff), is.null))) {
-    stop("In single mode, supply comparison_name, subject_fasta, query_fasta, subject_gff, and query_gff.")
+  if (any(vapply(list(comparison_name, subject_fasta, query_fasta, subject_gff, query_gff),
+                 is.null, logical(1)))) {
+    stop("In single mode, supply comparison_name, subject_fasta, query_fasta, subject_gff, and query_gff.", call. = FALSE)
   }
   out <- run_dnds(
     comparison_basename = comparison_name,
