@@ -20,7 +20,12 @@ go_enrichment(
   node_max = Inf,
   p_adjust = c("BH", "none"),
   make_plots = TRUE,
-  top_n = 20
+  top_n = 20,
+  exclude_gos = NULL,
+  exclude_descendants = FALSE,
+  exclude_descendants_depth = Inf,
+  exclude_descendants_limit = 5000,
+  include_definition = TRUE
 )
 }
 \arguments{
@@ -52,12 +57,24 @@ columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{node_max}{Maximum term size (filtered after test; default Inf).}
 
-\item{p_adjust}{"BH"|"none" for multiple-testing correction across tested nodes.
-(Note: topGO already de-correlates via its algorithm; BH is still common.)}
+\item{p_adjust}{"BH"|"none" for multiple-testing correction across tested nodes.}
 
 \item{make_plots}{If TRUE, writes a top-N bubble plot per result.}
 
 \item{top_n}{Number of rows to plot.}
+
+\item{exclude_gos}{Character vector of GO IDs to exclude globally
+from positives/background and from tested nodes (default NULL).}
+
+\item{exclude_descendants}{If TRUE, also exclude descendants of each GO ID (default FALSE).}
+
+\item{exclude_descendants_depth}{Integer depth limit for descendant exclusion;
+1 = direct children only, Inf = entire subtree (default Inf).}
+
+\item{exclude_descendants_limit}{Hard cap on total excluded nodes per (side,ontology)
+run to avoid accidentally nuking huge swaths (default 5000).}
+
+\item{include_definition}{If TRUE (default), append TERM definition from GO.db.}
 }
 \value{
 Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
