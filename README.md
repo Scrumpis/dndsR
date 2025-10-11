@@ -26,23 +26,32 @@ docker pull scrumpis/dndsr:latest
 ## Data preparation
 Separate subgenomes or phased haplotypes into their own genome, protein, or CDS fastas prior to calculating dN/dS. [Orthologr](https://github.com/drostlab/orthologr), which calculates dN/dS, outputs the best match for every query/subject CDS/protein comparison. If subgenomes or haplotypes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons, leading to spurious results. We have had success using [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) to phase subgenomes of allopolyploids with unavalaiable diploid progenitor genomes.
 For subgenome-phased genome FASTAs, a BASH command can be used to extract each into their own FASTAs. This also works to separate haplotypes in phased genomes.
-provide a BASH script () and R helper function () to assist in subgenome or haplotype FASTA seperation.
+
 
 ## Usage
-The below documents the command line interface (CLI) workflow, which is recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who would to work in Rstudio or similar.  
+The below documents the command line interface (CLI) workflow, which is recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who would to work in Rstudio or similar. All commands allow single or batch comparisons.  
 
-### 1. Extract CDS or Proteins (optional)
-### 2. Calculate dNdS
-### 3. Append annotations
-### 4. Annotation term enrichment
-### 5. Selection pressure ideogram
+### 1. split_comparisons.R
+Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids.
+```
+```
+### 2. Extract CDS or Proteins
+```
+```
+### 3. Calculate dN/dS
+Run [Orthologr](https://github.com/drostlab/orthologr).
+```
+```
+### 4. Append annotations
+```
+```
+### 5. Annotation term enrichment
+```
+```
+### 6. Selection pressure ideogram
+```
+```
 
-
-
-Start-up
-
-
-To run, open Rstudio from a conda env containing OrthoFinder
 
 dndsR has a wrapper script () to run batches of comparisons which takes as input a space or tab separated text file containing: comparison_basename, query_fasta, query_gff3, subject_fasta, subject_gff3. 
 Example:
