@@ -8,7 +8,7 @@
 #' @param case_insensitive Logical; match labels case-insensitively (default TRUE).
 #' @return Invisibly, the path to the new comparison file (with "_split" inserted before the extension).
 #' @export
-split_comparisons_by_label <- function(comparison_file,
+split_comparisons <- function(comparison_file,
                                        mode = c("subgenome","haplotype","custom"),
                                        custom_regex = NULL,
                                        case_insensitive = TRUE) {
