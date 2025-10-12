@@ -1,5 +1,5 @@
 #!/bin/bash --login
-#SBATCH --time=8:00:00
+#SBATCH --time=1:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=80
@@ -12,30 +12,61 @@
 
 set -euo pipefail
 
-# --- Env ---
-#module purge
-#module load Singularity || module load Apptainer || true
+# -------- Container runtime detection --------
+if command -v apptainer >/dev/null 2>&1; then
+  CTNR=apptainer
+elif command -v singularity >/dev/null 2>&1; then
+  CTNR=singularity
+else
+  echo "ERROR: Neither apptainer nor singularity found on PATH" >&2
+  exit 127
+fi
 
 date
 echo "Host: $(hostname)"
 echo "SLURM_CPUS_PER_TASK=${SLURM_CPUS_PER_TASK:-unset}  SLURM_CPUS_ON_NODE=${SLURM_CPUS_ON_NODE:-unset}"
 
-# --- Paths (edit if you move things) ---
+# -------- Paths --------
 SIF="/mnt/gs21/scratch/john7932/dndsR/dndsr.sif"
-SCRIPT="/mnt/gs21/scratch/john7932/dndsR/dndsR-launcher run"
+LAUNCHER="/mnt/gs21/scratch/john7932/dndsR/dndsR-launcher"
+# IMPORTANT: array, not a quoted string
+SUBCMD=(run calculate_dnds)
+
 COMPARISON="/mnt/gs21/scratch/john7932/dndsR/data/CheFo_vs_CheAl_full_fofn_split.txt"
 OUTDIR="/mnt/gs21/scratch/john7932/dndsR"
 
-# --- Threads ---
+# -------- Threads --------
 THREADS="${SLURM_CPUS_PER_TASK:-${SLURM_CPUS_ON_NODE:-80}}"
 echo "Using THREADS=${THREADS}"
 
-# --- Run alignment + dedup (script runs INSIDE the container) ---
-singularity exec "${SIF}" bash '${SCRIPT}' \
-    -C '${COMPARISON}' \
-    -O '${OUTDIR}' \
-    -t '${THREADS}' \
+# -------- Safe HOME and user R lib inside the container --------
+SAFE_HOME="/mnt/gs21/scratch/john7932/.container_home"
+SAFE_RLIB="/mnt/gs21/scratch/john7932/.dndsr/rlib"
+mkdir -p "$SAFE_HOME" "$SAFE_RLIB"
+
+# Pass env for BOTH runtimes
+export SINGULARITYENV_HOST_RLIB="$SAFE_RLIB"
+export SINGULARITYENV_R_LIBS_USER="$SAFE_RLIB"
+export APPTAINERENV_HOST_RLIB="$SAFE_RLIB"
+export APPTAINERENV_R_LIBS_USER="$SAFE_RLIB"
+
+set -x
+# Optional preflight
+$CTNR exec --cleanenv -B /mnt -H "$SAFE_HOME" "$SIF" bash -lc '
+  echo "Container HOME=$HOME"
+  ls -ld /mnt || true
+  ls -ld "$HOST_RLIB" || true
+'
+
+# -------- Run dndsR via launcher --------
+$CTNR exec --cleanenv -B /mnt -H "$SAFE_HOME" \
+  "$SIF" \
+  "$LAUNCHER" "${SUBCMD[@]}" \
+    -C "$COMPARISON" \
+    -O "$OUTDIR" \
+    -t "$THREADS" \
     -v
-    
+
+set +x
 date
 echo "Done."
