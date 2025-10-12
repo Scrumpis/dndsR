@@ -54,6 +54,7 @@ singularity exec dndsr.sif ./dndsR-launcher run extract_cds -C data/CheFo_vs_Che
 ```
 ### 3. Calculate dN/dS
 ```
+singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
 ```
 ### 4. Append annotations
 ```
