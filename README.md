@@ -13,6 +13,7 @@ Rebuild container with biomartr
 
 
 ## Setup
+Note: We recommend Docker and Singularity usage for either CLI or RStudio usage, however, if you have a working Conda env or other way to provide the dependencies, Docker and Singularity are not required. You can install directly into RStudio as shown below (note line once we make it).
 ### Clone the Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
@@ -25,6 +26,12 @@ singularity pull dndsr.sif docker://scrumpis/dndsr:latest
 Docker
 ```
 docker pull scrumpis/dndsr:latest
+```
+
+### Install dndsR library
+Singularity
+```
+singularity exec dndsr.sif ./dndsR-launcher install
 ```
 
 ## Data preparation
