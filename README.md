@@ -44,7 +44,9 @@ The below documents the command line interface (CLI) workflow, which is recommen
 
 ### 1. split_comparisons.R
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids.
+#### Singularity
 ```
+singularity exec dndsr.sif ./dndsR-launcher run split_comparisons -C data/CheFo_vs_CheAl_full_fofn.txt -v -m subgenome
 ```
 ### 2. Extract CDS or Proteins
 ```
