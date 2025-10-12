@@ -53,6 +53,7 @@ singularity exec dndsr.sif ./dndsR-launcher run split_comparisons -C data/CheFo_
 singularity exec dndsr.sif ./dndsR-launcher run extract_cds -C data/CheFo_vs_CheAl_full_fofn_split.txt
 ```
 ### 3. Calculate dN/dS
+Recommended to run on cluster, slurm script available.  
 Need shims first? Test again without.
 ```
 bash scripts/make_shims.sh shims
