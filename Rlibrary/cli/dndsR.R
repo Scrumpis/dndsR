@@ -112,9 +112,9 @@ opts_split <- list(
               help="subgenome|haplotype|custom [default: %default]"),
   make_option(c("-r","--custom-regex"), type="character", default=NULL,
               help="Regex with exactly one capture group when --mode=custom"),
-  make_option(NULL, "--case-insensitive", action="store_true", default=TRUE,
+  make_option(c("--case-insensitive"), action="store_true", default=TRUE,
               help="Case-insensitive label matching [default: %default]"),
-  make_option(NULL, "--case-sensitive", action="store_true", default=FALSE,
+  make_option(c("--case-sensitive"),   action="store_true", default=FALSE,
               help="Override to make matching case-sensitive")
 )
 run_split <- function(o){
