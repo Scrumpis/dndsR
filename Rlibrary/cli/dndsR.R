@@ -265,6 +265,13 @@ opts_append_annotations <- list(
 
 run_append_annotations <- function(o) {
   .dump_opts("append_annotations", o)
+
+  # advertise globally for helpers
+  options(dndsR.threads = as.integer(o$threads))
+
+  threads <- as.integer(o$threads)
+  if (is.na(threads) || threads < 1L) threads <- 1L
+
   res <- dndsR::append_annotations(
     dnds_file       = o$dnds_file,
     query_gff       = o$query_gff,
@@ -272,8 +279,10 @@ run_append_annotations <- function(o) {
     output_file     = o$output_file,
     comparison_file = o$comparison_file,
     output_dir      = o$output_dir,
-    custom          = o$custom
+    custom          = o$custom,
+    threads         = threads          # use base_opts' -t/--threads
   )
+
   if (is.character(res) && length(res)) {
     cli::cli_alert_success("append_annotations completed. Wrote {length(res)} file{?s}.")
     for (p in res) cli::cli_bullets(c(v = paste0("<", p, ">")))
@@ -800,6 +809,11 @@ if (isTRUE(opts$verbose) || identical(tolower(Sys.getenv("DNDSR_VERBOSE", "0")),
     opts$verbose <- TRUE
   }
 }
+
+# ---- Threads bridge for all subcommands ----
+threads <- if (!is.null(opts$threads)) as.integer(opts$threads) else 1L
+if (is.na(threads) || threads < 1L) threads <- 1L
+options(dndsR.threads = threads)
   
 tryCatch({
   spec$fun(opts)
