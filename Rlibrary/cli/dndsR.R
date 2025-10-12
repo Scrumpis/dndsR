@@ -259,6 +259,8 @@ opts_append_annotations <- list(
               help = "TSV with: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
   make_option(c("-O","--output-dir"), type = "character", dest = "output_dir", default = getwd(),
               help = "Root directory containing per-comparison folders (batch mode) [default: %default]"),
+  make_option(c("--overwrite"), action = "store_true", default = FALSE,
+              help = "Recompute and overwrite existing <comp>_dnds_annot.tsv [default: %default]"),
   make_option(c("--custom"), type = "character", default = NULL,
               help = "Comma patterns like 'REX{5},TOM{8}' → q_prefix/s_prefix columns")
 )
@@ -280,7 +282,8 @@ run_append_annotations <- function(o) {
     comparison_file = o$comparison_file,
     output_dir      = o$output_dir,
     custom          = o$custom,
-    threads         = threads          # use base_opts' -t/--threads
+    threads         = threads,          # use base_opts' -t/--threads
+    overwrite       = isTRUE(o$overwrite)
   )
 
   if (is.character(res) && length(res)) {
@@ -575,7 +578,8 @@ opts_term_enrichment <- list(
               help='Candidate separators for auto-detect per column (comma-separated). Use "<comma>" for ",". Default resolves to c(";", "|", ",").'),
 
   make_option(c("--term-blocklist"), type="character",
-              default="attributes,attribute,attr,notes,note,description,product,name,id,gene_id,transcript_id,parent,dbxref,source,target,type,seqname,seqid,start,end,strand,phase,biotype,class,len",
+              default="attributes,attribute,attr,notes,note,description,product,name,id,gene_id,transcript_id,parent,dbxref,source,target,type,seqname,seqid,star
+t,end,strand,phase,biotype,class,len",
               help="Comma list of suffixes to ignore as term families [default: a built-in list]"),
 
   # Exclusions / trees / metadata
