@@ -11,6 +11,7 @@
 #'   PREFIX followed by exactly N digits; produces q_prefix/s_prefix columns.
 #' @param threads Integer threads to use for per-ID annotation. If NULL/NA, uses
 #'   options(dndsR.threads) or DNDSR_THREADS env; defaults to 1.
+#' @param overwrite Logical; in batch mode, skip a comparison if output exists unless TRUE. Default FALSE.
 #' @return In single mode: a data.frame. In batch mode: (invisibly) vector of output paths.
 #' @export
 append_annotations <- function(dnds_file = NULL,
@@ -20,7 +21,8 @@ append_annotations <- function(dnds_file = NULL,
                                comparison_file = NULL,
                                output_dir = getwd(),
                                custom = NULL,
-                               threads = NULL) {
+                               threads = NULL,
+                               overwrite = FALSE) {
 
   ## ---------- lightweight verbose helper ----------
   vmsg <- function(...) {
@@ -69,87 +71,71 @@ append_annotations <- function(dnds_file = NULL,
     df2[, req, drop = FALSE]
   }
 
-  # Fast & flexible GFF reader: try fread (TAB), then fread (SPACE), then robust base fallback.
-  .read_gff <- function(path, nThread = getOption("dndsR.threads", 1L)) {
-    stopifnot(file.exists(path))
-    use_dt <- requireNamespace("data.table", quietly = TRUE)
+  # ---- Fast GFF reader with pure-R fallbacks (no shell) ----
+  .read_gff <- function(path) {
+    start_time <- proc.time()[["elapsed"]]
+    ok9 <- function(x) is.data.frame(x) && ncol(x) >= 9L
 
-    .fix9 <- function(g) {
-      if (!is.data.frame(g) || ncol(g) < 9L) return(NULL)
-      if (ncol(g) > 9L) {
-        extra <- g[, 9:ncol(g), drop = FALSE]
-        g[[9]] <- apply(extra, 1L, function(row) {
-          row <- row[!is.na(row) & nzchar(row)]
-          if (!length(row)) "" else paste(row, collapse = "\t")
-        })
-        g <- g[, 1:9, drop = FALSE]
-      }
-      names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-      g
-    }
+    use_fread <- requireNamespace("data.table", quietly = TRUE)
 
-    if (use_dt) {
-      grep_bin <- Sys.which("grep")
-      fast_cmd <- if (nzchar(grep_bin)) sprintf("%s -v '^#' %s", shQuote(grep_bin), shQuote(path)) else NULL
-      nThread  <- as.integer(max(1L, nThread))
-
-      # Try TAB first
-      g <- try({
-        if (!is.null(fast_cmd)) {
-          data.table::fread(cmd = fast_cmd, sep = "\t", header = FALSE, quote = "",
-                            na.strings = c("", "NA"), data.table = FALSE,
-                            fill = TRUE, showProgress = FALSE, nThread = nThread)
-        } else {
-          data.table::fread(path, sep = "\t", header = FALSE, quote = "",
-                            na.strings = c("", "NA"), data.table = FALSE,
-                            fill = TRUE, showProgress = FALSE, nThread = nThread)
+    if (use_fread) {
+      # We'll try three modes with comment skipping (pure R):
+      # 1) tab, 2) auto, 3) single-space. All keep only columns 1:9.
+      modes <- list(
+        list(sep = "\t", tag = "fread(tab,comment)"),
+        list(sep = "auto", tag = "fread(auto,comment)"),
+        list(sep = " ", tag = "fread(space,comment)")
+      )
+      for (mode in modes) {
+        g <- try(data.table::fread(
+          file = path,
+          sep = mode$sep,
+          header = FALSE,
+          quote = "",
+          data.table = FALSE,
+          showProgress = FALSE,
+          fill = TRUE,
+          comment = "#",          # ignore inline comments; full-line '#' become empty -> skipped
+          skipEmptyLines = TRUE,
+          select = 1:9,           # read only first 9 columns
+          col.names = paste0("V", 1:9),
+          colClasses = c("character","character","character",
+                         "integer","integer","character",
+                         "character","character","character"),
+          na.strings = c("", "NA", ".")
+        ), silent = TRUE)
+        if (!inherits(g, "try-error") && ok9(g)) {
+          names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
+          et <- proc.time()[["elapsed"]] - start_time
+          vmsg(sprintf("GFF read via %s in %.3fs; rows=%s: %s",
+                       mode$tag, et, format(nrow(g), big.mark=","), basename(path)))
+          return(g)
         }
-      }, silent = TRUE)
-
-      if (!inherits(g, "try-error")) {
-        if (is.null(fast_cmd)) {
-          g <- g[!(startsWith(g[[1]], "#")), , drop = FALSE]
-        }
-        g9 <- .fix9(g)
-        if (!is.null(g9)) return(g9)
-      }
-
-      # Try SPACE (collapses runs of spaces)
-      g2 <- try({
-        if (!is.null(fast_cmd)) {
-          data.table::fread(cmd = fast_cmd, sep = " ", header = FALSE, quote = "",
-                            na.strings = c("", "NA"), data.table = FALSE,
-                            fill = TRUE, strip.white = TRUE, showProgress = FALSE, nThread = nThread)
-        } else {
-          data.table::fread(path, sep = " ", header = FALSE, quote = "",
-                            na.strings = c("", "NA"), data.table = FALSE,
-                            fill = TRUE, strip.white = TRUE, showProgress = FALSE, nThread = nThread)
-        }
-      }, silent = TRUE)
-
-      if (!inherits(g2, "try-error")) {
-        if (is.null(fast_cmd)) {
-          g2 <- g2[!(startsWith(g2[[1]], "#")), , drop = FALSE]
-        }
-        g9 <- .fix9(g2)
-        if (!is.null(g9)) return(g9)
       }
     }
 
-    # Robust fallback: base read.table with flexible whitespace; preserves attributes safely
-    g <- utils::read.table(path, sep = "", header = FALSE, quote = "",
-                           stringsAsFactors = FALSE, comment.char = "#", fill = TRUE)
-    if (ncol(g) < 9L) stop("GFF appears malformed (found ", ncol(g), " columns): ", path)
-    if (ncol(g) > 9L) {
-      extra <- g[, 9:ncol(g), drop = FALSE]
-      g[[9]] <- apply(extra, 1L, function(row) {
-        row <- row[!is.na(row) & nzchar(row)]
-        if (!length(row)) "" else paste(row, collapse = "\t")
-      })
-      g <- g[, 1:9, drop = FALSE]
+    # Base fallback(s): first tab (strict), then any whitespace (last resort).
+    for (sep in c("\t", "")) {
+      g <- try(utils::read.table(path, sep = sep, header = FALSE, quote = "",
+                                 stringsAsFactors = FALSE, comment.char = "#", fill = TRUE,
+                                 colClasses = c("character","character","character",
+                                                "integer","integer","character",
+                                                "character","character","character")),
+               silent = TRUE)
+      if (!inherits(g, "try-error") && ok9(g)) {
+        names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
+        et <- proc.time()[["elapsed"]] - start_time
+        vmsg(sprintf("GFF read via base (sep='%s') in %.3fs; rows=%s: %s",
+                     if (sep=="") "any whitespace" else "\\t",
+                     et, format(nrow(g), big.mark=","), basename(path)))
+        if (sep == "") {
+          vmsg("Warning: parsed with sep=''; if attribute values contain unescaped spaces, they may be split.")
+        }
+        return(g)
+      }
     }
-    names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-    g
+
+    stop("GFF appears malformed or unreadable: ", path)
   }
 
   ## ---------- term patterns & normalizers ----------
@@ -195,7 +181,8 @@ append_annotations <- function(dnds_file = NULL,
     s <- attr_string
     for (lab in names(patterns)) {
       rx <- patterns[[lab]]
-      hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE, ignore.case = case_insensitive)))
+      hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE,
+                                            ignore.case = case_insensitive)))
       if (length(hits)) {
         if (!is.null(normalizers[[lab]])) hits <- normalizers[[lab]](hits)
         out[[lab]] <- unique(hits[nzchar(hits)])
@@ -208,7 +195,7 @@ append_annotations <- function(dnds_file = NULL,
   .precompute_maps_and_terms <- function(gff_df, patterns, normalizers) {
     children  <- new.env(hash = TRUE, parent = emptyenv())  # parent -> child IDs
     own_terms <- new.env(hash = TRUE, parent = emptyenv())  # id -> list(term vectors)
-    own_attrs <- new.env(hash = TRUE, parent = emptyenv())  # id -> character vectors of filtered attribute strings
+    own_attrs <- new.env(hash = TRUE, parent = emptyenv())  # id -> character vector of filtered attribute strings
 
     any_rx <- paste(sprintf("(?:%s)", unname(patterns)), collapse = "|")
 
@@ -350,23 +337,20 @@ append_annotations <- function(dnds_file = NULL,
       stop("dN/dS file must have columns 'query_id' and 'subject_id'.")
     }
 
-    # patterns: defaults + parsed customs (customs appended after standard order)
     patterns    <- .default_term_patterns()
     customs     <- .parse_custom(custom)
     if (!is.null(customs)) patterns[names(customs)] <- unname(customs)
     normalizers <- .default_normalizers()
 
-    # desired term order: standard first, then any custom labels
     std_order <- c("IPR","GO","KEGG","PANTHER","PFAM","TIGRFAM","COG")
     labs <- c(std_order[std_order %in% names(patterns)],
-              setdiff(names(patterns), std_order))  # customs at the end
+              setdiff(names(patterns), std_order))
 
     vmsg("Precomputing query-side maps…")
-    q_maps <- .precompute_maps_and_terms(.read_gff(q_gff, nThread = threads), patterns, normalizers)
+    q_maps <- .precompute_maps_and_terms(.read_gff(q_gff), patterns, normalizers)
     vmsg("Precomputing subject-side maps…")
-    s_maps <- .precompute_maps_and_terms(.read_gff(s_gff, nThread = threads), patterns, normalizers)
+    s_maps <- .precompute_maps_and_terms(.read_gff(s_gff), patterns, normalizers)
 
-    # Annotate the unique IDs (returns ID, ATTR, and one column per label in 'labs')
     q_ids <- unique(dnds$query_id)
     s_ids <- unique(dnds$subject_id)
     vmsg(sprintf("Annotating IDs (q=%d, s=%d) with threads=%d…", length(q_ids), length(s_ids), threads))
@@ -385,13 +369,11 @@ append_annotations <- function(dnds_file = NULL,
       s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts)
     }
 
-    # keep only labels that actually appear
     present_labs <- labs[vapply(labs, function(L) {
       qa <- q_ann[[L]]; sa <- s_ann[[L]]
       any(!is.na(qa) & qa != "") || any(!is.na(sa) & sa != "")
     }, logical(1))]
 
-    # Join by match; order: q_attributes, s_attributes, then interleaved q_<lab>, s_<lab>
     d <- dnds
     mapv <- function(df, col) { v <- df[[col]]; names(v) <- df$ID; v }
 
@@ -425,6 +407,13 @@ append_annotations <- function(dnds_file = NULL,
       comp_dir  <- file.path(output_dir, comp)
       dnds_path <- file.path(comp_dir, paste0(comp, "_dnds.tsv"))
       out_path  <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
+
+      if (!isTRUE(overwrite) && file.exists(out_path) && file.info(out_path)$size > 0) {
+        vmsg(sprintf("[%s] exists; skipping (use overwrite=TRUE to regenerate).", basename(out_path)))
+        out_paths <- c(out_paths, out_path)
+        next
+      }
+
       vmsg(sprintf("[%s] reading GFFs & appending annotations…", comp))
       out <- .annotate_single(dnds_path, df$query_gff[i], df$subject_gff[i], out_path, threads = threads)
       vmsg(sprintf("[%s] wrote %s", comp, out))
