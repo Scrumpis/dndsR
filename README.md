@@ -65,6 +65,7 @@ singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds -C data/CheFo_vs_
 ```
 ### 4. Append annotations
 ```
+singularity exec dndsr.sif ./dndsR-launcher run append_annotations -C data/CheFo_vs_CheAl_full_fofn_split.txt -O . -v -t 8
 ```
 ### 5. Annotation term enrichment
 ```
