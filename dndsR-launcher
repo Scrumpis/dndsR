@@ -3,8 +3,13 @@ set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-$PWD}"
 PKG_DIR="Rlibrary"
-HOST_RLIB="${HOST_RLIB:-$HOME/.dndsr/rlib}"
-FORCE=0
+PKG_NAME="dndsR"
+
+# default install location; override safely in SLURM with HOST_RLIB or SINGULARITYENV_HOST_RLIB
+HOST_RLIB="${HOST_RLIB:-${HOME:-}/.dndsr/rlib}"
+
+# global force from flag or env
+FORCE="${DNDSR_FORCE:-0}"
 
 die(){ echo "Error: $*" >&2; exit 1; }
 have(){ command -v "$1" >/dev/null 2>&1; }
@@ -14,55 +19,71 @@ cat <<'EOF'
 dndsR-launcher — installs and runs the dndsR CLI (container-agnostic)
 
 USAGE
-  dndsR-launcher install [--force]
-  dndsR-launcher run <args...>
+  dndsR-launcher [--force] install
+  dndsR-launcher [--force] run <dndsR subcommand> [args...]
 
 ENV (optional)
-  HOST_RLIB=~/.dndsr/rlib   # where the package is installed
-  REPO_DIR=$PWD             # repo root (containing Rlibrary/)
+  HOST_RLIB        user library path (default: ~/.dndsr/rlib)
+  REPO_DIR         repo root containing Rlibrary/
+  DNDSR_FORCE=1    force reinstall even if version/hash unchanged
 EOF
 }
 
-cmd="${1:-}"; shift || true
-case "${cmd}" in
-  install|run) ;;
-  -h|--help|"") usage; exit 0 ;;
-  *) usage; exit 1 ;;
-esac
+# ------------- helper: compute source hash -------------
+src_hash(){
+  # Prefer sha256sum, fallback to shasum or md5sum
+  local SUM=""; have sha256sum && SUM="sha256sum" || have shasum && SUM="shasum -a 256" || SUM="md5sum"
+  (
+    cd "${REPO_DIR}/${PKG_DIR}" || exit 1
+    # stable list of files that define the package
+    find DESCRIPTION NAMESPACE R inst -type f 2>/dev/null | LC_ALL=C sort | xargs ${SUM} | ${SUM%% *} | awk '{print $1}'
+  )
+}
 
-# parse flags for install
-if [[ "${cmd}" == "install" ]]; then
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --force) FORCE=1; shift ;;
-      --) shift; break ;;
-      *) break ;;
-    esac
-  done
-fi
-
+# ------------- install-if-needed -------------
 install_pkg_if_needed(){
   have R || die "R not found in PATH"
   have Rscript || die "Rscript not found in PATH"
 
-  mkdir -p "${HOST_RLIB}"
+  [[ -n "${HOST_RLIB}" ]] || die "HOST_RLIB is empty; set HOST_RLIB or HOME"
+  mkdir -p "${HOST_RLIB}" || die "Failed to create ${HOST_RLIB}"
   [[ -w "${HOST_RLIB}" ]] || die "User library not writable: ${HOST_RLIB}"
 
   local desc="${REPO_DIR}/${PKG_DIR}/DESCRIPTION"
   [[ -f "$desc" ]] || die "No DESCRIPTION at ${desc}"
+
   local ver; ver="$(awk -F': *' '$1=="Version"{print $2}' "$desc")"
   [[ -n "$ver" ]] || die "Could not parse Version from DESCRIPTION"
 
-  local vfile="${HOST_RLIB}/.dndsR.version"
-  if [[ ${FORCE} -eq 0 && -f "${vfile}" && "$(cat "${vfile}")" == "${ver}" ]]; then
-    echo "dndsR ${ver} already installed in ${HOST_RLIB} (use --force to reinstall)."
-  else
-    R CMD INSTALL --library="${HOST_RLIB}" "${REPO_DIR}/${PKG_DIR}"
-    echo "${ver}" > "${vfile}"
+  local hash; hash="$(src_hash || true)"
+  [[ -n "$hash" ]] || echo "Warning: could not compute source hash; falling back to version only." >&2
+
+  local meta="${HOST_RLIB}/.${PKG_NAME}.installmeta"
+  local need=1
+  if [[ -f "$meta" ]]; then
+    read -r prev_ver prev_hash < "$meta" || true
+    if [[ "${FORCE}" -eq 0 && "${prev_ver:-}" == "$ver" && ( -z "$hash" || "${prev_hash:-}" == "$hash" ) ]]; then
+      need=0
+    fi
   fi
 
-  # quick load test with the same lib path
-  R_LIBS_USER="${HOST_RLIB}" Rscript - <<'RS'
+  if [[ "${FORCE}" -eq 1 ]]; then
+    echo "[${PKG_NAME}] FORCE reinstall requested."
+    need=1
+  fi
+
+  if [[ "$need" -eq 0 ]]; then
+    echo "[${PKG_NAME}] ${ver} already installed in ${HOST_RLIB} (hash match)."
+  else
+    echo "[${PKG_NAME}] Installing ${ver} into ${HOST_RLIB} ..."
+    # remove any prior install to avoid stale objects
+    R CMD REMOVE -l "${HOST_RLIB}" "${PKG_NAME}" >/dev/null 2>&1 || true
+    R CMD INSTALL --clean --preclean --library="${HOST_RLIB}" "${REPO_DIR}/${PKG_DIR}"
+    echo "${ver} ${hash:-nohash}" > "$meta"
+  fi
+
+  # sanity: load from the same lib path we just used
+  R_LIBS_USER="${HOST_RLIB}" Rscript --vanilla - <<'RS'
 opts <- options(warn=1); on.exit(options(opts), add=TRUE)
 .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
 suppressPackageStartupMessages(library(dndsR))
@@ -71,16 +92,30 @@ cat("libPaths:\n"); print(.libPaths())
 RS
 }
 
+# ------------- parse global flags before subcommand -------------
+cmd=
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force) FORCE=1; shift ;;
+    install|run) cmd="$1"; shift; break ;;
+    -h|--help|"") usage; exit 0 ;;
+    *) usage; exit 1 ;;
+  esac
+done
+[[ -n "${cmd:-}" ]] || { usage; exit 1; }
+
 case "${cmd}" in
   install)
     install_pkg_if_needed
-    echo "Installed/updated dndsR into ${HOST_RLIB}"
+    echo "Installed/updated ${PKG_NAME} into ${HOST_RLIB}"
     ;;
-
   run)
+    # args to pass through to the package CLI
     install_pkg_if_needed
     export R_LIBS_USER="${HOST_RLIB}"
     # exec so signals/exit codes propagate
-    exec Rscript "${REPO_DIR}/${PKG_DIR}/cli/dndsR.R" "$@"
+    exec Rscript --vanilla "${REPO_DIR}/${PKG_DIR}/cli/dndsR.R" "$@"
     ;;
+  *)
+    usage; exit 1 ;;
 esac
