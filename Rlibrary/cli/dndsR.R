@@ -792,6 +792,15 @@ spec <- subcommands[[cmd]]
 parser <- optparse::OptionParser(usage=paste0("%prog ", cmd, " [options]"), option_list = spec$opts)
 opts <- optparse::parse_args(parser, args=args, positional_arguments = FALSE)
 
+# ---- Verbosity bridge for all subcommands ----
+if (isTRUE(opts$verbose) || identical(tolower(Sys.getenv("DNDSR_VERBOSE", "0")), "1")) {
+  options(dndsR.verbose = TRUE, dndsR.cli.verbose = TRUE)
+  # keep flags consistent if env var turned it on
+  if (!isTRUE(opts$verbose) && identical(tolower(Sys.getenv("DNDSR_VERBOSE", "0")), "1")) {
+    opts$verbose <- TRUE
+  }
+}
+  
 tryCatch({
   spec$fun(opts)
   if (isTRUE(opts$verbose)) cli::cli_alert_success("Done.")
