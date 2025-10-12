@@ -50,6 +50,7 @@ singularity exec dndsr.sif ./dndsR-launcher run split_comparisons -C data/CheFo_
 ```
 ### 2. Extract CDS or Proteins
 ```
+singularity exec dndsr.sif ./dndsR-launcher run extract_cds -C data/CheFo_vs_CheAl_full_fofn_split.txt
 ```
 ### 3. Calculate dN/dS
 ```
