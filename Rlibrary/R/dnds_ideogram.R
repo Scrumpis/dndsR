@@ -10,8 +10,8 @@
 #' (\code{dNdS < 1}) overlaid, and positive selection (\code{dNdS >= 1}) as the
 #' label heatmap. Outputs are \code{<comp>_{query|subject}_ideogram.{svg,png}}.
 #'
-#' @param dnds_merged_file Path to a single prebuilt intermediate table that
-#'   already contains \code{q_chr/q_gene_start} or \code{s_chr/s_gene_start}
+#' @param dnds_annot Path to a single prebuilt intermediate table (or annotated table)
+#'   that already contains \code{q_chr/q_gene_start} or \code{s_chr/s_gene_start}
 #'   (single mode). Most users should prefer batch mode via \code{comparison_file}.
 #' @param comparison_file Whitespace-delimited file with columns:
 #'   \code{comparison_name}, \code{query_fasta}, \code{query_gff},
@@ -54,8 +54,8 @@
 #'
 #' @return Invisibly, a character vector of output file paths written.
 #' @export
-dnds_ideogram <- function(dnds_merged_file = NULL,
-                          comparison_file  = NULL,
+dnds_ideogram <- function(dnds_annot      = NULL,
+                          comparison_file = NULL,
                           output_dir       = getwd(),
                           sides            = c("query","subject"),
                           window_size      = 300000,
@@ -101,7 +101,6 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     }
     fai
   }
-  # Keep RAW names (no digit stripping). RIdeogram accepts arbitrary labels.
   .read_karyotype <- function(fai_path) {
     fai <- utils::read.table(fai_path, sep = "\t", header = FALSE,
                              stringsAsFactors = FALSE, quote = "", comment.char = "")
@@ -113,12 +112,21 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       stringsAsFactors = FALSE
     )
   }
+  # Treat "" as NULL for robust CLI plumbing
+  .null_if_empty <- function(x) {
+    if (is.null(x)) return(NULL)
+    if (is.character(x) && length(x) == 1L && !nzchar(x)) return(NULL)
+    x
+  }
+  .fasta_karyotype <- function(fasta) {
+    fai <- .ensure_fai(fasta)
+    .read_karyotype(fai)
+  }
   .order_by_karyotype <- function(tbl, karyo, chr_col = "Chr") {
     if (!nrow(tbl)) return(tbl)
     lev <- karyo$Chr
     f <- factor(tbl[[chr_col]], levels = lev, ordered = TRUE)
     tbl <- tbl[order(f, tbl$Start), , drop = FALSE]
-    # ensure Chr is character, not factor
     tbl[[chr_col]] <- as.character(tbl[[chr_col]])
     tbl
   }
@@ -196,41 +204,7 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     if (!any(ex)) return(NA_character_)
     candidates[which(ex)[1]]
   }
-  # Crop output SVG to remove bottom white space
-  crop_svg_by_bottom_margin <- function(svg, cut_px) {
-    root <- xml2::xml_root(svg)
 
-    vb <- xml2::xml_attr(root, "viewBox")
-    if (is.na(vb) || !nzchar(vb)) {
-      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
-      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-      if (!is.finite(w) || !is.finite(h)) { w <- 1200; h <- 800 }
-      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
-      vb <- xml2::xml_attr(root, "viewBox")
-    }
-
-    nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
-    minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
-
-    new_vh <- max(10, vh - cut_px)
-
-    xml2::xml_attr(root, "viewBox") <- sprintf("%g %g %g %g", minX, minY, vw, new_vh)
-
-    old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-    if (is.finite(old_h) && vh > 0) {
-      xml2::xml_attr(root, "height") <- paste0(old_h * (new_vh / vh), "px")
-    }
-
-    bg <- xml2::xml_find_first(root, ".//rect[@id='svg-bg-rect']")
-    if (!inherits(bg, "xml_missing")) {
-      xml2::xml_set_attr(bg, "x", as.character(minX))
-      xml2::xml_set_attr(bg, "y", as.character(minY))
-      xml2::xml_set_attr(bg, "width",  as.character(vw))
-      xml2::xml_set_attr(bg, "height", as.character(new_vh))
-    }
-
-    svg
-  }
   # ---------- rendering worker (per side) ----------
   .one_side <- function(merged_path, side, fasta, window_size, max_dnds, filter_expr,
                         make_png, overwrite,
@@ -296,20 +270,16 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       FUN = function(x) if (is.numeric(x)) sum(x, na.rm = TRUE) else sum(x)
     )
 
-    # add End and the averaged columns (these lines were missing)
+    # add End and the averaged columns
     win$End <- win$Start + window_size
     win$avg_ln_dNdS      <- ifelse(win$n_genes  == 0, NA_real_, win$total_ln_dNdS      / pmax(win$n_genes,  1))
     win$avg_ln_neg_dNdS  <- ifelse(win$neg_genes== 0, NA_real_, win$total_ln_neg_dNdS  / pmax(win$neg_genes,1))
     win$avg_ln_pos_dNdS  <- ifelse(win$pos_genes== 0, NA_real_, win$total_ln_pos_dNdS  / pmax(win$pos_genes,1))
     if (!nrow(win)) { req_cli("No windows formed -> skip"); return(character(0)) }
-    win$End <- win$Start + window_size
 
-    # Karyotype (RAW names), then optional normalization for both karyotype & win
-    #fai <- .ensure_fai(fasta)
-    #karyotype <- .read_karyotype(fai)
+    # Karyotype (RAW names), then optional normalization
     karyotype <- .fasta_karyotype(fasta)
 
-    # Optional normalization (opt-in; default no change)
     karyotype$Chr <- .normalize_chr(
       karyotype$Chr,
       strip_chr0 = chr_strip_leading_chr0,
@@ -336,8 +306,6 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     if (!nrow(win)) { req_cli("All windows invalid after clamping -> skip"); return(character(0)) }
 
     # Build heatmaps
-    #neg <- win[!is.nan(win$avg_ln_neg_dNdS), c("Chr","Start","End","avg_ln_neg_dNdS")]
-    #pos <- win[!is.nan(win$avg_ln_pos_dNdS), c("Chr","Start","End","avg_ln_pos_dNdS")]
     neg <- subset(win, is.finite(avg_ln_neg_dNdS), select = c("Chr","Start","End","avg_ln_neg_dNdS"))
     pos <- subset(win, is.finite(avg_ln_pos_dNdS), select = c("Chr","Start","End","avg_ln_pos_dNdS"))
     if (!nrow(neg) && !nrow(pos)) { req_cli("No heatmap data -> skip"); return(character(0)) }
@@ -375,12 +343,11 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
     }
 
-    # === Center chromosome labels around their current placement ===
+    # Center chromosome labels around their current placement
     chr_names <- karyotype$Chr
     lab_nodes <- tn[xml2::xml_text(tn) %in% chr_names]
     if (length(lab_nodes)) {
 
-      # helpers: parse translate(...) and compute absolute X
       parse_tx <- function(tr) {
         if (is.na(tr) || !nzchar(tr)) return(0)
         m <- regmatches(tr, regexpr("translate\\s*\\(([^)]*)\\)", tr))
@@ -388,19 +355,6 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
         nums <- as.numeric(strsplit(sub(".*\\(([^)]*)\\).*", "\\1", m), "[ ,]+")[[1]])
         if (length(nums) >= 1 && is.finite(nums[1])) nums[1] else 0
       }
-      abs_x <- function(node) {
-        x <- suppressWarnings(as.numeric(xml2::xml_attr(node, "x"))); if (is.na(x)) x <- 0
-        cur <- node
-        repeat {
-          x <- x + parse_tx(xml2::xml_attr(cur, "transform"))
-          par <- xml2::xml_parent(cur)
-          if (inherits(par, "xml_missing")) break
-          cur <- par
-        }
-        x
-      }
-
-      # average glyph width in em for Arial-ish fonts; adjust if needed
       char_width_em <- 0.56
 
       for (i in seq_along(lab_nodes)) {
@@ -408,32 +362,22 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
         txt   <- xml2::xml_text(node)
         nchar_txt <- nchar(txt)
 
-        # current styling
         fs <- suppressWarnings(as.numeric(xml2::xml_attr(node, "font-size")))
-        if (is.na(fs)) fs <- 14  # your code sets 14; keep in sync
+        if (is.na(fs)) fs <- 14
         old_anchor <- xml2::xml_attr(node, "text-anchor")
         if (is.na(old_anchor) || !nzchar(old_anchor)) old_anchor <- "start"
 
-        # we always want center anchoring going forward
         xml2::xml_attr(node, "text-anchor") <- "middle"
-        xml2::xml_attr(node, "dx") <- NULL  # avoid compounding shifts
+        xml2::xml_attr(node, "dx") <- NULL
 
-        # compute an adjustment so the label is centered *around its current placement*
-        # If RIdeogram used left-edge (start), shift right by ~half text width.
-        # If it used right-edge (end), shift left by ~half text width.
-        # If it already used middle, no shift needed.
         half_px <- 0.5 * nchar_txt * fs * char_width_em
         dx <- switch(tolower(old_anchor),
                      "start"  =  +half_px,
                      "end"    =  -half_px,
                      "middle" =  0,
-                     # unknown -> assume start
-                     +half_px
-        )
-
+                     +half_px)
         dx <- dx - 4
 
-        # Apply dx via a local translate that preserves Y and all ancestors.
         old_tr <- xml2::xml_attr(node, "transform")
         new_tr <- if (!is.na(old_tr) && nzchar(old_tr)) {
           sprintf("translate(%g,0) %s", dx, old_tr)
@@ -444,42 +388,9 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       }
     }
 
-    # === Add top padding by shifting the viewBox (no reparenting) ===
-    y_pad <- 80  # px; increase if your header still touches the top 140
-
+    # Add top padding by shifting the viewBox
+    y_pad <- 80
     root <- xml2::xml_root(svg)
-
-    # Ensure viewBox exists; if not, synthesize from width/height
-    vb <- xml2::xml_attr(root, "viewBox")
-    if (is.na(vb) || !nzchar(vb)) {
-      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
-      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-      if (is.na(w) || is.na(h)) {
-        # fallback to a reasonable default if dimensions are missing
-        w <- 1200; h <- 800
-      }
-      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
-      vb <- xml2::xml_attr(root, "viewBox")
-    }
-
-    # Shift min-y up by y_pad and extend height by y_pad
-    nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
-    if (length(nums) == 4) {
-      nums[2] <- nums[2] - y_pad   # minY becomes negative -> adds top space
-      nums[4] <- nums[4] + y_pad   # increase viewBox height
-      xml2::xml_attr(root, "viewBox") <- paste(nums, collapse = " ")
-    }
-
-    # If explicit pixel height is set, bump it so nothing is clipped when exporting
-    old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-    if (!is.na(old_h)) {
-      xml2::xml_attr(root, "height") <- paste0(old_h + y_pad, "px")
-    }
-
-    # === Solid white background behind everything (robust) ===
-    root <- xml2::xml_root(svg)
-
-    # 1) Ensure viewBox exists, then parse it
     vb <- xml2::xml_attr(root, "viewBox")
     if (is.na(vb) || !nzchar(vb)) {
       w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
@@ -489,34 +400,73 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
       vb <- xml2::xml_attr(root, "viewBox")
     }
     nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
-    stopifnot(length(nums) == 4)
+    if (length(nums) == 4) {
+      nums[2] <- nums[2] - y_pad
+      nums[4] <- nums[4] + y_pad
+      xml2::xml_attr(root, "viewBox") <- paste(nums, collapse = " ")
+    }
+    old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+    if (!is.na(old_h)) {
+      xml2::xml_attr(root, "height") <- paste0(old_h + y_pad, "px")
+    }
+
+    # Solid white background under everything + bottom crop
+    root <- xml2::xml_root(svg)
+    vb <- xml2::xml_attr(root, "viewBox")
+    if (is.na(vb) || !nzchar(vb)) {
+      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
+      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+      if (is.na(w) || is.na(h)) { w <- 1200; h <- 800 }
+      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
+      vb <- xml2::xml_attr(root, "viewBox")
+    }
+    nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
     minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
-
-    # 2) Remove any previous bg rect(s)
     xml2::xml_find_all(root, ".//rect[@id='svg-bg-rect']") |> xml2::xml_remove()
-
-    # 3) Find the FIRST non-<defs> child directly under <svg>
-    first_draw <- xml2::xml_find_first(root, "./*[not(self::defs)][1]")  # <-- always defined
-
-    # 4) Build the background node as a tiny fragment and insert it
+    first_draw <- xml2::xml_find_first(root, "./*[not(self::defs)][1]")
     bg_markup <- sprintf(
       "<rect id='svg-bg-rect' x='%g' y='%g' width='%g' height='%g' fill='#ffffff' fill-opacity='1' stroke='none' pointer-events='none'/>",
       minX, minY, vw, vh
     )
     bg_node <- xml2::read_xml(bg_markup)
-
     if (!inherits(first_draw, "xml_missing")) {
-      # Insert BEFORE the first drawable child so it paints underneath everything else
       xml2::xml_add_sibling(first_draw, bg_node, .where = "before")
     } else {
-      # No drawable children? Just append under <svg>; it will be the only child anyway
       xml2::xml_add_child(root, bg_node)
     }
+
+    crop_svg_by_bottom_margin <- function(svg_doc, cut_px) {
+      root <- xml2::xml_root(svg_doc)
+      vb <- xml2::xml_attr(root, "viewBox")
+      if (is.na(vb) || !nzchar(vb)) {
+        w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
+        h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+        if (!is.finite(w) || !is.finite(h)) { w <- 1200; h <- 800 }
+        xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
+        vb <- xml2::xml_attr(root, "viewBox")
+      }
+      nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
+      minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
+      new_vh <- max(10, vh - cut_px)
+      xml2::xml_attr(root, "viewBox") <- sprintf("%g %g %g %g", minX, minY, vw, new_vh)
+      old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
+      if (is.finite(old_h) && vh > 0) {
+        xml2::xml_attr(root, "height") <- paste0(old_h * (new_vh / vh), "px")
+      }
+      bg <- xml2::xml_find_first(root, ".//rect[@id='svg-bg-rect']")
+      if (!inherits(bg, "xml_missing")) {
+        xml2::xml_set_attr(bg, "x", as.character(minX))
+        xml2::xml_set_attr(bg, "y", as.character(minY))
+        xml2::xml_set_attr(bg, "width",  as.character(vw))
+        xml2::xml_set_attr(bg, "height", as.character(new_vh))
+      }
+      svg_doc
+    }
     svg <- crop_svg_by_bottom_margin(svg, cut_px = 350)
-    # --- save & return ---
+
+    # save & convert
     xml2::write_xml(svg, "chromosome.svg")
     file.rename("chromosome.svg", out_svg)
-
     if (make_png) {
       RIdeogram::convertSVG(out_svg, device = "png")
       if (file.exists("chromosome.png")) file.rename("chromosome.png", out_png)
@@ -525,12 +475,22 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     if (verbose) message("[dndsR::dnds_ideogram] Wrote: ", out_svg,
                          if (make_png && file.exists(out_png)) paste0(" and ", out_png) else "")
     out_svg
-  }  # <- this closes .one_side()
+  }  # end .one_side
 
-  # ---------- batch vs single ----------
+  # ---------- batch vs single (robust arg resolution) ----------
+  comparison_file <- .null_if_empty(comparison_file)
+  dnds_annot      <- .null_if_empty(dnds_annot)
+
+  have_C <- !is.null(comparison_file)
+  have_A <- !is.null(dnds_annot)
+
+  if (have_C && have_A) {
+    die("Choose exactly one of comparison_file (batch) OR dnds_annot (single).")
+  }
+
   outs <- character(0)
 
-  if (!is.null(comparison_file)) {
+  if (have_C) {
     df <- .read_comparisons(comparison_file)
     for (i in seq_len(nrow(df))) {
       comp <- df$comparison_name[i]
@@ -558,7 +518,7 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
         D <- .augment_with_coords(D, q_map, "query_id",   "q")
         D <- .augment_with_coords(D, s_map, "subject_id", "s")
 
-        # Optional normalization of chr labels in the intermediate (opt-in; raw by default)
+        # Optional normalization in the intermediate (opt-in; raw by default)
         D$q_chr <- .normalize_chr(D$q_chr,
                                   strip_chr0 = chr_strip_leading_chr0,
                                   strip_lead = chr_strip_leading,
@@ -589,13 +549,13 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
     return(invisible(stats::na.omit(outs)))
   }
 
-  # single mode (expects a prebuilt intermediate with q_/s_ coords; choose exactly one side)
-  if (is.null(dnds_merged_file)) die("Provide either comparison_file (batch) OR dnds_merged_file (single).")
-  if (!file.exists(dnds_merged_file)) die("dnds_merged_file not found: %s", dnds_merged_file)
+  # single mode (expects a prebuilt/annotated table path and exactly one side)
+  if (!have_A) die("Provide either comparison_file (batch) OR dnds_annot (single).")
   if (length(sides) != 1L) die("Single mode requires exactly one 'side' in 'sides'.")
 
-  # Require caller to provide the correct side's FASTA via a wrapper/CLI; this
-  # exported function is primarily intended for batch mode.
-  stop("Single-mode expects prebuilt intermediate and a FASTA supplied by a wrapper. ",
-       "Run via batch (comparison_file) or build your own wrapper that calls .one_side().")
+  # Require caller to provide the correct side's FASTA via a wrapper/CLI; this function
+  # is primarily intended for batch mode. If you want true single-mode plotting, build
+  # a minimal wrapper that calls .one_side(dnds_annot, side, fasta, ...).
+  stop("Single-mode expects a prebuilt annotated/intermediate table and a FASTA supplied by a wrapper. ",
+       "Run via batch (comparison_file) or build a thin wrapper that calls .one_side().")
 }
