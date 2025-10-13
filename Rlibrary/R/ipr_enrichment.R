@@ -6,6 +6,17 @@
 #'
 #' Plotting is harmonized with GO/term: x = Enrichment (pos/bg), size = # pos, color = adj p.
 #'
+#' @section Plotting behavior (updated):
+#' - **adj-p color scale**: fixed lower bound at 0 and a dynamic upper bound at the
+#'   largest adj-p among plotted points. The gradient has a strict **knee at `alpha`**,
+#'   so any red/orange is p ≤ alpha; a tiny epsilon is used only for numerical stability.
+#' - **Right-edge anti-clipping**: compute the normal mirrored right limit, **then add 1**
+#'   to whatever the final max is (even when `x_axis_max` is provided).
+#' - **Fonts**: if `inst/fonts/Arial-Bold.ttf` exists, we (1) register it with **showtext**
+#'   and enable showtext so the family **"Arial Bold"** is used in CLI and SVG; and
+#'   (2) pass an svglite `system_fonts` mapping as a backup. Otherwise fall back to
+#'   DejaVu/Liberation/Noto/Arial/`sans`.
+#'
 #' @param dnds_annot_file Path to a single <comp>_dnds_annot.tsv (single mode).
 #' @param comparison_file Path to whitespace-delimited file (tabs/spaces; header or not)
 #'   with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
@@ -15,53 +26,36 @@
 #' @param sides Character vector among c("query","subject"). Default both.
 #' @param pos_threshold Numeric. dNdS > pos_threshold defines "positive" (default 1).
 #' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds (default 10) or NA dNdS.
-#' @param filter_expr Optional character with a logical expression evaluated in the data
-#'   (e.g., "q_seqname == s_seqname").
+#' @param filter_expr Optional character with a logical expression evaluated in the data.
 #' @param make_plots Logical; if TRUE, write a top-N bubble plot per result (default TRUE).
 #' @param top_n Integer; number of rows for plot (default 20).
 #' @param drop_rows_without_term Logical; if TRUE (default), rows with no IPR term are
 #'   removed from BOTH positives and background (annotation-aware universe).
-#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 0).
-#' @param min_pos   Minimum positive occurrences required for a term (default 0).
-#' @param fdr_method One of "BH","IHW","qvalue","none". Defaults to "BH".
-#'                   If "IHW"/"qvalue" is chosen but the package is missing, falls back to "BH".
-#' @param alpha FDR level for IHW weighting (default 0.05).
+#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 2).
+#' @param min_pos   Minimum positive occurrences required for a term (default 2).
+#' @param fdr_method "BH","IHW","qvalue","none" (default "BH").
+#' @param alpha FDR level (default 0.05). Also used as the **color knee**.
 #' @param term_sep Separator used in q_ipr/s_ipr strings (default ";").
-#'
-#' @param include_types Optional character vector of InterPro ENTRY_TYPE values to keep
-#'   in pooled mode (e.g., c("Domain","Homologous_superfamily")). Ignored if stratified.
-#' @param stratify_by_type Logical. If TRUE, run separate analyses per ENTRY_TYPE with
-#'   type-specific backgrounds (recommended). Default FALSE.
-#' @param types Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
-#'   = infer from data present in q_ipr/s_ipr (after exclusions).
-#' @param adjust_scope When stratified, "global" (one BH across all tests) or "per_type".
-#'
-#' @param entries_source Where to load InterPro entries from:
-#'   "auto" (bundled static; default), "local" (use entries_path),
-#'   "remote" (download; falls back to bundled), or "none" (skip metadata).
-#' @param entries_path Optional path to a TSV copy of InterPro entry.list
-#'   (columns: ENTRY_AC, ENTRY_TYPE, ENTRY_NAME). Used for "auto"/"local".
+#' @param include_types Optional vector of ENTRY_TYPEs to keep in pooled mode.
+#' @param stratify_by_type Logical. If TRUE (default), analyze per ENTRY_TYPE with type-specific backgrounds.
+#' @param types Optional ENTRY_TYPEs to analyze when stratified.
+#' @param adjust_scope When stratified, "global" (one BH) or "per_type".
+#' @param entries_source "auto","local","remote","none" (default "auto").
+#' @param entries_path Optional path to a TSV copy of InterPro entry.list.
 #' @param entries_url  Remote URL for current InterPro entry.list (default EBI).
 #' @param entries_timeout_s Numeric timeout (seconds) for remote fetch (default 20).
 #' @param keep_unmatched Keep IPRs not found in entry.list when filtering (default TRUE).
+#' @param exclude_ids IPR accessions to exclude globally.
+#' @param exclude_iprs Deprecated alias of `exclude_ids`.
+#' @param term_trees Optional parent/child edgelist for IPRs (2 columns).
+#' @param exclude_descendants If TRUE, expand `exclude_ids` using `term_trees`.
+#' @param exclude_descendants_depth Depth limit for descendant exclusion (default Inf).
+#' @param exclude_descendants_limit Hard cap on excluded IPRs (default 5000).
+#' @param x_axis_min Optional numeric x-axis minimum.
+#' @param x_axis_max Optional numeric x-axis maximum.
 #'
-#' @param exclude_ids Character vector of IPR accessions (e.g. "IPR000123") to exclude
-#'   globally from both positives and background before enrichment. Preferred name.
-#' @param exclude_iprs Deprecated alias of `exclude_ids` for backward compatibility.
-#'
-#' @param term_trees Optional path or data.frame of a parent/child edgelist for IPRs
-#'   (two columns). Only used if you want to expand `exclude_ids` to their descendants.
-#' @param exclude_descendants If TRUE, expand `exclude_ids` using `term_trees`. Default FALSE.
-#' @param exclude_descendants_depth Integer depth limit for descendant exclusion;
-#'   1 = direct children only, Inf = entire subtree (default Inf).
-#' @param exclude_descendants_limit Hard cap on the number of excluded IPRs to avoid
-#'   accidental mass exclusion (default 5000).
-#'
-#' @return In single mode: (invisibly) list of output TSV paths.
-#'         In batch mode:  (invisibly) vector of output TSV paths across comparisons.
-#'         Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
-#'         pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment,
-#'         label, side, comparison.
+#' @return Paths to output TSVs (invisibly). SVG plots are written alongside.
+#' @keywords enrichment InterPro Fisher dNdS visualization
 #' @export
 ipr_enrichment <- function(dnds_annot_file = NULL,
                            comparison_file = NULL,
@@ -92,13 +86,22 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            term_trees = NULL,
                            exclude_descendants = FALSE,
                            exclude_descendants_depth = Inf,
-                           exclude_descendants_limit = 5000) {
+                           exclude_descendants_limit = 5000,
+                           x_axis_min = NULL,
+                           x_axis_max = NULL) {
 
-  # ---- arg setup ----
   sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
   fdr_method <- match.arg(fdr_method)
   adjust_scope <- match.arg(adjust_scope)
   entries_source <- match.arg(entries_source)
+
+  # ---- normalize possibly-NA flags from CLI ----
+  .normalize_flag <- function(x, default) if (is.na(x)) default else x
+  make_plots             <- .normalize_flag(make_plots,             TRUE)
+  drop_rows_without_term <- .normalize_flag(drop_rows_without_term, TRUE)
+  stratify_by_type       <- .normalize_flag(stratify_by_type,       TRUE)
+  keep_unmatched         <- .normalize_flag(keep_unmatched,         TRUE)
+  exclude_descendants    <- .normalize_flag(exclude_descendants,    FALSE)
 
   # Back-compat alias
   if (!is.null(exclude_iprs) && is.null(exclude_ids)) {
@@ -106,7 +109,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     exclude_ids <- exclude_iprs
   }
 
-  # ---- helpers ----
+  # ---------- helpers ----------
   .read_ws <- function(path, header_try = TRUE) {
     utils::read.table(path, header = header_try, sep = "", quote = "\"",
                       stringsAsFactors = FALSE, comment.char = "",
@@ -165,42 +168,139 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         warning("IHW not installed; falling back to BH.")
         res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
       }
-    } else { # "none"
+    } else {
       res$p_adj <- res$p_value
     }
     res
   }
 
-  .write_plot <- function(df, ylab, out_svg) {
+  # ---------- font helpers ----------
+  .bundled_arial_path <- function() {
+    ttf <- system.file("fonts", "Arial-Bold.ttf", package = "dndsR")
+    if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
+    ttf
+  }
+
+  .setup_showtext <- function() {
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+    if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
+    try({
+      showtext::font_add(family = "Arial Bold", regular = ttf)
+      showtext::showtext_auto(enable = TRUE)
+    }, silent = TRUE)
+    "Arial Bold"
+  }
+
+  .register_svglite_mapping <- function() {
+    if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+    function(file, ...) {
+      svglite::svglite(file, system_fonts = list(`Arial Bold` = ttf), ...)
+    }
+  }
+
+  .pick_sans_family <- function() {
+    fam <- .setup_showtext()
+    if (!is.null(fam)) return(fam)
+    if (!requireNamespace("systemfonts", quietly = TRUE)) return("sans")
+    for (f in c("Arial Bold","DejaVu Sans","Liberation Sans","Noto Sans","Arial","sans")) {
+      info <- try(systemfonts::match_font(f), silent = TRUE)
+      if (!inherits(info, "try-error") && is.list(info) && !is.null(info$path) && nzchar(info$path)) return(f)
+    }
+    "sans"
+  }
+
+  # SVG device wrapper that does NOT hardcode width/height; ggsave will provide them.
+  .svg_device <- function() {
+    dev_map <- .register_svglite_mapping()
+    if (!is.null(dev_map)) return(dev_map)
+    if (requireNamespace("svglite", quietly = TRUE)) {
+      return(function(file, ...) svglite::svglite(file, ...))
+    }
+    NULL
+  }
+
+  # ---------- color-scale helpers (exact knee with epsilon) ----------
+  .upper_padj <- function(d, alpha) {
+    max_p <- suppressWarnings(max(d$p_adj, na.rm = TRUE))
+    if (!is.finite(max_p)) max_p <- alpha
+    eps <- max(1e-12, alpha * 1e-6)
+    max(max_p, alpha + eps)
+  }
+
+  .padj_scale <- function(alpha, upper) {
+    ggplot2::scale_color_gradientn(
+      colours = c("red", "grey80", "steelblue"),
+      values  = scales::rescale(c(0, alpha, upper), to = c(0,1), from = c(0, upper)),
+      limits  = c(0, upper),
+      oob     = scales::squish,
+      name    = "adj p"
+    )
+  }
+
+  # ---------- plotting (mirror-left + force +1) ----------
+  .write_plot <- function(df, ylab, out_svg, alpha_val = alpha,
+                          x_axis_min = x_axis_min, x_axis_max = x_axis_max) {
     if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) return(invisible(NULL))
-    # Order by significance, then enrichment
+
     top <- df[order(df$p_adj, -df$enrichment, df$IPR), , drop = FALSE]
     top <- utils::head(top, top_n)
+
     yvar <- if ("label" %in% names(top)) "label" else "IPR"
     top$y_lab <- top[[yvar]]
-    gg <- ggplot2::ggplot(top, ggplot2::aes(x = enrichment,
-                                            y = stats::reorder(y_lab, -p_adj),
-                                            size = pos_count,
-                                            color = p_adj)) +
+
+    x_vals <- top$enrichment[is.finite(top$enrichment)]
+    if (!length(x_vals)) x_vals <- 0
+
+    x_min_ax <- if (!is.null(x_axis_min)) x_axis_min else 0
+    x_min_pt <- min(x_vals, na.rm = TRUE)
+    x_max_pt <- max(x_vals, na.rm = TRUE)
+
+    left_gap   <- max(x_min_pt - x_min_ax, 0)
+    base_right <- if (!is.null(x_axis_max)) x_axis_max else (x_max_pt + left_gap)
+    x_limits   <- c(x_min_ax, base_right + 1)  # always add +1 as requested
+
+    base_family <- .pick_sans_family()
+    upper <- .upper_padj(top, alpha_val)
+
+    gg <- ggplot2::ggplot(
+      top,
+      ggplot2::aes(x = enrichment,
+                   y = stats::reorder(y_lab, -p_adj),
+                   size = pos_count,
+                   color = p_adj)
+    ) +
       ggplot2::geom_point() +
-      ggplot2::scale_color_gradient(low = "red", high = "blue") +
-      ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos", color = "adj p") +
-      ggplot2::theme_minimal(base_size = 13)
-    ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+      ggplot2::scale_x_continuous(limits = x_limits,
+                                  expand = ggplot2::expansion(mult = c(0, 0))) +
+      .padj_scale(alpha_val, upper) +
+      ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos") +
+      ggplot2::theme_minimal(base_size = 13, base_family = base_family)
+
+    dev_fun <- .svg_device()
+    if (!is.null(dev_fun)) {
+      ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
+    } else {
+      ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+    }
     invisible(NULL)
   }
 
-  # InterPro entry.list I/O
+  # ---------- InterPro entry.list I/O ----------
   .read_entries <- function(path) {
     utils::read.table(path, header = TRUE, sep = "\t", quote = "",
                       stringsAsFactors = FALSE, comment.char = "",
                       check.names = FALSE)
   }
+
   .bundled_path <- function() {
     p <- system.file("extdata", "interpro_entry.list.tsv", package = "dndsR")
     if (!nzchar(p) || !file.exists(p)) return(NULL)
     p
   }
+
   .load_entries <- function() {
     if (entries_source == "none") return(NULL)
     if (!is.null(entries_path) && file.exists(entries_path) &&
@@ -229,6 +329,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
     NULL
   }
+
   .build_ipr_maps <- function(entries) {
     if (is.null(entries)) return(list(type_by_ipr = NULL, name_by_ipr = NULL))
     ac <- as.character(entries$ENTRY_AC)
@@ -238,7 +339,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
          name_by_ipr = stats::setNames(nm, ac))
   }
 
-  # ----- Tree/metadata-like helpers (only for exclude-descendants) -----
+  # ---------- tree/metadata helpers (exclude-descendants) ----------
   .load_df <- function(obj) {
     if (is.null(obj)) return(NULL)
     if (is.character(obj) && length(obj) == 1L && file.exists(obj)) {
@@ -247,10 +348,12 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (is.data.frame(obj)) return(obj)
     NULL
   }
+
   .expand_descendants <- function(seeds, tree_df, depth = Inf, limit = Inf) {
     if (is.null(tree_df) || !length(seeds)) return(seeds)
-    parents <- as.character(tree_df[[1]]); children <- as.character(tree_df[[2]])
-    adj <- split(children, parents)  # parent -> vector(child)
+    parents <- as.character(tree_df[[1]])
+    children <- as.character(tree_df[[2]])
+    adj <- split(children, parents)
     seen <- unique(seeds)
     frontier <- unique(seeds)
     curd <- 0L
@@ -265,12 +368,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         seen <- unique(seen)[seq_len(limit)]
         break
       }
-      frontier <- kids; curd <- curd + 1L
+      frontier <- kids
+      curd <- curd + 1L
     }
     unique(seen)
   }
 
-  # ---- string filter (types + exclusions) ----
+  # ---------- string filter (types + exclusions) ----------
   .filter_terms_string <- function(s,
                                    allowed_types = NULL,
                                    type_by_ipr = NULL,
@@ -282,9 +386,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     keep <- logical(length(parts))
     for (i in seq_along(parts)) {
       ipr <- parts[i]
-      # Exclude explicit IPRs
       if (!is.null(exclude_set) && isTRUE(exclude_set[ipr])) { keep[i] <- FALSE; next }
-      # Filter by ENTRY_TYPE if requested
       if (!is.null(allowed_types)) {
         ty <- if (!is.null(type_by_ipr)) type_by_ipr[ipr] else NA_character_
         if (is.na(ty)) {
@@ -306,7 +408,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     gsub("_+", "_", gsub("^_|_$", "", x))
   }
 
-  # ---- core fisher from vectors (adds enrichment) ----
+  # ---------- core fisher (adds enrichment) ----------
   .fisher_from_vectors <- function(vec_all, vec_pos, drop_empty) {
     vec_all <- as.character(vec_all)
     vec_pos <- as.character(vec_pos)
@@ -324,10 +426,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (length(all_tab) == 0) return(NULL)
 
     res <- do.call(rbind, lapply(names(all_tab), function(tt) {
-      a <- as.integer(ifelse(tt %in% names(pos_tab), pos_tab[[tt]], 0L)) # pos with term
-      c <- as.integer(all_tab[[tt]] - a)                                 # non-pos with term
-      b <- n_pos - a                                                     # pos without term
-      d <- n_bg  - c                                                     # non-pos without term
+      a <- as.integer(ifelse(tt %in% names(pos_tab), pos_tab[[tt]], 0L))
+      c <- as.integer(all_tab[[tt]] - a)
+      b <- n_pos - a
+      d <- n_bg  - c
       ft <- try(stats::fisher.test(matrix(c(a,b,c,d), nrow = 2),
                                    alternative = "greater"), silent = TRUE)
       data.frame(
@@ -344,7 +446,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (is.null(res) || !nrow(res)) return(NULL)
     res$total_count <- res$pos_count + res$nonpos_count
 
-    # Enrichment = (pos_count/pos_total) / (nonpos_count/nonpos_total)
     pc <- pmax(res$pos_count, 0);  pt <- pmax(res$pos_total, 1)
     nc <- pmax(res$nonpos_count, 0); nt <- pmax(res$nonpos_total, 1)
     bg_rate  <- nc / nt
@@ -354,7 +455,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res
   }
 
-  # ---- metadata attach ----
+  # ---------- metadata attach ----------
   .attach_metadata_to_res <- function(res, type_by_ipr, name_by_ipr) {
     if (is.null(res) || !nrow(res)) return(res)
     if (is.null(type_by_ipr) && is.null(name_by_ipr)) {
@@ -371,7 +472,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res
   }
 
-  # ---- exclusion set (with optional descendants) ----
+  # ---------- exclusion set (with optional descendants) ----------
   .build_exclude_set <- function(excl) {
     if (is.null(excl) || !length(excl)) return(NULL)
     x <- unique(as.character(excl))
@@ -396,12 +497,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   exclude_set <- .build_exclude_set(exclude_seeds)
 
-  # ---- one side, one IPR vector ----
+  # ---------- one side ----------
   .enrich_side_ipr <- function(d, side, comp, comp_dir,
                                type_by_ipr, name_by_ipr,
                                pooled_allowed_types = NULL,
                                stratified_types = NULL) {
-
     prefix <- if (side == "query") "q_" else "s_"
     col <- paste0(prefix, "ipr")
     if (!col %in% names(d) || !is.character(d[[col]])) return(character(0))
@@ -480,7 +580,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res
   }
 
-  # ---- runner per comparison ----
+  # ---------- runner per comparison ----------
   .run_one_comparison <- function(comp_name, comp_dir) {
     in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) stop("Annotated dN/dS file not found: ", in_file)
@@ -488,11 +588,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     outs <- character(0)
 
-    # STRATIFIED: figure out which types to run
     strat_types <- NULL
     if (isTRUE(stratify_by_type)) {
       if (is.null(type_by_ipr)) stop("stratify_by_type=TRUE requires InterPro metadata (entries_source != 'none').")
-      # infer from present (after exclusions)
       if (is.null(types)) {
         all_terms <- character(0)
         if ("q_ipr" %in% names(d) && is.character(d$q_ipr)) {
@@ -526,7 +624,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         allres <- do.call(rbind, slices)
         if (!nrow(allres)) next
 
-        # FDR scope
         if (adjust_scope == "global") {
           allres$p_adj <- stats::p.adjust(allres$p_value, method = "BH")
         } else {
@@ -548,7 +645,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                                                  comp_name, if (sd=="query") "q" else "s", .sanitize_type(tp)))
           utils::write.table(sub, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
           out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
-          .write_plot(sub, sprintf("IPR (%s, %s)", tp, sd), out_svg)
+          .write_plot(sub, sprintf("IPR (%s, %s)", tp, sd), out_svg,
+                      x_axis_min = x_axis_min, x_axis_max = x_axis_max)
           outs <- c(outs, out_tsv)
         }
 
@@ -559,7 +657,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         if (is.character(res)) next
         if (is.null(res) || !nrow(res)) next
 
-        # FDR + annotate + write
         res <- .adjust_pvals(res, fdr_method, alpha)
         res$side <- sd
         res$comparison <- comp_name
@@ -569,7 +666,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                                                comp_name, if (sd=="query") "q" else "s"))
         utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
         out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
-        .write_plot(res, sprintf("IPR (%s)", sd), out_svg)
+        .write_plot(res, sprintf("IPR (%s)", sd), out_svg,
+                    x_axis_min = x_axis_min, x_axis_max = x_axis_max)
         outs <- c(outs, out_tsv)
       }
     }
@@ -578,7 +676,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     outs
   }
 
-  # ---- batch vs single ----
+  # ---------- batch vs single ----------
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
     outs <- character(0)
