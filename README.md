@@ -46,11 +46,13 @@ The below documents the command line interface (CLI) workflow, which is recommen
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids.
 #### Singularity
 ```
-singularity exec dndsr.sif ./dndsR-launcher run split_comparisons -C data/CheFo_vs_CheAl_full_fofn.txt -v -m subgenome
+singularity exec dndsr.sif ./dndsR-launcher run split_comparisons \
+-C data/CheFo_vs_CheAl_full_fofn.txt -v -m subgenome
 ```
 ### 2. Extract CDS or Proteins
 ```
-singularity exec dndsr.sif ./dndsR-launcher run extract_cds -C data/CheFo_vs_CheAl_full_fofn_split.txt
+singularity exec dndsr.sif ./dndsR-launcher run extract_cds \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt
 ```
 ### 3. Calculate dN/dS
 Recommended to run on cluster, slurm script available.  
@@ -61,27 +63,33 @@ export PATH="/mnt/gs21/scratch/john7932/dndsR/shims:$PATH"
 ```
 Singularity
 ```
-singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
+singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
 ```
 ### 4. Append annotations
 ```
-singularity exec dndsr.sif ./dndsR-launcher run append_annotations -C data/CheFo_vs_CheAl_full_fofn_split.txt -O . -v -t 8
+singularity exec dndsr.sif ./dndsR-launcher run append_annotations \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt -O . -v -t 8
 ```
 ### 5. Annotation term enrichment
 #### ipr_enrichment
 ```
-singularity exec dndsr.sif ./dndsR-launcher run ipr_enrichment -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
+singularity exec dndsr.sif ./dndsR-launcher run ipr_enrichment \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 #### go_enrichment
 ```
-singularity exec dndsr.sif ./dndsR-launcher run go_enrichment -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
+singularity exec dndsr.sif ./dndsR-launcher run go_enrichment \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 #### term_enrichment
 ```
-singularity exec dndsr.sif ./dndsR-launcher run term_enrichment -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
+singularity exec dndsr.sif ./dndsR-launcher run term_enrichment \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 ### 6. Selection pressure ideogram
 ```
+singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 
 
