@@ -68,7 +68,17 @@ singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds -C data/CheFo_vs_
 singularity exec dndsr.sif ./dndsR-launcher run append_annotations -C data/CheFo_vs_CheAl_full_fofn_split.txt -O . -v -t 8
 ```
 ### 5. Annotation term enrichment
+#### ipr_enrichment
 ```
+singularity exec dndsr.sif ./dndsR-launcher run ipr_enrichment -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
+```
+#### go_enrichment
+```
+singularity exec dndsr.sif ./dndsR-launcher run go_enrichment -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
+```
+#### term_enrichment
+```
+singularity exec dndsr.sif ./dndsR-launcher run term_enrichment -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 ### 6. Selection pressure ideogram
 ```
