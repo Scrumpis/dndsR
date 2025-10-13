@@ -89,7 +89,8 @@ singularity exec dndsr.sif ./dndsR-launcher run term_enrichment \
 ```
 ### 6. Selection pressure ideogram
 ```
-singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
+singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
+-C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 
 
