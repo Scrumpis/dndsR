@@ -9,8 +9,8 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 
 Improvements:
-Rebuild container with biomartr
-
+- Rebuild container with biomartr
+- Add fonts to inst
 
 ## Setup
 Note: We recommend Docker and Singularity usage for either CLI or RStudio usage, however, if you have a working Conda env or other way to provide the dependencies, Docker and Singularity are not required. You can install directly into RStudio as shown below (note line once we make it).
