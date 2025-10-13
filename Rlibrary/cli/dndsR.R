@@ -684,7 +684,7 @@ run_term_enrichment <- function(o){
 # dnds_ideogram
 # =========================
 opts_dnds_ideogram <- list(
-  make_option(c("--dnds-merged-file"), type="character", dest="dnds_merged_file",
+  make_option(c("--dnds-annot-file"), type="character", dest="dnds_annot_file",
               help="Single prebuilt table with q_/s_ coords (single mode; function mainly intended for batch)"),
   make_option(c("-C","--comparison-file"), type="character", dest="comparison_file",
               help="TSV: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (batch mode)"),
@@ -733,7 +733,7 @@ run_dnds_ideogram <- function(o){
   chr_case_insensitive <- if (isTRUE(o$`chr-case-sensitive`)) FALSE else isTRUE(o$`chr-case-insensitive`)
 
   res <- dndsR::dnds_ideogram(
-    dnds_merged_file        = o$`dnds-merged-file`,
+    dnds_annot_file        = o$`dnds-annot-file`,
     comparison_file         = o$`comparison-file`,
     output_dir              = o$`output-dir`,
     sides                   = sides_vec,
