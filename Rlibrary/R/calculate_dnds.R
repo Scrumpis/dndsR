@@ -39,7 +39,7 @@ calculate_dnds <- function(comparison_file = NULL,
 
   # Optional but helpful: if using DIAMOND, confirm the binary is on PATH
   if (identical(tolower(aligner), "diamond")) {
-    ok <- !inherits(suppressWarnings(try(system2("diamond", "--version"), silent = TRUE)), "try-error")
+    ok <- trySuppressWarnings(system2("diamond", "--version", stdout = TRUE, stderr = TRUE))
     if (inherits(ok, "try-error")) {
       stop(
         paste0(
