@@ -409,7 +409,8 @@ run_ipr_enrichment <- function(o){
   make_plots_val     <- .resolve_toggle(o$make_plots, o$no_plots)
   drop_rows_val      <- .resolve_toggle(o$drop_rows_without_term, o$keep_rows_without_term)
   keep_unmatched_val <- .resolve_toggle(o$keep_unmatched, o$drop_unmatched)
-  stratify_val       <- if (!is.na(o$stratify_by_type) && isTRUE(o$stratify_by_type)) TRUE else if (isFALSE(o$stratify_by_type)) FALSE else NULL
+  stratify_val       <- if (!is.na(o$stratify_by_type) && isTRUE(o$stratify_by_type)) TRUE else if (isFALSE(o$stratify_by_type)) FALSE e
+lse NULL
   exclude_desc_val   <- if (!is.na(o$exclude_descendants) && isTRUE(o$exclude_descendants)) TRUE else NULL
 
   args <- list(
