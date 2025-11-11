@@ -25,7 +25,7 @@ dndsR was developed for use as a complete pipeline, however, we thought it was i
 
 ## Split Comparison File and Associated Files by Subgenome
 ```{r}
-split_comparisons_by_label(
+split_comparisons(
   comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn.txt",
   mode = "subgenome"   # Chr1A / chr03_b → labels A,B,...
 )
@@ -90,18 +90,19 @@ go_enrichment(
   output_dir = "./tests/full/",
   sides = c("query","subject"),
   ontologies = c("BP","MF","CC"),
-  algorithm  = "weight01",     # good default
+  #algorithm  = "weight01",     # good default
   statistic  = "fisher",
   pos_threshold = 1,
   drop_rows_without_go = TRUE, # annotation-aware universe
-  node_min = 10,               # drop ultra-rare terms
-  node_max = 2000,             # optional upper cap
-  p_adjust = "BH",
+  node_min = 5,               # drop ultra-rare terms
+  #node_max = 2000,             # optional upper cap
+  #p_adjust = "BH",
+  p_adjust = "none",
   make_plots = TRUE,
   top_n = 20,
   exclude_gos = "GO:0015074",
-  exclude_descendants = TRUE)
-)
+  #exclude_descendants = TRUE
+  )
 ```
 
 ## IPR Enrichment
@@ -113,10 +114,14 @@ ipr_enrichment(
   #universe = universe_ids,
   stratify_by_type = TRUE,
   #types = c("Domain","Homologous_superfamily"),   # or leave NULL to auto-infer
-  adjust_scope = "global",
+  #adjust_scope = "global",
   min_pos = 2,
   min_total = 10,
-  exclude_iprs = "IPR000109"
+  #method = "weight01",
+  #fdr_method = "IHW",
+  pos_threshold = 1.1
+  #interpro_release = "83.0"
+  #exclude_ids = "IPR000109"
 )
 
 ```
