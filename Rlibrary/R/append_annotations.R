@@ -9,6 +9,9 @@
 #' @param output_dir Root directory containing per-comparison folders (batch mode).
 #' @param custom Optional comma-separated patterns like "REX{5},TOM{8}" meaning
 #'   PREFIX followed by exactly N digits; produces q_prefix/s_prefix columns.
+#' @param threads Integer threads to use for per-ID annotation. If NULL/NA, uses
+#'   options(dndsR.threads) or DNDSR_THREADS env; defaults to 1.
+#' @param overwrite Logical; in batch mode, skip a comparison if output exists unless TRUE. Default FALSE.
 #' @return In single mode: a data.frame. In batch mode: (invisibly) vector of output paths.
 #' @export
 append_annotations <- function(dnds_file = NULL,
@@ -17,7 +20,38 @@ append_annotations <- function(dnds_file = NULL,
                                output_file = NULL,
                                comparison_file = NULL,
                                output_dir = getwd(),
-                               custom = NULL) {
+                               custom = NULL,
+                               threads = NULL,
+                               overwrite = FALSE) {
+
+  ## ---------- lightweight verbose helper ----------
+  vmsg <- function(...) {
+    if (isTRUE(getOption("dndsR.verbose")) || isTRUE(getOption("dndsR.cli.verbose"))) {
+      message(...)
+    }
+  }
+
+  ## ---------- thread resolver & parallel lapply ----------
+  .resolve_threads <- function(th) {
+    if (is.null(th) || is.na(th)) {
+      opt <- getOption("dndsR.threads", NULL)
+      if (is.null(opt)) {
+        env <- Sys.getenv("DNDSR_THREADS", "")
+        if (nzchar(env) && grepl("^[0-9]+$", env)) as.integer(env) else 1L
+      } else as.integer(opt)
+    } else {
+      as.integer(th)
+    }
+  }
+
+  plapply <- function(X, FUN, threads = 1L, ...) {
+    threads <- max(1L, as.integer(threads))
+    if (.Platform$OS.type != "windows" && threads > 1L) {
+      return(parallel::mclapply(X, FUN, mc.cores = threads, mc.preschedule = TRUE, ...))
+    } else {
+      return(lapply(X, FUN, ...))
+    }
+  }
 
   ## ---------- readers ----------
   .read_ws <- function(path, header_try = TRUE) {
@@ -25,6 +59,7 @@ append_annotations <- function(dnds_file = NULL,
                       stringsAsFactors = FALSE, comment.char = "",
                       strip.white = TRUE, blank.lines.skip = TRUE, check.names = FALSE)
   }
+
   .read_comparisons <- function(x) {
     req <- c("comparison_name","query_fasta","query_gff","subject_fasta","subject_gff")
     if (is.data.frame(x)) { stopifnot(all(req %in% names(x))); return(x[, req, drop = FALSE]) }
@@ -35,14 +70,72 @@ append_annotations <- function(dnds_file = NULL,
     names(df2)[1:5] <- req
     df2[, req, drop = FALSE]
   }
+
+  # ---- Fast GFF reader with pure-R fallbacks (no shell) ----
   .read_gff <- function(path) {
-    cl <- c("character","character","character","integer","integer","character","character","character","character")
-    g <- utils::read.table(path, sep = "\t", header = FALSE, quote = "",
-                           stringsAsFactors = FALSE, comment.char = "#", fill = TRUE,
-                           colClasses = cl)
-    if (ncol(g) < 9) stop("GFF appears malformed: ", path)
-    names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-    g
+    start_time <- proc.time()[["elapsed"]]
+    ok9 <- function(x) is.data.frame(x) && ncol(x) >= 9L
+
+    use_fread <- requireNamespace("data.table", quietly = TRUE)
+
+    if (use_fread) {
+      # We'll try three modes with comment skipping (pure R):
+      # 1) tab, 2) auto, 3) single-space. All keep only columns 1:9.
+      modes <- list(
+        list(sep = "\t", tag = "fread(tab,comment)"),
+        list(sep = "auto", tag = "fread(auto,comment)"),
+        list(sep = " ", tag = "fread(space,comment)")
+      )
+      for (mode in modes) {
+        g <- try(data.table::fread(
+          file = path,
+          sep = mode$sep,
+          header = FALSE,
+          quote = "",
+          data.table = FALSE,
+          showProgress = FALSE,
+          fill = TRUE,
+          comment = "#",          # ignore inline comments; full-line '#' become empty -> skipped
+          skipEmptyLines = TRUE,
+          select = 1:9,           # read only first 9 columns
+          col.names = paste0("V", 1:9),
+          colClasses = c("character","character","character",
+                         "integer","integer","character",
+                         "character","character","character"),
+          na.strings = c("", "NA", ".")
+        ), silent = TRUE)
+        if (!inherits(g, "try-error") && ok9(g)) {
+          names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
+          et <- proc.time()[["elapsed"]] - start_time
+          vmsg(sprintf("GFF read via %s in %.3fs; rows=%s: %s",
+                       mode$tag, et, format(nrow(g), big.mark=","), basename(path)))
+          return(g)
+        }
+      }
+    }
+
+    # Base fallback(s): first tab (strict), then any whitespace (last resort).
+    for (sep in c("\t", "")) {
+      g <- try(utils::read.table(path, sep = sep, header = FALSE, quote = "",
+                                 stringsAsFactors = FALSE, comment.char = "#", fill = TRUE,
+                                 colClasses = c("character","character","character",
+                                                "integer","integer","character",
+                                                "character","character","character")),
+               silent = TRUE)
+      if (!inherits(g, "try-error") && ok9(g)) {
+        names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
+        et <- proc.time()[["elapsed"]] - start_time
+        vmsg(sprintf("GFF read via base (sep='%s') in %.3fs; rows=%s: %s",
+                     if (sep=="") "any whitespace" else "\\t",
+                     et, format(nrow(g), big.mark=","), basename(path)))
+        if (sep == "") {
+          vmsg("Warning: parsed with sep=''; if attribute values contain unescaped spaces, they may be split.")
+        }
+        return(g)
+      }
+    }
+
+    stop("GFF appears malformed or unreadable: ", path)
   }
 
   ## ---------- term patterns & normalizers ----------
@@ -106,18 +199,6 @@ append_annotations <- function(dnds_file = NULL,
 
     any_rx <- paste(sprintf("(?:%s)", unname(patterns)), collapse = "|")
 
-    parse_id_parent <- function(attr) {
-      if (isTRUE(is.na(attr)) || !nzchar(attr)) return(list(id = NA_character_, parents = character(0)))
-      pieces <- strsplit(attr, ";", fixed = TRUE)[[1]]
-      kv <- strsplit(pieces, "=", fixed = TRUE)
-      key <- vapply(kv, `[`, "", 1L); val <- vapply(kv, function(x) if (length(x) > 1) x[2] else "", "")
-      names(val) <- key
-      id  <- unname(val["ID"]); if (is.na(id)) id <- NA_character_
-      par <- unname(val["Parent"])
-      parents <- if (is.na(par) || !nzchar(par)) character(0) else strsplit(par, ",", fixed = TRUE)[[1]]
-      list(id = id, parents = parents)
-    }
-
     .union_term_lists <- function(a, b) {
       labs <- unique(c(names(a), names(b)))
       out <- structure(vector("list", length(labs)), names = labs)
@@ -139,9 +220,10 @@ append_annotations <- function(dnds_file = NULL,
       par <- unname(val["Parent"])
 
       if (!is.na(id) && nzchar(id)) {
-        # children edges
+        # children edges (skip self-parent to avoid trivial cycles)
         if (!is.na(par) && nzchar(par)) {
           for (p in strsplit(par, ",", fixed = TRUE)[[1]]) {
+            if (identical(p, id)) next
             cur <- if (exists(p, envir = children, inherits = FALSE)) get(p, envir = children) else character(0)
             assign(p, unique(c(cur, id)), envir = children)
           }
@@ -179,32 +261,52 @@ append_annotations <- function(dnds_file = NULL,
     out
   }
 
-  ## Memoized subtree unions
+  ## Memoized subtree unions WITH CYCLE GUARDS
   .subtree_terms <- local({
     cache <- new.env(hash = TRUE, parent = emptyenv())
+    INPROG <- new.env(hash = TRUE, parent = emptyenv())
+
     function(id, children_env, own_terms_env) {
       if (is.null(id) || !nzchar(id)) return(structure(list(), names = character(0)))
       if (exists(id, envir = cache, inherits = FALSE)) return(get(id, envir = cache))
-      own  <- if (exists(id, envir = own_terms_env, inherits = FALSE)) get(id, envir = own_terms_env) else structure(list(), names = character(0))
+      if (exists(id, envir = INPROG, inherits = FALSE)) return(structure(list(), names = character(0)))
+
+      assign(id, TRUE, envir = INPROG)
+      on.exit({ if (exists(id, envir = INPROG, inherits = FALSE)) rm(list = id, envir = INPROG) }, add = TRUE)
+
+      own  <- if (exists(id, envir = own_terms_env, inherits = FALSE)) get(id, envir = own_terms_env) else structure(list(), names = cha
+racter(0))
       kids <- if (exists(id, envir = children_env,  inherits = FALSE)) get(id, envir = children_env)  else character(0)
-      res <- if (length(kids)) .union_lists(c(list(own), lapply(kids, .subtree_terms, children_env = children_env, own_terms_env = own_terms_env))) else own
+
+      res <- if (length(kids)) .union_lists(c(list(own), lapply(kids, .subtree_terms, children_env = children_env, own_terms_env = own_t
+erms_env))) else own
       assign(id, res, envir = cache); res
     }
   })
+
   .subtree_attrs <- local({
     cache <- new.env(hash = TRUE, parent = emptyenv())
+    INPROG <- new.env(hash = TRUE, parent = emptyenv())
+
     function(id, children_env, own_attrs_env) {
       if (is.null(id) || !nzchar(id)) return(character(0))
       if (exists(id, envir = cache, inherits = FALSE)) return(get(id, envir = cache))
+      if (exists(id, envir = INPROG, inherits = FALSE)) return(character(0))
+
+      assign(id, TRUE, envir = INPROG)
+      on.exit({ if (exists(id, envir = INPROG, inherits = FALSE)) rm(list = id, envir = INPROG) }, add = TRUE)
+
       own  <- if (exists(id, envir = own_attrs_env, inherits = FALSE)) get(id, envir = own_attrs_env) else character(0)
       kids <- if (exists(id, envir = children_env,  inherits = FALSE)) get(id, envir = children_env)  else character(0)
-      res <- if (length(kids)) unique(c(own, unlist(lapply(kids, .subtree_attrs, children_env = children_env, own_attrs_env = own_attrs_env), use.names = FALSE))) else own
+
+      res <- if (length(kids)) unique(c(own, unlist(lapply(kids, .subtree_attrs, children_env = children_env, own_attrs_env = own_attrs_
+env), use.names = FALSE))) else own
       assign(id, res, envir = cache); res
     }
   })
 
   ## Annotate a set of IDs -> data.frame(ID, ATTR, <terms...>)
-  .annotate_id_set <- function(ids, children_env, own_terms_env, own_attrs_env, labs, collapse_sep = ";") {
+  .annotate_id_set <- function(ids, children_env, own_terms_env, own_attrs_env, labs, collapse_sep = ";", threads = 1L) {
     to_row <- function(id) {
       terms <- .subtree_terms(id, children_env, own_terms_env)
       attrs <- .subtree_attrs(id, children_env, own_attrs_env)
@@ -218,59 +320,70 @@ append_annotations <- function(dnds_file = NULL,
       }
       row
     }
-    rows <- lapply(ids, to_row)
+    rows <- plapply(ids, to_row, threads = threads)
     df <- as.data.frame(do.call(rbind, rows), stringsAsFactors = FALSE)
     rownames(df) <- NULL
     df
   }
 
   ## ---------- single comparison ----------
-  .annotate_single <- function(dnds_path, q_gff, s_gff, out_path = NULL) {
+  .annotate_single <- function(dnds_path, q_gff, s_gff, out_path = NULL, threads = 1L) {
     if (!file.exists(dnds_path)) stop("dN/dS file not found: ", dnds_path)
     if (!file.exists(q_gff))     stop("query_gff not found: ", q_gff)
     if (!file.exists(s_gff))     stop("subject_gff not found: ", s_gff)
 
+    vmsg(sprintf("Reading dN/dS: %s", dnds_path))
     dnds <- utils::read.table(dnds_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
+
     if (!all(c("query_id","subject_id") %in% names(dnds))) {
       stop("dN/dS file must have columns 'query_id' and 'subject_id'.")
     }
 
-    # patterns: defaults + parsed customs (customs appended after standard order)
     patterns    <- .default_term_patterns()
     customs     <- .parse_custom(custom)
     if (!is.null(customs)) patterns[names(customs)] <- unname(customs)
     normalizers <- .default_normalizers()
 
-    # desired term order: standard first, then any custom labels
     std_order <- c("IPR","GO","KEGG","PANTHER","PFAM","TIGRFAM","COG")
     labs <- c(std_order[std_order %in% names(patterns)],
-              setdiff(names(patterns), std_order))  # customs at the end
+              setdiff(names(patterns), std_order))
 
-    # Precompute per-GFF (once)
+    vmsg("Precomputing query-side maps…")
     q_maps <- .precompute_maps_and_terms(.read_gff(q_gff), patterns, normalizers)
+    vmsg("Precomputing subject-side maps…")
     s_maps <- .precompute_maps_and_terms(.read_gff(s_gff), patterns, normalizers)
 
-    # Annotate the unique IDs (returns ID, ATTR, and one column per label in 'labs')
     q_ids <- unique(dnds$query_id)
     s_ids <- unique(dnds$subject_id)
-    q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs)
-    s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs)
+    vmsg(sprintf("Annotating IDs (q=%d, s=%d) with threads=%d…", length(q_ids), length(s_ids), threads))
 
-    # --- NEW: figure out which term labels actually appear (non-NA in either side)
+    # Split threads across sides to avoid oversubscription
+    tq <- max(1L, threads %/% 2L)
+    ts <- max(1L, threads - tq)
+
+    if (.Platform$OS.type != "windows" && threads > 1L) {
+      j1 <- parallel::mcparallel(.annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs, threads = tq), silen
+t = TRUE)
+      j2 <- parallel::mcparallel(.annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts), silen
+t = TRUE)
+      res <- parallel::mccollect(list(j1, j2), wait = TRUE)
+      q_ann <- res[[1]]; s_ann <- res[[2]]
+    } else {
+      q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs, threads = tq)
+      s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts)
+    }
+
     present_labs <- labs[vapply(labs, function(L) {
       qa <- q_ann[[L]]; sa <- s_ann[[L]]
       any(!is.na(qa) & qa != "") || any(!is.na(sa) & sa != "")
     }, logical(1))]
 
-    # Join by match; order: q_attributes, s_attributes, then interleaved q_<lab>, s_<lab>
     d <- dnds
     mapv <- function(df, col) { v <- df[[col]]; names(v) <- df$ID; v }
 
-    # attributes first (always included)
     d$q_attributes <- mapv(q_ann, "ATTR")[match(d$query_id,   q_ann$ID)]
     d$s_attributes <- mapv(s_ann, "ATTR")[match(d$subject_id, s_ann$ID)]
 
-    # only add terms that actually appear, interleaved q/s in your preferred order
     for (L in present_labs) {
       lname <- tolower(L)
       d[[paste0("q_", lname)]] <- mapv(q_ann, L)[match(d$query_id,   q_ann$ID)]
@@ -278,6 +391,7 @@ append_annotations <- function(dnds_file = NULL,
     }
 
     if (!is.null(out_path)) {
+      vmsg(sprintf("Writing: %s", out_path))
       utils::write.table(d, file = out_path, sep = "\t", quote = FALSE, row.names = FALSE)
       return(out_path)
     }
@@ -285,15 +399,28 @@ append_annotations <- function(dnds_file = NULL,
   }
 
   ## ---------- batch vs single ----------
+  threads <- .resolve_threads(threads)
+  if (threads < 1L || is.na(threads)) threads <- 1L
+
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    vmsg(sprintf("Batch mode: %d comparison(s). Using threads=%d per comparison.", nrow(df), threads))
     out_paths <- character(0)
     for (i in seq_len(nrow(df))) {
       comp      <- df$comparison_name[i]
       comp_dir  <- file.path(output_dir, comp)
       dnds_path <- file.path(comp_dir, paste0(comp, "_dnds.tsv"))
       out_path  <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
-      out <- .annotate_single(dnds_path, df$query_gff[i], df$subject_gff[i], out_path)
+
+      if (!isTRUE(overwrite) && file.exists(out_path) && file.info(out_path)$size > 0) {
+        vmsg(sprintf("[%s] exists; skipping (use overwrite=TRUE to regenerate).", basename(out_path)))
+        out_paths <- c(out_paths, out_path)
+        next
+      }
+
+      vmsg(sprintf("[%s] reading GFFs & appending annotations…", comp))
+      out <- .annotate_single(dnds_path, df$query_gff[i], df$subject_gff[i], out_path, threads = threads)
+      vmsg(sprintf("[%s] wrote %s", comp, out))
       out_paths <- c(out_paths, out)
     }
     message("All annotation appends complete.")
@@ -303,5 +430,5 @@ append_annotations <- function(dnds_file = NULL,
   if (is.null(dnds_file) || is.null(query_gff) || is.null(subject_gff)) {
     stop("Provide either comparison_file (batch) OR dnds_file + query_gff + subject_gff (single).")
   }
-  .annotate_single(dnds_file, query_gff, subject_gff, output_file)
+  .annotate_single(dnds_file, query_gff, subject_gff, output_file, threads = threads)
 }
