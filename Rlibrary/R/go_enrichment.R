@@ -30,6 +30,7 @@
 #' @param exclude_descendants_limit Hard cap on total excluded nodes per (side,ontology)
 #'   run to avoid accidentally nuking huge swaths (default 5000).
 #' @param include_definition If TRUE (default), append TERM definition from GO.db.
+#' @param alpha Numeric FDR reference level for color scale (default 0.05).
 #'
 #' @return Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
 #' @export
@@ -53,7 +54,8 @@ go_enrichment <- function(dnds_annot_file = NULL,
                           exclude_descendants = FALSE,
                           exclude_descendants_depth = Inf,
                           exclude_descendants_limit = 5000,
-                          include_definition = TRUE) {
+                          include_definition = TRUE,
+                          alpha = 0.05) {
 
   if (!requireNamespace("topGO", quietly = TRUE) || !requireNamespace("GO.db", quietly = TRUE)) {
     stop("Please install Bioconductor packages 'topGO' and 'GO.db'.")
@@ -170,6 +172,23 @@ go_enrichment <- function(dnds_annot_file = NULL,
   }
   .ensure_GOdb_term_envs()
 
+  # ---- plotting helpers (match IPR style) ----
+  .upper_padj <- function(d, alpha) {
+    max_p <- suppressWarnings(max(d$p_adj, na.rm = TRUE))
+    if (!is.finite(max_p)) max_p <- alpha
+    eps <- max(1e-12, alpha * 1e-6)
+    max(max_p, alpha + eps)
+  }
+  .padj_scale <- function(alpha, upper) {
+    ggplot2::scale_color_gradientn(
+      colours = c("red", "grey80", "steelblue"),
+      values  = scales::rescale(c(0, alpha, upper), to = c(0,1), from = c(0, upper)),
+      limits  = c(0, upper),
+      oob     = scales::squish,
+      name    = "adj p"
+    )
+  }
+
   base_exclude_set <- .build_exclude_set(exclude_gos)
 
   .run_one <- function(d, side, ont, comp, comp_dir) {
@@ -251,8 +270,15 @@ go_enrichment <- function(dnds_annot_file = NULL,
       term_def  <- if ("DEFINITION" %in% names(term_map)) term_map$DEFINITION else NA_character_
     }
 
-    # Adjust & enrichment
-    p_adj <- if (p_adjust == "BH") stats::p.adjust(raw_p, method = "BH") else raw_p
+    # Adjust & enrichment (BH only on informative subset)
+    valid_idx <- which(is.finite(raw_p) & raw_p < 1 & sig_counts > 0)
+    p_adj <- rep(1, length(raw_p))
+    if (length(valid_idx)) {
+      p_adj[valid_idx] <- if (p_adjust == "BH") {
+        stats::p.adjust(raw_p[valid_idx], method = "BH")
+      } else raw_p[valid_idx]
+    }
+
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
     n_all <- length(geneList)
     enrichment <- (sig_counts / n_pos) / (annotated / n_all)
@@ -283,19 +309,31 @@ go_enrichment <- function(dnds_annot_file = NULL,
     if (make_plots && requireNamespace("ggplot2", quietly = TRUE)) {
       plt <- out[order(out$p_adj, -out$enrichment), ]
       plt <- utils::head(plt, top_n)
-      gg <- ggplot2::ggplot(plt, ggplot2::aes(x = enrichment,
-                                              y = stats::reorder(label, -p_adj),
-                                              size = significant,
-                                              color = p_adj)) +
+
+      upper <- .upper_padj(plt, alpha)
+
+      gg <- ggplot2::ggplot(
+        plt,
+        ggplot2::aes(x = enrichment,
+                     y = stats::reorder(label, -p_adj),
+                     size = significant,
+                     color = p_adj)
+      ) +
         ggplot2::geom_point() +
-        ggplot2::scale_color_gradient(low = "red", high = "blue") +
-        ggplot2::labs(x = "Enrichment (pos/bg)", y = sprintf("GO %s (%s)", ont, side),
-                      size = "# pos", color = "adj p") +
+        .padj_scale(alpha, upper) +
+        ggplot2::labs(
+          x = "Enrichment (pos/bg)",
+          y = sprintf("GO %s (%s)", ont, side),
+          size = "# pos"
+        ) +
         ggplot2::theme_minimal(base_size = 12)
+
       ggplot2::ggsave(sub("\\.tsv$", "_topN.svg", out_file), gg, width = 11, height = 9)
     }
     out_file
   }
+
+  base_exclude_set <- .build_exclude_set(exclude_gos)
 
   .run_comp <- function(comp, comp_dir) {
     in_file <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
