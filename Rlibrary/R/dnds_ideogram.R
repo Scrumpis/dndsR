@@ -425,7 +425,8 @@ dnds_ideogram <- function(dnds_annot      = NULL,
     xml2::xml_find_all(root, ".//rect[@id='svg-bg-rect']") |> xml2::xml_remove()
     first_draw <- xml2::xml_find_first(root, "./*[not(self::defs)][1]")
     bg_markup <- sprintf(
-      "<rect id='svg-bg-rect' x='%g' y='%g' width='%g' height='%g' fill='#ffffff' fill-opacity='1' stroke='none' pointer-events='none'/>",
+      "<rect id='svg-bg-rect' x='%g' y='%g' width='%g' height='%g' fill='#ffffff' fill-opacity='1' stroke='none' pointer-events='none'/>
+",
       minX, minY, vw, vh
     )
     bg_node <- xml2::read_xml(bg_markup)
