@@ -5,6 +5,17 @@ suppressPackageStartupMessages({
   library(dndsR)
 })
 
+# === Container-first PATH bootstrap for R/RStudio ===
+# If RUN_PREFIX is set and shims exist, prepend shims to PATH so system2("diamond") etc. use containers.
+local({
+  dndsr_auto <- tolower(Sys.getenv("AUTO_SHIMS", "1"))
+  run_prefix <- Sys.getenv("RUN_PREFIX", "")
+  shims_dir  <- Sys.getenv("SHIMS_DIR", path.expand("~/.dndsr/shims"))
+  if (dndsr_auto %in% c("1","true","yes") && nzchar(run_prefix) && dir.exists(shims_dir)) {
+    Sys.setenv(PATH = paste(shims_dir, Sys.getenv("PATH"), sep = .Platform$path.sep))
+  }
+})
+
 # =========================
 # Dual-form flag alias helper
 # =========================
@@ -125,6 +136,42 @@ base_opts <- list(
   v <- trimws(v[nzchar(v)])
   v[v %in% c("comma", "<comma>", "\\,")] <- ","
   v
+}
+
+.semver_ge <- function(a, b) {
+  a <- gsub("[^0-9.]", "", a); b <- gsub("[^0-9.]", "", b)
+  ap <- as.integer(strsplit(a, "\\.")[[1]])
+  bp <- as.integer(strsplit(b, "\\.")[[1]])
+  len <- max(length(ap), length(bp)); ap <- c(ap, rep(0L, len - length(ap))); bp <- c(bp, rep(0L, len - length(bp)))
+  for (i in seq_len(len)) { if (ap[i] > bp[i]) return(TRUE); if (ap[i] < bp[i]) return(FALSE) }
+  TRUE
+}
+`%||%` <- function(a, b) if (is.null(a) || is.na(a) || !nzchar(a)) b else a
+
+.host_tool_versions <- function() {
+  dv <- tryCatch(system2("diamond", "--version", stdout = TRUE, stderr = TRUE), error = function(e) NA_character_)
+  dv <- paste(dv, collapse = " ")
+  diamond <- if (is.na(dv)) NA_character_ else sub(".*diamond version ([0-9][0-9\\.]*).*", "\\1", dv)
+  if (!is.na(diamond) && identical(diamond, dv)) diamond <- NA_character_
+
+  ov <- tryCatch(system2("orthofinder", "-h", stdout = TRUE, stderr = TRUE), error = function(e) NA_character_)
+  ov <- paste(ov, collapse = " ")
+  orthof <- if (is.na(ov)) NA_character_ else sub(".*OrthoFinder v?([0-9][0-9\\.]*).*", "\\1", ov)
+  if (!is.na(orthof) && identical(orthof, ov)) orthof <- NA_character_
+
+  list(diamond = diamond, orthofinder = orthof)
+}
+
+.assert_host_min_versions <- function(min_d = "2.0.0", min_o = "2.5.0") {
+  if (nzchar(Sys.getenv("RUN_PREFIX", ""))) return(invisible(TRUE))  # using container; skip checks
+  vs <- .host_tool_versions()
+  errs <- character()
+  if (is.na(vs$diamond) || !.semver_ge(vs$diamond, min_d))
+    errs <- c(errs, sprintf("DIAMOND >= %s required (found: %s)", min_d, vs$diamond %||% "unknown"))
+  if (!is.na(vs$orthofinder) && !.semver_ge(vs$orthofinder, min_o))
+    errs <- c(errs, sprintf("OrthoFinder >= %s required (found: %s)", min_o, vs$orthofinder))
+  if (length(errs))
+    stop(paste(errs, collapse = "\n"), "\nTip: use the container (set RUN_PREFIX and shims) or update host tools.")
 }
 
 # =========================
@@ -409,8 +456,7 @@ run_ipr_enrichment <- function(o){
   make_plots_val     <- .resolve_toggle(o$make_plots, o$no_plots)
   drop_rows_val      <- .resolve_toggle(o$drop_rows_without_term, o$keep_rows_without_term)
   keep_unmatched_val <- .resolve_toggle(o$keep_unmatched, o$drop_unmatched)
-  stratify_val       <- if (!is.na(o$stratify_by_type) && isTRUE(o$stratify_by_type)) TRUE else if (isFALSE(o$stratify_by_type)) FALSE e
-lse NULL
+  stratify_val       <- if (!is.na(o$stratify_by_type) && isTRUE(o$stratify_by_type)) TRUE else if (isFALSE(o$stratify_by_type)) FALSE else NULL
   exclude_desc_val   <- if (!is.na(o$exclude_descendants) && isTRUE(o$exclude_descendants)) TRUE else NULL
 
   args <- list(
@@ -806,6 +852,55 @@ run_dnds_ideogram <- function(o){
   invisible(res)
 }
 
+# Doctor
+run_doctor <- function(o){
+  cli::cli_h2("dndsR doctor")
+
+  # Backend + shims
+  run_prefix <- Sys.getenv("RUN_PREFIX", "")
+  shims_dir  <- Sys.getenv("SHIMS_DIR", path.expand("~/.dndsr/shims"))
+  has_shims  <- grepl("dndsr/shims", Sys.getenv("PATH"))
+
+  cli::cli_text("RUN_PREFIX: {if (nzchar(run_prefix)) run_prefix else '<empty>'}")
+  cli::cli_text("SHIMS_DIR:  {shims_dir}")
+  cli::cli_text("PATH has shims: {has_shims}")
+
+  cli::cli_rule("diamond --version")
+  dv <- tryCatch(system2("diamond","--version",stdout=TRUE,stderr=TRUE),
+                 error=function(e) "<diamond not found on PATH>")
+  cat(paste(dv, collapse="\n"), "\n")
+
+  cli::cli_rule("orthofinder -h (first lines)")
+  ov <- tryCatch(system2("orthofinder","-h",stdout=TRUE,stderr=TRUE),
+                 error=function(e) "<orthofinder not found on PATH>")
+  cat(paste(head(ov, 4), collapse="\n"), "\n")
+
+  cli::cli_rule("Host tool version check (skipped if using container)")
+  if (nzchar(run_prefix)) {
+    cli::cli_alert_info("RUN_PREFIX is set → assuming container-backed tools; host version check skipped.")
+  } else {
+    msg <- tryCatch(
+      {
+        .assert_host_min_versions(min_d = "2.0.0", min_o = "2.5.0")
+        "OK: host DIAMOND / OrthoFinder meet minimum versions."
+      },
+      error = function(e) conditionMessage(e)
+    )
+    if (startsWith(msg, "OK:")) {
+      cli::cli_alert_success(msg)
+    } else {
+      cli::cli_alert_warning(msg)
+      cli::cli_text("Hint: Either:")
+      cli::cli_ul(c(
+        "Use the dndsR container + shims (recommended), or",
+        "Update DIAMOND / OrthoFinder on the host."
+      ))
+    }
+  }
+
+  invisible(NULL)
+}
+
 # =========================
 # Subcommands registry
 # =========================
@@ -830,6 +925,11 @@ subcommands <- list(
     opts = c(base_opts, opts_dnds_ideogram),
     fun  = run_dnds_ideogram,
     help = "Genome-wide dN/dS ideograms (RIdeogram) for query/subject"
+  ),
+  doctor = list(
+    opts = c(base_opts),
+    fun  = run_doctor,
+    help = "Report backend (container vs host), shim state, and tool versions"
   )
 )
 
