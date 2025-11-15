@@ -55,11 +55,10 @@ ENV PATH=/usr/local/bin:$MAMBA_ROOT_PREFIX/envs/tools/bin:$PATH
 # ============================================================
 RUN R -q -e "install.packages(c('remotes','BiocManager'), Ncpus=2)"
 
-RUN R -q -e "BiocManager::install(version='3.21'); \
-  BiocManager::install(c( \
+RUN R -q -e "BiocManager::install(c( \
     'AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures', \
     'GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO', \
-    'IHW','qvalue','rtracklayer','pwalign' \
+    'IHW','qvalue','rtracklayer','pwalign','txdbmaker' \
   ), update=FALSE, ask=FALSE)"
 
 RUN R -q -e "install.packages(c( \
