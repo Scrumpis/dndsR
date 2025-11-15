@@ -17,6 +17,7 @@ Note: We recommend Docker and Singularity usage for either CLI or RStudio usage,
 ### Clone the Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
+chmod 774 -R dndsR
 ```
 ### Pull the Image
 Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr)  
