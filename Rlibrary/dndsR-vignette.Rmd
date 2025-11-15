@@ -71,36 +71,15 @@ go_enrichment(
   output_dir = "./tests/full/",
   sides = c("query","subject"),
   ontologies = c("BP","MF","CC"),
-  algorithm  = "weight01",     # good default
+  algorithm  = "weight01",      # good default
   statistic  = "fisher",
   pos_threshold = 1,
-  drop_rows_without_go = TRUE, # annotation-aware universe
-  node_min = 10,               # drop ultra-rare terms
-  node_max = 2000,             # optional upper cap
-  p_adjust = "BH",
-  make_plots = TRUE,
-  top_n = 20,
-  exclude_gos = "GO:0015074"
-)
-
-
-# Exclude a subtree
-go_enrichment(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-  output_dir = "./tests/full/",
-  sides = c("query","subject"),
-  ontologies = c("BP","MF","CC"),
-  #algorithm  = "weight01",     # good default
-  statistic  = "fisher",
-  pos_threshold = 1,
-  drop_rows_without_go = TRUE, # annotation-aware universe
-  node_min = 5,               # drop ultra-rare terms
+  drop_rows_without_go = TRUE,  # annotation-aware universe
+  node_min = 5,                 # drop ultra-rare terms
   #node_max = 2000,             # optional upper cap
-  #p_adjust = "BH",
-  p_adjust = "none",
   make_plots = TRUE,
   top_n = 20,
-  exclude_gos = "GO:0015074",
+  #exclude_gos = "GO:0015074",
   #exclude_descendants = TRUE
   )
 ```
