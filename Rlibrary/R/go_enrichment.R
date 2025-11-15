@@ -19,7 +19,7 @@
 #' @param drop_rows_without_go If TRUE (default), universe is genes with ≥1 GO for that side.
 #' @param node_min Minimum term size (topGO nodeSize) to keep (default 10).
 #' @param node_max Maximum term size (filtered after test; default Inf).
-#' @param p_adjust "BH"|"none" for multiple-testing correction across tested nodes.
+#' @param p_adjust "none"|"BH" for multiple-testing correction across tested nodes (default "none").
 #' @param make_plots If TRUE, writes a top-N bubble plot per result.
 #' @param top_n Number of rows to plot.
 #' @param exclude_gos Character vector of GO IDs to exclude globally
@@ -31,6 +31,10 @@
 #'   run to avoid accidentally nuking huge swaths (default 5000).
 #' @param include_definition If TRUE (default), append TERM definition from GO.db.
 #' @param alpha Numeric FDR reference level for color scale (default 0.05).
+#' @param ... Additional arguments passed on to [topGO::runTest()], e.g. `score`,
+#'   `ties.method`, or other topGO tuning parameters. Core arguments
+#'   `object`, `algorithm`, and `statistic` are always set by dndsR and
+#'   cannot be overridden.
 #'
 #' @return Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
 #' @export
@@ -47,7 +51,7 @@ go_enrichment <- function(dnds_annot_file = NULL,
                           drop_rows_without_go = TRUE,
                           node_min = 10,
                           node_max = Inf,
-                          p_adjust = c("BH","none"),
+                          p_adjust = c("none","BH"),
                           make_plots = TRUE,
                           top_n = 20,
                           exclude_gos = NULL,
@@ -55,7 +59,8 @@ go_enrichment <- function(dnds_annot_file = NULL,
                           exclude_descendants_depth = Inf,
                           exclude_descendants_limit = 5000,
                           include_definition = TRUE,
-                          alpha = 0.05) {
+                          alpha = 0.05,
+                          ...) {
 
   if (!requireNamespace("topGO", quietly = TRUE) || !requireNamespace("GO.db", quietly = TRUE)) {
     stop("Please install Bioconductor packages 'topGO' and 'GO.db'.")
@@ -66,6 +71,9 @@ go_enrichment <- function(dnds_annot_file = NULL,
   if (!requireNamespace("AnnotationDbi", quietly = TRUE)) {
     stop("Please install Bioconductor package 'AnnotationDbi'.")
   }
+
+  # extra args to pass to topGO::runTest()
+  topgo_dots <- list(...)
 
   sides      <- match.arg(sides,      c("query","subject"), several.ok = TRUE)
   ontologies <- match.arg(ontologies, c("BP","MF","CC"),    several.ok = TRUE)
@@ -191,7 +199,7 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
   base_exclude_set <- .build_exclude_set(exclude_gos)
 
-  .run_one <- function(d, side, ont, comp, comp_dir) {
+  .run_one <- function(d, side, ont, comp, comp_dir, topgo_args = NULL) {
     prefix <- if (side == "query") "q_" else "s_"
     id_col <- if (side == "query") "query_id" else "subject_id"
     go_col <- paste0(prefix, "go")
@@ -231,7 +239,24 @@ go_enrichment <- function(dnds_annot_file = NULL,
                         gene2GO  = gene2GO,
                         nodeSize = as.integer(node_min))
 
-    res <- topGO::runTest(tgd, algorithm = algorithm, statistic = statistic)
+    # --- topGO::runTest with ... passthrough ---
+    if (is.null(topgo_args)) topgo_args <- list()
+
+    protected <- c("object","algorithm","statistic")
+    bad <- intersect(names(topgo_args), protected)
+    if (length(bad)) {
+      warning("[dndsR::go_enrichment] Ignoring arguments in ... that conflict with core topGO::runTest params: ",
+              paste(bad, collapse = ", "))
+      topgo_args[bad] <- NULL
+    }
+
+    run_args <- list(
+      object    = tgd,
+      algorithm = algorithm,
+      statistic = statistic
+    )
+
+    res <- do.call(topGO::runTest, c(run_args, topgo_args))
 
     # Tested nodes & raw p-values
     raw_scores <- topGO::score(res)
@@ -333,15 +358,13 @@ go_enrichment <- function(dnds_annot_file = NULL,
     out_file
   }
 
-  base_exclude_set <- .build_exclude_set(exclude_gos)
-
   .run_comp <- function(comp, comp_dir) {
     in_file <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) { warning("Missing annotated file: ", in_file); return(character(0)) }
     d <- utils::read.table(in_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
     paths <- character(0)
     for (sd in sides) for (ont in ontologies) {
-      p <- .run_one(d, sd, ont, comp, comp_dir)
+      p <- .run_one(d, sd, ont, comp, comp_dir, topgo_args = topgo_dots)
       if (!is.null(p)) paths <- c(paths, p)
     }
     if (!length(paths)) message("No GO enrichments produced for ", comp)
@@ -368,7 +391,7 @@ go_enrichment <- function(dnds_annot_file = NULL,
   d <- utils::read.table(dnds_annot_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
   outs <- character(0)
   for (sd in sides) for (ont in ontologies) {
-    p <- .run_one(d, sd, ont, comp_name, comp_dir)
+    p <- .run_one(d, sd, ont, comp_name, comp_dir, topgo_args = topgo_dots)
     if (!is.null(p)) outs <- c(outs, p)
   }
   message("topGO enrichment complete for: ", dnds_annot_file)
