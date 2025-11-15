@@ -38,7 +38,7 @@ calculate_dnds <- function(comparison_file = NULL,
   )
   .need_pkg(
     "pwalign",
-    "Biostrings >= 2.77.1 moved pairwiseAlignment() into the 'pwalign' package. ",
+    "Biostrings >= 2.77.1 moved pairwiseAlignment() into the 'pwalign' package. "
   )
 
   # Shim: if Biostrings made pairwiseAlignment() defunct, re-point it to pwalign's impl
