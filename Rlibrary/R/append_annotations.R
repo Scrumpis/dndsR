@@ -274,12 +274,10 @@ append_annotations <- function(dnds_file = NULL,
       assign(id, TRUE, envir = INPROG)
       on.exit({ if (exists(id, envir = INPROG, inherits = FALSE)) rm(list = id, envir = INPROG) }, add = TRUE)
 
-      own  <- if (exists(id, envir = own_terms_env, inherits = FALSE)) get(id, envir = own_terms_env) else structure(list(), names = cha
-racter(0))
+      own  <- if (exists(id, envir = own_terms_env, inherits = FALSE)) get(id, envir = own_terms_env) else structure(list(), names = character(0))
       kids <- if (exists(id, envir = children_env,  inherits = FALSE)) get(id, envir = children_env)  else character(0)
 
-      res <- if (length(kids)) .union_lists(c(list(own), lapply(kids, .subtree_terms, children_env = children_env, own_terms_env = own_t
-erms_env))) else own
+      res <- if (length(kids)) .union_lists(c(list(own), lapply(kids, .subtree_terms, children_env = children_env, own_terms_env = own_terms_env))) else own
       assign(id, res, envir = cache); res
     }
   })
@@ -299,8 +297,7 @@ erms_env))) else own
       own  <- if (exists(id, envir = own_attrs_env, inherits = FALSE)) get(id, envir = own_attrs_env) else character(0)
       kids <- if (exists(id, envir = children_env,  inherits = FALSE)) get(id, envir = children_env)  else character(0)
 
-      res <- if (length(kids)) unique(c(own, unlist(lapply(kids, .subtree_attrs, children_env = children_env, own_attrs_env = own_attrs_
-env), use.names = FALSE))) else own
+      res <- if (length(kids)) unique(c(own, unlist(lapply(kids, .subtree_attrs, children_env = children_env, own_attrs_env = own_attrs_env), use.names = FALSE))) else own
       assign(id, res, envir = cache); res
     }
   })
