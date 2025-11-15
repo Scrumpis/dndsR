@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-$PWD}"
+# Resolve directory of this script (even if invoked via relative path)
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
+while [ -h "$SCRIPT_SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+  [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$DIR/$SCRIPT_SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+
+# Default repo dir to the directory containing this launcher
+REPO_DIR="${REPO_DIR:-$SCRIPT_DIR}"
 PKG_DIR="Rlibrary"
 PKG_NAME="dndsR"
 
