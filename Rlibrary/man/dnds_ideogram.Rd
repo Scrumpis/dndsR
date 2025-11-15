@@ -20,7 +20,8 @@ dnds_ideogram(
   chr_strip_trailing = NULL,
   chr_case_insensitive = TRUE,
   restrict_gff_to_gene = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -72,6 +73,10 @@ Default \code{NULL} (no stripping).}
 when indexing coordinates. Default \code{FALSE}.}
 
 \item{verbose}{Logical; print progress.}
+
+\item{...}{Additional arguments passed to \code{RIdeogram::ideogram()}, such
+as layout or color options. Arguments that would override core mappings
+(\code{karyotype}, \code{overlaid}, \code{label}) are ignored.}
 }
 \value{
 Invisibly, a character vector of output file paths written.
