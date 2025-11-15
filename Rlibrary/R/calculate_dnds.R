@@ -36,6 +36,28 @@ calculate_dnds <- function(comparison_file = NULL,
     "This step needs 'orthologr'. Install via remotes::install_github('drostlab/orthologr') "
     |> paste0("or run inside the dndsR container (recommended).")
   )
+  .need_pkg(
+    "pwalign",
+    "Biostrings >= 2.77.1 moved pairwiseAlignment() into the 'pwalign' package. ",
+  )
+
+  # Shim: if Biostrings made pairwiseAlignment() defunct, re-point it to pwalign's impl
+  .fix_pairwiseAlignment <- function() {
+    if (!requireNamespace("Biostrings", quietly = TRUE)) return(invisible())
+    bs_ver <- utils::packageVersion("Biostrings")
+    # Threshold version is approximate; adjust if you want:
+    if (bs_ver >= "2.77.1") {
+      ns <- asNamespace("Biostrings")
+      if (bindingIsLocked("pairwiseAlignment", ns)) {
+        unlockBinding("pairwiseAlignment", ns)
+        on.exit(lockBinding("pairwiseAlignment", ns), add = TRUE)
+      }
+      ns$pairwiseAlignment <- pwalign::pairwiseAlignment
+    }
+    invisible()
+  }
+
+  .fix_pairwiseAlignment()
 
   # Optional but helpful: if using DIAMOND, confirm the binary is on PATH
   if (identical(tolower(aligner), "diamond")) {
@@ -119,7 +141,7 @@ calculate_dnds <- function(comparison_file = NULL,
       delete_corrupt_cds = TRUE,
       eval               = "1E-5",
       aa_aln_type        = "pairwise",
-      aa_aln_tool        = "NW",
+      aa_aln_tool        = "mafft",
       codon_aln_tool     = "pal2nal",
       dnds_est.method    = dnds_method,
       comp_cores         = as.integer(comp_cores),
@@ -129,15 +151,38 @@ calculate_dnds <- function(comparison_file = NULL,
     )
 
     # user-supplied overrides / additions
+        # user-supplied overrides / additions
     user <- list(...)
     if (length(user)) {
-      overlap <- intersect(names(user), names(args))
-      if (length(overlap)) message("Overriding defaults: ", paste(overlap, collapse = ", "))
-      args[overlap] <- user[overlap]                              # override defaults
-      extra <- setdiff(names(user), names(args))
-      if (length(extra)) args <- c(args, user[extra])             # add any other dNdS args
-    }
+      # Drop unnamed / invalid extras (e.g. stray alist() from launcher/optparse glue)
+      nms <- names(user)
+      if (is.null(nms)) {
+        user <- list()
+      } else {
+        keep <- nzchar(nms) & !is.na(nms)
+        if (!all(keep)) {
+          message("Ignoring ", sum(!keep), " unnamed/invalid extra argument(s) passed via '...'.")
+          user <- user[keep]
+          nms  <- names(user)
+        }
+      }
+      if (length(user)) {
+        # Only forward arguments that orthologr::dNdS actually knows about
+        dnds_formals <- names(formals(orthologr::dNdS))
+        user <- user[nms %in% dnds_formals]
 
+        overlap <- intersect(names(user), names(args))
+        if (length(overlap)) {
+          message("Overriding defaults: ", paste(overlap, collapse = ", "))
+          args[overlap] <- user[overlap]  # override defaults
+        }
+
+        extra <- setdiff(names(user), names(args))
+        if (length(extra)) {
+          args <- c(args, user[extra])    # add additional valid dNdS args
+        }
+      }
+    }
     message("Running dN/dS for: ", comparison_basename)
     res <- do.call(orthologr::dNdS, args)
     utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
