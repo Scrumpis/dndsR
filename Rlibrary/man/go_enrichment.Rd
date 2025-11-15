@@ -18,14 +18,16 @@ go_enrichment(
   drop_rows_without_go = TRUE,
   node_min = 10,
   node_max = Inf,
-  p_adjust = c("BH", "none"),
+  p_adjust = c("none", "BH"),
   make_plots = TRUE,
   top_n = 20,
   exclude_gos = NULL,
   exclude_descendants = FALSE,
   exclude_descendants_depth = Inf,
   exclude_descendants_limit = 5000,
-  include_definition = TRUE
+  include_definition = TRUE,
+  alpha = 0.05,
+  ...
 )
 }
 \arguments{
@@ -57,7 +59,7 @@ columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{node_max}{Maximum term size (filtered after test; default Inf).}
 
-\item{p_adjust}{"BH"|"none" for multiple-testing correction across tested nodes.}
+\item{p_adjust}{"none"|"BH" for multiple-testing correction across tested nodes (default "none").}
 
 \item{make_plots}{If TRUE, writes a top-N bubble plot per result.}
 
@@ -75,6 +77,13 @@ from positives/background and from tested nodes (default NULL).}
 run to avoid accidentally nuking huge swaths (default 5000).}
 
 \item{include_definition}{If TRUE (default), append TERM definition from GO.db.}
+
+\item{alpha}{Numeric FDR reference level for color scale (default 0.05).}
+
+\item{...}{Additional arguments passed on to [topGO::runTest()], e.g. `score`,
+`ties.method`, or other topGO tuning parameters. Core arguments
+`object`, `algorithm`, and `statistic` are always set by dndsR and
+cannot be overridden.}
 }
 \value{
 Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
