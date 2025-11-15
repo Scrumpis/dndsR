@@ -15,13 +15,14 @@ ipr_enrichment(
   make_plots = TRUE,
   top_n = 20,
   drop_rows_without_term = TRUE,
-  min_total = 0,
-  min_pos = 0,
-  fdr_method = c("BH", "IHW", "qvalue", "none"),
+  min_total = 2,
+  min_pos = 2,
+  max_prop = 0.2,
+  fdr_method = c("BH", "BY", "IHW", "qvalue", "none"),
   alpha = 0.05,
   term_sep = ";",
   include_types = NULL,
-  stratify_by_type = FALSE,
+  stratify_by_type = TRUE,
   types = NULL,
   adjust_scope = c("global", "per_type"),
   entries_source = c("auto", "local", "remote", "none"),
@@ -34,7 +35,20 @@ ipr_enrichment(
   term_trees = NULL,
   exclude_descendants = FALSE,
   exclude_descendants_depth = Inf,
-  exclude_descendants_limit = 5000
+  exclude_descendants_limit = 5000,
+  method = c("fisher", "parent_child", "weight01"),
+  ancestor_novel_frac = 0.2,
+  x_axis_min = NULL,
+  x_axis_max = NULL,
+  interpro_release = NULL,
+  auto_detect_release = TRUE,
+  release_candidates = c("92.0", "94.0", "96.0", "98.0", "100.0"),
+  strict_coverage = 0.9,
+  tree_source = c("auto", "local", "remote", "none"),
+  tree_path = NULL,
+  tree_url =
+    "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt",
+  tree_timeout_s = 20
 )
 }
 \arguments{
@@ -67,8 +81,7 @@ removed from BOTH positives and background (annotation-aware universe).}
 
 \item{min_pos}{Minimum positive occurrences required for a term (default 0).}
 
-\item{fdr_method}{One of "BH","IHW","qvalue","none". Defaults to "BH".
-If "IHW"/"qvalue" is chosen but the package is missing, falls back to "BH".}
+\item{fdr_method}{One of "BH","BY","IHW","qvalue","none". Defaults to "BH".}
 
 \item{alpha}{FDR level for IHW weighting (default 0.05).}
 
@@ -103,16 +116,38 @@ globally from both positives and background before enrichment. Preferred name.}
 
 \item{exclude_iprs}{Deprecated alias of `exclude_ids` for backward compatibility.}
 
-\item{term_trees}{Optional path or data.frame of a parent/child edgelist for IPRs
-(two columns). Only used if you want to expand `exclude_ids` to their descendants.}
+\item{term_trees}{Optional path or data.frame of a parent/child edgelist for IPRs.
+(High-priority local override if provided; two columns parent,child).}
 
-\item{exclude_descendants}{If TRUE, expand `exclude_ids` using `term_trees`. Default FALSE.}
+\item{exclude_descendants}{If TRUE, expand `exclude_ids` using tree. Default FALSE.}
 
 \item{exclude_descendants_depth}{Integer depth limit for descendant exclusion;
 1 = direct children only, Inf = entire subtree (default Inf).}
 
 \item{exclude_descendants_limit}{Hard cap on the number of excluded IPRs to avoid
 accidental mass exclusion (default 5000).}
+
+\item{method}{Enrichment mode: "fisher" (default), "parent_child" (elim-like), "weight01".}
+
+\item{ancestor_novel_frac}{Keep parent only if ≥ this fraction of unclaimed genes (default 0.20).}
+
+\item{x_axis_min, x_axis_max}{Optional fixed x-axis limits for plots.}
+
+\item{interpro_release}{Optional string (e.g. "94.0") to pin archived InterPro release.}
+
+\item{auto_detect_release}{Logical; auto-pick best archived release by IPR coverage (default TRUE).}
+
+\item{release_candidates}{Character vector of releases to test (default c("92.0","94.0","96.0","98.0","100.0")).}
+
+\item{strict_coverage}{Numeric in [0,1]; fail if best coverage < this (default 0.90).}
+
+\item{tree_source}{Where to load ParentChildTree from: "auto","local","remote","none".}
+
+\item{tree_path}{Optional local ParentChildTreeFile.txt or 2-col TSV edgelist.}
+
+\item{tree_url}{Optional explicit URL to ParentChildTree (raw txt or TSV).}
+
+\item{tree_timeout_s}{Numeric timeout (seconds) for tree fetch (default 20).}
 }
 \value{
 In single mode: (invisibly) list of output TSV paths.
