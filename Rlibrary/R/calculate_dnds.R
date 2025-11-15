@@ -38,26 +38,48 @@ calculate_dnds <- function(comparison_file = NULL,
   )
   .need_pkg(
     "pwalign",
-    "Biostrings >= 2.77.1 moved pairwiseAlignment() into the 'pwalign' package. "
+    "Biostrings >= 2.77.1 moved pairwiseAlignment()/pattern()/subject()/writePairwiseAlignments() into the 'pwalign' package."
   )
 
-  # Shim: if Biostrings made pairwiseAlignment() defunct, re-point it to pwalign's impl
-  .fix_pairwiseAlignment <- function() {
-    if (!requireNamespace("Biostrings", quietly = TRUE)) return(invisible())
-    bs_ver <- utils::packageVersion("Biostrings")
-    # Threshold version is approximate; adjust if you want:
-    if (bs_ver >= "2.77.1") {
-      ns <- asNamespace("Biostrings")
-      if (bindingIsLocked("pairwiseAlignment", ns)) {
-        unlockBinding("pairwiseAlignment", ns)
-        on.exit(lockBinding("pairwiseAlignment", ns), add = TRUE)
-      }
-      ns$pairwiseAlignment <- pwalign::pairwiseAlignment
+  # Shim: if Biostrings made core alignment helpers defunct, re-point them to pwalign's impl
+  .fix_pwalign_shim <- function() {
+    if (!requireNamespace("Biostrings", quietly = TRUE) ||
+        !requireNamespace("pwalign",    quietly = TRUE)) {
+      return(invisible())
     }
+
+    bs_ver <- utils::packageVersion("Biostrings")
+    if (bs_ver < "2.77.1") return(invisible())
+
+    ns <- asNamespace("Biostrings")
+
+    rebind_if_exists <- function(name, fun) {
+      if (!is.function(fun)) return(invisible())
+      # Only touch it if Biostrings actually has this symbol
+      if (!exists(name, envir = ns, inherits = FALSE)) return(invisible())
+
+      locked <- tryCatch(bindingIsLocked(name, ns),
+                         error = function(e) FALSE)
+      if (isTRUE(locked)) {
+        unlockBinding(name, ns)
+        # (Optional) you could relock here with on.exit, but not required.
+      }
+
+      assign(name, fun, envir = ns)
+      invisible()
+    }
+
+    # Core functions that Biostrings says moved to pwalign
+    rebind_if_exists("pairwiseAlignment",       pwalign::pairwiseAlignment)
+    rebind_if_exists("pattern",                 pwalign::pattern)
+    rebind_if_exists("subject",                 pwalign::subject)
+    rebind_if_exists("writePairwiseAlignments", pwalign::writePairwiseAlignments)
+
     invisible()
   }
 
-  .fix_pairwiseAlignment()
+  .fix_pwalign_shim()
+
 
   # Optional but helpful: if using DIAMOND, confirm the binary is on PATH
   if (identical(tolower(aligner), "diamond")) {
