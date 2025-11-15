@@ -19,6 +19,8 @@ Note: We recommend Docker and Singularity usage for either CLI or RStudio usage,
 git clone https://github.com/Scrumpis/dndsR
 ```
 ### Pull the Image
+Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr)  
+
 Singularity
 ```
 singularity pull dndsr.sif docker://scrumpis/dndsr:latest
