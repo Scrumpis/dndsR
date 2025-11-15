@@ -362,10 +362,8 @@ env), use.names = FALSE))) else own
     ts <- max(1L, threads - tq)
 
     if (.Platform$OS.type != "windows" && threads > 1L) {
-      j1 <- parallel::mcparallel(.annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs, threads = tq), silen
-t = TRUE)
-      j2 <- parallel::mcparallel(.annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts), silen
-t = TRUE)
+      j1 <- parallel::mcparallel(.annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs, threads = tq), silent = TRUE)
+      j2 <- parallel::mcparallel(.annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts), silent = TRUE)
       res <- parallel::mccollect(list(j1, j2), wait = TRUE)
       q_ann <- res[[1]]; s_ann <- res[[2]]
     } else {
