@@ -34,6 +34,7 @@ extract_cds <- function(comparison_name = NULL,
 
   # Require namespaces you actually use
   requireNamespace("GenomicFeatures", quietly = TRUE)
+  requireNamespace("txdbmaker", quietly = TRUE)
   requireNamespace("Biostrings", quietly = TRUE)
   requireNamespace("Rsamtools", quietly = TRUE)
   requireNamespace("GenomeInfoDb", quietly = TRUE)
@@ -51,9 +52,10 @@ extract_cds <- function(comparison_name = NULL,
 
   # Helper: build TxDb and choose CDS grouping
   .cds_groups <- function(gff, by = "gene") {
-    txdb <- GenomicFeatures::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character())
+    # makeTxDbFromGFF moved to txdbmaker (defunct in GenomicFeatures >= 1.61.1)
+    txdb <- txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character())
     if (by == "gene") {
-      GenomicFeatures::cdsBy(txdb, by = "gene")            # ← no use.names here
+      GenomicFeatures::cdsBy(txdb, by = "gene")            # no use.names here
     } else {
       GenomicFeatures::cdsBy(txdb, by = "tx", use.names = TRUE)
     }
