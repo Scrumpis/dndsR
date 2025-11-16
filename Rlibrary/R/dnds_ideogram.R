@@ -10,7 +10,7 @@
 #' (\code{dNdS < 1}) overlaid, and positive selection (\code{dNdS >= 1}) as the
 #' label heatmap. Outputs are \code{<comp>_{query|subject}_ideogram.{svg,png}}.
 #'
-#' @param dnds_merged_file Path to a single prebuilt intermediate table that
+#' @param dnds_annot_file Path to a single prebuilt intermediate table that
 #'   already contains \code{q_chr/q_gene_start} or \code{s_chr/s_gene_start}
 #'   (single mode). Most users should prefer batch mode via \code{comparison_file}.
 #' @param comparison_file Whitespace-delimited file with columns:
@@ -57,7 +57,7 @@
 #'
 #' @return Invisibly, a character vector of output file paths written.
 #' @export
-dnds_ideogram <- function(dnds_merged_file = NULL,
+dnds_ideogram <- function(dnds_annot_file = NULL,
                           comparison_file  = NULL,
                           output_dir       = getwd(),
                           sides            = c("query","subject"),
@@ -614,8 +614,11 @@ dnds_ideogram <- function(dnds_merged_file = NULL,
   }
 
   # single mode (expects a prebuilt intermediate with q_/s_ coords; choose exactly one side)
-  if (is.null(dnds_merged_file)) die("Provide either comparison_file (batch) OR dnds_merged_file (single).")
-  if (!file.exists(dnds_merged_file)) die("dnds_merged_file not found: %s", dnds_merged_file)
+  #if (is.null(dnds_merged_file)) die("Provide either comparison_file (batch) OR dnds_merged_file (single).")
+  #if (!file.exists(dnds_merged_file)) die("dnds_merged_file not found: %s", dnds_merged_file)
+  #if (length(sides) != 1L) die("Single mode requires exactly one 'side' in 'sides'.")
+  if (is.null(dnds_annot_file)) die("Provide either comparison_file (batch) OR dnds_annot_file (single).")
+  if (!file.exists(dnds_annot_file)) die("dnds_annot_file not found: %s", dnds_annot_file)
   if (length(sides) != 1L) die("Single mode requires exactly one 'side' in 'sides'.")
 
   # Require caller to provide the correct side's FASTA via a wrapper/CLI; this
