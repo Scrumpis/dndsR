@@ -45,26 +45,64 @@
 
 #' Read a contrast file defining pairwise regional dN/dS comparisons
 #'
-#' Expects columns: contrast_name, compA, compB, side
+#' Supports either:
+#'   4 columns: contrast_name, compA, compB, side
+#'     (side is applied to both compA and compB)
+#'   or
+#'   5 columns: contrast_name, compA, compA_side, compB, compB_side
+#'
+#' Returns a data.frame with normalized columns:
+#'   contrast_name, compA, compA_side, compB, compB_side
 #'
 #' @keywords internal
 .read_contrasts <- function(x) {
-  req <- c("contrast_name", "compA", "compB", "side")
+  req5 <- c("contrast_name", "compA", "compA_side", "compB", "compB_side")
+  req4 <- c("contrast_name", "compA", "compB", "side")
+
+  normalize_df <- function(df) {
+    # If already 5-column style
+    if (all(req5 %in% names(df))) {
+      return(df[, req5, drop = FALSE])
+    }
+    # If 4-column style, expand side -> compA_side / compB_side
+    if (all(req4 %in% names(df))) {
+      df_out <- data.frame(
+        contrast_name = df$contrast_name,
+        compA         = df$compA,
+        compA_side    = df$side,
+        compB         = df$compB,
+        compB_side    = df$side,
+        stringsAsFactors = FALSE
+      )
+      return(df_out)
+    }
+    stop("contrast_file must have either 4 cols (",
+         paste(req4, collapse = ", "),
+         ") or 5 cols (",
+         paste(req5, collapse = ", "),
+         "), or a header with those names.")
+  }
+
   if (is.data.frame(x)) {
-    stopifnot(all(req %in% names(x)))
-    return(x[, req, drop = FALSE])
+    return(normalize_df(x))
   }
+
+  # Try with header
   df1 <- try(.read_ws(x, header_try = TRUE), silent = TRUE)
-  if (!inherits(df1, "try-error") && all(req %in% names(df1))) {
-    return(df1[, req, drop = FALSE])
+  if (!inherits(df1, "try-error")) {
+    return(normalize_df(df1))
   }
+
+  # Fallback: no header, assign by position
   df2 <- .read_ws(x, header_try = FALSE)
-  if (ncol(df2) < 4) {
-    stop("contrast_file must have 4 columns or a header with: ",
-         paste(req, collapse = ", "))
+  if (ncol(df2) == 5) {
+    names(df2)[1:5] <- req5
+  } else if (ncol(df2) == 4) {
+    names(df2)[1:4] <- req4
+  } else {
+    stop("contrast_file must have 4 or 5 columns if no header is present.")
   }
-  names(df2)[1:4] <- req
-  df2[, req, drop = FALSE]
+  normalize_df(df2)
 }
 
 #' Filter dNdS annotation table by NA / max_dnds / optional logical expression
@@ -409,7 +447,7 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #' Compare dN/dS between pairs of dNdS annotation files within specified genomic
 #' regions using paired nonparametric tests. For each contrast (compA vs compB),
 #' the function:
-#'   - restricts to genes in the provided regions (query or subject side),
+#'   - restricts to genes in the provided regions (per-comparison query/subject side),
 #'   - matches rows across comparisons by user-specified ID columns,
 #'   - computes delta = dNdS_A - dNdS_B per matched gene,
 #'   - runs a Wilcoxon signed-rank test on delta,
@@ -427,11 +465,11 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #'   comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
 #'   Used in batch mode together with contrast_file or auto-all-pairs.
 #' @param contrast_file Optional path to a whitespace-delimited file defining pairwise
-#'   contrasts. Required columns:
-#'     contrast_name, compA, compB, side
-#'   where side is "query" or "subject" indicating which genome's coordinates
-#'   should be overlapped with regions. If contrast_file is NULL, all unique
-#'   unordered pairs of comparisons are tested for each side in 'sides'.
+#'   contrasts. Supported column layouts:
+#'   - 4 columns: contrast_name, compA, compB, side
+#'       (side is applied to both compA and compB)
+#'   - 5 columns: contrast_name, compA, compA_side, compB, compB_side
+#'       (sides may differ per comparison)
 #'
 #' @param output_dir Root directory containing per-comparison folders (batch mode).
 #'
@@ -442,12 +480,12 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #'
 #' @param merge_cols Character vector of column names used to match rows across
 #'   comparisons (e.g. "query_id", "subject_id", or an orthogroup ID). If NULL
-#'   (default), the function uses "query_id" when side = "query" and "subject_id"
-#'   when side = "subject".
+#'   (default), the function first tries "query_id" and then "subject_id",
+#'   requiring the chosen column to be present in both dNdS tables.
 #'
 #' @param sides Character vector among c("query","subject") indicating which side(s)
 #'   to evaluate in auto-all-pairs mode and single-contrast mode. Ignored when
-#'   contrast_file explicitly specifies side.
+#'   contrast_file explicitly specifies per-comparison sides.
 #'
 #' @param filter_expr Optional character with a logical expression evaluated in
 #'   each dNdS table before merging (e.g., "q_seqname == s_seqname & dNdS < 5").
@@ -457,11 +495,11 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #' @param n_boot Integer; number of bootstrap resamples if ci_method = "bootstrap".
 #'
 #' @param make_plots Logical; if TRUE, write a paired scatter and delta histogram
-#'   per contrast and side.
+#'   per contrast and side-combination.
 #'
-#' @return Invisibly, a character vector of summary TSV paths (one per contrast × side).
+#' @return Invisibly, a character vector of summary TSV paths (one per contrast).
 #'         Each TSV has columns:
-#'           contrast_name, compA, compB, side, n,
+#'           contrast_name, compA, compB, sideA, sideB, n,
 #'           mean_dnds_A, median_dnds_A,
 #'           mean_dnds_B, median_dnds_B,
 #'           mean_delta, median_delta,
@@ -503,7 +541,8 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
   .run_one_contrast <- function(contrast_name,
                                 compA_name,
                                 compB_name,
-                                side,
+                                sideA,
+                                sideB,
                                 fileA,
                                 fileB,
                                 out_dir) {
@@ -532,13 +571,15 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
       return(NA_character_)
     }
 
-    dA <- .label_region_side(dA, regions = regions, side = side)
-    dB <- .label_region_side(dB, regions = regions, side = side)
+    # Label regions per comparison with their own side
+    dA <- .label_region_side(dA, regions = regions, side = sideA)
+    dB <- .label_region_side(dB, regions = regions, side = sideB)
 
-    status_col <- if (side == "query") "q_region_status" else "s_region_status"
+    status_col_A <- if (sideA == "query") "q_region_status" else "s_region_status"
+    status_col_B <- if (sideB == "query") "q_region_status" else "s_region_status"
 
-    dA_reg <- dA[dA[[status_col]] == "region", , drop = FALSE]
-    dB_reg <- dB[dB[[status_col]] == "region", , drop = FALSE]
+    dA_reg <- dA[dA[[status_col_A]] == "region", , drop = FALSE]
+    dB_reg <- dB[dB[[status_col_B]] == "region", , drop = FALSE]
 
     if (!nrow(dA_reg) || !nrow(dB_reg)) {
       warning("No region rows for contrast ", contrast_name)
@@ -548,7 +589,19 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
     # Decide which columns to use for matching rows across comparisons
     merge_cols_eff <- merge_cols
     if (is.null(merge_cols_eff) || identical(merge_cols_eff, "auto")) {
-      merge_cols_eff <- if (side == "query") "query_id" else "subject_id"
+      candidates <- c("query_id", "subject_id")
+      chosen <- NULL
+      for (cand in candidates) {
+        if (cand %in% names(dA_reg) && cand %in% names(dB_reg)) {
+          chosen <- cand
+          break
+        }
+      }
+      if (is.null(chosen)) {
+        stop("Could not auto-detect merge_cols; neither 'query_id' nor 'subject_id' ",
+             "are present in both region-filtered tables. Please supply merge_cols.")
+      }
+      merge_cols_eff <- chosen
     }
 
     missing_colsA <- setdiff(merge_cols_eff, names(dA_reg))
@@ -589,11 +642,14 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
 
     p_wilcox <- .wilcox_signed(merged$delta)
 
+    side_tag <- paste0("A_", sideA, "__B_", sideB)
+
     summary_df <- data.frame(
       contrast_name   = contrast_name,
       compA           = compA_name,
       compB           = compB_name,
-      side            = side,
+      sideA           = sideA,
+      sideB           = sideB,
       n               = n,
       mean_dnds_A     = mean_A,
       median_dnds_A   = med_A,
@@ -611,7 +667,7 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
 
     dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
     out_tsv <- file.path(out_dir,
-                         paste0(contrast_name, "_", side, "_regional_dnds_contrast.tsv"))
+                         paste0(contrast_name, "_", side_tag, "_regional_dnds_contrast.tsv"))
     utils::write.table(summary_df, file = out_tsv, sep = "\t",
                        quote = FALSE, row.names = FALSE)
 
@@ -625,13 +681,13 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
         ggplot2::scale_y_continuous(trans = "log1p") +
         ggplot2::theme_minimal(base_size = 12) +
         ggplot2::labs(
-          title = paste0(contrast_name, " (", side, " side, region-only)"),
+          title = paste0(contrast_name, " (", side_tag, ", region-only)"),
           x     = paste0("dN/dS (", compB_name, ")"),
           y     = paste0("dN/dS (", compA_name, ")")
         )
 
       out_pdf <- file.path(out_dir,
-                           paste0(contrast_name, "_", side, "_regional_dnds_scatter.pdf"))
+                           paste0(contrast_name, "_", side_tag, "_regional_dnds_scatter.pdf"))
       ggplot2::ggsave(out_pdf, gg, width = 5, height = 4)
 
       # Delta histogram
@@ -642,10 +698,10 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
         ggplot2::labs(
           x     = "delta dN/dS (A - B)",
           y     = "Count",
-          title = paste0(contrast_name, " — delta distribution (region-only, ", side, ")")
+          title = paste0(contrast_name, " — delta distribution (region-only, ", side_tag, ")")
         )
       out_pdf2 <- file.path(out_dir,
-                            paste0(contrast_name, "_", side, "_regional_dnds_delta_hist.pdf"))
+                            paste0(contrast_name, "_", side_tag, "_regional_dnds_delta_hist.pdf"))
       ggplot2::ggsave(out_pdf2, gg2, width = 5, height = 4)
     }
 
@@ -665,15 +721,19 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
       # Explicit contrasts
       contr <- .read_contrasts(contrast_file)
       for (i in seq_len(nrow(contr))) {
-        cn   <- contr$contrast_name[i]
-        cA   <- contr$compA[i]
-        cB   <- contr$compB[i]
-        side <- contr$side[i]
+        cn     <- contr$contrast_name[i]
+        cA     <- contr$compA[i]
+        cB     <- contr$compB[i]
+        sideA  <- contr$compA_side[i]
+        sideB  <- contr$compB_side[i]
 
         if (!cA %in% comp_names) stop("compA '", cA, "' not found in comparison_file.")
         if (!cB %in% comp_names) stop("compB '", cB, "' not found in comparison_file.")
-        if (!side %in% c("query", "subject")) {
-          stop("side must be 'query' or 'subject' in contrast_file.")
+        if (!sideA %in% c("query", "subject")) {
+          stop("compA_side must be 'query' or 'subject' in contrast_file.")
+        }
+        if (!sideB %in% c("query", "subject")) {
+          stop("compB_side must be 'query' or 'subject' in contrast_file.")
         }
 
         fileA <- file.path(output_dir, cA, paste0(cA, "_dnds_annot.tsv"))
@@ -681,13 +741,13 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
 
         contrast_dir <- file.path(output_dir, "regional_contrasts")
         out_paths <- c(out_paths,
-                       .run_one_contrast(cn, cA, cB, side, fileA, fileB, contrast_dir))
+                       .run_one_contrast(cn, cA, cB, sideA, sideB, fileA, fileB, contrast_dir))
       }
       message("Regional dN/dS contrasts complete (explicit contrast_file).")
       return(invisible(out_paths))
     }
 
-    # Auto all-pairs mode
+    # Auto all-pairs mode: use same side for A and B
     pairs        <- utils::combn(comp_names, 2, simplify = FALSE)
     contrast_dir <- file.path(output_dir, "regional_contrasts")
     for (p in pairs) {
@@ -698,7 +758,7 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
       for (sd in sides) {
         cn <- paste0(cA, "_vs_", cB)
         out_paths <- c(out_paths,
-                       .run_one_contrast(cn, cA, cB, sd, fileA, fileB, contrast_dir))
+                       .run_one_contrast(cn, cA, cB, sd, sd, fileA, fileB, contrast_dir))
       }
     }
     message("Regional dN/dS contrasts complete (auto all-pairs).")
@@ -721,7 +781,7 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
     for (sd in sides) {
       cn <- paste0(compA_name, "_vs_", compB_name)
       out_paths <- c(out_paths,
-                     .run_one_contrast(cn, compA_name, compB_name, sd,
+                     .run_one_contrast(cn, compA_name, compB_name, sd, sd,
                                        dnds_annot_file_a, dnds_annot_file_b,
                                        out_dir))
     }
