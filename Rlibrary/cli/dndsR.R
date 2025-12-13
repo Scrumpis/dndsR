@@ -852,6 +852,149 @@ run_dnds_ideogram <- function(o){
   invisible(res)
 }
 
+
+# =========================
+# regional_dnds_summary
+# =========================
+opts_regional_summary <- list(
+  make_option(.alias("--dnds-annot-file"), type="character", dest="dnds_annot_file",
+              help="Path to <comp>_dnds_annot.tsv (single mode)"),
+  make_option(c("-C", .alias("--comparison-file")), type="character", dest="comparison_file",
+              help="TSV of comparisons (batch mode)"),
+  make_option(c("-O", .alias("--output-dir")), type="character", dest="output_dir", default=NULL,
+              help="Root directory for comparison folders"),
+
+  make_option(.alias("--regions-bed"), type="character", dest="regions_bed",
+              help="BED-like file of regions (required)"),
+  make_option(.alias("--region-seq-col"), type="character", dest="region_seq_col", default=NULL,
+              help="Column name for seqname"),
+  make_option(.alias("--region-start-col"), type="character", dest="region_start_col", default=NULL,
+              help="Column for start"),
+  make_option(.alias("--region-end-col"), type="character", dest="region_end_col", default=NULL,
+              help="Column for end"),
+  make_option(.alias("--region-name-col"), type="character", dest="region_name_col", default=NULL,
+              help="Optional label column"),
+
+  make_option(.alias("--sides"), type="character", dest="sides", default=NULL,
+              help="Comma-separated: query, subject"),
+
+  make_option(.alias("--filter-expr"), type="character", dest="filter_expr", default=NULL,
+              help="Logical filter expression"),
+  make_option(.alias("--max-dnds"), type="double", dest="max_dnds", default=NULL,
+              help="Drop rows >= max_dnds"),
+
+  make_option(.alias("--ci-method"), type="character", dest="ci_method", default=NULL,
+              help="normal|bootstrap"),
+  make_option(.alias("--n-boot"), type="integer", dest="n_boot", default=NULL,
+              help="Bootstrap iterations"),
+
+  make_option(.alias("--make-plots"), action="store_true", dest="make_plots", default=NA,
+              help="Generate violin/boxplots"),
+  make_option(.alias("--no-plots"),   action="store_true", dest="no_plots", default=NA,
+              help="Disable plots")
+)
+
+run_regional_summary <- function(o){
+  .dump_opts("regional_dnds_summary", o)
+
+  sides_vec <- .parse_csv(o$sides)
+  make_plots_val <- .resolve_toggle(o$make_plots, o$no_plots)
+
+  args <- list(
+    dnds_annot_file = o$dnds_annot_file,
+    comparison_file = o$comparison_file
+  )
+  args <- .add_if(args, "output_dir",         o$output_dir)
+  args <- .add_if(args, "regions_bed",        o$regions_bed)
+  args <- .add_if(args, "region_seq_col",     o$region_seq_col)
+  args <- .add_if(args, "region_start_col",   o$region_start_col)
+  args <- .add_if(args, "region_end_col",     o$region_end_col)
+  args <- .add_if(args, "region_name_col",    o$region_name_col)
+  args <- .add_if(args, "sides",              sides_vec)
+  args <- .add_if(args, "filter_expr",        o$filter_expr)
+  args <- .add_if(args, "max_dnds",           o$max_dnds)
+  args <- .add_if(args, "make_plots",         make_plots_val)
+  args <- .add_if(args, "ci_method",          o$ci_method)
+  args <- .add_if(args, "n_boot",             o$n_boot)
+
+  out <- do.call(dndsR::regional_dnds_summary, args)
+  cli::cli_alert_success("regional_dnds_summary completed.")
+  invisible(out)
+}
+
+
+# =========================
+# regional_dnds_contrasts
+# =========================
+opts_regional_contrasts <- list(
+  make_option(.alias("--dnds-a"), type="character", dest="dnds_a",
+              help="Path to compA dnds_annot.tsv (single mode)"),
+  make_option(.alias("--dnds-b"), type="character", dest="dnds_b",
+              help="Path to compB dnds_annot.tsv (single mode)"),
+
+  make_option(c("-C", .alias("--comparison-file")), type="character", dest="comparison_file",
+              help="TSV with comparisons (batch mode)"),
+  make_option(.alias("--contrast-file"), type="character", dest="contrast_file",
+              help="TSV defining contrasts (compA compA_side compB compB_side)"),
+  make_option(c("-O", .alias("--output-dir")), type="character", dest="output_dir", default=NULL,
+              help="Root dir of comparison outputs"),
+
+  make_option(.alias("--regions-bed"), type="character", dest="regions_bed",
+              help="BED-like file of regions (required)"),
+  make_option(.alias("--region-seq-col"), type="character", dest="region_seq_col", default=NULL),
+  make_option(.alias("--region-start-col"), type="character", dest="region_start_col", default=NULL),
+  make_option(.alias("--region-end-col"), type="character", dest="region_end_col", default=NULL),
+  make_option(.alias("--region-name-col"), type="character", dest="region_name_col", default=NULL),
+
+  make_option(.alias("--merge-cols"), type="character", dest="merge_cols", default=NULL,
+              help="Comma-separated ID columns for gene matching"),
+
+  make_option(.alias("--sides"), type="character", dest="sides", default=NULL,
+              help="Comma list for auto-all-pairs mode"),
+
+  make_option(.alias("--filter-expr"), type="character", dest="filter_expr", default=NULL),
+  make_option(.alias("--max-dnds"), type="double", dest="max_dnds", default=NULL),
+
+  make_option(.alias("--ci-method"), type="character", dest="ci_method", default=NULL),
+  make_option(.alias("--n-boot"), type="integer", dest="n_boot", default=NULL),
+
+  make_option(.alias("--make-plots"), action="store_true", dest="make_plots", default=NA),
+  make_option(.alias("--no-plots"),   action="store_true", dest="no_plots", default=NA)
+)
+
+run_regional_contrasts <- function(o){
+  .dump_opts("regional_dnds_contrasts", o)
+
+  sides_vec <- .parse_csv(o$sides)
+  merge_cols_vec <- .parse_csv(o$merge_cols)
+  make_plots_val <- .resolve_toggle(o$make_plots, o$no_plots)
+
+  args <- list(
+    dnds_annot_file_a = o$dnds_a,
+    dnds_annot_file_b = o$dnds_b,
+    comparison_file   = o$comparison_file,
+    contrast_file     = o$contrast_file
+  )
+  args <- .add_if(args, "output_dir",        o$output_dir)
+  args <- .add_if(args, "regions_bed",       o$regions_bed)
+  args <- .add_if(args, "region_seq_col",    o$region_seq_col)
+  args <- .add_if(args, "region_start_col",  o$region_start_col)
+  args <- .add_if(args, "region_end_col",    o$region_end_col)
+  args <- .add_if(args, "region_name_col",   o$region_name_col)
+  args <- .add_if(args, "merge_cols",        merge_cols_vec)
+  args <- .add_if(args, "sides",             sides_vec)
+  args <- .add_if(args, "filter_expr",       o$filter_expr)
+  args <- .add_if(args, "max_dnds",          o$max_dnds)
+  args <- .add_if(args, "ci_method",         o$ci_method)
+  args <- .add_if(args, "n_boot",            o$n_boot)
+  args <- .add_if(args, "make_plots",        make_plots_val)
+
+  out <- do.call(dndsR::regional_dnds_contrasts, args)
+  cli::cli_alert_success("regional_dnds_contrasts completed.")
+  invisible(out)
+}
+
+                  
 # Doctor
 run_doctor <- function(o){
   cli::cli_h2("dndsR doctor")
@@ -906,26 +1049,65 @@ run_doctor <- function(o){
 # =========================
 subcommands <- list(
   split_comparisons = list(
-    opts = c(base_opts, opts_split),      fun = run_split,
+    opts = c(base_opts, opts_split),
+    fun  = run_split,
     help = "Split genomes by label (subgenome or haplotype) and emit a new comparison file"
   ),
-  extract_cds    = list(opts = c(base_opts, opts_extract_cds), fun = run_extract_cds,
-                        help = "Extract CDS (and optionally proteins) from genome+GFF"),
-  calculate_dnds = list(opts = c(base_opts, opts_calculate_dnds), fun = run_calculate_dnds,
-                        help = "Run dN/dS with orthologr from pre-extracted CDS"),
-  append_annotations = list(opts = c(base_opts, opts_append_annotations), fun = run_append_annotations,
-                            help = "Append query/subject GFF annotations to dN/dS results"),
-  ipr_enrichment = list(opts = c(base_opts, opts_ipr_enrichment), fun = run_ipr_enrichment,
-                        help = "InterPro (IPR) enrichment (Fisher) for q/s IPR terms in dNdS results"),
-  go_enrichment = list(opts = c(base_opts, opts_go_enrichment), fun = run_go_enrichment,
-                       help = "GO enrichment with topGO for query/subject columns"),
-  term_enrichment = list(opts = c(base_opts, opts_term_enrichment), fun = run_term_enrichment,
-                         help = "Generic term enrichment (Fisher) for q_*/s_* term columns"),
+
+  extract_cds = list(
+    opts = c(base_opts, opts_extract_cds),
+    fun  = run_extract_cds,
+    help = "Extract CDS (and optionally proteins) from genome+GFF"
+  ),
+
+  calculate_dnds = list(
+    opts = c(base_opts, opts_calculate_dnds),
+    fun  = run_calculate_dnds,
+    help = "Run dN/dS with orthologr from pre-extracted CDS"
+  ),
+
+  append_annotations = list(
+    opts = c(base_opts, opts_append_annotations),
+    fun  = run_append_annotations,
+    help = "Append query/subject GFF annotations to dN/dS results"
+  ),
+
+  ipr_enrichment = list(
+    opts = c(base_opts, opts_ipr_enrichment),
+    fun  = run_ipr_enrichment,
+    help = "InterPro (IPR) enrichment (Fisher) for q/s IPR terms in dNdS results"
+  ),
+
+  go_enrichment = list(
+    opts = c(base_opts, opts_go_enrichment),
+    fun  = run_go_enrichment,
+    help = "GO enrichment with topGO for query/subject columns"
+  ),
+
+  term_enrichment = list(
+    opts = c(base_opts, opts_term_enrichment),
+    fun  = run_term_enrichment,
+    help = "Generic term enrichment (Fisher) for q_*/s_* term columns"
+  ),
+
   dnds_ideogram = list(
     opts = c(base_opts, opts_dnds_ideogram),
     fun  = run_dnds_ideogram,
     help = "Genome-wide dN/dS ideograms (RIdeogram) for query/subject"
   ),
+
+  regional_dnds_summary = list(
+    opts = c(base_opts, opts_regional_summary),
+    fun  = run_regional_summary,
+    help = "Summaries of dN/dS inside/outside regions with Wilcoxon tests"
+  ),
+
+  regional_dnds_contrasts = list(
+    opts = c(base_opts, opts_regional_contrasts),
+    fun  = run_regional_contrasts,
+    help = "Pairwise contrasts of regional dN/dS (signed-rank) across comparisons"
+  ),
+
   doctor = list(
     opts = c(base_opts),
     fun  = run_doctor,
