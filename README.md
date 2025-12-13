@@ -7,12 +7,7 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Calculates dN/dS
 - Visualizes selection pressures across the genomes through an ideogram
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
-
-Improvements:
-- Rebuild container with biomartr?
-- Append annotation - seems to currently single thread each linearlly, if can't get more threads per job, then use available threads to run each in parallel. Ideally, precompute query and subject in parallel, wait until both are done, then move until next step. This might be a little complex though so at least give all comparisons a thread to run in parallel.
-- Update Rvignette with test dataset
-- Cleanup documentation
+- Analyzes specified retgions for overall differences in dN/dS (i.e., do Dkmer regions of B and C have dN/dS>1 significantly more frequently than
 
 ## Setup
 Note: We recommend Docker and Singularity usage for either CLI or RStudio usage, however, if you have a working Conda env or other way to provide the dependencies, Docker and Singularity are not required. You can install directly into RStudio as shown below (note line once we make it).
@@ -98,14 +93,27 @@ singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 
+### 7. Regional Analysis
+Regional summary between comparisons 
+```
+dndsR regional_dnds_summary \
+  --comparison-file comps.tsv \
+  --regions-bed distal_regions.bed \
+  --sides query,subject \
+  --output-dir results/
+```
+
 
 dndsR has a wrapper script () to run batches of comparisons which takes as input a space or tab separated text file containing: comparison_basename, query_fasta, query_gff3, subject_fasta, subject_gff3. 
 Example:
 ```
 CformvsCalbumIWGC "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_formosanum_chrs.fasta" "/Users/john7932/GitHub/dndsR/tests/full/CheFo_v3.gff" "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_album.genome_v2_chrs.fasta" "/Users/john7932/GitHub/dndsR/tests/full/CheAl_v01.0.note_fixed.gff"
 ```
-The wrapper will accomplish the below tasks, which can also be run piecewise as their own callable functions from the dndsR package.
-1. Extract CDS sequence from
-
 ## Notes
 Can use special characters or spaces in path if quoted in the fofn
+
+## Future Improvements:
+- Rebuild container with biomartr?
+- Append annotation - seems to currently single thread each linearlly, if can't get more threads per job, then use available threads to run each in parallel. Ideally, precompute query and subject in parallel, wait until both are done, then move until next step. This might be a little complex though so at least give all comparisons a thread to run in parallel.
+- Update Rvignette with test dataset
+- Cleanup documentation
