@@ -883,6 +883,9 @@ opts_regional_summary <- list(
   make_option(.alias("--max-dnds"), type="double", dest="max_dnds", default=NULL,
               help="Drop rows >= max_dnds"),
 
+  make_option(.alias("--pos-threshold"), type="double", dest="pos_threshold", default=NULL,
+              help="dNdS > pos_threshold defines positive selection for Fisher tests [default in R: 1]"),
+
   make_option(.alias("--ci-method"), type="character", dest="ci_method", default=NULL,
               help="normal|bootstrap"),
   make_option(.alias("--n-boot"), type="integer", dest="n_boot", default=NULL,
@@ -893,7 +896,7 @@ opts_regional_summary <- list(
   make_option(.alias("--no-plots"),   action="store_true", dest="no_plots", default=NA,
               help="Disable plots")
 )
-
+                  
 run_regional_summary <- function(o){
   .dump_opts("regional_dnds_summary", o)
 
@@ -904,23 +907,25 @@ run_regional_summary <- function(o){
     dnds_annot_file = o$dnds_annot_file,
     comparison_file = o$comparison_file
   )
-  args <- .add_if(args, "output_dir",         o$output_dir)
-  args <- .add_if(args, "regions_bed",        o$regions_bed)
-  args <- .add_if(args, "region_seq_col",     o$region_seq_col)
-  args <- .add_if(args, "region_start_col",   o$region_start_col)
-  args <- .add_if(args, "region_end_col",     o$region_end_col)
-  args <- .add_if(args, "region_name_col",    o$region_name_col)
-  args <- .add_if(args, "sides",              sides_vec)
-  args <- .add_if(args, "filter_expr",        o$filter_expr)
-  args <- .add_if(args, "max_dnds",           o$max_dnds)
-  args <- .add_if(args, "make_plots",         make_plots_val)
-  args <- .add_if(args, "ci_method",          o$ci_method)
-  args <- .add_if(args, "n_boot",             o$n_boot)
+  args <- .add_if(args, "output_dir",       o$output_dir)
+  args <- .add_if(args, "regions_bed",      o$regions_bed)
+  args <- .add_if(args, "region_seq_col",   o$region_seq_col)
+  args <- .add_if(args, "region_start_col", o$region_start_col)
+  args <- .add_if(args, "region_end_col",   o$region_end_col)
+  args <- .add_if(args, "region_name_col",  o$region_name_col)
+  args <- .add_if(args, "sides",            sides_vec)
+  args <- .add_if(args, "filter_expr",      o$filter_expr)
+  args <- .add_if(args, "max_dnds",         o$max_dnds)
+  args <- .add_if(args, "pos_threshold",    o$pos_threshold, as.numeric)
+  args <- .add_if(args, "make_plots",       make_plots_val)
+  args <- .add_if(args, "ci_method",        o$ci_method)
+  args <- .add_if(args, "n_boot",           o$n_boot)
 
   out <- do.call(dndsR::regional_dnds_summary, args)
   cli::cli_alert_success("regional_dnds_summary completed.")
   invisible(out)
 }
+
 
 
 # =========================
@@ -955,6 +960,9 @@ opts_regional_contrasts <- list(
   make_option(.alias("--filter-expr"), type="character", dest="filter_expr", default=NULL),
   make_option(.alias("--max-dnds"), type="double", dest="max_dnds", default=NULL),
 
+  make_option(.alias("--pos-threshold"), type="double", dest="pos_threshold", default=NULL,
+              help="dNdS > pos_threshold defines positive selection for Fisher tests [default in R: 1]"),
+
   make_option(.alias("--ci-method"), type="character", dest="ci_method", default=NULL),
   make_option(.alias("--n-boot"), type="integer", dest="n_boot", default=NULL),
 
@@ -965,7 +973,7 @@ opts_regional_contrasts <- list(
 run_regional_contrasts <- function(o){
   .dump_opts("regional_dnds_contrasts", o)
 
-  sides_vec <- .parse_csv(o$sides)
+  sides_vec      <- .parse_csv(o$sides)
   merge_cols_vec <- .parse_csv(o$merge_cols)
   make_plots_val <- .resolve_toggle(o$make_plots, o$no_plots)
 
@@ -975,24 +983,26 @@ run_regional_contrasts <- function(o){
     comparison_file   = o$comparison_file,
     contrast_file     = o$contrast_file
   )
-  args <- .add_if(args, "output_dir",        o$output_dir)
-  args <- .add_if(args, "regions_bed",       o$regions_bed)
-  args <- .add_if(args, "region_seq_col",    o$region_seq_col)
-  args <- .add_if(args, "region_start_col",  o$region_start_col)
-  args <- .add_if(args, "region_end_col",    o$region_end_col)
-  args <- .add_if(args, "region_name_col",   o$region_name_col)
-  args <- .add_if(args, "merge_cols",        merge_cols_vec)
-  args <- .add_if(args, "sides",             sides_vec)
-  args <- .add_if(args, "filter_expr",       o$filter_expr)
-  args <- .add_if(args, "max_dnds",          o$max_dnds)
-  args <- .add_if(args, "ci_method",         o$ci_method)
-  args <- .add_if(args, "n_boot",            o$n_boot)
-  args <- .add_if(args, "make_plots",        make_plots_val)
+  args <- .add_if(args, "output_dir",      o$output_dir)
+  args <- .add_if(args, "regions_bed",     o$regions_bed)
+  args <- .add_if(args, "region_seq_col",  o$region_seq_col)
+  args <- .add_if(args, "region_start_col",o$region_start_col)
+  args <- .add_if(args, "region_end_col",  o$region_end_col)
+  args <- .add_if(args, "region_name_col", o$region_name_col)
+  args <- .add_if(args, "merge_cols",      merge_cols_vec)
+  args <- .add_if(args, "sides",           sides_vec)
+  args <- .add_if(args, "filter_expr",     o$filter_expr)
+  args <- .add_if(args, "max_dnds",        o$max_dnds)
+  args <- .add_if(args, "pos_threshold",   o$pos_threshold, as.numeric)
+  args <- .add_if(args, "ci_method",       o$ci_method)
+  args <- .add_if(args, "n_boot",          o$n_boot)
+  args <- .add_if(args, "make_plots",      make_plots_val)
 
   out <- do.call(dndsR::regional_dnds_contrasts, args)
   cli::cli_alert_success("regional_dnds_contrasts completed.")
   invisible(out)
 }
+
 
                   
 # Doctor
@@ -1099,13 +1109,13 @@ subcommands <- list(
   regional_dnds_summary = list(
     opts = c(base_opts, opts_regional_summary),
     fun  = run_regional_summary,
-    help = "Summaries of dN/dS inside/outside regions with Wilcoxon tests"
+    help = "Summaries of dN/dS inside/outside regions with Wilcoxon + Fisher enrichment for dN/dS > threshold"
   ),
 
   regional_dnds_contrasts = list(
     opts = c(base_opts, opts_regional_contrasts),
     fun  = run_regional_contrasts,
-    help = "Pairwise contrasts of regional dN/dS (signed-rank) across comparisons"
+    help = "Pairwise contrasts of regional dN/dS (signed-rank) plus enrichment of dN/dS > threshold across comparisons"
   ),
 
   doctor = list(
