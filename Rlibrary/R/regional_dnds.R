@@ -442,7 +442,7 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 # 2) Regional contrasts function
 # -----------------------------
 
-#' Pairwise regional dN/dS contrasts (Wilcoxon signed-rank)
+#' Pairwise regional dN/dS contrasts (Wilcoxon signed-rank + dN/dS>threshold enrichment)
 #'
 #' Compare dN/dS between pairs of dNdS annotation files within specified genomic
 #' regions using paired nonparametric tests. For each contrast (compA vs compB),
@@ -452,6 +452,14 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #'   - computes delta = dNdS_A - dNdS_B per matched gene,
 #'   - runs a Wilcoxon signed-rank test on delta,
 #'   - summarizes statistics and writes a TSV (and optional plots) per contrast.
+#'
+#' In addition, it tests whether compA is enriched for putatively positively selected
+#' genes (dN/dS > pos_threshold) compared to compB using Fisher's exact test on:
+#'
+#'   [row1] compA: n_pos_A, n_nonpos_A
+#'   [row2] compB: n_pos_B, n_nonpos_B
+#'
+#' with alternative = "greater" (H1: prop_A > prop_B).
 #'
 #' Modes:
 #'   1) Single-contrast: supply dnds_annot_file_a and dnds_annot_file_b.
@@ -497,6 +505,9 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #' @param make_plots Logical; if TRUE, write a paired scatter and delta histogram
 #'   per contrast and side-combination.
 #'
+#' @param pos_threshold Numeric threshold for calling "positive selection"
+#'   (genes with dN/dS > pos_threshold are counted in the enrichment test; default 1).
+#'
 #' @return Invisibly, a character vector of summary TSV paths (one per contrast).
 #'         Each TSV has columns:
 #'           contrast_name, compA, compB, sideA, sideB, n,
@@ -504,7 +515,11 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
 #'           mean_dnds_B, median_dnds_B,
 #'           mean_delta, median_delta,
 #'           delta_sd, delta_se, delta_ci_lower, delta_ci_upper,
-#'           wilcox_p_value.
+#'           wilcox_p_value,
+#'           n_pos_A, n_nonpos_A, frac_pos_A,
+#'           n_pos_B, n_nonpos_B, frac_pos_B,
+#'           pos_threshold,
+#'           fisher_p_A_gt_B_dnds_gt_pos_threshold.
 #' @export
 regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
                                     dnds_annot_file_b = NULL,
@@ -522,7 +537,8 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
                                     max_dnds         = 10,
                                     ci_method        = c("normal", "bootstrap"),
                                     n_boot           = 1000,
-                                    make_plots       = TRUE) {
+                                    make_plots       = TRUE,
+                                    pos_threshold    = 1) {
   ci_method <- match.arg(ci_method)
   sides     <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
 
@@ -642,6 +658,33 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
 
     p_wilcox <- .wilcox_signed(merged$delta)
 
+    # Positive selection enrichment: dN/dS > pos_threshold
+    is_finite_A <- is.finite(merged$dNdS_A)
+    is_finite_B <- is.finite(merged$dNdS_B)
+    is_pos_A    <- is_finite_A & merged$dNdS_A > pos_threshold
+    is_pos_B    <- is_finite_B & merged$dNdS_B > pos_threshold
+
+    nA        <- sum(is_finite_A)
+    nB        <- sum(is_finite_B)
+    n_pos_A   <- sum(is_pos_A)
+    n_pos_B   <- sum(is_pos_B)
+    n_non_A   <- nA - n_pos_A
+    n_non_B   <- nB - n_pos_B
+    frac_pos_A<- if (nA > 0) n_pos_A / nA else NA_real_
+    frac_pos_B<- if (nB > 0) n_pos_B / nB else NA_real_
+
+    fisher_p <- NA_real_
+    if (nA > 0 && nB > 0) {
+      tab <- matrix(c(n_pos_A, n_non_A,
+                      n_pos_B, n_non_B),
+                    nrow = 2, byrow = TRUE)
+      # H1: compA enriched for dN/dS > pos_threshold vs compB
+      fisher_p <- tryCatch(
+        stats::fisher.test(tab, alternative = "greater")$p.value,
+        error = function(e) NA_real_
+      )
+    }
+
     side_tag <- paste0("A_", sideA, "__B_", sideB)
 
     summary_df <- data.frame(
@@ -662,6 +705,14 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
       delta_ci_lower  = delta_ci_lo,
       delta_ci_upper  = delta_ci_hi,
       wilcox_p_value  = p_wilcox,
+      n_pos_A         = n_pos_A,
+      n_nonpos_A      = n_non_A,
+      frac_pos_A      = frac_pos_A,
+      n_pos_B         = n_pos_B,
+      n_nonpos_B      = n_non_B,
+      frac_pos_B      = frac_pos_B,
+      pos_threshold   = pos_threshold,
+      fisher_p_A_gt_B_dnds_gt_pos_threshold = fisher_p,
       stringsAsFactors = FALSE
     )
 
