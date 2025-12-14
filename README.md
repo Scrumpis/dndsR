@@ -36,7 +36,7 @@ Recommended for large-scale analysis. There is also an [R.md vignette](https://g
 
 ### Sample comparison_file
 
-### 1. split_comparisons.R
+### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If subgenomes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
 singularity exec dndsr.sif ./dndsR-launcher run split_comparisons \
