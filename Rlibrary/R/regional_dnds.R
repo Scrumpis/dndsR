@@ -348,7 +348,18 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
     }
 
     for (sd in sides) {
-      d <- .label_region_side(d, regions = regions, side = sd)
+      d <- tryCatch(
+        .label_region_side(d, regions = regions, side = sd),
+        error = function(e) {
+          stop(
+            sprintf(
+              "regional_dnds_summary failed for comparison '%s' (file: %s) while labeling side='%s':\n%s",
+              comp_name, in_file, sd, conditionMessage(e)
+            ),
+            call. = FALSE
+          )
+        }
+      )
     }
 
     res_list <- list()
@@ -426,15 +437,33 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
   if (!is.null(comparison_file)) {
     df   <- .read_comparisons(comparison_file)
     outs <- character(0)
+
     for (i in seq_len(nrow(df))) {
       comp     <- df$comparison_name[i]
       comp_dir <- file.path(output_dir, comp)
       dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
-      outs <- c(outs, .summarize_one(comp, comp_dir))
+
+      one <- tryCatch(
+        .summarize_one(comp, comp_dir),
+        error = function(e) {
+          warning(
+            sprintf(
+              "Skipping comparison '%s' (dir: %s): %s",
+              comp, comp_dir, conditionMessage(e)
+            ),
+            call. = FALSE
+          )
+          character(0)
+        }
+      )
+
+      outs <- c(outs, one)
     }
+
     message("Regional dN/dS summaries complete.")
     return(invisible(outs))
   }
+
 
   if (is.null(dnds_annot_file)) {
     stop("Provide either comparison_file (batch) OR dnds_annot_file (single).")
