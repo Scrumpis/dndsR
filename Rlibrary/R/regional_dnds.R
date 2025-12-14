@@ -170,14 +170,14 @@
   has_dt <- requireNamespace("data.table", quietly = TRUE)
 
   if (side == "query") {
-    seq_col    <- "q_seqname"
-    start_col  <- "q_start"
-    end_col    <- "q_end"
+    seq_col    <- "q_gff_seqname"
+    start_col  <- "q_gff_start"
+    end_col    <- "q_gff_end"
     status_col <- "q_region_status"
   } else {
-    seq_col    <- "s_seqname"
-    start_col  <- "s_start"
-    end_col    <- "s_end"
+    seq_col    <- "s_gff_seqname"
+    start_col  <- "s_gff_start"
+    end_col    <- "s_gff_end"
     status_col <- "s_region_status"
   }
 
@@ -242,6 +242,16 @@
   }
   c(m, med, sd, se, ci[1], ci[2])
 }
+
+#' Clean column names
+.clean_colnames <- function(d) {
+  nn <- names(d)
+  nn <- sub("\r$", "", nn)   # strip CRLF artifacts
+  nn <- trimws(nn)          # strip leading/trailing spaces
+  names(d) <- nn
+  d
+}
+
 
 # -----------------------------
 # 1) Regional summary function
@@ -324,12 +334,14 @@ regional_dnds_summary <- function(dnds_annot_file = NULL,
       stop("Annotated dN/dS file not found: ", in_file)
     }
     d <- utils::read.table(in_file,
-                           sep       = "\t",
-                           header    = TRUE,
-                           stringsAsFactors = FALSE,
-                           quote     = "",
-                           comment.char = "")
-    d <- .filter_dnds(d, filter_expr = filter_expr, max_dnds = max_dnds)
+                       sep = "\t",
+                       header = TRUE,
+                       stringsAsFactors = FALSE,
+                       quote = "",
+                       comment.char = "",
+                       check.names = FALSE)
+
+    d <- .clean_colnames(d)
     if (!nrow(d)) {
       warning("No rows after filter for ", comp_name)
       return(character(0))
@@ -566,21 +578,13 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
     if (!file.exists(fileA)) stop("dNdS file A not found: ", fileA)
     if (!file.exists(fileB)) stop("dNdS file B not found: ", fileB)
 
-    dA <- utils::read.table(fileA,
-                            sep       = "\t",
-                            header    = TRUE,
-                            stringsAsFactors = FALSE,
-                            quote     = "",
-                            comment.char = "")
-    dB <- utils::read.table(fileB,
-                            sep       = "\t",
-                            header    = TRUE,
-                            stringsAsFactors = FALSE,
-                            quote     = "",
-                            comment.char = "")
+    dA <- utils::read.table(fileA, sep="\t", header=TRUE, stringsAsFactors=FALSE,
+                        quote="", comment.char="", check.names=FALSE)
+    dA <- .clean_colnames(dA)
 
-    dA <- .filter_dnds(dA, filter_expr = filter_expr, max_dnds = max_dnds)
-    dB <- .filter_dnds(dB, filter_expr = filter_expr, max_dnds = max_dnds)
+    dB <- utils::read.table(fileB, sep="\t", header=TRUE, stringsAsFactors=FALSE,
+                        quote="", comment.char="", check.names=FALSE)
+    dB <- .clean_colnames(dB)
 
     if (!nrow(dA) || !nrow(dB)) {
       warning("No rows after filtering for contrast ", contrast_name)
