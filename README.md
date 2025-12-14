@@ -83,11 +83,10 @@ singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 ### 7. Regional Analysis
 Regional summary between comparisons 
 ```
-singularity exec dndsr.sif ./dndsR-launcher run regional_dnds_summary \
-  -C data/CheFo_vs_CheAl_full_fofn_split_mod.txt \
-  --regions-bed data/Calbum_dkmer_regions.txt \
-  --contrast-file data/Calbum_contrast_file.txt \
-  -O .
+singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_summary \
+-C data/Chenopod_internal_fofn_split_mod.txt \
+--regions-bed data/Calbum_dkmer_regions.txt \
+-O .
 ```
 
 
