@@ -98,7 +98,7 @@ Regional summary between comparisons
 ```
 singularity exec dndsr.sif ./dndsR-launcher run regional_dnds_summary \
   -C data/CheFo_vs_CheAl_full_fofn_split_mod.txt \
-  --regions-bed data/subBC_Dkmer_regions.enrich \
+  --regions-bed data/Calbum_dkmer_regions.txt \
   --contrast-file data/Calbum_contrast_file.txt \
   -O .
 ```
