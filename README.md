@@ -44,7 +44,6 @@ Recommended for large-scale analysis. There is also an [R.md vignette](https://g
 
 ### 1. split_comparisons.R
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If subgenomes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
-#### Singularity
 ```
 singularity exec dndsr.sif ./dndsR-launcher run split_comparisons \
 -C data/CheFo_vs_CheAl_full_fofn.txt -v -m subgenome
@@ -55,13 +54,7 @@ singularity exec dndsr.sif ./dndsR-launcher run extract_cds \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt
 ```
 ### 3. Calculate dN/dS
-Recommended to run on cluster, slurm script available.  
-Need shims first? Test again without.
-```
-bash scripts/make_shims.sh shims
-export PATH="/mnt/gs21/scratch/john7932/dndsR/shims:$PATH"
-```
-Singularity
+Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
 ```
 singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
