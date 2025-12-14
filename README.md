@@ -100,8 +100,6 @@ CformvsCalbumIWGC "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_formosanu
 Can use special characters or spaces in path if quoted in the fofn
 
 ## Future Improvements
-- Rebuild container with biomartr?
-- Append annotation - seems to currently single thread each linearlly, if can't get more threads per job, then use available threads to run each in parallel. Ideally, precompute query and subject in parallel, wait until both are done, then move until next step. This might be a little complex though so at least give all comparisons a thread to run in parallel.
 - ggplot::aes_string deprecated
 - Update Rvignette with test dataset
 - Cleanup documentation
