@@ -1,5 +1,4 @@
 #' Append annotations from query & subject GFFs to dN/dS results (ordered outputs + simple customs)
-#'
 #' @param dnds_file Path to a dN/dS TSV (single mode).
 #' @param query_gff,subject_gff Paths to GFF3 files (single mode).
 #' @param output_file Optional output path (single mode).
@@ -79,8 +78,6 @@ append_annotations <- function(dnds_file = NULL,
     use_fread <- requireNamespace("data.table", quietly = TRUE)
 
     if (use_fread) {
-      # We'll try three modes with comment skipping (pure R):
-      # 1) tab, 2) auto, 3) single-space. All keep only columns 1:9.
       modes <- list(
         list(sep = "\t", tag = "fread(tab,comment)"),
         list(sep = "auto", tag = "fread(auto,comment)"),
@@ -95,9 +92,9 @@ append_annotations <- function(dnds_file = NULL,
           data.table = FALSE,
           showProgress = FALSE,
           fill = TRUE,
-          comment = "#",          # ignore inline comments; full-line '#' become empty -> skipped
+          comment = "#",
           skipEmptyLines = TRUE,
-          select = 1:9,           # read only first 9 columns
+          select = 1:9,
           col.names = paste0("V", 1:9),
           colClasses = c("character","character","character",
                          "integer","integer","character",
@@ -114,7 +111,6 @@ append_annotations <- function(dnds_file = NULL,
       }
     }
 
-    # Base fallback(s): first tab (strict), then any whitespace (last resort).
     for (sep in c("\t", "")) {
       g <- try(utils::read.table(path, sep = sep, header = FALSE, quote = "",
                                  stringsAsFactors = FALSE, comment.char = "#", fill = TRUE,
@@ -154,7 +150,6 @@ append_annotations <- function(dnds_file = NULL,
     list(IPR = function(x) sub("^InterPro:", "", x, ignore.case = TRUE))
   }
 
-  # Parse comma-separated customs like "REX{5},TOM{8}" -> named list: REX="REX\\d{5}", TOM="TOM\\d{8}"
   .parse_custom <- function(custom) {
     if (is.null(custom) || !nzchar(custom)) return(NULL)
     toks <- strsplit(custom, ",", fixed = TRUE)[[1]]
@@ -164,9 +159,9 @@ append_annotations <- function(dnds_file = NULL,
       m <- regexec("^([A-Za-z][A-Za-z0-9_]*)\\{(\\d+)\\}$", tk)
       mm <- regmatches(tk, m)[[1]]
       if (length(mm) == 3) {
-        key <- toupper(mm[2])  # label (we'll tolower for column names later)
+        key <- toupper(mm[2])
         n   <- as.integer(mm[3])
-        out[[key]] <- paste0(mm[2], "\\d{", n, "}")  # pattern: PREFIX followed by exactly n digits
+        out[[key]] <- paste0(mm[2], "\\d{", n, "}")
       } else {
         warning("Ignoring custom token (expects PREFIX{N}): ", tk)
       }
@@ -174,7 +169,6 @@ append_annotations <- function(dnds_file = NULL,
     if (!length(out)) NULL else out
   }
 
-  ## Extract terms from ONE attributes string (key-agnostic)
   .extract_terms_from_string <- function(attr_string, patterns, normalizers, case_insensitive = TRUE) {
     out <- structure(vector("list", length(patterns)), names = names(patterns))
     if (isTRUE(is.na(attr_string)) || !nzchar(attr_string)) return(out)
@@ -191,11 +185,12 @@ append_annotations <- function(dnds_file = NULL,
     out
   }
 
-  ## Build graph + pre-extract OWN terms and OWN attribute strings that contain any term
+  ## Build graph + pre-extract OWN terms/attrs + OWN coords (seqid/start/end/type)
   .precompute_maps_and_terms <- function(gff_df, patterns, normalizers) {
-    children  <- new.env(hash = TRUE, parent = emptyenv())  # parent -> child IDs
-    own_terms <- new.env(hash = TRUE, parent = emptyenv())  # id -> list(term vectors)
-    own_attrs <- new.env(hash = TRUE, parent = emptyenv())  # id -> character vector of filtered attribute strings
+    children    <- new.env(hash = TRUE, parent = emptyenv())
+    own_terms   <- new.env(hash = TRUE, parent = emptyenv())
+    own_attrs   <- new.env(hash = TRUE, parent = emptyenv())
+    own_coords  <- new.env(hash = TRUE, parent = emptyenv())  # id -> list(seqid,start,end,type)
 
     any_rx <- paste(sprintf("(?:%s)", unname(patterns)), collapse = "|")
 
@@ -210,17 +205,33 @@ append_annotations <- function(dnds_file = NULL,
       out
     }
 
+    .union_coords <- function(old, new) {
+      # old/new are lists: seqid,start,end,type; union start=min, end=max
+      if (is.null(old)) return(new)
+      s1 <- suppressWarnings(as.numeric(old$start)); e1 <- suppressWarnings(as.numeric(old$end))
+      s2 <- suppressWarnings(as.numeric(new$start)); e2 <- suppressWarnings(as.numeric(new$end))
+      seqid <- if (!is.null(old$seqid) && !is.null(new$seqid) && identical(old$seqid, new$seqid)) old$seqid else NA_character_
+      type  <- if (!is.null(old$type)  && !is.null(new$type)  && identical(old$type,  new$type))  old$type  else NA_character_
+      list(
+        seqid = seqid,
+        start = suppressWarnings(min(c(s1, s2), na.rm = TRUE)),
+        end   = suppressWarnings(max(c(e1, e2), na.rm = TRUE)),
+        type  = type
+      )
+    }
+
     for (i in seq_len(nrow(gff_df))) {
       attr <- gff_df$attributes[i]
       pieces <- strsplit(attr, ";", fixed = TRUE)[[1]]
       kv <- strsplit(pieces, "=", fixed = TRUE)
-      key <- vapply(kv, `[`, "", 1L); val <- vapply(kv, function(x) if (length(x) > 1) x[2] else "", "")
+      key <- vapply(kv, `[`, "", 1L)
+      val <- vapply(kv, function(x) if (length(x) > 1) x[2] else "", "")
       names(val) <- key
       id  <- unname(val["ID"])
       par <- unname(val["Parent"])
 
       if (!is.na(id) && nzchar(id)) {
-        # children edges (skip self-parent to avoid trivial cycles)
+        # children edges
         if (!is.na(par) && nzchar(par)) {
           for (p in strsplit(par, ",", fixed = TRUE)[[1]]) {
             if (identical(p, id)) next
@@ -228,7 +239,8 @@ append_annotations <- function(dnds_file = NULL,
             assign(p, unique(c(cur, id)), envir = children)
           }
         }
-        # own terms (union across duplicate IDs if any)
+
+        # own terms
         new_terms <- .extract_terms_from_string(attr, patterns, normalizers)
         if (exists(id, envir = own_terms, inherits = FALSE)) {
           old <- get(id, envir = own_terms)
@@ -236,7 +248,8 @@ append_annotations <- function(dnds_file = NULL,
         } else {
           assign(id, new_terms, envir = own_terms)
         }
-        # own attributes: keep ONLY rows that contain any recognized term
+
+        # own attrs: keep only rows with terms
         if (grepl(any_rx, attr, perl = TRUE, ignore.case = TRUE)) {
           if (exists(id, envir = own_attrs, inherits = FALSE)) {
             assign(id, unique(c(get(id, envir = own_attrs), attr)), envir = own_attrs)
@@ -246,16 +259,32 @@ append_annotations <- function(dnds_file = NULL,
         } else if (!exists(id, envir = own_attrs, inherits = FALSE)) {
           assign(id, character(0), envir = own_attrs)
         }
+
+        # own coords (union across duplicate IDs)
+        new_coord <- list(
+          seqid = as.character(gff_df$seqid[i]),
+          start = suppressWarnings(as.numeric(gff_df$start[i])),
+          end   = suppressWarnings(as.numeric(gff_df$end[i])),
+          type  = as.character(gff_df$type[i])
+        )
+        if (exists(id, envir = own_coords, inherits = FALSE)) {
+          oldc <- get(id, envir = own_coords)
+          assign(id, .union_coords(oldc, new_coord), envir = own_coords)
+        } else {
+          assign(id, new_coord, envir = own_coords)
+        }
       }
     }
-    list(children = children, own_terms = own_terms, own_attrs = own_attrs)
+
+    list(children = children, own_terms = own_terms, own_attrs = own_attrs, own_coords = own_coords)
   }
 
   .union_lists <- function(lst) {
     labs <- unique(unlist(lapply(lst, names)))
     out <- structure(vector("list", length(labs)), names = labs)
     for (lab in labs) {
-      vals <- unlist(lapply(lst, function(x) if (!is.null(x[[lab]])) x[[lab]] else character(0)), use.names = FALSE)
+      vals <- unlist(lapply(lst, function(x) if (!is.null(x[[lab]])) x[[lab]] else character(0)),
+                     use.names = FALSE)
       out[[lab]] <- unique(vals[nzchar(vals)])
     }
     out
@@ -302,14 +331,70 @@ append_annotations <- function(dnds_file = NULL,
     }
   })
 
-  ## Annotate a set of IDs -> data.frame(ID, ATTR, <terms...>)
-  .annotate_id_set <- function(ids, children_env, own_terms_env, own_attrs_env, labs, collapse_sep = ";", threads = 1L) {
+  .subtree_coords <- local({
+    cache <- new.env(hash = TRUE, parent = emptyenv())
+    INPROG <- new.env(hash = TRUE, parent = emptyenv())
+
+    function(id, children_env, own_coords_env) {
+      if (is.null(id) || !nzchar(id)) {
+        return(list(seqid = NA_character_, start = NA_real_, end = NA_real_, type = NA_character_))
+      }
+      if (exists(id, envir = cache, inherits = FALSE)) return(get(id, envir = cache))
+      if (exists(id, envir = INPROG, inherits = FALSE)) {
+        return(list(seqid = NA_character_, start = NA_real_, end = NA_real_, type = NA_character_))
+      }
+
+      assign(id, TRUE, envir = INPROG)
+      on.exit({ if (exists(id, envir = INPROG, inherits = FALSE)) rm(list = id, envir = INPROG) }, add = TRUE)
+
+      own <- if (exists(id, envir = own_coords_env, inherits = FALSE)) get(id, envir = own_coords_env) else NULL
+      kids <- if (exists(id, envir = children_env, inherits = FALSE)) get(id, envir = children_env) else character(0)
+
+      coords_list <- list()
+      if (!is.null(own)) coords_list <- c(coords_list, list(own))
+      if (length(kids)) {
+        coords_list <- c(coords_list, lapply(kids, .subtree_coords, children_env = children_env, own_coords_env = own_coords_env))
+      }
+
+      if (!length(coords_list)) {
+        res <- list(seqid = NA_character_, start = NA_real_, end = NA_real_, type = NA_character_)
+        assign(id, res, envir = cache)
+        return(res)
+      }
+
+      seqs <- vapply(coords_list, function(x) as.character(x$seqid), character(1))
+      seqs <- seqs[!is.na(seqs) & nzchar(seqs)]
+      seqid_out <- if (length(seqs) && length(unique(seqs)) == 1L) unique(seqs) else NA_character_
+
+      starts <- suppressWarnings(as.numeric(vapply(coords_list, function(x) x$start, numeric(1))))
+      ends   <- suppressWarnings(as.numeric(vapply(coords_list, function(x) x$end, numeric(1))))
+      start_out <- if (any(is.finite(starts))) min(starts[is.finite(starts)]) else NA_real_
+      end_out   <- if (any(is.finite(ends)))   max(ends[is.finite(ends)])     else NA_real_
+
+      types <- vapply(coords_list, function(x) as.character(x$type), character(1))
+      types <- types[!is.na(types) & nzchar(types)]
+      type_out <- if (length(types) && length(unique(types)) == 1L) unique(types) else NA_character_
+
+      res <- list(seqid = seqid_out, start = start_out, end = end_out, type = type_out)
+      assign(id, res, envir = cache)
+      res
+    }
+  })
+
+  ## Annotate a set of IDs -> data.frame(ID, GFF_SEQID, GFF_START, GFF_END, ATTR, <terms...>)
+  .annotate_id_set <- function(ids, children_env, own_terms_env, own_attrs_env, own_coords_env,
+                               labs, collapse_sep = ";", threads = 1L) {
     to_row <- function(id) {
-      terms <- .subtree_terms(id, children_env, own_terms_env)
-      attrs <- .subtree_attrs(id, children_env, own_attrs_env)
+      terms  <- .subtree_terms(id, children_env, own_terms_env)
+      attrs  <- .subtree_attrs(id, children_env, own_attrs_env)
+      coords <- .subtree_coords(id, children_env, own_coords_env)
+
       row <- c(
-        ID   = id,
-        ATTR = if (length(attrs)) paste(unique(attrs), collapse = collapse_sep) else NA_character_
+        ID        = id,
+        GFF_SEQID = if (!is.null(coords$seqid) && nzchar(coords$seqid)) coords$seqid else NA_character_,
+        GFF_START = if (!is.null(coords$start) && is.finite(coords$start)) as.character(coords$start) else NA_character_,
+        GFF_END   = if (!is.null(coords$end)   && is.finite(coords$end))   as.character(coords$end)   else NA_character_,
+        ATTR      = if (length(attrs)) paste(unique(attrs), collapse = collapse_sep) else NA_character_
       )
       for (L in labs) {
         v <- terms[[L]]
@@ -317,9 +402,15 @@ append_annotations <- function(dnds_file = NULL,
       }
       row
     }
+
     rows <- plapply(ids, to_row, threads = threads)
     df <- as.data.frame(do.call(rbind, rows), stringsAsFactors = FALSE)
     rownames(df) <- NULL
+
+    # Coerce coords to numeric where possible
+    df$GFF_START <- suppressWarnings(as.numeric(df$GFF_START))
+    df$GFF_END   <- suppressWarnings(as.numeric(df$GFF_END))
+
     df
   }
 
@@ -330,7 +421,8 @@ append_annotations <- function(dnds_file = NULL,
     if (!file.exists(s_gff))     stop("subject_gff not found: ", s_gff)
 
     vmsg(sprintf("Reading dN/dS: %s", dnds_path))
-    dnds <- utils::read.table(dnds_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
+    dnds <- utils::read.table(dnds_path, sep = "\t", header = TRUE,
+                             stringsAsFactors = FALSE, quote = "", comment.char = "")
 
     if (!all(c("query_id","subject_id") %in% names(dnds))) {
       stop("dN/dS file must have columns 'query_id' and 'subject_id'.")
@@ -354,18 +446,23 @@ append_annotations <- function(dnds_file = NULL,
     s_ids <- unique(dnds$subject_id)
     vmsg(sprintf("Annotating IDs (q=%d, s=%d) with threads=%d…", length(q_ids), length(s_ids), threads))
 
-    # Split threads across sides to avoid oversubscription
     tq <- max(1L, threads %/% 2L)
     ts <- max(1L, threads - tq)
 
     if (.Platform$OS.type != "windows" && threads > 1L) {
-      j1 <- parallel::mcparallel(.annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs, threads = tq), silent = TRUE)
-      j2 <- parallel::mcparallel(.annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts), silent = TRUE)
+      j1 <- parallel::mcparallel(
+        .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, q_maps$own_coords, labs, threads = tq),
+        silent = TRUE
+      )
+      j2 <- parallel::mcparallel(
+        .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, s_maps$own_coords, labs, threads = ts),
+        silent = TRUE
+      )
       res <- parallel::mccollect(list(j1, j2), wait = TRUE)
       q_ann <- res[[1]]; s_ann <- res[[2]]
     } else {
-      q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, labs, threads = tq)
-      s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, labs, threads = ts)
+      q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, q_maps$own_coords, labs, threads = tq)
+      s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, s_maps$own_coords, labs, threads = ts)
     }
 
     present_labs <- labs[vapply(labs, function(L) {
@@ -376,6 +473,7 @@ append_annotations <- function(dnds_file = NULL,
     d <- dnds
     mapv <- function(df, col) { v <- df[[col]]; names(v) <- df$ID; v }
 
+    # Existing behavior: attributes + terms
     d$q_attributes <- mapv(q_ann, "ATTR")[match(d$query_id,   q_ann$ID)]
     d$s_attributes <- mapv(s_ann, "ATTR")[match(d$subject_id, s_ann$ID)]
 
@@ -384,6 +482,21 @@ append_annotations <- function(dnds_file = NULL,
       d[[paste0("q_", lname)]] <- mapv(q_ann, L)[match(d$query_id,   q_ann$ID)]
       d[[paste0("s_", lname)]] <- mapv(s_ann, L)[match(d$subject_id, s_ann$ID)]
     }
+
+    # NEW: GFF coordinates (non-colliding names)
+    d$q_gff_seqname <- mapv(q_ann, "GFF_SEQID")[match(d$query_id,   q_ann$ID)]
+    d$q_gff_start   <- mapv(q_ann, "GFF_START")[match(d$query_id,   q_ann$ID)]
+    d$q_gff_end     <- mapv(q_ann, "GFF_END")[match(d$query_id,     q_ann$ID)]
+
+    d$s_gff_seqname <- mapv(s_ann, "GFF_SEQID")[match(d$subject_id, s_ann$ID)]
+    d$s_gff_start   <- mapv(s_ann, "GFF_START")[match(d$subject_id, s_ann$ID)]
+    d$s_gff_end     <- mapv(s_ann, "GFF_END")[match(d$subject_id,   s_ann$ID)]
+
+    # Ensure numeric for downstream overlap tools
+    d$q_gff_start <- suppressWarnings(as.numeric(d$q_gff_start))
+    d$q_gff_end   <- suppressWarnings(as.numeric(d$q_gff_end))
+    d$s_gff_start <- suppressWarnings(as.numeric(d$s_gff_start))
+    d$s_gff_end   <- suppressWarnings(as.numeric(d$s_gff_end))
 
     if (!is.null(out_path)) {
       vmsg(sprintf("Writing: %s", out_path))
