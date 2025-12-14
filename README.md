@@ -31,12 +31,6 @@ Docker
 docker pull scrumpis/dndsr:latest
 ```
 
-### Install dndsR library
-Singularity
-```
-singularity exec dndsr.sif ./dndsR-launcher install
-```
-
 ## CLI Usage
 Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons.  
 
@@ -111,3 +105,9 @@ Can use special characters or spaces in path if quoted in the fofn
 - Append annotation - seems to currently single thread each linearlly, if can't get more threads per job, then use available threads to run each in parallel. Ideally, precompute query and subject in parallel, wait until both are done, then move until next step. This might be a little complex though so at least give all comparisons a thread to run in parallel.
 - Update Rvignette with test dataset
 - Cleanup documentation
+- Check if below is needed anymore
+### Install dndsR library
+#### Singularity
+```
+singularity exec dndsr.sif ./dndsR-launcher install
+```
