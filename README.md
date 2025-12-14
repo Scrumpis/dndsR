@@ -8,9 +8,12 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Visualizes selection pressures across the genomes through an ideogram
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 - Analyzes specified retgions for overall differences in dN/dS (i.e., do Dkmer regions of B and C have dN/dS>1 significantly more frequently than
+  
+dndsR is built for both containerized command line usage and as a loadable library in R.
 
 ## Setup
-Note: We recommend Docker and Singularity usage for either CLI or RStudio usage, however, if you have a working Conda env or other way to provide the dependencies, Docker and Singularity are not required. You can install directly into RStudio as shown below (note line once we make it).
+Note: We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in R. See Dockerfile for dependencies.
+  
 ### Clone the Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
