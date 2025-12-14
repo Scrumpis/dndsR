@@ -32,7 +32,7 @@ docker pull scrumpis/dndsr:latest
 ```
 
 ## CLI Usage
-Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons.  
+Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons. All functions will produce outputs for both the query and subject of a comparison by default.    
 
 ### Sample comparison_file
 dndsR was built to run batches of comparisons which takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
@@ -48,6 +48,7 @@ singularity exec dndsr.sif ./dndsR-launcher run split_comparisons \
 -C data/CheFo_vs_CheAl_full_fofn.txt -v -m subgenome
 ```
 ### 2. Extract CDS or Proteins
+Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff files for each species of each comparison in comparison_file.
 ```
 singularity exec dndsr.sif ./dndsR-launcher run extract_cds \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt
@@ -59,27 +60,32 @@ singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
 ```
 ### 4. Append annotations
+Appends GFF annotation attributes, functional terms, seqname, start, and end values for both query and subject to dN/dS calculations based on gene_id.
 ```
 singularity exec dndsr.sif ./dndsR-launcher run append_annotations \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -O . -v -t 8
 ```
 ### 5. Annotation term enrichment
+Enrichment of IPR terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 #### ipr_enrichment
 ```
 singularity exec dndsr.sif ./dndsR-launcher run ipr_enrichment \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 #### go_enrichment
+TopGO enrichment of GO terms under positive selection.
 ```
 singularity exec dndsr.sif ./dndsR-launcher run go_enrichment \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 #### term_enrichment
+General term enrichment. Basic Fisher's Exact Test and multiple testing correction. Looks for non-IPR or GO terms like KEGG, PANTHER, etc. Optionally takes as input a custom pattern of interest to test for enrichment. 
 ```
 singularity exec dndsr.sif ./dndsR-launcher run term_enrichment \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 ### 6. Selection pressure ideogram
+Visualizes dN/dS binned values accross a genome in an ideogram.
 ```
 singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
