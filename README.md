@@ -38,7 +38,9 @@ singularity exec dndsr.sif ./dndsR-launcher install
 ```
 
 ## CLI Usage
-The below documents the command line interface (CLI) workflow, which is recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons.  
+Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons.  
+
+### Sample comparison_file
 
 ### 1. split_comparisons.R
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If subgenomes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
@@ -107,10 +109,11 @@ Example:
 ```
 CformvsCalbumIWGC "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_formosanum_chrs.fasta" "/Users/john7932/GitHub/dndsR/tests/full/CheFo_v3.gff" "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_album.genome_v2_chrs.fasta" "/Users/john7932/GitHub/dndsR/tests/full/CheAl_v01.0.note_fixed.gff"
 ```
+
 ## Notes
 Can use special characters or spaces in path if quoted in the fofn
 
-## Future Improvements:
+## Future Improvements
 - Rebuild container with biomartr?
 - Append annotation - seems to currently single thread each linearlly, if can't get more threads per job, then use available threads to run each in parallel. Ideally, precompute query and subject in parallel, wait until both are done, then move until next step. This might be a little complex though so at least give all comparisons a thread to run in parallel.
 - Update Rvignette with test dataset
