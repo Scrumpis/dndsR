@@ -87,10 +87,13 @@
     return(normalize_df(x))
   }
 
-  # Try with header
+  # Try with header (only accept if header matches expected names)
   df1 <- try(.read_ws(x, header_try = TRUE), silent = TRUE)
   if (!inherits(df1, "try-error")) {
-    return(normalize_df(df1))
+    if (all(req5 %in% names(df1)) || all(req4 %in% names(df1))) {
+      return(normalize_df(df1))
+    }
+    # else fall through to no-header parsing
   }
 
   # Fallback: no header, assign by position
@@ -635,44 +638,57 @@ regional_dnds_contrasts <- function(dnds_annot_file_a = NULL,
       return(NA_character_)
     }
 
-    # Decide which columns to use for matching rows across comparisons
-    merge_cols_eff <- merge_cols
-    if (is.null(merge_cols_eff) || identical(merge_cols_eff, "auto")) {
-      candidates <- c("query_id", "subject_id")
-      chosen <- NULL
-      for (cand in candidates) {
-        if (cand %in% names(dA_reg) && cand %in% names(dB_reg)) {
-          chosen <- cand
-          break
-        }
-      }
-      if (is.null(chosen)) {
-        stop("Could not auto-detect merge_cols; neither 'query_id' nor 'subject_id' ",
-             "are present in both region-filtered tables. Please supply merge_cols.")
-      }
-      merge_cols_eff <- chosen
+    # ------------------------------------------------------------
+    # Match rows across comparisons using the *focal side* gene ID
+    # (the side used for region overlap), so subject/query mixes work.
+    #
+    # Example: BCvsCD
+    #   BvC subject-side regions => focal IDs are subject_id (C genes)
+    #   CvD query-side regions   => focal IDs are query_id   (C genes)
+    # ------------------------------------------------------------
+    if (!all(c("query_id", "subject_id") %in% names(dA_reg))) {
+      stop("dNdS table A is missing query_id and/or subject_id; cannot match focal IDs.")
+    }
+    if (!all(c("query_id", "subject_id") %in% names(dB_reg))) {
+      stop("dNdS table B is missing query_id and/or subject_id; cannot match focal IDs.")
     }
 
-    missing_colsA <- setdiff(merge_cols_eff, names(dA_reg))
-    missing_colsB <- setdiff(merge_cols_eff, names(dB_reg))
-    if (length(missing_colsA) || length(missing_colsB)) {
-      stop("merge_cols must be present in both dNdS tables. Missing: A=",
-           paste(missing_colsA, collapse = ","), " B=",
-           paste(missing_colsB, collapse = ","))
-    }
+    focal_id_A <- if (sideA == "query") dA_reg$query_id else dA_reg$subject_id
+    focal_id_B <- if (sideB == "query") dB_reg$query_id else dB_reg$subject_id
+
+    dA_key <- data.frame(
+      focal_id = as.character(focal_id_A),
+      dNdS     = as.numeric(dA_reg$dNdS),
+      stringsAsFactors = FALSE
+    )
+    dB_key <- data.frame(
+      focal_id = as.character(focal_id_B),
+      dNdS     = as.numeric(dB_reg$dNdS),
+      stringsAsFactors = FALSE
+    )
+
+    # drop empty IDs (defensive)
+    dA_key <- dA_key[!is.na(dA_key$focal_id) & nzchar(dA_key$focal_id), , drop = FALSE]
+    dB_key <- dB_key[!is.na(dB_key$focal_id) & nzchar(dB_key$focal_id), , drop = FALSE]
+
+    # If there are duplicate focal IDs (multiple transcripts), keep the first.
+    # (You can swap this for "best dNdS" or "min p" logic later if desired.)
+    dA_key <- dA_key[!duplicated(dA_key$focal_id), , drop = FALSE]
+    dB_key <- dB_key[!duplicated(dB_key$focal_id), , drop = FALSE]
 
     merged <- merge(
-      dA_reg[, c(merge_cols_eff, "dNdS"), drop = FALSE],
-      dB_reg[, c(merge_cols_eff, "dNdS"), drop = FALSE],
-      by       = merge_cols_eff,
+      dA_key,
+      dB_key,
+      by       = "focal_id",
       suffixes = c("_A", "_B")
     )
 
     if (!nrow(merged)) {
-      warning("No overlapping IDs between comps A and B in regions for contrast ",
+      warning("No overlapping focal IDs between comps A and B in regions for contrast ",
               contrast_name)
       return(NA_character_)
     }
+
 
     merged$delta   <- merged$dNdS_A - merged$dNdS_B
     stats_delta    <- .calc_mean_ci(merged$delta, ci_method = ci_method, n_boot = n_boot)
