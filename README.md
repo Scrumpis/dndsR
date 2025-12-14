@@ -81,7 +81,8 @@ singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 ```
 
 ### 7. Regional Analysis
-Regional summary between comparisons 
+The below is for making comparisons between dN/dS outputs
+Outputs dN/dS distributions between comparisons. Requires regions.bed of interest for analysis.
 ```
 singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_summary \
 -C data/Chenopod_internal_fofn_split_mod.txt \
@@ -103,6 +104,8 @@ Can use special characters or spaces in path if quoted in the fofn
 - ggplot::aes_string deprecated
 - Update Rvignette with test dataset
 - Cleanup documentation
+- Change regional analysis name. Can focus regions, but can do whole genome summaries too.
+  - Change default to regions_bed = NULL
 - Check if below is needed anymore
 ### Install dndsR library
 #### Singularity
