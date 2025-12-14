@@ -35,7 +35,12 @@ docker pull scrumpis/dndsr:latest
 Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons.  
 
 ### Sample comparison_file
-
+dndsR was built to run batches of comparisons which takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
+Example:
+```
+Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
+CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
+```
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs to prevent erroneous dN/dS analysis. If subgenomes are left unphased, the best matches will be a mix of homeolog and ortholog comparisons. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
@@ -89,16 +94,19 @@ singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_su
 --regions-bed data/Calbum_dkmer_regions.txt \
 -O .
 ```
-
-
-dndsR has a wrapper script () to run batches of comparisons which takes as input a space or tab separated text file containing: comparison_basename, query_fasta, query_gff3, subject_fasta, subject_gff3. 
-Example:
+Contrast dndsR calculations (i.e., enrichment of regional selection pressures)
 ```
-CformvsCalbumIWGC "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_formosanum_chrs.fasta" "/Users/john7932/GitHub/dndsR/tests/full/CheFo_v3.gff" "/Users/john7932/GitHub/dndsR/tests/full/Chenopodium_album.genome_v2_chrs.fasta" "/Users/john7932/GitHub/dndsR/tests/full/CheAl_v01.0.note_fixed.gff"
+singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_contrasts \
+-C data/Chenopod_internal_fofn_split_mod_calbum_only.txt \
+--regions-bed data/Calbum_dkmer_regions.txt \
+--contrast-file data/Calbum_contrast_file.txt \
+-O .
 ```
+
 
 ## Notes
-Can use special characters or spaces in path if quoted in the fofn
+Can use special characters or spaces in path if quoted in the comparison_file
+
 
 ## Future Improvements
 - ggplot::aes_string deprecated
