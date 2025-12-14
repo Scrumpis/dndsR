@@ -96,11 +96,11 @@ singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 ### 7. Regional Analysis
 Regional summary between comparisons 
 ```
-dndsR regional_dnds_summary \
-  --comparison-file comps.tsv \
-  --regions-bed distal_regions.bed \
-  --sides query,subject \
-  --output-dir results/
+singularity exec dndsr.sif ./dndsR-launcher run regional_dnds_summary \
+  -C data/CheFo_vs_CheAl_full_fofn_split_mod.txt \
+  --regions-bed data/subBC_Dkmer_regions.enrich \
+  --contrast-file data/Calbum_contrast_file.txt \
+  -O .
 ```
 
 
