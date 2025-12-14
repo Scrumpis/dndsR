@@ -132,6 +132,12 @@ EOF
 
 # ------------- install pkg if needed -------------
 install_pkg_if_needed(){
+  # Prevent bspm activity
+  export R_PROFILE=/dev/null
+  export R_PROFILE_USER=/dev/null
+  export R_ENVIRON_USER=/dev/null
+  export BSPM_DISABLE=1
+
   have R || die "R not found in PATH"
   have Rscript || die "Rscript not found in PATH"
 
@@ -167,7 +173,7 @@ install_pkg_if_needed(){
   else
     echo "[${PKG_NAME}] Installing ${ver} into ${HOST_RLIB} ..."
     R CMD REMOVE -l "${HOST_RLIB}" "${PKG_NAME}" >/dev/null 2>&1 || true
-    R CMD INSTALL --clean --preclean --library="${HOST_RLIB}" "${REPO_DIR}/${PKG_DIR}"
+    Rscript --vanilla -e "install.packages(normalizePath('${REPO_DIR}/${PKG_DIR}'), repos=NULL, type='source', lib='${HOST_RLIB}', INSTALL_opts=c('--clean','--preclean'))"
     echo "${ver} ${hash:-nohash}" > "$meta"
   fi
 
