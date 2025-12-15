@@ -1,6 +1,6 @@
 # dndsR
 
-***Functionality seems stable. Still performing tests before publication. Use at your own risk.***  
+***Pre-release. Still performing tests before publication. Use at your own risk.***  
   
 A scalable dN/dS analysis R package. For single or multiple pairwise comparisons of genomes, dndsR...
 - Extracts CDS or proteins using input genome FASTAs and gene annotation GFF3s
