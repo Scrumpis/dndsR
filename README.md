@@ -92,8 +92,16 @@ singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 ```
 
 ### 7. Regional Analysis
-The below is for making comparisons between dN/dS outputs
+The below is for making comparisons between dN/dS outputs.
 Outputs dN/dS distributions between comparisons. Requires regions.bed of interest for analysis.
+regions.bed (seq_name, start, end, feature_name (optional)  
+Example:
+```
+Chr01B 71000000 72000000 SG3
+Chr01B 72000000 73000000 SG3
+Chr01B 73000000 74000000 SG3
+```
+Run regional_dnds_summary
 ```
 singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_summary \
 -C data/Chenopod_internal_fofn_split_mod.txt \
@@ -101,6 +109,13 @@ singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_su
 -O .
 ```
 Contrast dndsR calculations (i.e., enrichment of regional selection pressures)
+contrast_file.txt (new_comparison_name, query_comparison_name, query_genome, subject_comparison, subject_genome). The query_ and subject_genome entries are the side of the comparison (query/subject) they belonged to in the referenced comparison. B was query in CalbumBvC and I want to use its dN/dS calculations and gene_ids, so I selected query, where subject would've used C's values.  
+Example:
+```
+BCvsBD CalbumBvC query CalbumUkBvD query
+BCvsCD CalbumBvC subject CalbumUkCvD query
+```
+Run regional_dnds_contrasts
 ```
 singularity exec ../dndsR/dndsr.sif ../dndsR/dndsR-launcher run regional_dnds_contrasts \
 -C data/Chenopod_internal_fofn_split_mod_calbum_only.txt \
