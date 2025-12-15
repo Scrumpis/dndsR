@@ -35,7 +35,7 @@ docker pull scrumpis/dndsr:latest
 Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons. All functions will produce outputs for both the query and subject of a comparison by default.    
 
 ### Sample comparison_file
-dndsR was built to run batches of comparisons which takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
+dndsR was built to run batches of comparisons and can optionally take as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
 Example:
 ```
 Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
