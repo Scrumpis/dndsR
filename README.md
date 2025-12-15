@@ -134,6 +134,7 @@ Can use special characters or spaces in path if quoted in the comparison_file
 - ggplot::aes_string deprecated
 - Update Rvignette with test dataset
 - Cleanup documentation
+- DBUS warning is container related, can be ignored, and will be updated
 - Add forest plot function and other grand analyses
 - Change regional analysis name. Can focus regions, but can do whole genome summaries too.
   - Change default to regions_bed = NULL
