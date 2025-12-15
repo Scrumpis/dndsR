@@ -79,7 +79,7 @@ singularity exec dndsr.sif ./dndsR-launcher run go_enrichment \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 #### term_enrichment
-General term enrichment. Basic Fisher's Exact Test and multiple testing correction. Looks for non-IPR or GO terms like KEGG, PANTHER, etc. Optionally takes as input a custom pattern of interest to test for enrichment. 
+General term enrichment. Fisher's Exact Test and multiple testing correction. Looks for non-IPR or GO terms like KEGG, PANTHER, etc. Optionally takes as input a custom pattern of interest to test for enrichment. 
 ```
 singularity exec dndsr.sif ./dndsR-launcher run term_enrichment \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
