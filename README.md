@@ -91,7 +91,7 @@ singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
 -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 8 -v -O .
 ```
 
-### 7. Regional Analysis
+### 7. Regional Analysis (will update to default to regionless, whole genome analysis with regional option)
 The below is for making comparisons between dN/dS outputs.
 Outputs dN/dS distributions between comparisons. Requires regions.bed of interest for analysis.
 regions.bed (seq_name, start, end, feature_name (optional)  
