@@ -1,6 +1,6 @@
 cli_list_commands <- function() {
-  ns <- asNamespace("dndsR")
-  fns <- ls(ns, pattern = "^cli_")
+  ns <- asNamespace("dndsR")  # safe after loadNamespace
+  fns <- ls(ns, pattern = "^cli_", all.names = TRUE)
   sort(sub("^cli_", "", fns))
 }
 
@@ -18,48 +18,44 @@ cli_print_usage <- function() {
   cat("\nRun: dndsr <command> --help\n")
 }
 
+cli_print_command_help <- function(cmd) {
+  topic <- paste0("cli_", cmd)
+  # If you document cli_<cmd> with roxygen, this works reliably when installed.
+  out <- utils::capture.output(utils::help(topic, package = "dndsR"))
+  # help() prints "No documentation for ..." to stdout; capture it and show nicely.
+  cat(paste(out, collapse = "\n"), "\n")
+}
+
 cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   suppressPackageStartupMessages({
     library(cli)
   })
 
-  # ---- load CLI helper utilities (works in cloned repo) ----
-.local({
-  # Find repo root (DESCRIPTION)
-  find_root <- function(start = getwd()) {
-    cur <- normalizePath(start, winslash = "/", mustWork = FALSE)
-    for (k in 0:50) {
-      if (file.exists(file.path(cur, "DESCRIPTION"))) return(cur)
-      parent <- normalizePath(file.path(cur, ".."), winslash = "/", mustWork = FALSE)
-      if (identical(parent, cur)) break
-      cur <- parent
-    }
-    NULL
+  # Ensure package is installed/loaded
+  if (!requireNamespace("dndsR", quietly = TRUE)) {
+    cli::cli_alert_danger("dndsR is not installed. Run: dndsR-launcher install")
+    quit(status = 1)
+  }
+  loadNamespace("dndsR")  # make asNamespace valid
+
+  # Optional: bootstrap PATH/env (but this should be a normal package function)
+  if (exists("cli_bootstrap_path", envir = asNamespace("dndsR"), inherits = FALSE)) {
+    get("cli_bootstrap_path", envir = asNamespace("dndsR"))()
   }
 
-  root <- find_root()
-  if (!is.null(root)) {
-    helpers <- file.path(root, "Rlibrary", "R", "cli_helpers")
-    if (dir.exists(helpers)) {
-      source(file.path(helpers, "path_utils.R"))
-      source(file.path(helpers, "help_from_roxygen.R"))
-    }
-  }
-})
-
-  cli_bootstrap_path()
-
-  if (length(argv) == 0 || argv[1] %in% c("-h","--help","help")) {
+  if (length(argv) == 0 || argv[1] %in% c("-h", "--help", "help")) {
     cli_print_usage()
     return(invisible(NULL))
   }
 
-  cmd <- argv[1]
+  cmd  <- argv[1]
   args <- argv[-1]
 
   if (cmd == "doctor") {
-    cli_doctor()
-    return(invisible(NULL))
+    if (exists("cli_doctor", envir = asNamespace("dndsR"), inherits = FALSE)) {
+      get("cli_doctor", envir = asNamespace("dndsR"))()
+      return(invisible(NULL))
+    }
   }
 
   fn <- cli_lookup_command(cmd)
@@ -69,14 +65,13 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     quit(status = 1)
   }
 
-  if (any(args %in% c("-h","--help","help"))) {
+  if (any(args %in% c("-h", "--help", "help"))) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
   }
 
-  parsed <- cli_parse_args(args)
+  parsed <- cli_parse_args(args)  # must exist in package namespace or global
 
-  # global bridges (optional)
   if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
   if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
 
@@ -87,50 +82,4 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
       quit(status = 1)
     }
   )
-}
-
-.print_subcommand_help <- function(cmd, subcommands) {
-  spec <- subcommands[[cmd]]
-  fn_name <- spec$target %||% cmd
-
-  src <- .fn_source_path(fn_name)
-  if (is.null(src)) {
-    stop("Can't locate source for ", fn_name, ".R.\n",
-         "Expected: <repo>/Rlibrary/R/", fn_name, ".R\n",
-         "Are you running from a cloned dndsR repo?")
-  }
-  .cli_help_from_source(fn_name, src, pkg_ns = asNamespace("dndsR"))
-}
-
-subcommands <- list(
-  ipr_enrichment = list(
-    opts = c(base_opts, opts_ipr_enrichment),
-    fun  = run_ipr_enrichment,
-    help = NULL,                 # no duplicated prose
-    target = "ipr_enrichment"     # core function name
-  ),
-  go_enrichment = list(
-    opts = c(base_opts, opts_go_enrichment),
-    fun  = run_go_enrichment,
-    help = NULL,
-    target = "go_enrichment"
-  ),
-  # ... etc ...
-  doctor = list(
-    opts = c(base_opts),
-    fun  = run_doctor,
-    help = "Report backend (container vs host), shim state, and tool versions",
-    target = NULL                # no roxygen-based help; keep CLI help
-  )
-)
-
-# Subcommand help: dndsr <cmd> --help
-if (length(args) && any(args %in% c("-h", "--help"))) {
-  if (cmd %in% names(subcommands)) {
-    # If this command has a target function, print roxygen-derived help; else fall back to optparse help
-    if (!is.null(subcommands[[cmd]]$target)) {
-      .print_subcommand_help(cmd, subcommands)
-      quit(status = 0)
-    }
-  }
 }
