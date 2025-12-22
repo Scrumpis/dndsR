@@ -1,5 +1,5 @@
 # Rlibrary/R/cli_helpers/path_utils.R
-# CLI helper
+# CLI helper to resolve R script paths
 
 # Try to get the path of the running Rscript file (when invoked as: Rscript /path/to/cli_main.R ...)
 .cli_script_path <- function() {
