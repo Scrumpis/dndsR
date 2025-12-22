@@ -1,0 +1,5 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.dockerignore$
+^\.dndsR.Rproj$
+^INSTALL\.md$

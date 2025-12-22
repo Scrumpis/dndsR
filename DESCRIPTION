@@ -1,0 +1,65 @@
+Package: dndsR
+Type: Package
+Title: dN/dS Pipeline Utilities for Comparative Genomics
+Version: 0.2.0.000
+Authors@R: 
+    person(given = "Nick", family = "Johnson", 
+           email = "john7932@msu.edu", role = c("aut","cre"))
+Description: Utilities to extract CDS and proteins from FASTA/GFF, 
+    orchestrate ortholog discovery, and run dN/dS analyses at scale. 
+    Includes helpers for batch comparisons, annotation joins, and QC.
+License: MIT + file LICENSE
+URL: https://github.com/Scrumpis/dndsR
+BugReports: https://github.com/Scrumpis/dndsR/issues
+Encoding: UTF-8
+Depends: 
+    R (>= 4.3)
+Imports:
+    AnnotationDbi,
+    Biostrings,
+    cli,
+    data.table,
+    GenomicFeatures,
+    GenomeInfoDb,
+    jsonlite,
+    Rsamtools,
+    stats,
+    utils,
+    xml2
+Remotes:
+    drostlab/orthologr,
+    drostlab/rdiamond,
+    drostlab/metablastr
+Suggests:
+    dplyr,
+    knitr,
+    ggplot2,
+    GO.db,
+    IHW,
+    IRanges,
+    lme4,
+    metablastr,
+    methods,
+    optparse,
+    orthologr,
+    pwalign,
+    qvalue,
+    readr,
+    RIdeogram,
+    S4Vectors,
+    scales,
+    showtext,
+    svglite,
+    systemfonts,
+    rdiamond,
+    rmarkdown,
+    testthat,
+    topGO,
+    txdbmaker
+SystemRequirements:
+    DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+ByteCompile: true
+RoxygenNote: 7.3.3
+Roxygen: list(markdown = TRUE)

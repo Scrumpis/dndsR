@@ -1,0 +1,130 @@
+# Needs updating with test set before being built in vignettes/
+
+---
+title: 'dndsR Test Workflow: Minimal Example with 6 Genes'
+author: "Nicholas A. Johnson"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{dndsR Test Workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 4
+)
+library(dndsR)
+```
+
+## Introduction
+
+dndsR was developed for use as a complete pipeline, however, we thought it was important in this vignette to demonstrate, piecewise, the workflow of dndsR through a minimal, end-to-end test using four chromosomes from two subgenomes (Chr01B, Chr04B, Chr02D, Chr07D) of the International Weed Genomics Consortium assemblies and annotations of Chenopodium album and C. formosanum. This subset can be used to test ideogram visualization, enrichment analysis, and annotation pipelines without running the full genome.
+
+## Split Comparison File and Associated Files by Subgenome
+```{r}
+split_comparisons(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn.txt",
+  mode = "subgenome"   # Chr1A / chr03_b → labels A,B,...
+)
+```
+
+## Extract CDS or Proteins
+```{r}
+extract_cds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full")
+```
+
+## Run Orthologr to Calculate dN/dS
+```{r}
+# Runs very slow on markdown - Use small test dataset
+calculate_dnds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full/", comp_cores = 10)
+```
+
+## Append Annotations
+```{r}
+append_annotations(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+                   output_dir = "./tests/full/")
+```
+
+## Term Enrichment
+```{r}
+term_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  terms = NULL,                 # auto-detect
+  sides = c("query","subject"),
+  pos_threshold = 1,
+  drop_rows_without_term = TRUE,
+  min_total = 10,
+  min_pos   = 2
+)
+
+```
+
+## GO Enrichment
+Need to add GO term text labels like we did with IPRs
+```{r}
+go_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  sides = c("query","subject"),
+  ontologies = c("BP","MF","CC"),
+  algorithm  = "weight01",      # good default
+  statistic  = "fisher",
+  pos_threshold = 1,
+  drop_rows_without_go = TRUE,  # annotation-aware universe
+  node_min = 5,                 # drop ultra-rare terms
+  #node_max = 2000,             # optional upper cap
+  make_plots = TRUE,
+  top_n = 20,
+  #exclude_gos = "GO:0015074",
+  #exclude_descendants = TRUE
+  )
+```
+
+## IPR Enrichment
+Add feature to allow you to omit a single or list of terms from analysis, example use: TEs misannotated as genes, enrichment of true gene terms muted by overabundance of TEs relative to genes. Add this to all enrichment functions.
+```{r}
+ipr_enrichment(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full/",
+  #universe = universe_ids,
+  stratify_by_type = TRUE,
+  #types = c("Domain","Homologous_superfamily"),   # or leave NULL to auto-infer
+  #adjust_scope = "global",
+  min_pos = 2,
+  min_total = 10,
+  #method = "weight01",
+  #fdr_method = "IHW",
+  pos_threshold = 1.1
+  #interpro_release = "83.0"
+  #exclude_ids = "IPR000109"
+)
+
+```
+
+
+## dN/dS Ideogram
+Only works with chrs beginning with chr or scaffold - totally fine, users have to rename
+Need to add portion to script which streams in the q_chr and q_gene_start
+```{r}
+dnds_ideogram(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full"
+)
+
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Regional dNdS
+```{r}
+dnds_ideogram(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full"
+)
+
+```
