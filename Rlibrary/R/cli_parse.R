@@ -1,3 +1,4 @@
+#' @keywords internal
 cli_cast <- function(x) {
   xl <- tolower(trimws(x))
   if (xl %in% c("true","false")) return(xl == "true")
