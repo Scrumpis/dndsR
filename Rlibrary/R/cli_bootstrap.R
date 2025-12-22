@@ -1,3 +1,4 @@
+#' @keywords internal
 cli_bootstrap_path <- function() {
   dndsr_auto <- tolower(Sys.getenv("AUTO_SHIMS", "1"))
   run_prefix <- Sys.getenv("RUN_PREFIX", "")
