@@ -117,3 +117,12 @@ dnds_ideogram(
 
 ```
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Regional dNdS
+```{r}
+dnds_ideogram(
+  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
+  output_dir = "./tests/full"
+)
+
+```
