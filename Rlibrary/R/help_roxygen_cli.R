@@ -1,3 +1,4 @@
+#' @keywords internal
 # Rlibrary/R/help_roxygen_cli.R
 # CLI helper to get roxygen help info
 
