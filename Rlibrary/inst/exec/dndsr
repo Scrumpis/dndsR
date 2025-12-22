@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec Rscript --vanilla -e 'dndsR::cli_main()' -- "$@"
