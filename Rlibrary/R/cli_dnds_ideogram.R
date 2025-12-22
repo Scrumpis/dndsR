@@ -1,4 +1,5 @@
 #' @keywords internal
-cli_dnds_ideogram <- function(...) {
-  do.call(dnds_ideogram, list(...))
-}
+cli_dnds_ideogram <- structure(
+  function(...) do.call(dnds_ideogram, list(...)),
+  target = "dnds_ideogram"
+)
