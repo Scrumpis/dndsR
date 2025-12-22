@@ -51,3 +51,4 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 ByteCompile: true
 RoxygenNote: 7.3.3
+Roxygen: list(markdown = TRUE)
