@@ -56,7 +56,7 @@
 #'   list(gene_table = ..., results_df = ..., out_tsv = ..., out_plot = ...)
 #'   In batch mode (comparison_file), writes outputs to file.path(output_dir, "gene_level_state_contrast").
 #' @export
-gene_level_state_contrast <- function(dnds_annot_files   = NULL,
+gene_state_contrast <- function(dnds_annot_files   = NULL,
                                       comparison_file    = NULL,
                                       output_dir         = getwd(),
                                       focal_sides        = c("query", "subject"),
