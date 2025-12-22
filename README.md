@@ -17,7 +17,7 @@ Note: We currently recommend Docker and Singularity with CLI usage, however, if 
 ### Clone the Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
-chmod 774 -R dndsR
+chmod -R 774 dndsR
 ```
 ### Pull the Image
 Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr)  
