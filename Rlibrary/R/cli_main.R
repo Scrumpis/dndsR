@@ -1,9 +1,11 @@
+#' @keywords internal
 cli_list_commands <- function() {
   ns <- asNamespace("dndsR")  # safe after loadNamespace
   fns <- ls(ns, pattern = "^cli_", all.names = TRUE)
   sort(sub("^cli_", "", fns))
 }
 
+#' @keywords internal
 cli_lookup_command <- function(cmd) {
   ns <- asNamespace("dndsR")
   fn_name <- paste0("cli_", cmd)
@@ -11,6 +13,7 @@ cli_lookup_command <- function(cmd) {
   get(fn_name, envir = ns, inherits = FALSE)
 }
 
+#' @keywords internal
 cli_print_usage <- function() {
   cmds <- cli_list_commands()
   cat("Usage: dndsr <command> [--key value] [--flag]\n\nCommands:\n")
@@ -18,14 +21,51 @@ cli_print_usage <- function() {
   cat("\nRun: dndsr <command> --help\n")
 }
 
+#' @keywords internal
 cli_print_command_help <- function(cmd) {
-  topic <- paste0("cli_", cmd)
-  # If you document cli_<cmd> with roxygen, this works reliably when installed.
-  out <- utils::capture.output(utils::help(topic, package = "dndsR"))
-  # help() prints "No documentation for ..." to stdout; capture it and show nicely.
-  cat(paste(out, collapse = "\n"), "\n")
+  fn <- cli_lookup_command(cmd)
+  if (is.null(fn)) {
+    cat("Unknown command:", cmd, "\n\n")
+    cli_print_usage()
+    return(invisible(NULL))
+  }
+
+  topic <- attr(fn, "target", exact = TRUE)
+  if (is.null(topic) || !nzchar(topic)) topic <- cmd
+
+  h <- utils::help(topic, package = "dndsR")
+  if (length(h) == 0) {
+    cat("No documentation found for:", topic, "\n")
+    cat("Tip: ensure the underlying function is documented with roxygen and exported,\n",
+        "or map this CLI command to a documented topic.\n", sep = "")
+    return(invisible(NULL))
+  }
+
+  utils::help(topic, package = "dndsR")  # prints help
+  invisible(NULL)
 }
 
+#' dndsR command-line entrypoint
+#'
+#' Dispatches the `dndsr` command-line interface (CLI). This function is intended
+#' to be called by the `dndsr` executable installed with the package (e.g.,
+#' `inst/exec/dndsr`) or by the `dndsR-launcher`, rather than being used
+#' interactively.
+#'
+#' The CLI discovers available commands by looking for functions named
+#' `cli_<command>` in the `dndsR` namespace.
+#'
+#' @param argv Character vector of command-line arguments. Defaults to
+#'   `commandArgs(trailingOnly = TRUE)`.
+#'
+#' @return Invisibly returns `NULL` on success. On failure, terminates the
+#'   process with a non-zero status via `quit(status = 1)`.
+#'
+#' @details
+#' Command help is printed using installed documentation for the underlying
+#' target function (e.g. ipr_enrichment) via utils::help()
+#'
+#' @export
 cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   suppressPackageStartupMessages({
     library(cli)
