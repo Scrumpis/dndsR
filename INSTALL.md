@@ -7,13 +7,16 @@ dir.create(userlib, recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(userlib, .libPaths()))
 
 ## Use Bioconductor’s repos and turn off interactive update prompts
+```
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager", lib = userlib, dependencies = FALSE)
 options(repos = BiocManager::repositories())
 Sys.setenv(R_REMOTES_NO_ERRORS_FROM_WARNINGS = "true")
 options(ask = FALSE)
+```
 
 ## Install just what you need, into *userlib*, without pulling updates
+```
 if (!requireNamespace("devtools", quietly = TRUE))
   install.packages("devtools", lib = userlib, dependencies = FALSE)
 if (!requireNamespace("usethis", quietly = TRUE))
@@ -33,7 +36,4 @@ if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 
 BiocManager::install("IHW")
-
-## Now do your dev loop
-#devtools::document()
-#devtools::load_all()
+```
