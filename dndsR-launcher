@@ -37,6 +37,36 @@ FORCE="${DNDSR_FORCE:-0}"
 die(){ echo "Error: $*" >&2; exit 1; }
 have(){ command -v "$1" >/dev/null 2>&1; }
 
+# ------------- CLI entrypoint resolver -------------
+resolve_cli(){
+  # Allow override
+  if [[ -n "${DNDSR_CLI:-}" ]]; then
+    [[ -f "$DNDSR_CLI" ]] || die "DNDSR_CLI set but file not found: $DNDSR_CLI"
+    echo "$DNDSR_CLI"
+    return
+  fi
+
+  # Try common locations (support old + new layouts)
+  local candidates=(
+    "${REPO_DIR}/${PKG_DIR}/cli/dndsR.R"
+    "${REPO_DIR}/${PKG_DIR}/R/cli_main.R"
+    "${REPO_DIR}/Rlibrary/cli/dndsR.R"
+    "${REPO_DIR}/Rlibrary/R/cli_main.R"
+  )
+
+  for p in "${candidates[@]}"; do
+    if [[ -f "$p" ]]; then
+      echo "$p"
+      return
+    fi
+  done
+
+  die "Could not find dndsR CLI entrypoint.
+Tried:
+  - ${candidates[*]}
+Set DNDSR_CLI=/path/to/cli_main.R (or dndsR.R) to override."
+}
+
 usage(){
 cat <<'EOF'
 dndsR-launcher — install and run the dndsR CLI (container-agnostic)
@@ -241,7 +271,11 @@ case "$cmd" in
       export PATH="$SHIMS_DIR:$PATH"
     fi
 
-    exec Rscript --vanilla "${REPO_DIR}/${PKG_DIR}/cli/dndsR.R" "$@"
+    export DNDSR_HOME="${REPO_DIR}"
+    export DNDSR_REPO="${REPO_DIR}"   # optional alias; harmless
+
+    CLI_PATH="$(resolve_cli)"
+    exec Rscript --vanilla "$CLI_PATH" "$@"
     ;;
 
   doctor)
@@ -251,6 +285,7 @@ case "$cmd" in
     echo "SHIMS_DIR:    $SHIMS_DIR"
     echo "RUN_PREFIX:   ${RUN_PREFIX:-<empty>}"
     echo "AUTO_SHIMS:   $AUTO_SHIMS"
+    echo "CLI_PATH:     $(resolve_cli 2>/dev/null || echo "<not found>")"
     echo
     echo "[Package]"
     R_LIBS_USER="$HOST_RLIB" Rscript --vanilla - <<'RS' || true
