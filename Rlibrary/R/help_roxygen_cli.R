@@ -1,4 +1,4 @@
-# Rlibrary/R/cli_helpers/help_from_roxygen.R
+# Rlibrary/R/help_roxygen_cli.R
 # CLI helper to get roxygen help info
 
 .read_roxygen_block <- function(path, fn_name) {
