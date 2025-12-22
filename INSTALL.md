@@ -1,10 +1,12 @@
 # R Installation for non-container usage in R
-Current way to use in Rstudio, as container image does not contain rstudio and don't have way to use with contained dependencies without using rstudio server from container
-
+Current way to use in Rstudio, as container image does not contain rstudio and don't have way to use with contained dependencies without using rstudio server from container  
+Will update this.
 ## Put your writable user library first
+```
 userlib <- file.path("~","Library","R","arm64","4.3","library")
 dir.create(userlib, recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(userlib, .libPaths()))
+```
 
 ## Use Bioconductor’s repos and turn off interactive update prompts
 ```
