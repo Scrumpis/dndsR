@@ -134,6 +134,7 @@ Can use special characters or spaces in path if quoted in the comparison_file
 - Update Rvignette with test dataset
 - Cleanup documentation
 - Add forest plot function and other grand analyses
+- Get CLI help to work and print usage when run without input
 - Ensure docker image contains all dependencies of all optional functions
 - Verify these are unusused and rebuild image: Biogenerics, IRanges, S4Vectors, optparse, readr
 - Change regional analysis name. Can focus regions, but can do whole genome summaries too.
