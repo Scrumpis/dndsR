@@ -4,7 +4,9 @@ set -euo pipefail
 die(){ echo "Error: $*" >&2; exit 1; }
 have(){ command -v "$1" >/dev/null 2>&1; }
 
-# Resolve directory of this script (even if invoked via relative path)
+# -----------------------------
+# Resolve directory of this script (even if invoked via symlink/relative path)
+# -----------------------------
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 while [ -h "$SCRIPT_SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
@@ -13,7 +15,42 @@ while [ -h "$SCRIPT_SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 
-# ---- repo root (standard R package only) ----
+# -----------------------------
+# Container guard (default ON)
+# -----------------------------
+# Set DNDSR_ALLOW_HOST=1 to bypass (advanced users installing deps locally).
+DNDSR_ALLOW_HOST="${DNDSR_ALLOW_HOST:-0}"
+
+in_container(){
+  # Apptainer/Singularity commonly set these
+  if [[ -n "${APPTAINER_NAME:-}" || -n "${SINGULARITY_NAME:-}" || -n "${SINGULARITY_CONTAINER:-}" ]]; then
+    return 0
+  fi
+  # Docker often has this file
+  if [[ -f "/.dockerenv" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+require_container(){
+  if [[ "$DNDSR_ALLOW_HOST" -eq 1 ]]; then
+    return 0
+  fi
+  if ! in_container; then
+    die "This launcher is intended to be run inside a container (Singularity/Apptainer or Docker).
+
+Recommended:
+  singularity exec /path/dndsr.sif tools/dndsR-launcher run <command> [args...]
+
+If you really want to run on the host (advanced; you must install all external dependencies yourself),
+set DNDSR_ALLOW_HOST=1."
+  fi
+}
+
+# -----------------------------
+# Repo root discovery (standard R package layout)
+# -----------------------------
 infer_repo_root() {
   [[ -n "${REPO_DIR:-}" ]] && { echo "$REPO_DIR"; return 0; }
 
@@ -37,73 +74,47 @@ PKG_NAME="dndsR"
 [[ -f "${REPO_DIR}/DESCRIPTION" ]] || die "No DESCRIPTION at ${REPO_DIR}/DESCRIPTION"
 [[ -d "${REPO_DIR}/R" ]]          || die "No R/ directory at ${REPO_DIR}/R"
 
-# default install location; override safely in SLURM with HOST_RLIB or SINGULARITYENV_HOST_RLIB
+# Default install location (mounted home inside container)
 HOST_RLIB="${HOST_RLIB:-${HOME:-}/.dndsr/rlib}"
 
-# ---- shim config (simple & predictable) ----
-WITH_SHIMS="${WITH_SHIMS:-0}"            # install-time: create/refresh shims
-USE_SHIMS="${USE_SHIMS:-0}"              # run-time: prepend shimdir to PATH
-AUTO_SHIMS="${AUTO_SHIMS:-1}"            # run-time: if RUN_PREFIX set & shims exist, use them automatically
-SHIMS_DIR_DEFAULT="${HOME:-}/.dndsr/shims"
-SHIMS_DIR="${SHIMS_DIR:-$SHIMS_DIR_DEFAULT}"
-TOOLS_DEFAULT="diamond,orthofinder,mafft,muscle,blastp,blastn,makeblastdb"
-SHIMS_TOOLS="${DNDSR_SHIMS_TOOLS:-$TOOLS_DEFAULT}"
-
-# container prefix used by shims (empty = host/conda PATH)
-RUN_PREFIX_DEFAULT="${RUN_PREFIX:-}"     # e.g., 'singularity exec /path/dndsr.sif'
-EMIT_RC="${EMIT_RC:-0}"
-
-# global force from flag or env
+# Force reinstall (flag or env)
 FORCE="${DNDSR_FORCE:-0}"
 
 usage(){
 cat <<'EOF'
-dndsR-launcher — install and run the dndsR CLI (container-agnostic)
+dndsR-launcher — install and run the dndsR CLI (container-first)
 
 USAGE
-  dndsR-launcher [--force] [--with-shims] [--shims-dir DIR] [--tools LIST] [--run-prefix STR] [--emit-rc] install
-  dndsR-launcher [--force] [--use-shims]  [--shims-dir DIR]                  [--run-prefix STR] run [--] <dndsR args...>
+  dndsR-launcher [--force] install
+  dndsR-launcher [--force] run [<dndsr command> [args...]]
   dndsR-launcher doctor
+  dndsR-launcher --help
 
-FLAGS
-  --force             Force reinstall even if version/hash unchanged (or DNDSR_FORCE=1)
-
-  # Install-time shims
-  --with-shims        Create/refresh shims (diamond/orthofinder/etc.) during 'install'
-  --shims-dir DIR     Where to place shims (default: ~/.dndsr/shims or SHIMS_DIR)
-  --tools LIST        Comma/space-separated tools to shim (default: "diamond,orthofinder,mafft,muscle,blastp,blastn,makeblastdb")
-  --emit-rc           Write ~/.dndsr/env.sh that exports PATH+RUN_PREFIX (optional)
-
-  # Run-time shims
-  --use-shims         Prepend existing shims to PATH for this invocation (does not create shims)
-                      (By default, shims are auto-used if RUN_PREFIX is set and shims exist; disable via AUTO_SHIMS=0)
-  --run-prefix STR    Prefix executed by shims (e.g., 'singularity exec /path/dndsr.sif' or 'docker run --rm ...')
-                      (also configurable via RUN_PREFIX env var)
+NOTES
+  - Intended to be run inside Singularity/Apptainer or Docker.
+  - dndsR is installed into a user library (default: ~/.dndsr/rlib), which should be mounted inside the container.
+  - If you run on the host (advanced), you must install all external tool dependencies yourself.
+    To bypass the container guard: DNDSR_ALLOW_HOST=1
 
 ENV (optional)
   HOST_RLIB           R library for dndsR (default: ~/.dndsr/rlib)
   REPO_DIR            repo root containing DESCRIPTION (standard R package layout)
   DNDSR_FORCE=1       force reinstall
-  SHIMS_DIR           default shim directory if --shims-dir not given
-  DNDSR_SHIMS_TOOLS   default tool list for shims
-  RUN_PREFIX          default run prefix if --run-prefix not given
-  AUTO_SHIMS=0        disable auto-using shims when RUN_PREFIX is set and shims exist
+  DNDSR_ALLOW_HOST=1  allow running launcher on host (advanced)
 
-EXAMPLES
-  # Install pkg + create shims, set container prefix, and emit activation snippet
-  dndsR-launcher --with-shims --shims-dir "$HOME/.dndsr/shims" \
-    --run-prefix "singularity exec /path/dndsr.sif" --emit-rc install
-  source "$HOME/.dndsr/env.sh"
+EXAMPLES (Singularity/Apptainer)
+  singularity exec dndsr.sif tools/dndsR-launcher install
+  singularity exec dndsr.sif tools/dndsR-launcher run --help
+  singularity exec dndsr.sif tools/dndsR-launcher run calculate_dnds --threads 16
 
-  # One-off run using existing shims without touching shell RC
-  dndsR-launcher --use-shims --run-prefix "singularity exec /path/dndsr.sif" run -- calculate_dnds --threads 16
-
-  # Host/conda-only (no shims): just ensure tools are on PATH
-  dndsR-launcher run -- calculate_dnds --threads 16
+EXAMPLES (Docker)
+  docker run --rm -v "$PWD:/data" -w /data scrumpis/dndsr:TAG tools/dndsR-launcher run calculate_dnds --threads 16
 EOF
 }
 
-# ------------- helper: compute source hash -------------
+# -----------------------------
+# Source hash for "install only when changed"
+# -----------------------------
 src_hash(){
   local SUM=""
   have sha256sum && SUM="sha256sum" || have shasum && SUM="shasum -a 256" || SUM="md5sum"
@@ -117,59 +128,26 @@ src_hash(){
   )
 }
 
-# ------------- shims -------------
-_make_shims(){
-  local outdir="$1"
-  local list="$2"
-  mkdir -p "$outdir"
-  local IFS=', '
-  read -r -a tools <<< "$list"
-  for t in "${tools[@]}"; do
-    [[ -z "$t" ]] && continue
-    cat > "${outdir}/${t}" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ -n "\${RUN_PREFIX:-}" ]]; then
-  exec \${RUN_PREFIX} ${t} "\$@"
-else
-  exec ${t} "\$@"
-fi
-EOF
-    chmod +x "${outdir}/${t}"
-  done
-  echo "Wrote shims to ${outdir}/"
-}
-
-_emit_rc_snippet(){
-  local rc="${HOME:-}/.dndsr/env.sh"
-  mkdir -p "$(dirname "$rc")"
-  cat > "$rc" <<EOF
-# dndsR environment (generated by dndsR-launcher)
-# shellcheck shell=bash
-export PATH="${SHIMS_DIR}:\${PATH}"
-${RUN_PREFIX_DEFAULT:+export RUN_PREFIX="${RUN_PREFIX_DEFAULT}"}
-EOF
-  echo "Wrote activation snippet: $rc"
-  echo "To activate now:  source \"$rc\""
-}
-
-# ------------- resolve installed runner -------------
+# -----------------------------
+# Resolve installed runner (preferred exec script)
+# -----------------------------
 resolve_runner(){
-  # Preferred: use installed exec script produced by R package installation
   local runner="${HOST_RLIB}/${PKG_NAME}/exec/dndsr"
   if [[ -x "$runner" ]]; then
     echo "$runner"
     return 0
   fi
 
-  # Fallback: run via Rscript calling the exported cli_main()
   have Rscript || die "Rscript not found in PATH and installed runner missing at ${runner}"
+  # Fallback: call cli_main directly
   echo "Rscript --vanilla -e dndsR::cli_main --"
 }
 
-# ------------- install pkg if needed -------------
+# -----------------------------
+# Install (or update) dndsR into user lib
+# -----------------------------
 install_pkg_if_needed(){
-  # Prevent bspm activity
+  # Prevent bspm activity (rocker/r2u etc.)
   export R_PROFILE=/dev/null
   export R_PROFILE_USER=/dev/null
   export R_ENVIRON_USER=/dev/null
@@ -223,68 +201,50 @@ cat("libPaths:\n"); print(.libPaths())
 RS
 }
 
-# ------------- parse flags -------------
-cmd=
-RUN_PREFIX_ARG="$RUN_PREFIX_DEFAULT"
-
+# -----------------------------
+# Parse flags + command
+# -----------------------------
+cmd=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --force) FORCE=1; shift ;;
-    --with-shims) WITH_SHIMS=1; shift ;;    # install-time
-    --use-shims)  USE_SHIMS=1; shift ;;     # run-time (explicit)
-    --shims-dir) SHIMS_DIR="${2:?}"; shift 2 ;;
-    --tools) SHIMS_TOOLS="${2:?}"; shift 2 ;;
-    --run-prefix) RUN_PREFIX_ARG="${2:?}"; shift 2 ;;
-    --emit-rc) EMIT_RC=1; shift ;;
     install|run|doctor) cmd="$1"; shift; break ;;
-    -h|--help|"") usage; exit 0 ;;
-    *) usage; exit 1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage; die "Unknown argument: $1" ;;
   esac
 done
 [[ -n "${cmd:-}" ]] || { usage; exit 1; }
 
-# make RUN_PREFIX visible to children if provided
-if [[ -n "$RUN_PREFIX_ARG" ]]; then
-  export RUN_PREFIX="$RUN_PREFIX_ARG"
-fi
-
-# ------------- commands -------------
+# -----------------------------
+# Commands
+# -----------------------------
 case "$cmd" in
   install)
+    require_container
     install_pkg_if_needed
-    if [[ "$WITH_SHIMS" -eq 1 ]]; then
-      _make_shims "$SHIMS_DIR" "$SHIMS_TOOLS"
-      export PATH="$SHIMS_DIR:$PATH"   # handy for this shell; permanence via env.sh
-      [[ "$EMIT_RC" -eq 1 ]] && _emit_rc_snippet
-      echo "Shims ready at $SHIMS_DIR."
-      [[ "$EMIT_RC" -eq 0 ]] && echo "Tip: export PATH=\"$SHIMS_DIR:\$PATH\" (or re-run with --emit-rc)."
-    fi
     echo "Installed/updated $PKG_NAME into $HOST_RLIB"
-    echo "CLI executable (after install): ${HOST_RLIB}/${PKG_NAME}/exec/dndsr"
+    echo "CLI executable: ${HOST_RLIB}/${PKG_NAME}/exec/dndsr"
     ;;
 
   run)
+    require_container
     install_pkg_if_needed
     export R_LIBS_USER="$HOST_RLIB"
-
-    # 1) explicit request
-    if [[ "$USE_SHIMS" -eq 1 ]]; then
-      if [[ -d "$SHIMS_DIR" && -n "$(ls -A "$SHIMS_DIR" 2>/dev/null || true)" ]]; then
-        export PATH="$SHIMS_DIR:$PATH"
-      else
-        echo "Warning: --use-shims set but no shims in $SHIMS_DIR. Run 'install --with-shims' first." >&2
-      fi
-    # 2) automatic convenience: if RUN_PREFIX is set and shims exist, use them
-    elif [[ "${AUTO_SHIMS}" -eq 1 && -n "${RUN_PREFIX:-}" && -d "$SHIMS_DIR" && -n "$(ls -A "$SHIMS_DIR" 2>/dev/null || true)" ]]; then
-      export PATH="$SHIMS_DIR:$PATH"
-    fi
-
     export DNDSR_HOME="${REPO_DIR}"
-    export DNDSR_REPO="${REPO_DIR}"   # optional alias; harmless
+    export DNDSR_REPO="${REPO_DIR}"   # harmless alias
 
     runner="$(resolve_runner)"
 
-    # If runner is a path, exec it; otherwise it's an "Rscript -e ..." fallback string
+    # If no args, show dndsr help
+    if [[ $# -eq 0 ]]; then
+      if [[ -x "$runner" ]]; then
+        exec "$runner" --help
+      else
+        # shellcheck disable=SC2086
+        exec $runner --help
+      fi
+    fi
+
     if [[ -x "$runner" ]]; then
       exec "$runner" "$@"
     else
@@ -295,13 +255,13 @@ case "$cmd" in
 
   doctor)
     echo "=== dndsR doctor ==="
-    echo "REPO_DIR:     $REPO_DIR"
-    echo "HOST_RLIB:    $HOST_RLIB"
-    echo "SHIMS_DIR:    $SHIMS_DIR"
-    echo "RUN_PREFIX:   ${RUN_PREFIX:-<empty>}"
-    echo "AUTO_SHIMS:   $AUTO_SHIMS"
-    echo "RUNNER:       $(resolve_runner 2>/dev/null || echo "<not found>")"
+    echo "In container:  $(in_container && echo yes || echo no)"
+    echo "REPO_DIR:      $REPO_DIR"
+    echo "HOST_RLIB:     $HOST_RLIB"
+    echo "RUNNER:        $(resolve_runner 2>/dev/null || echo "<not found>")"
+    echo "ALLOW_HOST:    $DNDSR_ALLOW_HOST"
     echo
+
     echo "[Package]"
     R_LIBS_USER="$HOST_RLIB" Rscript --vanilla - <<'RS' || true
 opts <- options(warn=1); on.exit(options(opts), add=TRUE)
@@ -312,22 +272,6 @@ if (ok) {
   cat("version:", as.character(utils::packageVersion("dndsR")), "\n")
 }
 RS
-    echo
-    echo "[Shims]"
-    if [[ -d "$SHIMS_DIR" ]]; then
-      echo "exists: yes"
-      ls -1 "$SHIMS_DIR" || true
-    else
-      echo "exists: no"
-    fi
-    echo
-    echo "[Resolution]"
-    for t in ${SHIMS_TOOLS//,/ }; do
-      t="${t// /}"
-      [[ -z "$t" ]] && continue
-      echo -n "$t -> "
-      command -v "$t" 2>/dev/null || echo "<not found>"
-    done
     ;;
 
   *) usage; exit 1 ;;
