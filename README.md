@@ -133,7 +133,6 @@ Can use special characters or spaces in path if quoted in the comparison_file
 - ggplot::aes_string deprecated
 - Update Rvignette with test dataset
 - Cleanup documentation
-- DBUS warning is container related, can be ignored, and will be updated
 - Add forest plot function and other grand analyses
 - Ensure docker image contains all dependencies of all optional functions
 - Verify these are unusused and rebuild image: Biogenerics, IRanges, S4Vectors, optparse, readr
