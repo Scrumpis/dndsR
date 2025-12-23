@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+die(){ echo "Error: $*" >&2; exit 1; }
+have(){ command -v "$1" >/dev/null 2>&1; }
+
 # Resolve directory of this script (even if invoked via relative path)
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 while [ -h "$SCRIPT_SOURCE" ]; do
@@ -32,8 +35,8 @@ infer_repo_dir() {
     d="$(cd "${d}/.." && pwd)"
   done
 
-  # Fallback: old behavior (best guess)
-  echo "$SCRIPT_DIR"
+  # Could not infer
+  echo ""
   return 0
 }
 
@@ -63,9 +66,6 @@ EMIT_RC="${EMIT_RC:-0}"
 
 # global force from flag or env
 FORCE="${DNDSR_FORCE:-0}"
-
-die(){ echo "Error: $*" >&2; exit 1; }
-have(){ command -v "$1" >/dev/null 2>&1; }
 
 # ------------- CLI entrypoint resolver -------------
 resolve_cli(){
