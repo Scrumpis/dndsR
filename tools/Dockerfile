@@ -21,6 +21,21 @@ RUN set -eux; \
   && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
+# Disable bspm auto-enable (breaks under Singularity / no apt access)
+# ============================================================
+RUN set -eux; \
+  for f in /etc/R/Rprofile.site /usr/lib/R/etc/Rprofile.site; do \
+    if [ -f "$f" ]; then \
+      sed -i \
+        -e '/bspm::enable/d' \
+        -e '/options(bspm\./d' \
+        "$f"; \
+      echo 'options(bspm.enabled = FALSE)' >> "$f"; \
+    fi; \
+  done
+ENV BSPM_DISABLE=1
+
+# ============================================================
 # Micromamba environment (python + OrthoFinder toolchain)
 # ============================================================
 ENV MAMBA_ROOT_PREFIX=/opt/conda
@@ -51,7 +66,7 @@ RUN set -eux; \
 ENV PATH=/usr/local/bin:$MAMBA_ROOT_PREFIX/envs/tools/bin:$PATH
 
 # ============================================================
-# R/Bioconductor dependencies (R 4.5 + Bioc 3.21)
+# R/Bioconductor dependencies
 # ============================================================
 RUN R -q -e "install.packages(c('remotes','BiocManager'), Ncpus=2)"
 
@@ -59,23 +74,21 @@ RUN R -q -e "BiocManager::install(c( \
     'AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures', \
     'GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO', \
     'IHW','qvalue','rtracklayer','pwalign','txdbmaker' \
-  ), update=FALSE, ask=FALSE)"
+  ), update=FALSE, ask=FALSE, Ncpus=2)"
 
 RUN R -q -e "install.packages(c( \
     'cli','data.table','optparse','xml2','ggplot2','dplyr','testthat','knitr','rmarkdown', \
-    'RIdeogram','doParallel','foreach','ape','Rdpack','benchmarkme','devtools','svglite' \
+    'RIdeogram','doParallel','foreach','ape','Rdpack','benchmarkme','devtools','svglite', \
+    'sysfonts','showtext','showtextdb' \
   ), Ncpus=2)"
 
 RUN R -q -e "remotes::install_github(c( \
     'drostlab/metablastr','drostlab/rdiamond','drostlab/orthologr' \
   ), upgrade='never')"
 
-# ============================================================
-# Final setup
-# ============================================================
 WORKDIR /work
 CMD ["bash"]
 
 LABEL \
   org.opencontainers.image.source="https://github.com/scrumpis/dndsr" \
-  org.opencontainers.image.description="dndsR runtime (R 4.5 + Bioconductor 3.21 + OrthoFinder toolchain)"
+  org.opencontainers.image.description="dndsR runtime (R 4.5 + Bioconductor + OrthoFinder toolchain)"
