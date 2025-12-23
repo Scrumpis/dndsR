@@ -1,3 +1,4 @@
+```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -13,40 +14,29 @@ while [ -h "$SCRIPT_SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 
-# Default repo dir: try to infer from launcher location, but allow override via REPO_DIR
-infer_repo_dir() {
-  # If user set REPO_DIR, respect it
-  if [[ -n "${REPO_DIR:-}" ]]; then
-    echo "${REPO_DIR}"
-    return 0
-  fi
+# ---- repo root (standard R package only) ----
+infer_repo_root() {
+  [[ -n "${REPO_DIR:-}" ]] && { echo "$REPO_DIR"; return 0; }
 
-  # Start from where this launcher lives
   local d="$SCRIPT_DIR"
-  local i
-
-  # Walk up a few levels and pick the first directory that looks like a dndsR repo root
-  # (contains Rlibrary/DESCRIPTION for your current layout)
-  for i in 0 1 2 3 4; do
-    if [[ -f "${d}/Rlibrary/DESCRIPTION" ]]; then
-      echo "${d}"
+  for _ in 0 1 2 3 4 5; do
+    if [[ -f "${d}/DESCRIPTION" && -d "${d}/R" ]]; then
+      echo "$d"
       return 0
     fi
     d="$(cd "${d}/.." && pwd)"
   done
-
-  # Could not infer
   echo ""
-  return 0
 }
 
-REPO_DIR="$(infer_repo_dir)"
-PKG_DIR="Rlibrary"
+REPO_DIR="$(infer_repo_root)"
+[[ -n "$REPO_DIR" ]] || die "Could not infer repo root from launcher path ($SCRIPT_DIR).
+Set REPO_DIR=/path/to/dndsR (directory containing DESCRIPTION and R/)."
+
 PKG_NAME="dndsR"
 
-[[ -f "${REPO_DIR}/${PKG_DIR}/DESCRIPTION" ]] || die \
-"Could not locate ${PKG_DIR}/DESCRIPTION.
-Set REPO_DIR=/path/to/dndsR repo root (the directory containing ${PKG_DIR}/)."
+[[ -f "${REPO_DIR}/DESCRIPTION" ]] || die "No DESCRIPTION at ${REPO_DIR}/DESCRIPTION"
+[[ -d "${REPO_DIR}/R" ]]          || die "No R/ directory at ${REPO_DIR}/R"
 
 # default install location; override safely in SLURM with HOST_RLIB or SINGULARITYENV_HOST_RLIB
 HOST_RLIB="${HOST_RLIB:-${HOME:-}/.dndsr/rlib}"
@@ -67,43 +57,13 @@ EMIT_RC="${EMIT_RC:-0}"
 # global force from flag or env
 FORCE="${DNDSR_FORCE:-0}"
 
-# ------------- CLI entrypoint resolver -------------
-resolve_cli(){
-  # Allow override
-  if [[ -n "${DNDSR_CLI:-}" ]]; then
-    [[ -f "$DNDSR_CLI" ]] || die "DNDSR_CLI set but file not found: $DNDSR_CLI"
-    echo "$DNDSR_CLI"
-    return
-  fi
-
-  # Try common locations (support old + new layouts)
-  local candidates=(
-    "${REPO_DIR}/${PKG_DIR}/cli/dndsR.R"
-    "${REPO_DIR}/${PKG_DIR}/R/cli_main.R"
-    "${REPO_DIR}/Rlibrary/cli/dndsR.R"
-    "${REPO_DIR}/Rlibrary/R/cli_main.R"
-  )
-
-  for p in "${candidates[@]}"; do
-    if [[ -f "$p" ]]; then
-      echo "$p"
-      return
-    fi
-  done
-
-  die "Could not find dndsR CLI entrypoint.
-Tried:
-  - ${candidates[*]}
-Set DNDSR_CLI=/path/to/cli_main.R (or dndsR.R) to override."
-}
-
 usage(){
 cat <<'EOF'
 dndsR-launcher — install and run the dndsR CLI (container-agnostic)
 
 USAGE
   dndsR-launcher [--force] [--with-shims] [--shims-dir DIR] [--tools LIST] [--run-prefix STR] [--emit-rc] install
-  dndsR-launcher [--force] [--use-shims]  [--shims-dir DIR]                  [--run-prefix STR] run <dndsR subcommand> [args...]
+  dndsR-launcher [--force] [--use-shims]  [--shims-dir DIR]                  [--run-prefix STR] run [--] <dndsR args...>
   dndsR-launcher doctor
 
 FLAGS
@@ -123,7 +83,7 @@ FLAGS
 
 ENV (optional)
   HOST_RLIB           R library for dndsR (default: ~/.dndsr/rlib)
-  REPO_DIR            repo root containing Rlibrary/
+  REPO_DIR            repo root containing DESCRIPTION (standard R package layout)
   DNDSR_FORCE=1       force reinstall
   SHIMS_DIR           default shim directory if --shims-dir not given
   DNDSR_SHIMS_TOOLS   default tool list for shims
@@ -137,10 +97,10 @@ EXAMPLES
   source "$HOME/.dndsr/env.sh"
 
   # One-off run using existing shims without touching shell RC
-  dndsR-launcher --use-shims --run-prefix "singularity exec /path/dndsr.sif" run calculate_dnds --threads 16
+  dndsR-launcher --use-shims --run-prefix "singularity exec /path/dndsr.sif" run -- calculate_dnds --threads 16
 
   # Host/conda-only (no shims): just ensure tools are on PATH
-  dndsR-launcher run calculate_dnds --threads 16
+  dndsR-launcher run -- calculate_dnds --threads 16
 EOF
 }
 
@@ -149,8 +109,12 @@ src_hash(){
   local SUM=""
   have sha256sum && SUM="sha256sum" || have shasum && SUM="shasum -a 256" || SUM="md5sum"
   (
-    cd "${REPO_DIR}/${PKG_DIR}" || exit 1
-    find DESCRIPTION NAMESPACE R inst -type f 2>/dev/null | LC_ALL=C sort | xargs ${SUM} | ${SUM%% *} | awk '{print $1}'
+    cd "${REPO_DIR}" || exit 1
+    find DESCRIPTION NAMESPACE R inst man tools -type f 2>/dev/null \
+      | LC_ALL=C sort \
+      | xargs ${SUM} \
+      | ${SUM%% *} \
+      | awk '{print $1}'
   )
 }
 
@@ -190,6 +154,20 @@ EOF
   echo "To activate now:  source \"$rc\""
 }
 
+# ------------- resolve installed runner -------------
+resolve_runner(){
+  # Preferred: use installed exec script produced by R package installation
+  local runner="${HOST_RLIB}/${PKG_NAME}/exec/dndsr"
+  if [[ -x "$runner" ]]; then
+    echo "$runner"
+    return 0
+  fi
+
+  # Fallback: run via Rscript calling the exported cli_main()
+  have Rscript || die "Rscript not found in PATH and installed runner missing at ${runner}"
+  echo "Rscript --vanilla -e dndsR::cli_main --"
+}
+
 # ------------- install pkg if needed -------------
 install_pkg_if_needed(){
   # Prevent bspm activity
@@ -205,7 +183,7 @@ install_pkg_if_needed(){
   mkdir -p "${HOST_RLIB}" || die "Failed to create ${HOST_RLIB}"
   [[ -w "${HOST_RLIB}" ]] || die "User library not writable: ${HOST_RLIB}"
 
-  local desc="${REPO_DIR}/${PKG_DIR}/DESCRIPTION"
+  local desc="${REPO_DIR}/DESCRIPTION"
   [[ -f "$desc" ]] || die "No DESCRIPTION at ${desc}"
 
   local ver; ver="$(awk -F': *' '$1=="Version"{print $2}' "$desc")"
@@ -233,7 +211,7 @@ install_pkg_if_needed(){
   else
     echo "[${PKG_NAME}] Installing ${ver} into ${HOST_RLIB} ..."
     R CMD REMOVE -l "${HOST_RLIB}" "${PKG_NAME}" >/dev/null 2>&1 || true
-    Rscript --vanilla -e "install.packages(normalizePath('${REPO_DIR}/${PKG_DIR}'), repos=NULL, type='source', lib='${HOST_RLIB}', INSTALL_opts=c('--clean','--preclean'))"
+    Rscript --vanilla -e "install.packages(normalizePath('${REPO_DIR}'), repos=NULL, type='source', lib='${HOST_RLIB}', INSTALL_opts=c('--clean','--preclean'))"
     echo "${ver} ${hash:-nohash}" > "$meta"
   fi
 
@@ -283,6 +261,7 @@ case "$cmd" in
       [[ "$EMIT_RC" -eq 0 ]] && echo "Tip: export PATH=\"$SHIMS_DIR:\$PATH\" (or re-run with --emit-rc)."
     fi
     echo "Installed/updated $PKG_NAME into $HOST_RLIB"
+    echo "CLI executable (after install): ${HOST_RLIB}/${PKG_NAME}/exec/dndsr"
     ;;
 
   run)
@@ -304,8 +283,15 @@ case "$cmd" in
     export DNDSR_HOME="${REPO_DIR}"
     export DNDSR_REPO="${REPO_DIR}"   # optional alias; harmless
 
-    CLI_PATH="$(resolve_cli)"
-    exec Rscript --vanilla "$CLI_PATH" "$@"
+    runner="$(resolve_runner)"
+
+    # If runner is a path, exec it; otherwise it's an "Rscript -e ..." fallback string
+    if [[ -x "$runner" ]]; then
+      exec "$runner" "$@"
+    else
+      # shellcheck disable=SC2086
+      exec $runner "$@"
+    fi
     ;;
 
   doctor)
@@ -315,7 +301,7 @@ case "$cmd" in
     echo "SHIMS_DIR:    $SHIMS_DIR"
     echo "RUN_PREFIX:   ${RUN_PREFIX:-<empty>}"
     echo "AUTO_SHIMS:   $AUTO_SHIMS"
-    echo "CLI_PATH:     $(resolve_cli 2>/dev/null || echo "<not found>")"
+    echo "RUNNER:       $(resolve_runner 2>/dev/null || echo "<not found>")"
     echo
     echo "[Package]"
     R_LIBS_USER="$HOST_RLIB" Rscript --vanilla - <<'RS' || true
@@ -347,3 +333,4 @@ RS
 
   *) usage; exit 1 ;;
 esac
+```
