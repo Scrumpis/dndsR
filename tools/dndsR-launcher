@@ -93,8 +93,8 @@ USAGE
 NOTES
   - Intended to be run inside Singularity/Apptainer or Docker.
   - dndsR is installed into a user library (default: ~/.dndsr/rlib), which should be mounted inside the container.
-  - If you run on the host (advanced), you must install all external tool dependencies yourself.
-    To bypass the container guard: DNDSR_ALLOW_HOST=1
+  - Host execution is advanced (you must install all external tool dependencies yourself):
+      DNDSR_ALLOW_HOST=1 dndsR-launcher run ...
 
 ENV (optional)
   HOST_RLIB           R library for dndsR (default: ~/.dndsr/rlib)
@@ -104,11 +104,9 @@ ENV (optional)
 
 EXAMPLES (Singularity/Apptainer)
   singularity exec dndsr.sif tools/dndsR-launcher install
-  singularity exec dndsr.sif tools/dndsR-launcher run --help
+  singularity exec dndsr.sif tools/dndsR-launcher run
   singularity exec dndsr.sif tools/dndsR-launcher run calculate_dnds --threads 16
 
-EXAMPLES (Docker)
-  docker run --rm -v "$PWD:/data" -w /data scrumpis/dndsr:TAG tools/dndsR-launcher run calculate_dnds --threads 16
 EOF
 }
 
@@ -191,14 +189,6 @@ install_pkg_if_needed(){
     Rscript --vanilla -e "install.packages(normalizePath('${REPO_DIR}'), repos=NULL, type='source', lib='${HOST_RLIB}', INSTALL_opts=c('--clean','--preclean'))"
     echo "${ver} ${hash:-nohash}" > "$meta"
   fi
-
-  R_LIBS_USER="${HOST_RLIB}" Rscript --vanilla - <<'RS'
-opts <- options(warn=1); on.exit(options(opts), add=TRUE)
-.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-suppressPackageStartupMessages(library(dndsR))
-cat(sprintf("dndsR version: %s\n", as.character(packageVersion("dndsR"))))
-cat("libPaths:\n"); print(.libPaths())
-RS
 }
 
 # -----------------------------
@@ -231,20 +221,11 @@ case "$cmd" in
     install_pkg_if_needed
     export R_LIBS_USER="$HOST_RLIB"
     export DNDSR_HOME="${REPO_DIR}"
-    export DNDSR_REPO="${REPO_DIR}"   # harmless alias
+    export DNDSR_REPO="${REPO_DIR}"
 
     runner="$(resolve_runner)"
 
-    # If no args, show dndsr help
-    if [[ $# -eq 0 ]]; then
-      if [[ -x "$runner" ]]; then
-        exec "$runner" --help
-      else
-        # shellcheck disable=SC2086
-        exec $runner --help
-      fi
-    fi
-
+    # If runner is a path, exec it; otherwise it's an "Rscript -e ..." fallback string
     if [[ -x "$runner" ]]; then
       exec "$runner" "$@"
     else
@@ -258,8 +239,13 @@ case "$cmd" in
     echo "In container:  $(in_container && echo yes || echo no)"
     echo "REPO_DIR:      $REPO_DIR"
     echo "HOST_RLIB:     $HOST_RLIB"
-    echo "RUNNER:        $(resolve_runner 2>/dev/null || echo "<not found>")"
     echo "ALLOW_HOST:    $DNDSR_ALLOW_HOST"
+    echo "Runner path:   ${HOST_RLIB}/${PKG_NAME}/exec/dndsr"
+    echo
+
+    echo "[R]"
+    command -v R || echo "<R not found>"
+    command -v Rscript || echo "<Rscript not found>"
     echo
 
     echo "[Package]"
@@ -268,9 +254,7 @@ opts <- options(warn=1); on.exit(options(opts), add=TRUE)
 .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
 ok <- requireNamespace("dndsR", quietly=TRUE)
 cat("installed:", ok, "\n")
-if (ok) {
-  cat("version:", as.character(utils::packageVersion("dndsR")), "\n")
-}
+if (ok) cat("version:", as.character(utils::packageVersion("dndsR")), "\n")
 RS
     ;;
 
