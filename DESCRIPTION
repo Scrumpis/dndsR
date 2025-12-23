@@ -23,7 +23,9 @@ Imports:
     GenomeInfoDb,
     jsonlite,
     Rsamtools,
+    showtext,
     stats,
+    sysfonts,
     utils,
     xml2
 Remotes:
@@ -48,7 +50,6 @@ Suggests:
     RIdeogram,
     S4Vectors,
     scales,
-    showtext,
     svglite,
     systemfonts,
     rdiamond,

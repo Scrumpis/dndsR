@@ -1,12 +1,10 @@
-# Needs updating with test set before being built in vignettes/
-
 ---
-title: 'dndsR Test Workflow: Minimal Example with 6 Genes'
+title: "dndsR: Quickstart Workflow"
 author: "Nicholas A. Johnson"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{dndsR Test Workflow}
+  %\VignetteIndexEntry{dndsR: Quickstart Workflow}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,116 +13,194 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.width = 8,
-  fig.height = 4
+  message = FALSE,
+  warning = FALSE,
+  error = FALSE
 )
-library(dndsR)
 ```
 
 ## Introduction
 
-dndsR was developed for use as a complete pipeline, however, we thought it was important in this vignette to demonstrate, piecewise, the workflow of dndsR through a minimal, end-to-end test using four chromosomes from two subgenomes (Chr01B, Chr04B, Chr02D, Chr07D) of the International Weed Genomics Consortium assemblies and annotations of Chenopodium album and C. formosanum. This subset can be used to test ideogram visualization, enrichment analysis, and annotation pipelines without running the full genome.
+Still under development.
 
-## Split Comparison File and Associated Files by Subgenome
+This vignette demonstrates the end-to-end workflow supported by `dndsR`:
+
+1. Split a comparison file into subgenome-specific comparisons (optional).
+2. Extract CDS from genome FASTA + GFF3.
+3. Compute dN/dS (may require external tools; typically slower).
+4. Append gene and feature annotations.
+5. Perform functional term enrichment (InterPro, GO, or other annotations).
+6. Visualize results (e.g., ideograms; optional).
+
+To ensure the vignette is **CRAN-safe**, reproducible, and fast during `R CMD check`, it uses:
+- small bundled example inputs, and
+- precomputed example outputs for compute-heavy steps.
+
+For real analyses, users should run the same functions on full genomes and annotations.
+
+## Load package
+
 ```{r}
+library(dndsR)
+```
+
+## Example data bundled with the package
+
+All files used in this vignette are loaded from `inst/extdata/` using `system.file()`.
+
+Expected example files:
+
+- `example_comparison_file.txt`
+- `example_comparison_file_split.txt` (optional)
+- `example_dnds.tsv`
+- `example_dnds_annot.tsv`
+- small FASTA and GFF3 slices referenced by the comparison file
+
+```{r example-paths}
+ext <- system.file("extdata", package = "dndsR")
+stopifnot(nzchar(ext))
+
+comparison_file          <- file.path(ext, "example_comparison_file.txt")
+comparison_file_split    <- file.path(ext, "example_comparison_file_split.txt")
+example_dnds  <- file.path(ext, "example_dnds.tsv")
+example_annot <- file.path(ext, "example_dnds_annot.tsv")
+
+file.exists(c(comparison_file, comparison_file_split, example_dnds, example_annot))
+```
+
+## 1) Split comparison file by subgenome (optional)
+
+If a combined comparison file is provided, `split_comparisons()` can generate subgenome-specific comparison files (e.g., B/C/D). This step is shown for reference only and is not executed during vignette rendering.
+
+```{r split-comparisons, eval=FALSE}
 split_comparisons(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn.txt",
-  mode = "subgenome"   # Chr1A / chr03_b → labels A,B,...
+  comparison_file = comparison_file,
+  mode = "subgenome"
 )
 ```
 
-## Extract CDS or Proteins
+For the remainder of this vignette, we use:
+
 ```{r}
-extract_cds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full")
+comparison_file_in_use <- if (file.exists(comparison_file_split)) comparison_file_split else comparison_file
+comparison_file_in_use
 ```
 
-## Run Orthologr to Calculate dN/dS
-```{r}
-# Runs very slow on markdown - Use small test dataset
-calculate_dnds(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt", output_dir = "./tests/full/", comp_cores = 10)
+## 2) Extract CDS
+
+`extract_cds()` extracts coding sequences (or proteins) from genome FASTA and GFF3 paths defined in the comparison file.
+
+```{r extract-cds}
+out_dir <- tempdir()
+
+cds_out <- extract_cds(
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir
+)
+
+cds_out
 ```
 
-## Append Annotations
-```{r}
-append_annotations(comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-                   output_dir = "./tests/full/")
+## 3) Calculate dN/dS (shown, not run)
+
+Calculating dN/dS relies on external tools (DIAMOND2 and OrthoFinder) and can be computationally intensive. The call below is shown for reference but not executed during this vignette.
+
+```{r calculate-dnds, eval=FALSE}
+calculate_dnds(
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir,
+  comp_cores = 4,
+  aligner = "diamond",
+  sensitivity_mode = "fast",
+  dnds_method = "Comeron"
+)
 ```
 
-## Term Enrichment
-```{r}
+Instead, we load a small pre-computed example result matching the output format of `calculate_dnds()`:
+
+```{r load-precomputed-dnds}
+dnds <- read.delim(example_dnds, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+head(dnds)
+```
+
+## 4) Append annotations
+
+To keep the vignette fast and deterministic, we load a precomputed annotated table:
+
+```{r load-precomputed-annot}
+dnds_annot <- read.delim(example_annot, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+head(dnds_annot)
+```
+
+Typical usage is shown below:
+
+```{r append-annotations, eval=FALSE}
+append_annotations(
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir
+)
+```
+
+## 5) Generic term enrichment (shown, not run)
+
+```{r term-enrichment, eval=FALSE}
 term_enrichment(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-  output_dir = "./tests/full/",
-  terms = NULL,                 # auto-detect
-  sides = c("query","subject"),
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir,
+  terms = NULL,
+  sides = c("query", "subject"),
   pos_threshold = 1,
   drop_rows_without_term = TRUE,
   min_total = 10,
   min_pos   = 2
 )
-
 ```
 
-## GO Enrichment
-Need to add GO term text labels like we did with IPRs
-```{r}
+## 6) GO enrichment (shown, not run)
+
+```{r go-enrichment, eval=FALSE}
 go_enrichment(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-  output_dir = "./tests/full/",
-  sides = c("query","subject"),
-  ontologies = c("BP","MF","CC"),
-  algorithm  = "weight01",      # good default
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir,
+  sides = c("query", "subject"),
+  ontologies = c("BP", "MF", "CC"),
+  algorithm  = "weight01",
   statistic  = "fisher",
   pos_threshold = 1,
-  drop_rows_without_go = TRUE,  # annotation-aware universe
-  node_min = 5,                 # drop ultra-rare terms
-  #node_max = 2000,             # optional upper cap
+  drop_rows_without_go = TRUE,
+  node_min = 5,
   make_plots = TRUE,
-  top_n = 20,
-  #exclude_gos = "GO:0015074",
-  #exclude_descendants = TRUE
-  )
+  top_n = 20
+)
 ```
 
-## IPR Enrichment
-Add feature to allow you to omit a single or list of terms from analysis, example use: TEs misannotated as genes, enrichment of true gene terms muted by overabundance of TEs relative to genes. Add this to all enrichment functions.
-```{r}
+## 7) InterPro enrichment (shown, not run)
+
+Network access is disabled during CRAN checks. This step is shown for reference only.
+
+```{r ipr-enrichment, eval=FALSE}
 ipr_enrichment(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-  output_dir = "./tests/full/",
-  #universe = universe_ids,
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir,
   stratify_by_type = TRUE,
-  #types = c("Domain","Homologous_superfamily"),   # or leave NULL to auto-infer
-  #adjust_scope = "global",
   min_pos = 2,
   min_total = 10,
-  #method = "weight01",
-  #fdr_method = "IHW",
   pos_threshold = 1.1
-  #interpro_release = "83.0"
-  #exclude_ids = "IPR000109"
 )
-
 ```
 
+## 8) dN/dS ideogram
 
-## dN/dS Ideogram
-Only works with chrs beginning with chr or scaffold - totally fine, users have to rename
-Need to add portion to script which streams in the q_chr and q_gene_start
-```{r}
+```{r dnds-ideogram, eval=FALSE}
 dnds_ideogram(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-  output_dir = "./tests/full"
+  comparison_file = comparison_file_in_use,
+  output_dir = out_dir
 )
-
 ```
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-## Regional dNdS
-```{r}
-dnds_ideogram(
-  comparison_file = "./tests/full/CheFo_vs_CheAl_full_fofn_split.txt",
-  output_dir = "./tests/full"
-)
+## 9) dN/dS contrasts and summaries
+Will add commands once these scripts are in a stable form, currently regional_contrasts and summary.
 
-```
+## Summary
+
+This vignette demonstrates the `dndsR` workflow in a reproducible manner while still showing the real function calls used for full analyses.

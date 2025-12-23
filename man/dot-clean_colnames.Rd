@@ -6,6 +6,13 @@
 \usage{
 .clean_colnames(d)
 }
-\description{
-Clean column names
+\arguments{
+\item{d}{A data.frame-like object.}
 }
+\value{
+\code{d} with cleaned column names.
+}
+\description{
+Strips CRLF artifacts and trims leading/trailing whitespace from column names.
+}
+\keyword{internal}

@@ -81,6 +81,11 @@ removed from BOTH positives and background (annotation-aware universe).}
 
 \item{min_pos}{Minimum positive occurrences required for a term (default 0).}
 
+\item{max_prop}{Maximum allowed proportion of the background annotated set
+that may be assigned to a term (default 0.20). Terms with
+(pos_count + nonpos_count) / (pos_total + nonpos_total) > max_prop
+are filtered out to avoid overly broad terms dominating enrichment.}
+
 \item{fdr_method}{One of "BH","BY","IHW","qvalue","none". Defaults to "BH".}
 
 \item{alpha}{FDR level for IHW weighting (default 0.05).}

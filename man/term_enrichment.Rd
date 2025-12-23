@@ -2,7 +2,7 @@
 % Please edit documentation in R/term_enrichment.R
 \name{term_enrichment}
 \alias{term_enrichment}
-\title{Term enrichment (Fisher test) for query/subject terms in dNdS results}
+\title{Term enrichment (Fisher test) for query/subject term columns in dN/dS results}
 \usage{
 term_enrichment(
   dnds_annot_file = NULL,
@@ -21,7 +21,6 @@ term_enrichment(
   min_pos = 0,
   fdr_method = c("BH", "IHW", "qvalue", "none"),
   alpha = 0.05,
-  term_sep = ";",
   term_seps = c(";", "|", ","),
   term_blocklist = c("attributes", "attribute", "attr", "notes", "note", "description",
     "product", "name", "id", "gene_id", "transcript_id", "parent", "dbxref", "source",
@@ -34,82 +33,102 @@ term_enrichment(
   exclude_descendants_limit = 5000,
   term_metadata = NULL,
   keep_unmatched_ids = TRUE,
-  dnds_file = NULL
+  verbose = TRUE
 )
 }
 \arguments{
-\item{dnds_annot_file}{Path to a single \if{html}{\out{<comp>}}_dnds_annot.tsv (single mode).}
+\item{dnds_annot_file}{Path to a single \verb{<comp>_dnds_annot.tsv} file (single mode).
+If provided, \code{comparison_file} must be NULL.}
 
 \item{comparison_file}{Path to whitespace-delimited file (tabs/spaces; header or not)
-with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
-If provided, batch mode reads:
-file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv")).}
+with columns: \verb{comparison_name, query_fasta, query_gff, subject_fasta, subject_gff}.
+In batch mode, each comparison is read from:
+\code{file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv"))}.}
 
 \item{output_dir}{Root directory containing per-comparison folders (batch mode).}
 
-\item{terms}{Character vector of term types to test (e.g., c("kegg","pfam")).
-Default NULL = auto-detect among {kegg, panther, pfam, tigrfam, cog} and any custom
-q_\emph{/s_} term columns present. IPR/GO are excluded by default (see \code{exclude_terms}).}
+\item{terms}{Optional character vector of term types to test (suffixes like
+\code{c("kegg","pfam")}). Default NULL = auto-detect from \verb{q_*}/\verb{s_*} columns.}
 
-\item{exclude_terms}{Character vector of term \strong{types} to exclude entirely from testing
-(auto-detect and explicit \verb{terms=}). Default c("ipr","go"). Set to NULL to allow them.}
+\item{exclude_terms}{Character vector of term types to exclude entirely from testing
+(applies to auto-detect and explicit \code{terms}). Default \code{c("ipr","go")}.
+Set to NULL to allow them.}
 
-\item{sides}{Character vector among c("query","subject"). Default both.}
+\item{sides}{Character vector among \code{c("query","subject")}. Default both.}
 
-\item{pos_threshold}{Numeric. dNdS > pos_threshold defines "positive" (default 1).}
+\item{pos_threshold}{Numeric. \code{dNdS > pos_threshold} defines "positive" (default 1).}
 
-\item{max_dnds}{Numeric. Drop rows with dNdS >= max_dnds (default 10) or NA dNdS.}
+\item{max_dnds}{Numeric. Drops rows with \code{dNdS >= max_dnds} or NA \code{dNdS} (default 10).}
 
-\item{filter_expr}{Optional character with a logical expression evaluated in the data.}
+\item{filter_expr}{Optional character; a logical expression evaluated in the data
+to further filter rows (e.g., \code{"q_seqname == s_seqname"}). Default NULL.}
 
 \item{make_plots}{Logical; if TRUE, write a top-N bubble plot per result (default TRUE).}
 
-\item{top_n}{Integer; number of rows for plot (default 20).}
+\item{top_n}{Integer; number of rows to include in the plot (default 20).}
 
-\item{drop_rows_without_term}{Logical; if TRUE (default), rows with no term of the tested
-type are removed from BOTH positives and background (annotation-aware universe).}
+\item{drop_rows_without_term}{Logical; if TRUE (default), rows with no term in the
+tested column are removed from BOTH positives and background before counting.}
 
 \item{min_total}{Minimum total occurrences (pos+nonpos) required for a term (default 0).}
 
 \item{min_pos}{Minimum positive occurrences required for a term (default 0).}
 
-\item{fdr_method}{One of "BH","IHW","qvalue","none". Defaults to "BH".}
+\item{fdr_method}{One of \code{"BH"}, \code{"IHW"}, \code{"qvalue"}, \code{"none"}. Default \code{"BH"}.}
 
 \item{alpha}{FDR level for IHW weighting (default 0.05).}
 
-\item{term_sep}{Default separator for term strings in q_\emph{/s_} columns (default ";").}
+\item{term_seps}{Candidate separators to auto-detect per column
+(default \code{c(";", "|", ",")}).}
 
-\item{term_seps}{Candidate separators to auto-detect per column (default c(";","|",",")).}
+\item{term_blocklist}{Character vector of suffixes to ignore as term families.
+(e.g. fields like \code{id}, \code{name}, \code{start}, \code{end}, etc.) Defaults are conservative.}
 
-\item{term_blocklist}{Character vector of suffixes to ignore as term families.}
+\item{exclude_ids}{Either a character vector of term IDs to exclude globally (all types),
+or a named list mapping \verb{term_type -> character vector} of IDs to exclude for that type.
+Default NULL.}
 
-\item{exclude_ids}{Either a character vector of term IDs (applies to \emph{all} term types),
-or a named list mapping term_type -> character vector of IDs to exclude. Default NULL.}
+\item{term_trees}{Optional tree(s) enabling descendant exclusion. Either:
+(1) a path/data.frame edgelist (two columns: parent, child) applied to all types, or
+(2) a named list mapping \verb{term_type -> (path or data.frame edgelist)}.}
 
-\item{term_trees}{Optional named list mapping term_type -> path or data.frame of a
-parent/child edgelist (two columns). Enables descendant exclusion for that type.}
+\item{exclude_descendants}{Logical; if TRUE, expands \code{exclude_ids} per type using
+descendants found in \code{term_trees}. Default FALSE.}
 
-\item{exclude_descendants}{Logical; if TRUE, expand \code{exclude_ids} per type using
-descendants from \code{term_trees[[type]]}. Default FALSE.}
+\item{exclude_descendants_depth}{Integer depth limit when expanding descendants.
+\code{1} = direct children; \code{Inf} = full subtree. Default \code{Inf}.}
 
-\item{exclude_descendants_depth}{Integer depth limit when expanding descendants.}
+\item{exclude_descendants_limit}{Hard cap on number of excluded nodes per type to
+avoid accidental mass exclusion. Default 5000.}
 
-\item{exclude_descendants_limit}{Hard cap on number of excluded nodes per (type).}
+\item{term_metadata}{Optional metadata join(s). Either:
+(1) a path/data.frame with columns \code{ID}, \code{NAME} (optional \code{DEFINITION}) applied to all types, or
+(2) a named list mapping \verb{term_type -> (path or data.frame)}.}
 
-\item{term_metadata}{Optional named list mapping term_type -> (path or data.frame)
-with columns: ID, NAME (optional: DEFINITION). Joined to results to add names/defs.}
+\item{keep_unmatched_ids}{Logical; if TRUE (default), keep terms lacking metadata.
+If FALSE, rows without a metadata NAME are dropped.}
 
-\item{keep_unmatched_ids}{Logical; if TRUE (default), keep terms lacking metadata.}
+\item{verbose}{Logical; if TRUE, prints detection and audit messages. Default TRUE.}
 }
 \value{
-In single mode: (invisibly) list of data.frames by side_term (if make_plots=FALSE)
-or vector of output TSV paths (if make_plots=TRUE). In batch mode: vector of paths.
+(Invisibly) a character vector of output TSV paths.
+In batch mode, this includes all comparisons. In single mode, paths for that file.
+TSV columns include: term, term_type, side, pos_count, nonpos_count, pos_total,
+nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment, and optionally
+term_name, term_def, label.
 }
 \description{
-Reads \if{html}{\out{<comp>}}/\if{html}{\out{<comp>}}\emph{dnds_annot.tsv and tests enrichment of terms (q}* / s_* columns)
-among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
+Reads a \verb{<comparison>/<comparison>_dnds_annot.tsv} file and tests enrichment of
+annotation terms found in \verb{q_*} / \verb{s_*} columns among positively selected rows
+(\code{dNdS > pos_threshold}) versus the filtered background.
 }
 \details{
-Supports optional per-term-type ID exclusion, subtree (descendant) exclusion using a
-provided parent->child edgelist, and metadata joins to append names/definitions.
+Term "types" are inferred from suffixes of \verb{q_*}/\verb{s_*} columns (e.g., \code{q_pfam},
+\code{s_kegg}). By default, \code{ipr} and \code{go} are excluded from this generic routine.
+(Use dedicated functions for IPR/GO if you have them.)
+
+For each term type and side, runs a one-sided Fisher exact test ("greater") on
+term presence/absence counts and reports odds ratio, p-value, and adjusted p-value.
+Optionally joins metadata (NAME/DEFINITION) and supports term-ID exclusion and
+descendant exclusion using a parent-child tree.
 }

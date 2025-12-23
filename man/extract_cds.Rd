@@ -17,7 +17,9 @@ extract_cds(
   group_by = c("gene", "tx"),
   export_proteins = FALSE,
   genetic_code = 1L,
-  keep_internal_stops = FALSE
+  keep_internal_stops = FALSE,
+  cds_suffix = "_CDS.fasta",
+  protein_suffix = "_AA.fasta"
 )
 }
 \arguments{
@@ -35,21 +37,34 @@ extract_cds(
 
 \item{overwrite}{Overwrite existing outputs if TRUE.}
 
-\item{verbose}{Print progress.}
+\item{verbose}{Print progress messages if TRUE.}
 
-\item{comparison_file}{Optional TSV: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
+\item{comparison_file}{Optional comparison table path or data.frame.}
 
 \item{group_by}{"gene" or "tx" for how CDS are grouped/named.}
 
-\item{export_proteins}{If TRUE, also write translated proteins (*.faa).}
+\item{export_proteins}{If TRUE, also write translated proteins as AA FASTA.}
 
-\item{genetic_code}{Integer NCBI code for translation (1=Standard).}
+\item{genetic_code}{Integer NCBI code for translation (1 = Standard).}
 
 \item{keep_internal_stops}{If FALSE, drop sequences with internal stops (post-translation).}
+
+\item{cds_suffix}{Filename suffix for CDS FASTA outputs. Default "_CDS.fasta".}
+
+\item{protein_suffix}{Filename suffix for AA FASTA outputs. Default "_AA.fasta".}
 }
 \value{
 A list (or list-of-lists in batch) with paths to CDS/protein files and metadata.
 }
 \description{
-Extract CDS (and optionally proteins) from genome+GFF using Bioconductor
+Extracts CDS sequences from a genome FASTA and GFF3 using TxDb/GenomicFeatures.
+Optionally translates CDS to proteins and writes an amino-acid FASTA.
+}
+\details{
+In batch mode, reads a whitespace-delimited comparison file (tabs/spaces) with either:
+\itemize{
+\item headered columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff
+\item or headerless with the above in the first 5 columns
+}
+Subject inputs may be left blank/NA to run query-only extraction.
 }

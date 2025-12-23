@@ -1,66 +1,100 @@
-#' Calculate dN/dS from pre-extracted CDS FASTAs using orthologr
+#' Calculate dN/dS in batch or single mode using orthologr
 #'
-#' Runs \code{orthologr::dNdS()} on per-comparison CDS FASTA files that are expected to
-#' already exist on disk. Supports batch mode via a comparison table or single-run mode
-#' via explicit arguments.
+#' Wraps \code{orthologr::dNdS()} to provide batch execution, sensible defaults,
+#' reproducible container-friendly behavior, and standardized output locations.
+#'
+#' This function supports two input styles:
+#' \itemize{
+#'   \item \strong{Direct mode}: provide \code{query_seq} and \code{subject_seq} paths
+#'     (CDS or protein FASTAs depending on \code{seq_type}).
+#'   \item \strong{Pipeline mode}: provide \code{query_fasta} and \code{subject_fasta} only
+#'     to derive expected per-comparison sequence FASTAs within \code{output_dir} using
+#'     standardized suffixes (e.g. \code{_CDS.fasta} or \code{_AA.fasta}).
+#' }
 #'
 #' @param comparison_file Path to a whitespace-delimited (tabs/spaces) file OR a data.frame
-#'   with columns: \code{comparison_name}, \code{query_fasta}, \code{query_gff},
-#'   \code{subject_fasta}, \code{subject_gff}. If provided, batch mode is used.
+#'   describing comparisons (batch mode).
+#'   Must include \code{comparison_name} and either:
+#'   \itemize{
+#'     \item \code{query_seq} and \code{subject_seq} (direct mode), OR
+#'     \item \code{query_fasta} and \code{subject_fasta} (pipeline mode).
+#'   }
+#'   Additional columns are allowed and ignored. For backward compatibility, files with
+#'   \code{query_gff}/\code{subject_gff} columns are accepted but those columns are not used.
+#'
 #' @param comparison_name Name for the comparison (single mode). Used as the per-comparison
 #'   folder name under \code{output_dir} and as the output TSV basename.
-#' @param query_fasta Path to the original query FASTA (single mode). Used only to derive
-#'   the expected CDS filename \code{<basename>_CDS.fasta} under the comparison folder.
-#' @param subject_fasta Path to the original subject FASTA (single mode). Used only to derive
-#'   the expected CDS filename \code{<basename>_CDS.fasta} under the comparison folder.
-#' @param query_gff Path to query GFF3 (single mode). Currently not used by this function,
-#'   but accepted for consistency with comparison tables.
-#' @param subject_gff Path to subject GFF3 (single mode). Currently not used by this function,
-#'   but accepted for consistency with comparison tables.
+#' @param query_seq Path to the query sequence FASTA used directly by \code{orthologr::dNdS()}
+#'   (single mode). Required for direct mode.
+#' @param subject_seq Path to the subject sequence FASTA used directly by \code{orthologr::dNdS()}
+#'   (single mode). Required for direct mode.
+#'
+#' @param query_fasta Path to the original query FASTA used only to derive the expected
+#'   per-comparison sequence FASTA in pipeline mode (single mode).
+#' @param subject_fasta Path to the original subject FASTA used only to derive the expected
+#'   per-comparison sequence FASTA in pipeline mode (single mode).
+#'
 #' @param output_dir Root directory containing per-comparison folders. Each run uses
 #'   \code{file.path(output_dir, comparison_name)}.
-#' @param comp_cores Integer number of CPU cores to pass to \code{orthologr::dNdS()}
-#'   as \code{comp_cores}. Default 4.
-#' @param aligner Character. Aligner passed to \code{orthologr::dNdS()} (e.g. \code{"diamond"}).
+#' @param overwrite Logical; if \code{FALSE}, skip a comparison when the output TSV already exists.
+#'   Default \code{FALSE}.
+#'
+#' @param seq_type Character; sequence type passed to \code{orthologr::dNdS()}.
+#'   Must be \code{"cds"} or \code{"protein"}. When \code{"cds"}, input files must be CDS nucleotide
+#'   FASTAs. When \code{"protein"}, input files must be protein FASTAs.
+#' @param cds_suffix Filename suffix used in pipeline mode when \code{seq_type="cds"}.
+#'   Default \code{"_CDS.fasta"}.
+#' @param protein_suffix Filename suffix used in pipeline mode when \code{seq_type="protein"}.
+#'   Default \code{"_AA.fasta"}.
+#'
+#' @param comp_cores Integer number of CPU cores to pass to \code{orthologr::dNdS()} as
+#'   \code{comp_cores}. Default 4.
+#' @param aligner Character. Aligner passed to \code{orthologr::dNdS()} (e.g. \code{"diamond"} or \code{"blast"}).
 #'   If \code{"diamond"}, the \code{diamond} binary must be available on \code{PATH}.
-#' @param sensitivity_mode Character. Passed to \code{orthologr::dNdS()} as \code{sensitivity_mode}
-#'   (e.g. \code{"fast"}).
-#' @param dnds_method Character. Passed to \code{orthologr::dNdS()} as \code{dnds_est.method}
-#'   (e.g. \code{"Comeron"}).
+#' @param sensitivity_mode Character. Passed to \code{orthologr::dNdS()} as \code{sensitivity_mode}.
+#' @param dnds_method Character. Passed to \code{orthologr::dNdS()} as \code{dnds_est.method}.
+#'
 #' @param ... Additional arguments forwarded to \code{orthologr::dNdS()}. Only named arguments
-#'   that match \code{formals(orthologr::dNdS)} are forwarded. If an argument overlaps a default
-#'   set by this wrapper, it will override the wrapper default.
+#'   matching \code{formals(orthologr::dNdS)} are forwarded. If an argument overlaps a default
+#'   set by this wrapper, it will override the wrapper default, except for \code{query_file},
+#'   \code{subject_file}, and \code{seq_type} which are controlled by this wrapper.
 #'
 #' @details
-#' Expected input CDS FASTAs (per comparison) are:
+#' \strong{Output path:} for each comparison, results are written to
+#' \code{file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds.tsv"))}.
+#'
+#' \strong{Pipeline mode file resolution:} when \code{query_fasta}/\code{subject_fasta} are used,
+#' the input FASTAs are resolved as:
 #' \itemize{
-#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(query_fasta_noext), "_CDS.fasta"))}
-#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(subject_fasta_noext), "_CDS.fasta"))}
+#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(query_fasta_noext), <suffix>))}
+#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(subject_fasta_noext), <suffix>))}
 #' }
-#' If either CDS file is missing, the comparison is skipped (returns \code{NULL} for that run).
-#' If the output TSV already exists, the run is skipped and the existing path is returned.
+#' where \code{<suffix>} is \code{cds_suffix} or \code{protein_suffix} depending on \code{seq_type}.
 #'
-#' This function requires the \pkg{orthologr} package. For Biostrings >= 2.77.1,
-#' alignment helpers were moved into \pkg{pwalign}; this function applies a small shim
-#' to keep older \pkg{orthologr} code working.
+#' This function requires the \pkg{orthologr} package. For Biostrings >= 2.77.1, alignment helpers
+#' were moved into \pkg{pwalign}; this function applies a small shim to keep older orthologr code working.
 #'
-#' @return (Invisibly) a character vector of output TSV paths (batch mode), or a single
-#'   output TSV path (single mode). Comparisons that are skipped due to missing CDS files
-#'   are omitted.
-#'
+#' @return (Invisibly) a character vector of output TSV paths (batch mode), or a single output TSV path
+#'   (single mode). Comparisons skipped due to missing inputs are omitted from batch outputs.
 #' @export
 calculate_dnds <- function(comparison_file = NULL,
                            comparison_name = NULL,
-                           subject_fasta = NULL,
+                           query_seq = NULL,
+                           subject_seq = NULL,
                            query_fasta = NULL,
-                           subject_gff = NULL,
-                           query_gff = NULL,
+                           subject_fasta = NULL,
                            output_dir = getwd(),
+                           overwrite = FALSE,
+                           seq_type = c("cds", "protein"),
+                           cds_suffix = "_CDS.fasta",
+                           protein_suffix = "_AA.fasta",
                            comp_cores = 4,
                            aligner = "diamond",
                            sensitivity_mode = "fast",
                            dnds_method = "Comeron",
                            ...) {
+
+  seq_type <- match.arg(seq_type)
 
   # ---- dependency guards ----
   .need_pkg <- function(pkg, msg = NULL) {
@@ -74,20 +108,26 @@ calculate_dnds <- function(comparison_file = NULL,
       stop(msg, call. = FALSE)
     }
   }
+
   .need_pkg(
     "orthologr",
-    "This step needs 'orthologr'. Install via remotes::install_github('drostlab/orthologr') "
-    |> paste0("or run inside the dndsR container (recommended).")
+    paste0(
+      "This step needs 'orthologr'. Install via remotes::install_github('drostlab/orthologr') ",
+      "or run inside the dndsR container (recommended)."
+    )
   )
   .need_pkg(
     "pwalign",
-    "Biostrings >= 2.77.1 moved pairwiseAlignment()/pattern()/subject()/writePairwiseAlignments() into the 'pwalign' package."
+    paste0(
+      "Biostrings >= 2.77.1 moved pairwiseAlignment()/pattern()/subject()/writePairwiseAlignments() ",
+      "into the 'pwalign' package."
+    )
   )
 
-  # Shim: if Biostrings made core alignment helpers defunct, re-point them to pwalign's impl
+  # ---- Shim: re-point Biostrings alignment helpers to pwalign when needed ----
   .fix_pwalign_shim <- function() {
     if (!requireNamespace("Biostrings", quietly = TRUE) ||
-        !requireNamespace("pwalign",    quietly = TRUE)) {
+        !requireNamespace("pwalign", quietly = TRUE)) {
       return(invisible())
     }
 
@@ -98,21 +138,16 @@ calculate_dnds <- function(comparison_file = NULL,
 
     rebind_if_exists <- function(name, fun) {
       if (!is.function(fun)) return(invisible())
-      # Only touch it if Biostrings actually has this symbol
       if (!exists(name, envir = ns, inherits = FALSE)) return(invisible())
 
       locked <- tryCatch(bindingIsLocked(name, ns),
                          error = function(e) FALSE)
-      if (isTRUE(locked)) {
-        unlockBinding(name, ns)
-        # (Optional) you could relock here with on.exit, but not required.
-      }
+      if (isTRUE(locked)) unlockBinding(name, ns)
 
       assign(name, fun, envir = ns)
       invisible()
     }
 
-    # Core functions that Biostrings says moved to pwalign
     rebind_if_exists("pairwiseAlignment",       pwalign::pairwiseAlignment)
     rebind_if_exists("pattern",                 pwalign::pattern)
     rebind_if_exists("subject",                 pwalign::subject)
@@ -120,87 +155,155 @@ calculate_dnds <- function(comparison_file = NULL,
 
     invisible()
   }
-
   .fix_pwalign_shim()
 
-
-  # Optional but helpful: if using DIAMOND, confirm the binary is on PATH
+  # ---- Optional: if using DIAMOND, confirm the binary is on PATH ----
   if (identical(tolower(aligner), "diamond")) {
-    ok <- !inherits(suppressWarnings(try(system2("diamond", "--version"), silent = TRUE)), "try-error")
-    if (inherits(ok, "try-error")) {
+    if (Sys.which("diamond") == "") {
       stop(
-        paste0(
-          "aligner='diamond' but the DIAMOND binary was not found on PATH.\n",
-          "* If you are using the container, this should already be installed and on PATH.\n",
-          "* Otherwise, install DIAMOND >= 2.1.8 and ensure 'diamond' is callable from your shell."
-        ),
+        "aligner='diamond' but the DIAMOND binary was not found on PATH.\n",
+        "Install DIAMOND >= 2.1.8 or run inside the dndsR container.",
         call. = FALSE
       )
     }
   }
 
-  # ---- helper: read comparison_file with ANY whitespace as delimiter ----
+  # ---- helper: read comparison table (whitespace-delimited) ----
   .read_comparisons <- function(x) {
-    req <- c("comparison_name","query_fasta","query_gff","subject_fasta","subject_gff")
     if (is.data.frame(x)) {
-      stopifnot(all(req %in% names(x)))
-      return(x[, req, drop = FALSE])
+      df <- x
+    } else {
+      read_ws <- function(hdr) {
+        utils::read.table(
+          x,
+          header = hdr,
+          sep = "",
+          quote = "\"",
+          stringsAsFactors = FALSE,
+          comment.char = "",
+          strip.white = TRUE,
+          blank.lines.skip = TRUE,
+          check.names = FALSE
+        )
+      }
+      df1 <- try(read_ws(TRUE), silent = TRUE)
+      if (!inherits(df1, "try-error")) {
+        df <- df1
+      } else {
+        df <- read_ws(FALSE)
+      }
     }
-    read_ws <- function(hdr) {
-      utils::read.table(x,
-                        header = hdr,
-                        sep = "",               # any whitespace (tabs OR spaces)
-                        quote = "\"",           # allow quoting paths if they contain spaces
-                        stringsAsFactors = FALSE,
-                        comment.char = "",
-                        strip.white = TRUE,
-                        blank.lines.skip = TRUE,
-                        check.names = FALSE)
+
+    if (!("comparison_name" %in% names(df))) {
+      # headerless fallback: assume first col is comparison_name
+      if (ncol(df) >= 1) names(df)[1] <- "comparison_name"
     }
-    # Try headered first
-    df1 <- try(read_ws(TRUE), silent = TRUE)
-    if (!inherits(df1, "try-error") && all(req %in% names(df1))) {
-      return(df1[, req, drop = FALSE])
+
+    if (!("comparison_name" %in% names(df))) {
+      stop("comparison_file must include a 'comparison_name' column (or be headerless with comparison_name in column 1).",
+           call. = FALSE)
     }
-    # Fallback: headerless
-    df2 <- read_ws(FALSE)
-    if (ncol(df2) < 5) {
-      stop("comparison_file must have 5 columns or a header with: ",
-           paste(req, collapse = ", "), call. = FALSE)
+
+    # Backward compatibility: accept old schema and ignore GFF columns
+    # New: accept direct mode (query_seq/subject_seq) OR pipeline mode (query_fasta/subject_fasta)
+    has_direct   <- all(c("query_seq", "subject_seq") %in% names(df))
+    has_pipeline <- all(c("query_fasta", "subject_fasta") %in% names(df))
+
+    if (!has_direct && !has_pipeline) {
+      # headerless fallback: if at least 3 cols, assume comparison_name, query_fasta, subject_fasta
+      if (!is.data.frame(x) && ncol(df) >= 3 && !any(grepl("query_|subject_", names(df)))) {
+        names(df)[1:3] <- c("comparison_name", "query_fasta", "subject_fasta")
+        has_pipeline <- TRUE
+      } else {
+        stop(
+          paste0(
+            "comparison_file must include either:\n",
+            "* query_seq and subject_seq (direct mode), OR\n",
+            "* query_fasta and subject_fasta (pipeline mode).\n",
+            "Additional columns are allowed."
+          ),
+          call. = FALSE
+        )
+      }
     }
-    names(df2)[1:5] <- req
-    df2[, req, drop = FALSE]
+
+    df
+  }
+
+  # ---- helper: resolve input FASTA paths for a comparison ----
+  .resolve_inputs <- function(comp, comp_dir, row) {
+    # Direct mode wins if provided (and non-empty)
+    if ("query_seq" %in% names(row) && "subject_seq" %in% names(row)) {
+      qs <- row[["query_seq"]]
+      ss <- row[["subject_seq"]]
+      if (!is.na(qs) && nzchar(qs) && !is.na(ss) && nzchar(ss)) {
+        return(list(
+          query_file = normalizePath(qs),
+          subject_file = normalizePath(ss),
+          mode = "direct"
+        ))
+      }
+    }
+
+    # Pipeline mode: derive from query_fasta/subject_fasta basename + suffix
+    if (!("query_fasta" %in% names(row)) || !("subject_fasta" %in% names(row))) {
+      return(list(query_file = NA_character_, subject_file = NA_character_, mode = "none"))
+    }
+
+    qfa <- row[["query_fasta"]]
+    sfa <- row[["subject_fasta"]]
+    if (is.na(qfa) || !nzchar(qfa) || is.na(sfa) || !nzchar(sfa)) {
+      return(list(query_file = NA_character_, subject_file = NA_character_, mode = "none"))
+    }
+
+    q_base <- tools::file_path_sans_ext(basename(qfa))
+    s_base <- tools::file_path_sans_ext(basename(sfa))
+
+    suffix <- if (seq_type == "cds") cds_suffix else protein_suffix
+
+    q_in <- file.path(comp_dir, paste0(q_base, suffix))
+    s_in <- file.path(comp_dir, paste0(s_base, suffix))
+
+    list(
+      query_file = normalizePath(q_in, mustWork = FALSE),
+      subject_file = normalizePath(s_in, mustWork = FALSE),
+      mode = "pipeline"
+    )
   }
 
   # ---- helper: one comparison ----
-  run_dnds <- function(comparison_basename, query_fa, subject_fa, query_gff, subject_gff, ...) {
+  run_dnds <- function(comparison_basename, row) {
     comp_dir <- file.path(output_dir, comparison_basename)
     dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
 
-    q_base <- tools::file_path_sans_ext(basename(query_fa))
-    s_base <- tools::file_path_sans_ext(basename(subject_fa))
-    query_CDS   <- file.path(comp_dir, paste0(q_base, "_CDS.fasta"))
-    subject_CDS <- file.path(comp_dir, paste0(s_base, "_CDS.fasta"))
-    out_tsv     <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
+    out_tsv <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
 
-    if (!file.exists(query_CDS) || !file.exists(subject_CDS)) {
-      warning("CDS files not found in ", comp_dir, ". Expected: ",
-              basename(query_CDS), " and ", basename(subject_CDS),
-              ". Skipping ", comparison_basename, ".")
-      return(NULL)
-    }
-    if (file.exists(out_tsv)) {
+    if (!isTRUE(overwrite) && file.exists(out_tsv) && file.info(out_tsv)$size > 0) {
       message("Skipping ", comparison_basename, " (exists).")
       return(out_tsv)
     }
 
+    inp <- .resolve_inputs(comparison_basename, comp_dir, row)
+    q_in <- inp$query_file
+    s_in <- inp$subject_file
+
+    if (!nzchar(q_in) || !nzchar(s_in) || !file.exists(q_in) || !file.exists(s_in)) {
+      warning(
+        "Sequence files not found for ", comparison_basename, " (mode=", inp$mode, ").\n",
+        "* query_file:   ", q_in, "\n",
+        "* subject_file: ", s_in, "\n",
+        "Skipping."
+      )
+      return(NULL)
+    }
+
     # defaults you provide
     args <- list(
-      query_file         = normalizePath(query_CDS),
-      subject_file       = normalizePath(subject_CDS),
+      query_file         = normalizePath(q_in),
+      subject_file       = normalizePath(s_in),
       aligner            = aligner,
       sensitivity_mode   = sensitivity_mode,
-      seq_type           = "cds",
+      seq_type           = seq_type,
       format             = "fasta",
       ortho_detection    = "RBH",
       delete_corrupt_cds = TRUE,
@@ -216,11 +319,11 @@ calculate_dnds <- function(comparison_file = NULL,
     )
 
     # user-supplied overrides / additions
-        # user-supplied overrides / additions
     user <- list(...)
     if (length(user)) {
-      # Drop unnamed / invalid extras (e.g. stray alist() from launcher/optparse glue)
       nms <- names(user)
+
+      # Drop unnamed/invalid extras
       if (is.null(nms)) {
         user <- list()
       } else {
@@ -231,24 +334,41 @@ calculate_dnds <- function(comparison_file = NULL,
           nms  <- names(user)
         }
       }
+
       if (length(user)) {
-        # Only forward arguments that orthologr::dNdS actually knows about
+        # Prevent desync: these are controlled by wrapper
+        if ("seq_type" %in% names(user)) {
+          message("Ignoring ...$seq_type (use calculate_dnds(seq_type=...) instead).")
+          user$seq_type <- NULL
+        }
+        if ("query_file" %in% names(user)) {
+          message("Ignoring ...$query_file (use query_seq/subject_seq in direct mode instead).")
+          user$query_file <- NULL
+        }
+        if ("subject_file" %in% names(user)) {
+          message("Ignoring ...$subject_file (use query_seq/subject_seq in direct mode instead).")
+          user$subject_file <- NULL
+        }
+
+        # Only forward arguments orthologr::dNdS knows
         dnds_formals <- names(formals(orthologr::dNdS))
+        nms <- names(user)
         user <- user[nms %in% dnds_formals]
 
         overlap <- intersect(names(user), names(args))
         if (length(overlap)) {
           message("Overriding defaults: ", paste(overlap, collapse = ", "))
-          args[overlap] <- user[overlap]  # override defaults
+          args[overlap] <- user[overlap]
         }
 
         extra <- setdiff(names(user), names(args))
         if (length(extra)) {
-          args <- c(args, user[extra])    # add additional valid dNdS args
+          args <- c(args, user[extra])
         }
       }
     }
-    message("Running dN/dS for: ", comparison_basename)
+
+    message("Running dN/dS for: ", comparison_basename, " (seq_type=", seq_type, ", mode=", inp$mode, ")")
     res <- do.call(orthologr::dNdS, args)
     utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
     message("Finished: ", comparison_basename)
@@ -260,32 +380,42 @@ calculate_dnds <- function(comparison_file = NULL,
 
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+
     for (i in seq_len(nrow(df))) {
-      out <- run_dnds(
-        comparison_basename = df$comparison_name[i],
-        query_fa   = normalizePath(df$query_fasta[i]),
-        subject_fa = normalizePath(df$subject_fasta[i]),
-        query_gff  = normalizePath(df$query_gff[i]),
-        subject_gff= normalizePath(df$subject_gff[i])
-      )
+      comp <- df$comparison_name[i]
+      row  <- as.list(df[i, , drop = FALSE])
+
+      out <- run_dnds(comparison_basename = comp, row = row)
       if (!is.null(out)) out_paths <- c(out_paths, out)
     }
+
     message("All dN/dS calculations complete.")
     return(invisible(out_paths))
   }
 
-  # Single mode
-  if (any(vapply(list(comparison_name, subject_fasta, query_fasta, subject_gff, query_gff),
-                 is.null, logical(1)))) {
-    stop("In single mode, supply comparison_name, subject_fasta, query_fasta, subject_gff, and query_gff.", call. = FALSE)
+  # ---- single mode ----
+  if (is.null(comparison_name) || !nzchar(comparison_name)) {
+    stop("In single mode, supply comparison_name.", call. = FALSE)
   }
-  out <- run_dnds(
-    comparison_basename = comparison_name,
-    query_fa   = normalizePath(query_fasta),
-    subject_fa = normalizePath(subject_fasta),
-    query_gff  = normalizePath(query_gff),
-    subject_gff= normalizePath(subject_gff)
-  )
+
+  # Direct mode if query_seq+subject_seq supplied; otherwise pipeline mode needs query_fasta+subject_fasta
+  if (!is.null(query_seq) && !is.null(subject_seq) && nzchar(query_seq) && nzchar(subject_seq)) {
+    row <- list(query_seq = query_seq, subject_seq = subject_seq)
+  } else {
+    if (is.null(query_fasta) || is.null(subject_fasta) || !nzchar(query_fasta) || !nzchar(subject_fasta)) {
+      stop(
+        paste0(
+          "In single mode, supply either:\n",
+          "* query_seq + subject_seq (direct mode), OR\n",
+          "* query_fasta + subject_fasta (pipeline mode)."
+        ),
+        call. = FALSE
+      )
+    }
+    row <- list(query_fasta = query_fasta, subject_fasta = subject_fasta)
+  }
+
+  out <- run_dnds(comparison_basename = comparison_name, row = row)
   message("All dN/dS calculations complete.")
   invisible(out)
 }

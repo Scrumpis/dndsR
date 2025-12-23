@@ -247,6 +247,12 @@
 }
 
 #' Clean column names
+#'
+#' Strips CRLF artifacts and trims leading/trailing whitespace from column names.
+#'
+#' @param d A data.frame-like object.
+#' @return `d` with cleaned column names.
+#' @keywords internal
 .clean_colnames <- function(d) {
   nn <- names(d)
   nn <- sub("\r$", "", nn)   # strip CRLF artifacts
@@ -254,7 +260,6 @@
   names(d) <- nn
   d
 }
-
 
 # -----------------------------
 # 1) Regional summary function

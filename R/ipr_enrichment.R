@@ -47,6 +47,10 @@
 #' @param exclude_ids Character vector of IPR accessions (e.g. "IPR000123") to exclude
 #'   globally from both positives and background before enrichment. Preferred name.
 #' @param exclude_iprs Deprecated alias of `exclude_ids` for backward compatibility.
+#' @param max_prop Maximum allowed proportion of the background annotated set
+#'   that may be assigned to a term (default 0.20). Terms with
+#'   (pos_count + nonpos_count) / (pos_total + nonpos_total) > max_prop
+#'   are filtered out to avoid overly broad terms dominating enrichment.
 #'
 #' @param term_trees Optional path or data.frame of a parent/child edgelist for IPRs.
 #'   (High-priority local override if provided; two columns parent,child).
@@ -435,19 +439,29 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res
   }
 
-  # ---------- font & plotting helpers (unchanged) ----------
+  # ---------- font & plotting helpers ----------
   .bundled_arial_path <- function() {
     ttf <- system.file("fonts", "Arial-Bold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
+
   .setup_showtext <- function() {
     ttf <- .bundled_arial_path()
     if (is.null(ttf)) return(NULL)
+
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
-    try({ showtext::font_add(family = "Arial Bold", regular = ttf); showtext::showtext_auto(TRUE) }, silent = TRUE)
-    "Arial Bold"
+    if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
+
+    ok <- try({
+      sysfonts::font_add(family = "Arial Bold", regular = ttf)
+      showtext::showtext_auto(TRUE)
+      TRUE
+    }, silent = TRUE)
+
+    if (isTRUE(ok)) "Arial Bold" else NULL
   }
+
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
     ttf <- .bundled_arial_path(); if (is.null(ttf)) return(NULL)
