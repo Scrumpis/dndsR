@@ -38,13 +38,12 @@ infer_repo_dir() {
 }
 
 REPO_DIR="$(infer_repo_dir)"
+PKG_DIR="Rlibrary"
+PKG_NAME="dndsR"
 
 [[ -f "${REPO_DIR}/${PKG_DIR}/DESCRIPTION" ]] || die \
 "Could not locate ${PKG_DIR}/DESCRIPTION.
 Set REPO_DIR=/path/to/dndsR repo root (the directory containing ${PKG_DIR}/)."
-
-PKG_DIR="Rlibrary"
-PKG_NAME="dndsR"
 
 # default install location; override safely in SLURM with HOST_RLIB or SINGULARITYENV_HOST_RLIB
 HOST_RLIB="${HOST_RLIB:-${HOME:-}/.dndsr/rlib}"
