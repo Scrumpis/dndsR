@@ -85,6 +85,10 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     get("cli_bootstrap_path", envir = ns, inherits = FALSE)()
   }
 
+  if (length(argv) > 0 && identical(argv[1], "--")) {
+    argv <- argv[-1]
+  }
+  
   if (length(argv) == 0 || argv[1] %in% c("-h", "--help", "help")) {
     cli_print_usage()
     return(invisible(NULL))
