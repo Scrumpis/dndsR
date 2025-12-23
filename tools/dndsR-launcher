@@ -10,8 +10,39 @@ while [ -h "$SCRIPT_SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 
-# Default repo dir to the directory containing this launcher
-REPO_DIR="${REPO_DIR:-$SCRIPT_DIR}"
+# Default repo dir: try to infer from launcher location, but allow override via REPO_DIR
+infer_repo_dir() {
+  # If user set REPO_DIR, respect it
+  if [[ -n "${REPO_DIR:-}" ]]; then
+    echo "${REPO_DIR}"
+    return 0
+  fi
+
+  # Start from where this launcher lives
+  local d="$SCRIPT_DIR"
+  local i
+
+  # Walk up a few levels and pick the first directory that looks like a dndsR repo root
+  # (contains Rlibrary/DESCRIPTION for your current layout)
+  for i in 0 1 2 3 4; do
+    if [[ -f "${d}/Rlibrary/DESCRIPTION" ]]; then
+      echo "${d}"
+      return 0
+    fi
+    d="$(cd "${d}/.." && pwd)"
+  done
+
+  # Fallback: old behavior (best guess)
+  echo "$SCRIPT_DIR"
+  return 0
+}
+
+REPO_DIR="$(infer_repo_dir)"
+
+[[ -f "${REPO_DIR}/${PKG_DIR}/DESCRIPTION" ]] || die \
+"Could not locate ${PKG_DIR}/DESCRIPTION.
+Set REPO_DIR=/path/to/dndsR repo root (the directory containing ${PKG_DIR}/)."
+
 PKG_DIR="Rlibrary"
 PKG_NAME="dndsR"
 
