@@ -126,6 +126,16 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   }
   parsed <- get("parse_dnds_opts", envir = ns, inherits = FALSE)(args = args)
 
+  # Remap global CLI naming to function arg naming when needed
+  target <- attr(fn, "target", exact = TRUE)
+  if (!is.null(target) && identical(target, "calculate_dnds")) {
+    if (!is.null(parsed$threads) && is.null(parsed$comp_cores)) {
+      parsed$comp_cores <- parsed$threads
+    }
+    # optional: drop threads so it doesn't get passed along too
+    parsed$threads <- NULL
+  }
+
   if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
   if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
 
