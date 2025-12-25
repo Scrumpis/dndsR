@@ -20,6 +20,16 @@
   )
 }
 
+#' Normalize long option tokens to kebab-case.
+#' Converts --foo_bar and --foo_bar=1 into --foo-bar / --foo-bar=1.
+#' Leaves values untouched.
+#' @keywords internal
+.cli_normalize_longopts <- function(args) {
+  vapply(args, function(a) {
+    if (grepl("^--", a)) gsub("_", "-", a, fixed = TRUE) else a
+  }, character(1))
+}
+
 #' Defaults for shared options
 #' @keywords internal
 .dnds_cli_defaults <- function() {
@@ -64,6 +74,26 @@ cli_parse_args <- function(args) {
     }
   }
   out
+}
+
+#' Parse CLI args:
+#' - normalize longopts to kebab-case
+#' - expand global short flags (-C/-o/-t)
+#' - parse all --key value pairs generically
+#' @keywords internal
+parse_dnds_opts <- function(args = commandArgs(trailingOnly = TRUE),
+                           defaults = list(output_dir=".", threads=4)) {
+  args <- .cli_expand_global_shorts(args)
+  args <- .cli_normalize_longopts(args)
+
+  opt <- cli_parse_args(args)  # your existing parser
+
+  # apply shared defaults
+  for (nm in names(defaults)) {
+    if (is.null(opt[[nm]])) opt[[nm]] <- defaults[[nm]]
+  }
+
+  opt
 }
 
 #' Expand -C/-t style args into canonical --long_name form
@@ -128,18 +158,25 @@ cli_parse_args <- function(args) {
 #' extra_aliases: named character vector like c("-p"="pos_threshold")
 #' defaults: named list of default values (merged after parsing)
 #' @keywords internal
-parse_dnds_opts <- function(extra_aliases = NULL, defaults = NULL, args = commandArgs(trailingOnly = TRUE)) {
+parse_dnds_opts <- function(extra_aliases = NULL,
+                            defaults = NULL,
+                            args = commandArgs(trailingOnly = TRUE)) {
+
   aliases <- .dnds_cli_aliases()
   if (!is.null(extra_aliases)) {
     aliases <- c(aliases, extra_aliases)
   }
 
-  # expand -C/-t etc into canonical --keys so cli_parse_args can do its thing
+  # 1) Expand -C/-t/-o etc
   expanded <- .cli_expand_aliases(args, aliases)
 
+  # 2) Normalize --foo_bar -> --foo-bar (ONLY for longopts)
+  expanded <- .cli_normalize_longopts(expanded)
+
+  # 3) Parse into snake_case keys
   opt <- cli_parse_args(expanded)
 
-  # apply defaults (command defaults override shared defaults if provided)
+  # 4) Defaults
   dflt <- .dnds_cli_defaults()
   if (!is.null(defaults)) dflt <- c(dflt, defaults)
 
