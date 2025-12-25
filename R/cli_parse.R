@@ -86,7 +86,7 @@ cli_parse_args <- function(args) {
 
 #' Expand -C/-t style args into canonical --long_name form
 #' Supports: -C file, -C=file, --comparison-file file, --comparison_file file
-#' Unknown --long options are passed through unchanged.
+#' Unknown --long options are passed through unchanged (including their values).
 #' @keywords internal
 .cli_expand_aliases <- function(args, aliases) {
   out <- character()
@@ -116,10 +116,9 @@ cli_parse_args <- function(args) {
       next
     }
 
-    # handle -C value and --long value and flags
+    # handle -C value and --long value and flags (known aliases)
     canon <- .cli_alias_get(aliases, a)
     if (!is.null(canon)) {
-      # is it a flag? if next token missing or another option => TRUE
       if (i == length(args) || is_opt(args[[i + 1]])) {
         out <- c(out, paste0("--", canon))
         i <- i + 1
@@ -130,10 +129,15 @@ cli_parse_args <- function(args) {
       next
     }
 
-    # allow any unknown --long option through unchanged
+    # allow any unknown --long option through unchanged (and consume value if present)
     if (grepl("^--", a)) {
-      out <- c(out, a)
-      i <- i + 1
+      if (i < length(args) && !is_opt(args[[i + 1]])) {
+        out <- c(out, a, args[[i + 1]])
+        i <- i + 2
+      } else {
+        out <- c(out, a)
+        i <- i + 1
+      }
       next
     }
 
