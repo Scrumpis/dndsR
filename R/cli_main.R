@@ -117,10 +117,6 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     return(invisible(NULL))
   }
 
-  # Make argument parsing explicit and discoverable
-  if (!exists("cli_parse_args", envir = ns, inherits = FALSE)) {
-    stop("Internal error: cli_parse_args() not found in dndsR namespace.", call. = FALSE)
-  }
   if (!exists("parse_dnds_opts", envir = ns, inherits = FALSE)) {
   stop("Internal error: parse_dnds_opts() not found in dndsR namespace.", call. = FALSE)
   }
