@@ -46,6 +46,7 @@ cli_cast <- function(x) {
   if (xl %in% c("na")) return(NA)
   if (xl %in% c("null","none")) return(NULL)
 
+  # comma -> character vector (nice for --sides query,subject)
   if (grepl(",", x, fixed = TRUE)) return(trimws(strsplit(x, ",", fixed = TRUE)[[1]]))
 
   if (grepl("^\\d+$", xl)) return(as.integer(xl))
@@ -76,28 +77,16 @@ cli_parse_args <- function(args) {
   out
 }
 
-#' Parse CLI args:
-#' - normalize longopts to kebab-case
-#' - expand global short flags (-C/-o/-t)
-#' - parse all --key value pairs generically
+#' Safe lookup for an alias key (returns NULL if missing)
 #' @keywords internal
-parse_dnds_opts <- function(args = commandArgs(trailingOnly = TRUE),
-                           defaults = list(output_dir=".", threads=4)) {
-  args <- .cli_expand_global_shorts(args)
-  args <- .cli_normalize_longopts(args)
-
-  opt <- cli_parse_args(args)  # your existing parser
-
-  # apply shared defaults
-  for (nm in names(defaults)) {
-    if (is.null(opt[[nm]])) opt[[nm]] <- defaults[[nm]]
-  }
-
-  opt
+.cli_alias_get <- function(aliases, key) {
+  v <- aliases[key]
+  if (length(v) && !is.na(v[[1]]) && nzchar(v[[1]])) v[[1]] else NULL
 }
 
 #' Expand -C/-t style args into canonical --long_name form
 #' Supports: -C file, -C=file, --comparison-file file, --comparison_file file
+#' Unknown --long options are passed through unchanged.
 #' @keywords internal
 .cli_expand_aliases <- function(args, aliases) {
   out <- character()
@@ -113,11 +102,12 @@ parse_dnds_opts <- function(args = commandArgs(trailingOnly = TRUE),
       parts <- strsplit(a, "=", fixed = TRUE)[[1]]
       k <- parts[[1]]
       v <- paste(parts[-1], collapse = "=") # keep any extra '='
-      canon <- aliases[[k]]
+
+      canon <- .cli_alias_get(aliases, k)
       if (!is.null(canon)) {
         out <- c(out, paste0("--", canon), v)
       } else if (grepl("^--", k)) {
-        # keep as-is (normalize later in cli_parse_args)
+        # keep as-is; will be normalized later
         out <- c(out, k, v)
       } else {
         stop("Unknown option: ", k)
@@ -127,7 +117,7 @@ parse_dnds_opts <- function(args = commandArgs(trailingOnly = TRUE),
     }
 
     # handle -C value and --long value and flags
-    canon <- aliases[[a]]
+    canon <- .cli_alias_get(aliases, a)
     if (!is.null(canon)) {
       # is it a flag? if next token missing or another option => TRUE
       if (i == length(args) || is_opt(args[[i + 1]])) {
@@ -140,7 +130,7 @@ parse_dnds_opts <- function(args = commandArgs(trailingOnly = TRUE),
       next
     }
 
-    # allow canonical --something through unchanged
+    # allow any unknown --long option through unchanged
     if (grepl("^--", a)) {
       out <- c(out, a)
       i <- i + 1
@@ -167,7 +157,7 @@ parse_dnds_opts <- function(extra_aliases = NULL,
     aliases <- c(aliases, extra_aliases)
   }
 
-  # 1) Expand -C/-t/-o etc
+  # 1) Expand -C/-t/-o etc (unknown --long pass through)
   expanded <- .cli_expand_aliases(args, aliases)
 
   # 2) Normalize --foo_bar -> --foo-bar (ONLY for longopts)
@@ -176,7 +166,7 @@ parse_dnds_opts <- function(extra_aliases = NULL,
   # 3) Parse into snake_case keys
   opt <- cli_parse_args(expanded)
 
-  # 4) Defaults
+  # 4) Defaults (command defaults override shared defaults if provided)
   dflt <- .dnds_cli_defaults()
   if (!is.null(defaults)) dflt <- c(dflt, defaults)
 
