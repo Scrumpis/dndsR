@@ -44,7 +44,8 @@ cli_print_command_help <- function(cmd) {
     return(invisible(NULL))
   }
 
-  utils::help(topic, package = "dndsR")  # prints help
+  txt <- utils::capture.output(utils::help(topic, package = "dndsR"))
+  if (length(txt)) cat(paste0(txt, collapse = "\n"), "\n")
   invisible(NULL)
 }
 
@@ -96,6 +97,18 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
 
   cmd  <- argv[1]
   args <- argv[-1]
+
+  # If the user runs `dndsr <command>` with no args, show help instead of error
+  if (length(args) == 0) {
+    cli_print_command_help(cmd)
+    return(invisible(NULL))
+  }
+  
+  # Command help
+  if (any(args %in% c("-h", "--help", "--usage", "help"))) {
+    cli_print_command_help(cmd)
+    return(invisible(NULL))
+  }
 
   # Special-case "doctor" if you want it independent of the usual dispatch
   if (identical(cmd, "doctor")) {
