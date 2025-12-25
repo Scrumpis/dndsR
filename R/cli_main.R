@@ -126,18 +126,32 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   }
   parsed <- get("parse_dnds_opts", envir = ns, inherits = FALSE)(args = args)
 
-  # Remap global CLI naming to function arg naming when needed
+  # Identify underlying target function (NOT the cli_* wrapper)
   target <- attr(fn, "target", exact = TRUE)
-  if (!is.null(target) && identical(target, "calculate_dnds")) {
+  if (is.null(target) || !nzchar(target)) target <- cmd
+  target_fn <- get(target, envir = ns, inherits = TRUE)
+  fmls <- names(formals(target_fn))
+  has_dots <- "..." %in% fmls
+  
+  # Special-case: map CLI --threads to calculate_dnds(comp_cores)
+  if (identical(target, "calculate_dnds")) {
     if (!is.null(parsed$threads) && is.null(parsed$comp_cores)) {
       parsed$comp_cores <- parsed$threads
     }
-    # optional: drop threads so it doesn't get passed along too
-    parsed$threads <- NULL
   }
-
+  
+  # Global options (do not forward as args)
   if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
   if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
+  
+  # Remove globals so they never reach target functions
+  parsed$threads <- NULL
+  parsed$verbose <- NULL
+  
+  # If target does not have ..., only pass arguments it explicitly accepts
+  if (!has_dots) {
+    parsed <- parsed[intersect(names(parsed), fmls)]
+  }
 
   tryCatch(
     do.call(fn, parsed),
@@ -146,6 +160,5 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
       stop(conditionMessage(e), call. = FALSE)
     }
   )
-
   invisible(NULL)
 }
