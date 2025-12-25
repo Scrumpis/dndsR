@@ -121,7 +121,10 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   if (!exists("cli_parse_args", envir = ns, inherits = FALSE)) {
     stop("Internal error: cli_parse_args() not found in dndsR namespace.", call. = FALSE)
   }
-  parsed <- get("cli_parse_args", envir = ns, inherits = FALSE)(args)
+  if (!exists("parse_dnds_opts", envir = ns, inherits = FALSE)) {
+  stop("Internal error: parse_dnds_opts() not found in dndsR namespace.", call. = FALSE)
+  }
+  parsed <- get("parse_dnds_opts", envir = ns, inherits = FALSE)(args = args)
 
   if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
   if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
