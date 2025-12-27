@@ -35,6 +35,15 @@ Singularity:
 ```
 tools/dndsr-install install --engine singularity --sif dndsr.sif
 ```
+### Make dndsR findable and allow tab completion
+Unix
+```
+source ~/.bashrc
+```
+Mac
+```
+source ~/.zshrc
+```
 
 ## CLI Usage
 Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons. All functions will produce outputs for both the query and subject of a comparison by default.    
