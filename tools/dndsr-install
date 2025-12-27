@@ -1,0 +1,302 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die(){ echo "Error: $*" >&2; exit 1; }
+have(){ command -v "$1" >/dev/null 2>&1; }
+
+# Locations (standard)
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dndsr"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/dndsr"
+BIN_DIR="${HOME}/.local/bin"
+CONF_FILE="${CONF_DIR}/config.env"
+BASH_COMP_DIR="${HOME}/.local/share/bash-completion/completions"
+ZSH_COMP_DIR="${HOME}/.zsh/completions"
+
+usage(){
+cat <<'EOF'
+dndsr-install — install host shim + config to run dndsR from a container
+
+USAGE
+  tools/dndsr-install install --engine auto|docker|apptainer|singularity --image <docker_ref>
+  tools/dndsr-install install --engine auto|apptainer|singularity --sif <path/to/dndsr.sif>
+  tools/dndsr-install doctor
+  tools/dndsr-install uninstall
+
+WHAT IT DOES
+  - Writes config: ~/.config/dndsr/config.env
+  - Installs shim: ~/.local/bin/dndsr
+  - (Optional) installs completion for bash/zsh
+
+NOTES
+  - After install, you can delete the repo; dndsr will keep working.
+  - You may need to ensure ~/.local/bin is on PATH.
+
+EOF
+}
+
+detect_engine(){
+  # Prefer apptainer on HPC, else docker, else singularity
+  if have apptainer; then echo "apptainer"; return 0; fi
+  if have singularity; then echo "singularity"; return 0; fi
+  if have docker; then echo "docker"; return 0; fi
+  return 1
+}
+
+write_config(){
+  local engine="$1"
+  local image="${2:-}"
+  local sif="${3:-}"
+
+  mkdir -p "$CONF_DIR" "$DATA_DIR" "$BIN_DIR" || die "Failed creating install dirs"
+
+  # Basic sanity
+  case "$engine" in
+    docker|apptainer|singularity) ;;
+    *) die "Invalid engine: $engine" ;;
+  esac
+
+  if [[ "$engine" == "docker" ]]; then
+    [[ -n "$image" ]] || die "Docker engine requires --image <ref>"
+  else
+    [[ -n "$sif" ]] || die "Apptainer/Singularity requires --sif <path>"
+    [[ -f "$sif" ]] || die "SIF not found: $sif"
+  fi
+
+  cat >"$CONF_FILE" <<EOF
+# dndsr host shim config
+DNDSR_ENGINE=$engine
+DNDSR_IMAGE=${image}
+DNDSR_SIF=${sif}
+
+# Workdir inside container
+DNDSR_WORKDIR=/work
+
+# Extra bind mounts (comma-separated "host:container" pairs), optional:
+# DNDSR_BINDS=/scratch:/scratch,/mnt:/mnt
+
+# Extra engine args, optional:
+# DNDSR_EXTRA_ARGS=
+EOF
+  chmod 600 "$CONF_FILE" || true
+}
+
+write_shim(){
+  local shim="${BIN_DIR}/dndsr"
+  cat >"$shim" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+die(){ echo "Error: $*" >&2; exit 1; }
+have(){ command -v "$1" >/dev/null 2>&1; }
+
+CONF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/dndsr/config.env"
+[[ -f "$CONF_FILE" ]] || die "Missing config: $CONF_FILE. Run: dndsr-install install ..."
+
+# shellcheck disable=SC1090
+source "$CONF_FILE"
+
+ENGINE="${DNDSR_ENGINE:-}"
+WORKDIR="${DNDSR_WORKDIR:-/work}"
+BINDS="${DNDSR_BINDS:-}"
+EXTRA="${DNDSR_EXTRA_ARGS:-}"
+
+# Build bind args list
+bind_args=()
+if [[ -n "$BINDS" ]]; then
+  IFS=',' read -r -a pairs <<< "$BINDS"
+  for p in "${pairs[@]}"; do
+    [[ -n "$p" ]] || continue
+    case "$ENGINE" in
+      apptainer|singularity) bind_args+=( --bind "$p" ) ;;
+      docker)
+        # docker expects: -v host:container (if user uses same "host:container" format)
+        bind_args+=( -v "$p" )
+        ;;
+    esac
+  done
+fi
+
+# Always mount current working dir -> WORKDIR and run there
+PWD_REAL="$(pwd -P)"
+
+case "$ENGINE" in
+  apptainer|singularity)
+    have "$ENGINE" || die "Engine not found: $ENGINE"
+    [[ -n "${DNDSR_SIF:-}" ]] || die "DNDSR_SIF is empty in config"
+    [[ -f "$DNDSR_SIF" ]] || die "SIF not found: $DNDSR_SIF"
+
+    # shellcheck disable=SC2206
+    extra_args=(${EXTRA:-})
+
+    exec "$ENGINE" exec \
+      "${extra_args[@]}" \
+      --bind "${PWD_REAL}:${WORKDIR}" \
+      "${bind_args[@]}" \
+      "$DNDSR_SIF" \
+      bash -lc "cd '$WORKDIR' && dndsr \"\$@\"" bash "$@"
+    ;;
+
+  docker)
+    have docker || die "docker not found"
+    [[ -n "${DNDSR_IMAGE:-}" ]] || die "DNDSR_IMAGE is empty in config"
+
+    # shellcheck disable=SC2206
+    extra_args=(${EXTRA:-})
+
+    exec docker run --rm \
+      -u "$(id -u)":"$(id -g)" \
+      -v "${PWD_REAL}:${WORKDIR}" \
+      -w "${WORKDIR}" \
+      "${bind_args[@]}" \
+      "${extra_args[@]}" \
+      "$DNDSR_IMAGE" \
+      dndsr "$@"
+    ;;
+
+  *)
+    die "Unknown DNDSR_ENGINE='$ENGINE' in config ($CONF_FILE)"
+    ;;
+esac
+EOF
+  chmod +x "$shim" || die "Failed to chmod +x $shim"
+}
+
+install_completion(){
+  mkdir -p "$BASH_COMP_DIR" "$ZSH_COMP_DIR" || true
+
+  # Bash completion: complete subcommands at position 1 using `dndsr __commands`
+  cat >"${BASH_COMP_DIR}/dndsr" <<'EOF'
+# bash completion for dndsr
+_dndsr_complete() {
+  local cur prev
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  # complete subcommands (first arg)
+  if [[ $COMP_CWORD -eq 1 ]]; then
+    local cmds
+    cmds="$(dndsr __commands 2>/dev/null || true)"
+    COMPREPLY=( $(compgen -W "$cmds" -- "$cur") )
+    return 0
+  fi
+
+  # otherwise fall back to file completion (useful for -C comparisons.tsv etc.)
+  COMPREPLY=( $(compgen -f -- "$cur") )
+  return 0
+}
+complete -F _dndsr_complete dndsr
+EOF
+
+  # Zsh completion: simple subcommand completion
+  cat >"${ZSH_COMP_DIR}/_dndsr" <<'EOF'
+#compdef dndsr
+_dndsr() {
+  local -a cmds
+  cmds=("${(@f)$(dndsr __commands 2>/dev/null)}")
+  if (( CURRENT == 2 )); then
+    _describe 'command' cmds
+  else
+    _files
+  fi
+}
+_dndsr "$@"
+EOF
+}
+
+doctor(){
+  echo "=== dndsr host install doctor ==="
+  echo "Config:  $CONF_FILE"
+  if [[ ! -f "$CONF_FILE" ]]; then
+    echo "  <missing>"
+    exit 1
+  fi
+  # shellcheck disable=SC1090
+  source "$CONF_FILE"
+
+  echo "Engine:  ${DNDSR_ENGINE:-<unset>}"
+  echo "Image:   ${DNDSR_IMAGE:-<unset>}"
+  echo "SIF:     ${DNDSR_SIF:-<unset>}"
+  echo "Workdir: ${DNDSR_WORKDIR:-<unset>}"
+  echo
+
+  if [[ -x "${BIN_DIR}/dndsr" ]]; then
+    echo "Shim:    ${BIN_DIR}/dndsr (ok)"
+  else
+    echo "Shim:    ${BIN_DIR}/dndsr (missing/not executable)"
+  fi
+
+  case "${DNDSR_ENGINE:-}" in
+    docker) have docker && echo "docker:  found" || echo "docker:  missing" ;;
+    apptainer) have apptainer && echo "apptainer: found" || echo "apptainer: missing" ;;
+    singularity) have singularity && echo "singularity: found" || echo "singularity: missing" ;;
+    *) echo "engine: unknown" ;;
+  esac
+
+  echo
+  echo "[test] dndsr --help"
+  if "${BIN_DIR}/dndsr" --help >/dev/null 2>&1; then
+    echo "  ok"
+  else
+    echo "  failed (run '${BIN_DIR}/dndsr --help' to see error)"
+  fi
+}
+
+uninstall(){
+  rm -f "${BIN_DIR}/dndsr" || true
+  rm -f "${BASH_COMP_DIR}/dndsr" || true
+  rm -f "${ZSH_COMP_DIR}/_dndsr" || true
+  rm -f "${CONF_FILE}" || true
+  rmdir "$CONF_DIR" 2>/dev/null || true
+  echo "Uninstalled dndsr shim/config/completions."
+}
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  install)
+    engine="auto"; image=""; sif=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --engine) engine="${2:-}"; shift 2 ;;
+        --image)  image="${2:-}"; shift 2 ;;
+        --sif)    sif="${2:-}"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "Unknown arg: $1" ;;
+      esac
+    done
+
+    if [[ "$engine" == "auto" ]]; then
+      engine="$(detect_engine)" || die "Could not detect engine. Install apptainer/singularity or docker, or pass --engine."
+    fi
+
+    write_config "$engine" "$image" "$sif"
+    write_shim
+    install_completion || true
+
+    echo "Installed:"
+    echo "  config: ${CONF_FILE}"
+    echo "  shim:   ${BIN_DIR}/dndsr"
+    echo
+    echo "Next:"
+    echo "  Ensure ~/.local/bin is on PATH"
+    echo "  Restart your shell (for completion), then run: dndsr --help"
+    ;;
+
+  doctor)
+    doctor
+    ;;
+
+  uninstall)
+    uninstall
+    ;;
+
+  ""|-h|--help)
+    usage
+    ;;
+
+  *)
+    usage
+    die "Unknown command: $cmd"
+    ;;
+esac
