@@ -9,6 +9,7 @@ REPO_DIR="$(cd -P "${SCRIPT_DIR}/.." && pwd)"
 
 CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dndsr"
 CONF_FILE="${CONF_DIR}/config.env"
+CMDS_FILE="${CONF_DIR}/commands.txt"
 BIN_DIR="${HOME}/.local/bin"
 SHIM="${BIN_DIR}/dndsr"
 BASH_COMP_DIR="${HOME}/.local/share/bash-completion/completions"
@@ -49,21 +50,58 @@ detect_engine(){
   return 1
 }
 
+abspath(){
+  local p="$1"
+  [[ -n "$p" ]] || { echo ""; return 0; }
+
+  # Prefer realpath if available
+  if have realpath; then
+    realpath "$p"
+    return 0
+  fi
+  # Fallback: cd + pwd
+  if [[ -d "$p" ]]; then
+    (cd "$p" && pwd -P)
+  else
+    local d
+    d="$(dirname "$p")"
+    (cd "$d" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$p")")
+  fi
+}
+path_has_local_bin(){
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+detect_shell(){
+  if [[ -n "${SHELL:-}" ]]; then basename "$SHELL"; else echo "sh"; fi
+}
+
 write_config(){
   local engine="$1" sif="$2" image="$3" rlib="$4"
   mkdir -p "$CONF_DIR" "$BIN_DIR" || die "Failed to create install dirs"
 
+  # Canonicalize paths so config works from ANY working directory
+  local repo_abs rlib_abs sif_abs
+  repo_abs="$(abspath "$REPO_DIR")"
+  rlib_abs="$(abspath "$rlib")"
+  sif_abs=""
+  if [[ -n "$sif" ]]; then
+    sif_abs="$(abspath "$sif")"
+  fi
+
   cat >"$CONF_FILE" <<EOF
 # dndsr host shim config
 DNDSR_ENGINE=$engine
-DNDSR_SIF=$sif
+DNDSR_SIF=$sif_abs
 DNDSR_IMAGE=$image
 
 # Host library where dndsR will be installed (MUST be writable)
-DNDSR_RLIB=$rlib
+DNDSR_RLIB=$rlib_abs
 
 # Path to dndsR repo (used to install/update package)
-DNDSR_REPO=$REPO_DIR
+DNDSR_REPO=$repo_abs
 
 # Workdir inside container for runtime execution
 DNDSR_WORKDIR=/work
@@ -340,40 +378,56 @@ EOF
   chmod +x "$SHIM" || die "Failed to chmod +x $SHIM"
 }
 
+write_commands_cache(){
+  # Generate a stable command list ONCE at install time so completion does not
+  # depend on container availability / SIF path / engine.
+  mkdir -p "$CONF_DIR" || true
+
+  # Try to run the just-installed shim (which will install dndsR if needed)
+  if "$SHIM" __commands >/dev/null 2>&1; then
+    "$SHIM" __commands > "$CMDS_FILE" || true
+  else
+    # If it fails (engine not available yet), create empty file; user can re-run install later
+    : > "$CMDS_FILE"
+  fi
+}
+
 install_completion(){
   mkdir -p "$BASH_COMP_DIR" "$ZSH_COMP_DIR" || true
 
-  cat >"${BASH_COMP_DIR}/dndsr" <<'EOF'
+  cat >"${BASH_COMP_DIR}/dndsr" <<EOF
 # bash completion for dndsr (subcommands only)
+# Uses cached commands at: ${CMDS_FILE}
 _dndsr_complete() {
   local cur
-  cur="${COMP_WORDS[COMP_CWORD]}"
+  cur="\${COMP_WORDS[\${COMP_CWORD}]}"
 
-  if [[ $COMP_CWORD -eq 1 ]]; then
+  if [[ \${COMP_CWORD} -eq 1 ]]; then
     local cmds
-    cmds="$(dndsr __commands 2>/dev/null || true)"
-    COMPREPLY=( $(compgen -W "$cmds" -- "$cur") )
+    cmds="\$(cat "${CMDS_FILE}" 2>/dev/null || true)"
+    COMPREPLY=( \$(compgen -W "\$cmds" -- "\$cur") )
     return 0
   fi
 
-  COMPREPLY=( $(compgen -f -- "$cur") )
+  COMPREPLY=( \$(compgen -f -- "\$cur") )
   return 0
 }
 complete -F _dndsr_complete dndsr
 EOF
 
-  cat >"${ZSH_COMP_DIR}/_dndsr" <<'EOF'
+  cat >"${ZSH_COMP_DIR}/_dndsr" <<EOF
 #compdef dndsr
+# Uses cached commands at: ${CMDS_FILE}
 _dndsr() {
   local -a cmds
-  cmds=("${(@f)$(dndsr __commands 2>/dev/null)}")
+  cmds=( "\${(@f)\$(cat "${CMDS_FILE}" 2>/dev/null)}" )
   if (( CURRENT == 2 )); then
     _describe 'command' cmds
   else
     _files
   fi
 }
-_dndsr "$@"
+_dndsr "\$@"
 EOF
 }
 
@@ -399,6 +453,7 @@ uninstall(){
   rm -f "${BASH_COMP_DIR}/dndsr" || true
   rm -f "${ZSH_COMP_DIR}/_dndsr" || true
   rm -f "$CONF_FILE" || true
+  rm -f "$CMDS_FILE" || true
   rmdir "$CONF_DIR" 2>/dev/null || true
   echo "Uninstalled shim/config/completions."
 }
@@ -436,15 +491,55 @@ case "$cmd" in
 
     write_config "$engine" "$sif" "$image" "$rlib"
     write_shim
+    write_commands_cache
     install_completion || true
 
-    echo "Installed:"
-    echo "  config: $CONF_FILE"
-    echo "  shim:   $SHIM"
     echo
-    echo "Next:"
-    echo "  Ensure ~/.local/bin is on PATH, restart shell for completion,"
-    echo "  then run: dndsr --help"
+    echo "Installed dndsr CLI to:"
+    echo "  $SHIM"
+    echo
+    echo "Cached subcommands for completion:"
+    echo "  $CMDS_FILE"
+    echo
+    
+    if path_has_local_bin; then
+      echo "~/.local/bin is already on PATH"
+    else
+      echo "~/.local/bin is not on PATH"
+      shell="$(detect_shell)"
+      echo
+      case "$shell" in
+        bash|sh)
+          echo "Add it (bash):"
+          echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+          echo "  source ~/.bashrc"
+          ;;
+        zsh)
+          echo "Add it (zsh):"
+          echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+          echo "  source ~/.zshrc"
+          ;;
+        fish)
+          echo "Add it (fish):"
+          echo "  fish_add_path ~/.local/bin"
+          ;;
+        *)
+          echo "Add ~/.local/bin to your PATH in your shell config, then restart your shell."
+          ;;
+      esac
+      echo
+    fi
+    
+    echo "To enable completion in this shell, either open a new terminal or run:"
+    echo "  source ~/.bashrc   # bash"
+    echo "  source ~/.zshrc    # zsh"
+    echo
+    echo "If you previously got 'command not found', clear shell command cache:"
+    echo "  hash -r 2>/dev/null || true"
+    echo "  rehash 2>/dev/null || true"
+    echo
+    echo "Verify:"
+    echo "  dndsr --help"
     ;;
 
   doctor) doctor ;;
