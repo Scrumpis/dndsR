@@ -200,20 +200,45 @@ calculate_dnds <- function(comparison_file = NULL,
     }
 
     if (!("comparison_name" %in% names(df))) {
-      stop("comparison_file must include a 'comparison_name' column (or be headerless with comparison_name in column 1).",
-           call. = FALSE)
+      stop(
+        "comparison_file must include a 'comparison_name' column (or be headerless with comparison_name in column 1).",
+        call. = FALSE
+      )
     }
 
-    # Backward compatibility: accept old schema and ignore GFF columns
-    # New: accept direct mode (query_seq/subject_seq) OR pipeline mode (query_fasta/subject_fasta)
+    # Accept:
+    #  - Direct mode:   query_seq + subject_seq
+    #  - Pipeline mode: query_fasta + subject_fasta (optionally with query_gff/subject_gff present)
     has_direct   <- all(c("query_seq", "subject_seq") %in% names(df))
     has_pipeline <- all(c("query_fasta", "subject_fasta") %in% names(df))
 
     if (!has_direct && !has_pipeline) {
-      # headerless fallback: if at least 3 cols, assume comparison_name, query_fasta, subject_fasta
-      if (!is.data.frame(x) && ncol(df) >= 3 && !any(grepl("query_|subject_", names(df)))) {
-        names(df)[1:3] <- c("comparison_name", "query_fasta", "subject_fasta")
-        has_pipeline <- TRUE
+      # Headerless schema inference by column count.
+      # Supported headerless formats:
+      #   (A) 3-col "direct":   comparison_name, query_seq, subject_seq
+      #   (B) 5-col "pipeline": comparison_name, query_fasta, query_gff, subject_fasta, subject_gff
+      #
+      # NOTE: if a user supplies >5 columns headerless, we name the first 5 and leave the rest untouched.
+      headerless_like <- !any(grepl("^(query_|subject_)", names(df)))
+
+      if (!is.data.frame(x) && headerless_like) {
+        if (ncol(df) >= 5) {
+          names(df)[1:5] <- c("comparison_name", "query_fasta", "query_gff", "subject_fasta", "subject_gff")
+          has_pipeline <- TRUE
+        } else if (ncol(df) >= 3) {
+          names(df)[1:3] <- c("comparison_name", "query_seq", "subject_seq")
+          has_direct <- TRUE
+        } else {
+          stop(
+            paste0(
+              "comparison_file must include either:\n",
+              "* 3 columns: comparison_name, query_seq, subject_seq (direct mode), OR\n",
+              "* 5 columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff (pipeline mode).\n",
+              "Additional columns are allowed."
+            ),
+            call. = FALSE
+          )
+        }
       } else {
         stop(
           paste0(
