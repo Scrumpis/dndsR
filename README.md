@@ -70,8 +70,7 @@ singularity exec dndsr.sif ./dndsR-launcher run extract_cds \
 ### 3. Calculate dN/dS
 Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
 ```
-singularity exec dndsr.sif ./dndsR-launcher run calculate_dnds \
--C comparison_file.txt -t 80
+dndsr calculate_dnds -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
 ```
 ### 4. Append annotations
 Appends GFF annotation attributes, functional terms, seqname, start, and end values for both query and subject to dN/dS calculations based on gene_id.
