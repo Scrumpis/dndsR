@@ -17,6 +17,7 @@ Note: We currently recommend Docker and Singularity with CLI usage, however, if 
 ### Clone the Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
+cd dndsR
 ```
 ### Pull the Image
 Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr)  
@@ -28,6 +29,11 @@ singularity pull dndsr.sif docker://scrumpis/dndsr:latest
 Docker
 ```
 docker pull scrumpis/dndsr:latest
+```
+### Install
+Singularity:
+```
+tools/dndsr-install install --engine singularity --sif dndsr.sif
 ```
 
 ## CLI Usage
