@@ -89,6 +89,12 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   if (length(argv) > 0 && identical(argv[1], "--")) {
     argv <- argv[-1]
   }
+
+  # Hidden: print subcommands (for shell completion)
+  if (length(argv) > 0 && identical(argv[1], "__commands")) {
+    cat(paste(cli_list_commands(), collapse = "\n"), "\n")
+    return(invisible(NULL))
+  }
   
   if (length(argv) == 0 || argv[1] %in% c("-h", "--help", "help")) {
     cli_print_usage()
