@@ -35,12 +35,12 @@ Singularity:
 ```
 tools/dndsr-install install --engine singularity --sif dndsr.sif
 ```
-### Make dndsR findable and allow tab completion
-Unix
+Make dndsR findable and allow tab completion  
+Unix:
 ```
 source ~/.bashrc
 ```
-Mac
+Mac:
 ```
 source ~/.zshrc
 ```
@@ -58,25 +58,22 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. This is generally recommended for calculations between polyploid species so best matches occur between the same subgenome. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
-singularity exec dndsr.sif ./dndsR-launcher run split_comparisons \
--C comparison_file.txt -v -m subgenome
+dndsr split_comparisons -C comparison_file.txt
 ```
 ### 2. Extract CDS or Proteins
 Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff files for each species of each comparison in comparison_file.
 ```
-singularity exec dndsr.sif ./dndsR-launcher run extract_cds \
--C comparison_file.txt
+dndsr extract_cds -C comparison_file.txt
 ```
 ### 3. Calculate dN/dS
 Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
 ```
-dndsr calculate_dnds -C data/CheFo_vs_CheAl_full_fofn_split.txt -t 80
+dndsr calculate_dnds -C comparison_file.txt -t 80
 ```
 ### 4. Append annotations
 Appends GFF annotation attributes, functional terms, seqname, start, and end values for both query and subject to dN/dS calculations based on gene_id.
 ```
-singularity exec dndsr.sif ./dndsR-launcher run append_annotations \
--C comparison_file.txt -O . -v -t 8
+dndsr append_annotations -C comparison_file.txt -t 8
 ```
 ### 5. Annotation term enrichment
 Enrichment of IPR terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
