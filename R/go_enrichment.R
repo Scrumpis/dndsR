@@ -152,6 +152,8 @@ go_enrichment <- function(dnds_annot_file = NULL,
     invisible(NULL)
   }
 
+  .ensure_topgo_go_symbols
+  
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
 
