@@ -85,26 +85,49 @@ go_enrichment <- function(dnds_annot_file = NULL,
   }
 
   .ensure_topgo_go_symbols <- function() {
-    syms  <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
-    go_ns <- asNamespace("GO.db")
+    # If GO.db doesn't ship the historical maps, create compatible ones.
+    # We create AnnotationDbi "maps" using GOID2TERM filtered by ontology.
+    if (!requireNamespace("GO.db", quietly = TRUE)) stop("GO.db required", call. = FALSE)
+    if (!requireNamespace("AnnotationDbi", quietly = TRUE)) stop("AnnotationDbi required", call. = FALSE)
 
-    for (nm in syms) {
-      if (!exists(nm, envir = go_ns, inherits = FALSE)) {
-        stop("GO.db does not contain symbol: ", nm, call. = FALSE)
-      }
-      val <- get(nm, envir = go_ns, inherits = FALSE)
+    goenv <- asNamespace("GO.db")
 
-      # Put the object *inside* topGO's namespace so topGO's internal get() finds it
-      utils::assignInNamespace(nm, val, ns = "topGO")
+    # If they already exist in the current GO.db, nothing to do
+    if (exists("GOBPTerm", envir = goenv, inherits = FALSE) &&
+        exists("GOMFTerm", envir = goenv, inherits = FALSE) &&
+        exists("GOCCTerm", envir = goenv, inherits = FALSE)) {
+      return(invisible(NULL))
     }
 
-    # sanity check (optional but helpful)
-    tg_ns <- asNamespace("topGO")
-    missing <- syms[!vapply(syms, exists, logical(1), envir = tg_ns, inherits = FALSE)]
-    if (length(missing)) stop("Failed to inject into topGO namespace: ", paste(missing, collapse = ", "), call. = FALSE)
+    # We need: GOID -> TERM, and GOID -> Ontology membership.
+    # GO.db provides an SQLite-backed object GO.db::GO.db
+    gotbl <- AnnotationDbi::select(
+      GO.db::GO.db,
+      keys     = AnnotationDbi::keys(GO.db::GO.db, keytype = "GOID"),
+      keytype  = "GOID",
+      columns  = c("GOID", "TERM", "ONTOLOGY")
+    )
+
+    # Helper to build an AnnotationDbi-like map as a named character vector
+    .mk_map <- function(ont) {
+      sub <- gotbl[gotbl$ONTOLOGY == ont & !is.na(gotbl$TERM) & nzchar(gotbl$TERM), c("GOID","TERM")]
+      sub <- sub[!duplicated(sub$GOID), , drop = FALSE]
+      stats::setNames(sub$TERM, sub$GOID)
+    }
+
+    # Create the stand-ins
+    GOBPTerm <- .mk_map("BP")
+    GOMFTerm <- .mk_map("MF")
+    GOCCTerm <- .mk_map("CC")
+
+    # Inject into topGO's namespace so its internal get("GOBPTerm") works
+    utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "topGO")
+    utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "topGO")
+    utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "topGO")
 
     invisible(NULL)
   }
+
   .ensure_topgo_go_symbols()
 
   # extra args to pass to topGO::runTest()
