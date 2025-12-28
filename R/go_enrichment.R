@@ -86,37 +86,34 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
   .ensure_topgo_go_symbols <- function() {
     if (!requireNamespace("GO.db", quietly = TRUE)) stop("GO.db required", call. = FALSE)
-
     goenv <- asNamespace("GO.db")
 
-    # If GO.db already exports the legacy maps, do nothing
     if (exists("GOBPTerm", envir = goenv, inherits = FALSE) &&
         exists("GOMFTerm", envir = goenv, inherits = FALSE) &&
         exists("GOCCTerm", envir = goenv, inherits = FALSE)) {
       return(invisible(NULL))
     }
 
-    # Robust stand-in: GOID -> TERM map (AnnDbBimap)
-    # This matches what topGO historically used for term lookup.
-    term_map <- GO.db::GOID2TERM
+    term_map <- try(getFromNamespace("GOID2TERM", "GO.db"), silent = TRUE)
+    if (inherits(term_map, "try-error") || is.null(term_map)) {
+      term_map <- try(getFromNamespace("GOTERM", "GO.db"), silent = TRUE)
+    }
+    if (inherits(term_map, "try-error") || is.null(term_map)) {
+      stop("Could not find GO term map inside GO.db (neither GOID2TERM nor GOTERM).", call. = FALSE)
+    }
 
-    # Create the legacy names
     GOBPTerm <- term_map
     GOMFTerm <- term_map
     GOCCTerm <- term_map
 
-    # Make them visible wherever topGO might be trying to `get()` them
-    # 1) topGO namespace
     utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "topGO")
     utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "topGO")
     utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "topGO")
 
-    # 2) GO.db namespace (some topGO versions look there / assume they exist)
     utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "GO.db")
     utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "GO.db")
     utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "GO.db")
 
-    # 3) last-resort: global env (covers weird `get()` calls with envir=.GlobalEnv)
     assign("GOBPTerm", GOBPTerm, envir = .GlobalEnv)
     assign("GOMFTerm", GOMFTerm, envir = .GlobalEnv)
     assign("GOCCTerm", GOCCTerm, envir = .GlobalEnv)
