@@ -85,43 +85,72 @@ go_enrichment <- function(dnds_annot_file = NULL,
   }
 
   .ensure_topgo_go_symbols <- function() {
-    if (!requireNamespace("GO.db", quietly = TRUE)) stop("GO.db required", call. = FALSE)
-    goenv <- asNamespace("GO.db")
-
-    if (exists("GOBPTerm", envir = goenv, inherits = FALSE) &&
-        exists("GOMFTerm", envir = goenv, inherits = FALSE) &&
-        exists("GOCCTerm", envir = goenv, inherits = FALSE)) {
-      return(invisible(NULL))
+    if (!requireNamespace("GO.db", quietly = TRUE)) {
+      stop("GO.db required", call. = FALSE)
     }
-
-    term_map <- try(getFromNamespace("GOID2TERM", "GO.db"), silent = TRUE)
-    if (inherits(term_map, "try-error") || is.null(term_map)) {
-      term_map <- try(getFromNamespace("GOTERM", "GO.db"), silent = TRUE)
+  
+    # Make sure GO.db is ATTACHED (so package:GO.db exists on the search path)
+    if (!"package:GO.db" %in% search()) {
+      suppressPackageStartupMessages(
+        library("GO.db", quietly = TRUE, warn.conflicts = FALSE)
+      )
     }
-    if (inherits(term_map, "try-error") || is.null(term_map)) {
-      stop("Could not find GO term map inside GO.db (neither GOID2TERM nor GOTERM).", call. = FALSE)
+  
+    pkg_env <- as.environment("package:GO.db")
+  
+    # If GO.db already provides these, we're done
+    needed <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
+    have <- vapply(needed, exists, logical(1), envir = pkg_env, inherits = FALSE)
+    if (all(have)) return(invisible(NULL))
+  
+    # Fallback: use an available GOID->TERM mapping from GO.db
+    term_map <- NULL
+    if (exists("GOID2TERM", envir = pkg_env, inherits = TRUE)) {
+      term_map <- get("GOID2TERM", envir = pkg_env, inherits = TRUE)
+    } else if (exists("GOTERM", envir = pkg_env, inherits = TRUE)) {
+      term_map <- get("GOTERM", envir = pkg_env, inherits = TRUE)
+    } else {
+      # last resort: try namespace exports
+      term_map <- try(getFromNamespace("GOID2TERM", "GO.db"), silent = TRUE)
+      if (inherits(term_map, "try-error") || is.null(term_map)) {
+        term_map <- try(getFromNamespace("GOTERM", "GO.db"), silent = TRUE)
+      }
     }
-
-    GOBPTerm <- term_map
-    GOMFTerm <- term_map
-    GOCCTerm <- term_map
-
-    utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "topGO")
-    utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "topGO")
-    utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "topGO")
-
-    utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "GO.db")
-    utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "GO.db")
-    utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "GO.db")
-
-    assign("GOBPTerm", GOBPTerm, envir = .GlobalEnv)
-    assign("GOMFTerm", GOMFTerm, envir = .GlobalEnv)
-    assign("GOCCTerm", GOCCTerm, envir = .GlobalEnv)
-
+  
+    if (is.null(term_map) || inherits(term_map, "try-error")) {
+      stop("Could not find a GO term map inside GO.db (GOID2TERM/GOTERM).", call. = FALSE)
+    }
+  
+    # Create bindings in *attached* GO.db package env (this is the key!)
+    for (nm in needed) {
+      if (exists(nm, envir = pkg_env, inherits = FALSE)) {
+        # if locked, temporarily unlock
+        if (bindingIsLocked(nm, pkg_env)) unlockBinding(nm, pkg_env)
+        assign(nm, term_map, envir = pkg_env)
+        lockBinding(nm, pkg_env)
+      } else {
+        assign(nm, term_map, envir = pkg_env)
+        lockBinding(nm, pkg_env)
+      }
+    }
+  
+    # Also place them into topGO namespace if possible (extra safety)
+    if (requireNamespace("topGO", quietly = TRUE)) {
+      top_env <- asNamespace("topGO")
+      for (nm in needed) {
+        if (exists(nm, envir = top_env, inherits = FALSE)) {
+          if (bindingIsLocked(nm, top_env)) unlockBinding(nm, top_env)
+          assign(nm, term_map, envir = top_env)
+          lockBinding(nm, top_env)
+        } else {
+          assign(nm, term_map, envir = top_env)
+          lockBinding(nm, top_env)
+        }
+      }
+    }
+  
     invisible(NULL)
   }
-
-  .ensure_topgo_go_symbols()
 
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
