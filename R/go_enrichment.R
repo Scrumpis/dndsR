@@ -75,6 +75,84 @@ go_enrichment <- function(dnds_annot_file = NULL,
   suppressPackageStartupMessages(require("topGO"))
   suppressPackageStartupMessages(require("GO.db"))
 
+  # ------------------------------------------------------------------
+  # Patch topGO DAG builder to avoid: "EXPR must be a length 1 vector"
+  # This happens when relationship type is length > 1 (e.g. c("isa","partof")).
+  # We coerce relationship type to length-1 (prefer "isa" if present).
+  # Safe no-op if topGO internals change.
+  # ------------------------------------------------------------------
+  .patch_topgo_buildGOgraph <- function() {
+    ns <- try(asNamespace("topGO"), silent = TRUE)
+    if (inherits(ns, "try-error")) return(invisible(FALSE))
+    if (!exists("buildGOgraph.topology", envir = ns, inherits = FALSE)) return(invisible(FALSE))
+
+    buildGOgraph.topology.patched <- function(knownNodes, whichOnto = "BP") {
+      nodeLookUp <- new.env(hash = TRUE, parent = emptyenv())
+      GOOTerm <- get(paste("GO", whichOnto, "Term", sep = ""), mode = "environment")
+
+      isNodeInDAG <- function(node) {
+        exists(node, envir = nodeLookUp, mode = "logical", inherits = FALSE)
+      }
+      setNodeInDAG <- function(node) assign(node, TRUE, envir = nodeLookUp)
+
+      GOParents <- get(paste("GO", whichOnto, "PARENTS", sep = ""))
+      GENE.ONTO.ROOT <- as.character(revmap(GOParents)$all)
+      adjLookUP <- as.list(GOParents)
+
+      edgeEnv <- new.env(hash = TRUE, parent = emptyenv())
+
+      envAddEdge <- function(u, v, type) {
+        # ---- PATCH: force relationship type to length-1 ----
+        type <- as.character(type)
+        if (length(type) > 1L) {
+          type <- if ("isa" %in% type) "isa" else type[[1L]]
+        }
+        assign(v, switch(type, isa = 0, partof = 1, -1), envir = get(u, envir = edgeEnv))
+      }
+
+      buildInducedGraph <- function(node) {
+        if (isNodeInDAG(node)) return(1)
+        setNodeInDAG(node)
+        assign(node, new.env(hash = TRUE, parent = emptyenv()), envir = edgeEnv)
+        if (node == GENE.ONTO.ROOT) return(2)
+
+        adjNodes <- adjLookUP[[node]]
+        if (length(adjNodes) == 0) {
+          message("\n There are no adj nodes for node: ", node)
+          return(0)
+        }
+
+        for (i in seq_along(adjNodes)) {
+          x <- as.character(adjNodes[i])
+          envAddEdge(node, x, names(adjNodes[i]))
+          buildInducedGraph(x)
+        }
+        0
+      }
+
+      lapply(knownNodes, buildInducedGraph)
+
+      .graphNodes <- ls(edgeEnv)
+      .edgeList <- eapply(edgeEnv, function(adjEnv) {
+        aux <- as.list(adjEnv)
+        list(edges = match(names(aux), .graphNodes), weights = as.numeric(aux))
+      })
+
+      new("graphNEL", nodes = .graphNodes, edgeL = .edgeList, edgemode = "directed")
+    }
+
+    ok <- try(assignInNamespace("buildGOgraph.topology",
+                                buildGOgraph.topology.patched,
+                                ns = "topGO"),
+              silent = TRUE)
+    invisible(!inherits(ok, "try-error"))
+  }
+
+  .patch_topgo_buildGOgraph()
+
+  # ------------------------------------------------------------------
+  # Ensure topGO has the GO term maps it expects (GOBPTerm/GOMFTerm/GOCCTerm)
+  # ------------------------------------------------------------------
   .force_bind_safe <- function(sym, value, env) {
     if (environmentIsLocked(env)) return(invisible(FALSE))
     assign(sym, value, envir = env)
@@ -94,25 +172,19 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
     needed <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
     envs <- list(parent.frame(), .GlobalEnv)
-
     for (nm in needed) for (e in envs) .force_bind_safe(nm, term_map, e)
     invisible(NULL)
   }
 
   .ensure_topgo_go_terms()
 
-  message("[dndsR::go_enrichment] GOBPTerm exists? ",
-          exists("GOBPTerm", inherits = TRUE),
-          " | in package:GO.db? ",
-          exists("GOBPTerm", envir = as.environment("package:GO.db"), inherits = FALSE))
-                         
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
 
   sides      <- match.arg(sides,      c("query","subject"), several.ok = TRUE)
   ontologies <- match.arg(ontologies, c("BP","MF","CC"),    several.ok = TRUE)
-  algorithm <- as.character(algorithm)[1]
-  statistic <- as.character(statistic)[1]
+  algorithm  <- as.character(algorithm)[1]
+  statistic  <- as.character(statistic)[1]
   p_adjust   <- match.arg(p_adjust)
 
   # --- helpers ---
