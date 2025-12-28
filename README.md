@@ -79,28 +79,23 @@ dndsr append_annotations -C comparison_file.txt -t 8
 Enrichment of IPR terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 #### ipr_enrichment
 ```
-singularity exec dndsr.sif ./dndsR-launcher run ipr_enrichment \
--C comparison_file.txt -t 8 -v -O .
+dndsr ipr_enrichment -C comparison_file.txt -t 8
 ```
 #### go_enrichment
 TopGO enrichment of GO terms under positive selection.
 ```
-singularity exec dndsr.sif ./dndsR-launcher run go_enrichment \
--C comparison_file.txt -t 8 -v -O .
+dndsr go_enrichment -C comparison_file.txt -t 8
 ```
 #### term_enrichment
 General term enrichment. Fisher's Exact Test and multiple testing correction. Looks for non-IPR or GO terms like KEGG, PANTHER, etc. Optionally takes as input a custom pattern of interest to test for enrichment. 
 ```
-singularity exec dndsr.sif ./dndsR-launcher run term_enrichment \
--C comparison_file.txt -t 8 -v -O .
+dndsr term_enrichment -C comparison_file.txt -t 8
 ```
 ### 6. Selection pressure ideogram
 Visualizes dN/dS binned values accross a genome in an ideogram.
 ```
-singularity exec dndsr.sif ./dndsR-launcher run dnds_ideogram \
--C comparison_file.txt -t 8 -v -O .
+dndsr dnds_ideogram -C comparison_file.txt -t 8
 ```
-
 ### 7. Comparative Analysis
 The below is for making comparisons between dN/dS outputs.
 Outputs dN/dS distributions and stats between comparisons. Requires regions.bed of interest for analysis (will update to default to regionless, whole genome analysis with regional option).
