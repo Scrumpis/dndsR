@@ -86,16 +86,25 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
   .ensure_topgo_go_symbols <- function() {
     syms <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
-    ns <- asNamespace("GO.db")
+
+    go_ns   <- asNamespace("GO.db")
+    tg_ns   <- asNamespace("topGO")
+    tg_imp  <- parent.env(tg_ns)  # topGO imports env (lookup chain for get())
+
     for (nm in syms) {
-      val <- try(get(nm, envir = ns), silent = TRUE)
+      val <- try(get(nm, envir = go_ns), silent = TRUE)
       if (!inherits(val, "try-error")) {
-        assign(nm, val, envir = .GlobalEnv)  # overwrite to avoid stale objects
+        # Put it where topGO's internal get() can actually find it
+        try(assign(nm, val, envir = tg_imp), silent = TRUE)
+
+        # Optional extra fallback (doesn't hurt, but isn't sufficient alone)
+        assign(nm, val, envir = .GlobalEnv)
       }
     }
     invisible(NULL)
   }
   .ensure_topgo_go_symbols()
+
 
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
