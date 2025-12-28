@@ -72,29 +72,18 @@ go_enrichment <- function(dnds_annot_file = NULL,
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
 
-  # ---- topGO compatibility shim ----
-  # topGO is not namespace-safe in some versions; it may do get("GOBPTerm") in odd frames.
   suppressPackageStartupMessages(require("topGO"))
   suppressPackageStartupMessages(require("GO.db"))
 
-  .force_bind <- function(sym, value, env) {
-    # Only do lock/unlock for package/namespace envs
-    env_name <- tryCatch(environmentName(env), error = function(e) "")
-    is_pkg_env <- grepl("^(package:|namespace:)", env_name)
-
-    if (is_pkg_env && exists(sym, envir = env, inherits = FALSE) && bindingIsLocked(sym, env)) {
-      unlockBinding(sym, env)
-      assign(sym, value, envir = env)
-      lockBinding(sym, env)
-    } else {
-      assign(sym, value, envir = env)
-    }
+  .force_bind_safe <- function(sym, value, env) {
+    if (environmentIsLocked(env)) return(invisible(FALSE))
+    assign(sym, value, envir = env)
+    invisible(TRUE)
   }
 
   .ensure_topgo_go_terms <- function() {
     pkg_env <- as.environment("package:GO.db")
 
-    # Prefer GOTERM (typical), fallback GOID2TERM
     term_map <- try(get("GOTERM", envir = pkg_env, inherits = TRUE), silent = TRUE)
     if (inherits(term_map, "try-error") || is.null(term_map)) {
       term_map <- try(get("GOID2TERM", envir = pkg_env, inherits = TRUE), silent = TRUE)
@@ -104,16 +93,9 @@ go_enrichment <- function(dnds_annot_file = NULL,
     }
 
     needed <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
+    envs <- list(parent.frame(), .GlobalEnv)
 
-    # Bind into common lookup envs for non-namespaced get()
-    envs <- list(
-      parent.frame(),
-      .GlobalEnv,
-      pkg_env,
-      asNamespace("topGO")
-    )
-
-    for (nm in needed) for (e in envs) .force_bind(nm, term_map, e)
+    for (nm in needed) for (e in envs) .force_bind_safe(nm, term_map, e)
     invisible(NULL)
   }
 
