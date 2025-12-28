@@ -72,13 +72,30 @@ go_enrichment <- function(dnds_annot_file = NULL,
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
 
-  # IMPORTANT: topGO expects GO.db symbols like GOBPTerm/GOMFTerm/GOCCTerm on the search path.
-  # requireNamespace() loads the namespace but does not attach it.
+  # IMPORTANT:
+  # topGO internally resolves GO.db symbols (GOBPTerm/GOMFTerm/GOCCTerm) via get()
+  # without namespace qualification. Depending on topGO version / code path, it may
+  # not reliably search attached namespaces. We therefore:
+  #  1) attach GO.db (side-effect required for topGO)
+  #  2) provide a robust fallback by aliasing these symbols into .GlobalEnv
   if (!"package:GO.db" %in% search()) {
     suppressPackageStartupMessages(
-      library("GO.db", character.only = TRUE, quietly = TRUE, warn.conflicts = FALSE)
+      library("GO.db", quietly = TRUE, warn.conflicts = FALSE)
     )
   }
+
+  .ensure_topgo_go_symbols <- function() {
+    syms <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
+    ns <- asNamespace("GO.db")
+    for (nm in syms) {
+      val <- try(get(nm, envir = ns), silent = TRUE)
+      if (!inherits(val, "try-error")) {
+        assign(nm, val, envir = .GlobalEnv)  # overwrite to avoid stale objects
+      }
+    }
+    invisible(NULL)
+  }
+  .ensure_topgo_go_symbols()
 
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
