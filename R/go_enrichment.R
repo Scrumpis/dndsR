@@ -85,50 +85,44 @@ go_enrichment <- function(dnds_annot_file = NULL,
   }
 
   .ensure_topgo_go_symbols <- function() {
-    # If GO.db doesn't ship the historical maps, create compatible ones.
-    # We create AnnotationDbi "maps" using GOID2TERM filtered by ontology.
     if (!requireNamespace("GO.db", quietly = TRUE)) stop("GO.db required", call. = FALSE)
-    if (!requireNamespace("AnnotationDbi", quietly = TRUE)) stop("AnnotationDbi required", call. = FALSE)
 
     goenv <- asNamespace("GO.db")
 
-    # If they already exist in the current GO.db, nothing to do
+    # If GO.db already exports the legacy maps, do nothing
     if (exists("GOBPTerm", envir = goenv, inherits = FALSE) &&
         exists("GOMFTerm", envir = goenv, inherits = FALSE) &&
         exists("GOCCTerm", envir = goenv, inherits = FALSE)) {
       return(invisible(NULL))
     }
 
-    # We need: GOID -> TERM, and GOID -> Ontology membership.
-    # GO.db provides an SQLite-backed object GO.db::GO.db
-    gotbl <- AnnotationDbi::select(
-      GO.db::GO.db,
-      keys     = AnnotationDbi::keys(GO.db::GO.db, keytype = "GOID"),
-      keytype  = "GOID",
-      columns  = c("GOID", "TERM", "ONTOLOGY")
-    )
+    # Robust stand-in: GOID -> TERM map (AnnDbBimap)
+    # This matches what topGO historically used for term lookup.
+    term_map <- GO.db::GOID2TERM
 
-    # Helper to build an AnnotationDbi-like map as a named character vector
-    .mk_map <- function(ont) {
-      sub <- gotbl[gotbl$ONTOLOGY == ont & !is.na(gotbl$TERM) & nzchar(gotbl$TERM), c("GOID","TERM")]
-      sub <- sub[!duplicated(sub$GOID), , drop = FALSE]
-      stats::setNames(sub$TERM, sub$GOID)
-    }
+    # Create the legacy names
+    GOBPTerm <- term_map
+    GOMFTerm <- term_map
+    GOCCTerm <- term_map
 
-    # Create the stand-ins
-    GOBPTerm <- .mk_map("BP")
-    GOMFTerm <- .mk_map("MF")
-    GOCCTerm <- .mk_map("CC")
-
-    # Inject into topGO's namespace so its internal get("GOBPTerm") works
+    # Make them visible wherever topGO might be trying to `get()` them
+    # 1) topGO namespace
     utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "topGO")
     utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "topGO")
     utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "topGO")
 
+    # 2) GO.db namespace (some topGO versions look there / assume they exist)
+    utils::assignInNamespace("GOBPTerm", GOBPTerm, ns = "GO.db")
+    utils::assignInNamespace("GOMFTerm", GOMFTerm, ns = "GO.db")
+    utils::assignInNamespace("GOCCTerm", GOCCTerm, ns = "GO.db")
+
+    # 3) last-resort: global env (covers weird `get()` calls with envir=.GlobalEnv)
+    assign("GOBPTerm", GOBPTerm, envir = .GlobalEnv)
+    assign("GOMFTerm", GOMFTerm, envir = .GlobalEnv)
+    assign("GOCCTerm", GOCCTerm, envir = .GlobalEnv)
+
     invisible(NULL)
   }
-
-  .ensure_topgo_go_symbols()
 
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
