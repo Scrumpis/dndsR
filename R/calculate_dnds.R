@@ -170,64 +170,94 @@ calculate_dnds <- function(comparison_file = NULL,
 
   # ---- helper: read comparison table (whitespace-delimited) ----
   .read_comparisons <- function(x) {
+
+    # ---- helper: read whitespace-delimited ----
+    read_ws <- function(hdr) {
+      utils::read.table(
+        x,
+        header = hdr,
+        sep = "",
+        quote = "\"",
+        stringsAsFactors = FALSE,
+        comment.char = "",
+        strip.white = TRUE,
+        blank.lines.skip = TRUE,
+        check.names = FALSE
+      )
+    }
+  
+    # ---- data.frame passthrough ----
     if (is.data.frame(x)) {
       df <- x
     } else {
-      read_ws <- function(hdr) {
-        utils::read.table(
-          x,
-          header = hdr,
-          sep = "",
-          quote = "\"",
-          stringsAsFactors = FALSE,
-          comment.char = "",
-          strip.white = TRUE,
-          blank.lines.skip = TRUE,
-          check.names = FALSE
-        )
+  
+      # ---- peek first non-empty line to detect header ----
+      first_line <- ""
+      con <- file(x, open = "r")
+      on.exit(close(con), add = TRUE)
+  
+      while (length(first_line) == 0) {
+        first_line <- readLines(con, n = 1)
+        if (length(first_line) == 0) break
+        first_line <- trimws(first_line)
+        if (first_line == "") first_line <- ""
       }
-      df1 <- try(read_ws(TRUE), silent = TRUE)
-      if (!inherits(df1, "try-error")) {
-        df <- df1
-      } else {
-        df <- read_ws(FALSE)
+  
+      has_header <- FALSE
+      if (nzchar(first_line)) {
+        toks <- strsplit(first_line, "\\s+")[[1]]
+        has_header <- any(toks %in% c(
+          "comparison_name",
+          "query_seq", "subject_seq",
+          "query_fasta", "subject_fasta",
+          "query_gff", "subject_gff"
+        ))
       }
+  
+      df <- read_ws(has_header)
     }
-
+  
+    # ---- ensure comparison_name exists ----
     if (!("comparison_name" %in% names(df))) {
-      # headerless fallback: assume first col is comparison_name
-      if (ncol(df) >= 1) names(df)[1] <- "comparison_name"
+      if (ncol(df) >= 1) {
+        names(df)[1] <- "comparison_name"
+      }
     }
-
+  
     if (!("comparison_name" %in% names(df))) {
       stop(
-        "comparison_file must include a 'comparison_name' column (or be headerless with comparison_name in column 1).",
+        "comparison_file must include a 'comparison_name' column ",
+        "(or be headerless with comparison_name in column 1).",
         call. = FALSE
       )
     }
-
-    # Accept:
-    #  - Direct mode:   query_seq + subject_seq
-    #  - Pipeline mode: query_fasta + subject_fasta (optionally with query_gff/subject_gff present)
+  
+    # ---- determine mode ----
     has_direct   <- all(c("query_seq", "subject_seq") %in% names(df))
     has_pipeline <- all(c("query_fasta", "subject_fasta") %in% names(df))
-
+  
+    # ---- headerless schema inference ----
     if (!has_direct && !has_pipeline) {
-      # Headerless schema inference by column count.
-      # Supported headerless formats:
-      #   (A) 3-col "direct":   comparison_name, query_seq, subject_seq
-      #   (B) 5-col "pipeline": comparison_name, query_fasta, query_gff, subject_fasta, subject_gff
-      #
-      # NOTE: if a user supplies >5 columns headerless, we name the first 5 and leave the rest untouched.
+  
       headerless_like <- !any(grepl("^(query_|subject_)", names(df)))
-
+  
       if (!is.data.frame(x) && headerless_like) {
+  
         if (ncol(df) >= 5) {
-          names(df)[1:5] <- c("comparison_name", "query_fasta", "query_gff", "subject_fasta", "subject_gff")
+          names(df)[1:5] <- c(
+            "comparison_name",
+            "query_fasta", "query_gff",
+            "subject_fasta", "subject_gff"
+          )
           has_pipeline <- TRUE
+  
         } else if (ncol(df) >= 3) {
-          names(df)[1:3] <- c("comparison_name", "query_seq", "subject_seq")
+          names(df)[1:3] <- c(
+            "comparison_name",
+            "query_seq", "subject_seq"
+          )
           has_direct <- TRUE
+  
         } else {
           stop(
             paste0(
@@ -239,6 +269,7 @@ calculate_dnds <- function(comparison_file = NULL,
             call. = FALSE
           )
         }
+  
       } else {
         stop(
           paste0(
@@ -251,7 +282,7 @@ calculate_dnds <- function(comparison_file = NULL,
         )
       }
     }
-
+  
     df
   }
 
