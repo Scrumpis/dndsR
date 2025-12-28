@@ -85,26 +85,27 @@ go_enrichment <- function(dnds_annot_file = NULL,
   }
 
   .ensure_topgo_go_symbols <- function() {
-    syms <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
-
-    go_ns   <- asNamespace("GO.db")
-    tg_ns   <- asNamespace("topGO")
-    tg_imp  <- parent.env(tg_ns)  # topGO imports env (lookup chain for get())
+    syms  <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
+    go_ns <- asNamespace("GO.db")
 
     for (nm in syms) {
-      val <- try(get(nm, envir = go_ns), silent = TRUE)
-      if (!inherits(val, "try-error")) {
-        # Put it where topGO's internal get() can actually find it
-        try(assign(nm, val, envir = tg_imp), silent = TRUE)
-
-        # Optional extra fallback (doesn't hurt, but isn't sufficient alone)
-        assign(nm, val, envir = .GlobalEnv)
+      if (!exists(nm, envir = go_ns, inherits = FALSE)) {
+        stop("GO.db does not contain symbol: ", nm, call. = FALSE)
       }
+      val <- get(nm, envir = go_ns, inherits = FALSE)
+
+      # Put the object *inside* topGO's namespace so topGO's internal get() finds it
+      utils::assignInNamespace(nm, val, ns = "topGO")
     }
+
+    # sanity check (optional but helpful)
+    tg_ns <- asNamespace("topGO")
+    missing <- syms[!vapply(syms, exists, logical(1), envir = tg_ns, inherits = FALSE)]
+    if (length(missing)) stop("Failed to inject into topGO namespace: ", paste(missing, collapse = ", "), call. = FALSE)
+
     invisible(NULL)
   }
   .ensure_topgo_go_symbols()
-
 
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
