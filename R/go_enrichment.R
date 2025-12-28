@@ -111,8 +111,8 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
   sides      <- match.arg(sides,      c("query","subject"), several.ok = TRUE)
   ontologies <- match.arg(ontologies, c("BP","MF","CC"),    several.ok = TRUE)
-  algorithm  <- match.arg(algorithm)
-  statistic  <- match.arg(statistic)
+  algorithm <- as.character(algorithm)[1]
+  statistic <- as.character(statistic)[1]
   p_adjust   <- match.arg(p_adjust)
 
   # --- helpers ---
@@ -148,10 +148,16 @@ go_enrichment <- function(dnds_annot_file = NULL,
 
   .expand_descendants <- function(seeds, ontology, depth = Inf, limit = Inf) {
     if (!length(seeds)) return(seeds)
+
+    ontology <- as.character(ontology)
+    if (length(ontology) != 1L) ontology <- ontology[[1L]]
+
     child_map <- switch(ontology,
                         BP = GO.db::GOBPCHILDREN,
                         MF = GO.db::GOMFCHILDREN,
-                        CC = GO.db::GOCCCHILDREN)
+                        CC = GO.db::GOCCCHILDREN,
+                        stop("Unknown ontology: ", ontology, call. = FALSE))
+
     seen <- unique(seeds)
     frontier <- unique(seeds)
     cur_depth <- 0L
@@ -217,6 +223,9 @@ go_enrichment <- function(dnds_annot_file = NULL,
   base_exclude_set <- .build_exclude_set(exclude_gos)
 
   .run_one <- function(d, side, ont, comp, comp_dir, topgo_args = NULL) {
+    ont <- as.character(ont)
+    if (length(ont) != 1L) ont <- ont[[1L]]
+
     prefix <- if (side == "query") "q_" else "s_"
     id_col <- if (side == "query") "query_id" else "subject_id"
     go_col <- paste0(prefix, "go")
