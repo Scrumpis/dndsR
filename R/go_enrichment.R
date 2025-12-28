@@ -72,88 +72,58 @@ go_enrichment <- function(dnds_annot_file = NULL,
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
 
-  # IMPORTANT:
-  # topGO internally resolves GO.db symbols (GOBPTerm/GOMFTerm/GOCCTerm) via get()
-  # without namespace qualification. Depending on topGO version / code path, it may
-  # not reliably search attached namespaces. We therefore:
-  #  1) attach GO.db (side-effect required for topGO)
-  #  2) provide a robust fallback by aliasing these symbols into .GlobalEnv
-  if (!"package:GO.db" %in% search()) {
-    suppressPackageStartupMessages(
-      library("GO.db", quietly = TRUE, warn.conflicts = FALSE)
-    )
+  # ---- topGO compatibility shim ----
+  # topGO is not namespace-safe in some versions; it may do get("GOBPTerm") in odd frames.
+  suppressPackageStartupMessages(require("topGO"))
+  suppressPackageStartupMessages(require("GO.db"))
+
+  .force_bind <- function(sym, value, env) {
+    # Only do lock/unlock for package/namespace envs
+    env_name <- tryCatch(environmentName(env), error = function(e) "")
+    is_pkg_env <- grepl("^(package:|namespace:)", env_name)
+
+    if (is_pkg_env && exists(sym, envir = env, inherits = FALSE) && bindingIsLocked(sym, env)) {
+      unlockBinding(sym, env)
+      assign(sym, value, envir = env)
+      lockBinding(sym, env)
+    } else {
+      assign(sym, value, envir = env)
+    }
   }
 
-  .ensure_topgo_go_symbols <- function() {
-    if (!requireNamespace("GO.db", quietly = TRUE)) {
-      stop("GO.db required", call. = FALSE)
-    }
-  
-    # Make sure GO.db is ATTACHED (so package:GO.db exists on the search path)
-    if (!"package:GO.db" %in% search()) {
-      suppressPackageStartupMessages(
-        library("GO.db", quietly = TRUE, warn.conflicts = FALSE)
-      )
-    }
-  
+  .ensure_topgo_go_terms <- function() {
     pkg_env <- as.environment("package:GO.db")
-  
-    # If GO.db already provides these, we're done
+
+    # Prefer GOTERM (typical), fallback GOID2TERM
+    term_map <- try(get("GOTERM", envir = pkg_env, inherits = TRUE), silent = TRUE)
+    if (inherits(term_map, "try-error") || is.null(term_map)) {
+      term_map <- try(get("GOID2TERM", envir = pkg_env, inherits = TRUE), silent = TRUE)
+    }
+    if (inherits(term_map, "try-error") || is.null(term_map)) {
+      stop("Could not locate GOTERM/GOID2TERM in GO.db; GO.db install looks broken.", call. = FALSE)
+    }
+
     needed <- c("GOBPTerm", "GOMFTerm", "GOCCTerm")
-    have <- vapply(needed, exists, logical(1), envir = pkg_env, inherits = FALSE)
-    if (all(have)) return(invisible(NULL))
-  
-    # Fallback: use an available GOID->TERM mapping from GO.db
-    term_map <- NULL
-    if (exists("GOID2TERM", envir = pkg_env, inherits = TRUE)) {
-      term_map <- get("GOID2TERM", envir = pkg_env, inherits = TRUE)
-    } else if (exists("GOTERM", envir = pkg_env, inherits = TRUE)) {
-      term_map <- get("GOTERM", envir = pkg_env, inherits = TRUE)
-    } else {
-      # last resort: try namespace exports
-      term_map <- try(getFromNamespace("GOID2TERM", "GO.db"), silent = TRUE)
-      if (inherits(term_map, "try-error") || is.null(term_map)) {
-        term_map <- try(getFromNamespace("GOTERM", "GO.db"), silent = TRUE)
-      }
-    }
-  
-    if (is.null(term_map) || inherits(term_map, "try-error")) {
-      stop("Could not find a GO term map inside GO.db (GOID2TERM/GOTERM).", call. = FALSE)
-    }
-  
-    # Create bindings in *attached* GO.db package env (this is the key!)
-    for (nm in needed) {
-      if (exists(nm, envir = pkg_env, inherits = FALSE)) {
-        # if locked, temporarily unlock
-        if (bindingIsLocked(nm, pkg_env)) unlockBinding(nm, pkg_env)
-        assign(nm, term_map, envir = pkg_env)
-        lockBinding(nm, pkg_env)
-      } else {
-        assign(nm, term_map, envir = pkg_env)
-        lockBinding(nm, pkg_env)
-      }
-    }
-  
-    # Also place them into topGO namespace if possible (extra safety)
-    if (requireNamespace("topGO", quietly = TRUE)) {
-      top_env <- asNamespace("topGO")
-      for (nm in needed) {
-        if (exists(nm, envir = top_env, inherits = FALSE)) {
-          if (bindingIsLocked(nm, top_env)) unlockBinding(nm, top_env)
-          assign(nm, term_map, envir = top_env)
-          lockBinding(nm, top_env)
-        } else {
-          assign(nm, term_map, envir = top_env)
-          lockBinding(nm, top_env)
-        }
-      }
-    }
-  
+
+    # Bind into common lookup envs for non-namespaced get()
+    envs <- list(
+      parent.frame(),
+      .GlobalEnv,
+      pkg_env,
+      asNamespace("topGO")
+    )
+
+    for (nm in needed) for (e in envs) .force_bind(nm, term_map, e)
     invisible(NULL)
   }
 
-  .ensure_topgo_go_symbols
-  
+  .ensure_topgo_go_terms()
+
+  message("[dndsR::go_enrichment] GOBPTerm exists? ",
+          exists("GOBPTerm", inherits = TRUE),
+          " | in package:GO.db? ",
+          exists("GOBPTerm", envir = as.environment("package:GO.db"), inherits = FALSE))
+                         
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
 
