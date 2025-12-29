@@ -89,7 +89,8 @@ term_enrichment <- function(dnds_annot_file = NULL,
                               "attributes","attribute","attr","notes","note","description",
                               "product","name","id","gene_id","transcript_id","parent",
                               "dbxref","source","target","type","seqname","seqid",
-                              "start","end","strand","phase","biotype","class","len"
+                              "start","end","strand","phase","biotype","class","len",
+                              "gff_start","gff_end","gff_seqname"
                             ),
                             exclude_ids = NULL,
                             term_trees = NULL,
