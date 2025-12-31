@@ -4,15 +4,16 @@
 #' \code{<comp>_dnds.tsv}, \code{<comp>_dnds_annot.tsv}, or \code{<comp>_merged.tsv}),
 #' derives genomic coordinates for \code{query_id}/\code{subject_id} from the
 #' provided GFFs (first attribute match per ID), writes a temporary
-#' \code{<comp>/<comp>_ideogram_input.tsv} containing \code{q_chr},
-#' \code{q_gene_start}, \code{s_chr}, \code{s_gene_start}, and then generates
+#' \code{<comp>/<comp>_ideogram_input.tsv} containing \code{q_gff_seqname},
+#' \code{q_gff_start}, \code{s_gff_seqname}, \code{s_gff_start}, and then generates
 #' chromosome ideograms per side with two heatmaps: inverted negative selection
 #' (\code{dNdS < 1}) overlaid, and positive selection (\code{dNdS >= 1}) as the
 #' label heatmap. Outputs are \code{<comp>_{query|subject}_ideogram.{svg,png}}.
 #'
-#' @param dnds_annot_file Path to a single prebuilt intermediate table that
-#'   already contains \code{q_chr/q_gene_start} or \code{s_chr/s_gene_start}
-#'   (single mode). Most users should prefer batch mode via \code{comparison_file}.
+#' @param dnds_annot_file Path to a single prebuilt table that already contains
+#'   \code{q_gff_seqname/q_gff_start} and/or \code{s_gff_seqname/s_gff_start}
+#'   (single mode), such as a \code{<comp>_dnds_annot.tsv}. Most users should prefer
+#'   batch mode via \code{comparison_file}.
 #' @param comparison_file Whitespace-delimited file with columns:
 #'   \code{comparison_name}, \code{query_fasta}, \code{query_gff},
 #'   \code{subject_fasta}, \code{subject_gff}. (Header optional.) In batch mode,
@@ -20,13 +21,15 @@
 #'   \code{file.path(output_dir, comparison_name)} using the first existing among
 #'   \code{<comp>_dnds.tsv}, \code{<comp>_dnds_annot.tsv}, \code{<comp>_merged.tsv},
 #'   build the intermediate by joining coordinates from the GFFs, and plot.
+#' @param query_fasta Single mode: FASTA for the query side (required if \code{sides} includes "query").
+#' @param subject_fasta Single mode: FASTA for the subject side (required if \code{sides} includes "subject").
 #' @param output_dir Root directory containing per-comparison folders in batch
 #'   mode. Default: current working directory.
 #' @param sides Character vector among \code{c("query","subject")}. Default both.
 #' @param window_size Integer window size (bp) for binning genes (default \code{300000}).
 #' @param max_dnds Drop rows with \code{dNdS >= max_dnds} or \code{NA} (default \code{10}).
 #' @param filter_expr Optional character with a logical expression evaluated in
-#'   the augmented table (e.g. \code{"q_chr == s_chr"}). Rows failing are removed.
+#'   the augmented table (e.g. \code{"q_gff_seqname == s_gff_seqname"}). Rows failing are removed.
 #'   (No chromosome mapping is performed; this is a raw filter.)
 #' @param make_png Logical; if \code{TRUE} (default) also write a PNG via \code{convertSVG()}.
 #' @param overwrite Logical; if \code{FALSE} (default) skip when outputs exist.
@@ -59,6 +62,8 @@
 #' @export
 dnds_ideogram <- function(dnds_annot_file = NULL,
                           comparison_file  = NULL,
+                          query_fasta      = NULL,
+                          subject_fasta    = NULL,
                           output_dir       = getwd(),
                           sides            = c("query","subject"),
                           window_size      = 300000,
@@ -90,6 +95,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
                       stringsAsFactors = FALSE, comment.char = "",
                       strip.white = TRUE, blank.lines.skip = TRUE, check.names = FALSE)
   }
+
   .read_comparisons <- function(x) {
     req <- c("comparison_name","query_fasta","query_gff","subject_fasta","subject_gff")
     if (is.data.frame(x)) { stopifnot(all(req %in% names(x))); return(x[, req, drop = FALSE]) }
@@ -100,6 +106,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     names(df2)[1:5] <- req
     df2[, req, drop = FALSE]
   }
+
   .ensure_fai <- function(fasta) {
     fai <- paste0(fasta, ".fai")
     if (!file.exists(fai)) {
@@ -108,6 +115,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     }
     fai
   }
+
   # Keep RAW names (no digit stripping). RIdeogram accepts arbitrary labels.
   .read_karyotype <- function(fai_path) {
     fai <- utils::read.table(fai_path, sep = "\t", header = FALSE,
@@ -120,6 +128,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
       stringsAsFactors = FALSE
     )
   }
+
   .order_by_karyotype <- function(tbl, karyo, chr_col = "Chr") {
     if (!nrow(tbl)) return(tbl)
     lev <- karyo$Chr
@@ -129,6 +138,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     tbl[[chr_col]] <- as.character(tbl[[chr_col]])
     tbl
   }
+
   .normalize_chr <- function(x,
                              strip_chr0 = FALSE,
                              strip_lead = NULL,
@@ -150,6 +160,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     }
     out
   }
+
   .gff_index <- function(gff_path, restrict_gene = FALSE) {
     if (!file.exists(gff_path)) die("GFF not found: %s", gff_path)
     g <- try(utils::read.table(gff_path, sep = "\t", quote = "", comment.char = "#",
@@ -184,15 +195,18 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     rownames(df) <- df$id
     df
   }
+
+  # Write coords using the same schema as *_dnds_annot.tsv: {q,s}_gff_seqname/{q,s}_gff_start
   .augment_with_coords <- function(d, id_map, id_col, out_prefix) {
     miss <- setdiff(id_col, names(d))
     if (length(miss)) die("Input missing required column(s): %s", paste(miss, collapse = ", "))
     ids <- d[[id_col]]
     m   <- id_map[ids, , drop = FALSE]
-    d[[paste0(out_prefix, "_chr")]]        <- m$chr
-    d[[paste0(out_prefix, "_gene_start")]] <- m$start
+    d[[paste0(out_prefix, "_gff_seqname")]] <- m$chr
+    d[[paste0(out_prefix, "_gff_start")]]   <- m$start
     d
   }
+
   .find_dnds_table <- function(comp_dir, comp) {
     candidates <- file.path(comp_dir, c(
       sprintf("%s_dnds.tsv", comp),
@@ -203,6 +217,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     if (!any(ex)) return(NA_character_)
     candidates[which(ex)[1]]
   }
+
   # Crop output SVG to remove bottom white space
   crop_svg_by_bottom_margin <- function(svg, cut_px) {
     root <- xml2::xml_root(svg)
@@ -272,7 +287,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     d <- d[keep, , drop = FALSE]
     if (!nrow(d)) { req_cli("No rows after dNdS filtering -> skip"); return(character(0)) }
 
-    need <- c(sprintf("%s_chr", short), sprintf("%s_gene_start", short))
+    need <- c(sprintf("%s_gff_seqname", short), sprintf("%s_gff_start", short))
     if (!all(need %in% names(d))) die("Internal error: expected coord columns %s in intermediate.", paste(need, collapse = ", "))
 
     # Optional user filter (raw logical; no mapping implied)
@@ -285,8 +300,8 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     if (!nrow(d)) { req_cli("No rows after filter_expr -> skip"); return(character(0)) }
 
     # Transform + windowing
-    chr_col   <- sprintf("%s_chr", short)
-    start_col <- sprintf("%s_gene_start", short)
+    chr_col   <- sprintf("%s_gff_seqname", short)
+    start_col <- sprintf("%s_gff_start", short)
     ln        <- log(d$dNdS + 1)
     d$ln_dNdS      <- ln
     d$ln_neg_dNdS  <- ifelse(d$dNdS >= 1, NA_real_, ln)
@@ -313,7 +328,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     if (!nrow(win)) { req_cli("No windows formed -> skip"); return(character(0)) }
 
     # Karyotype (RAW names), then optional normalization for both karyotype & win
-    #karyotype <- .fasta_karyotype(fasta)
     fai <- .ensure_fai(fasta)
     karyotype <- .read_karyotype(fai)
 
@@ -377,6 +391,11 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
     do.call(RIdeogram::ideogram, c(base_args, ideogram_args))
 
+    # ---- cleanup stray Rplots.pdf from RIdeogram/base graphics ----
+    if (file.exists("Rplots.pdf")) {
+      suppressWarnings(file.remove("Rplots.pdf"))
+    }
+
     if (!file.exists("chromosome.svg")) die("RIdeogram did not write chromosome.svg")
     svg <- xml2::read_xml("chromosome.svg")
     tn  <- xml2::xml_find_all(svg, ".//text")
@@ -400,24 +419,13 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     lab_nodes <- tn[xml2::xml_text(tn) %in% chr_names]
     if (length(lab_nodes)) {
 
-      # helpers: parse translate(...) and compute absolute X
+      # helpers: parse translate(...)
       parse_tx <- function(tr) {
         if (is.na(tr) || !nzchar(tr)) return(0)
         m <- regmatches(tr, regexpr("translate\\s*\\(([^)]*)\\)", tr))
         if (!length(m)) return(0)
         nums <- as.numeric(strsplit(sub(".*\\(([^)]*)\\).*", "\\1", m), "[ ,]+")[[1]])
         if (length(nums) >= 1 && is.finite(nums[1])) nums[1] else 0
-      }
-      abs_x <- function(node) {
-        x <- suppressWarnings(as.numeric(xml2::xml_attr(node, "x"))); if (is.na(x)) x <- 0
-        cur <- node
-        repeat {
-          x <- x + parse_tx(xml2::xml_attr(cur, "transform"))
-          par <- xml2::xml_parent(cur)
-          if (inherits(par, "xml_missing")) break
-          cur <- par
-        }
-        x
       }
 
       # average glyph width in em for Arial-ish fonts; adjust if needed
@@ -438,22 +446,14 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
         xml2::xml_attr(node, "text-anchor") <- "middle"
         xml2::xml_attr(node, "dx") <- NULL  # avoid compounding shifts
 
-        # compute an adjustment so the label is centered *around its current placement*
-        # If RIdeogram used left-edge (start), shift right by ~half text width.
-        # If it used right-edge (end), shift left by ~half text width.
-        # If it already used middle, no shift needed.
         half_px <- 0.5 * nchar_txt * fs * char_width_em
         dx <- switch(tolower(old_anchor),
                      "start"  =  +half_px,
                      "end"    =  -half_px,
                      "middle" =  0,
-                     # unknown -> assume start
-                     +half_px
-        )
-
+                     +half_px)
         dx <- dx - 4
 
-        # Apply dx via a local translate that preserves Y and all ancestors.
         old_tr <- xml2::xml_attr(node, "transform")
         new_tr <- if (!is.na(old_tr) && nzchar(old_tr)) {
           sprintf("translate(%g,0) %s", dx, old_tr)
@@ -469,28 +469,22 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
     root <- xml2::xml_root(svg)
 
-    # Ensure viewBox exists; if not, synthesize from width/height
     vb <- xml2::xml_attr(root, "viewBox")
     if (is.na(vb) || !nzchar(vb)) {
       w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
       h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-      if (is.na(w) || is.na(h)) {
-        # fallback to a reasonable default if dimensions are missing
-        w <- 1200; h <- 800
-      }
+      if (is.na(w) || is.na(h)) { w <- 1200; h <- 800 }
       xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
       vb <- xml2::xml_attr(root, "viewBox")
     }
 
-    # Shift min-y up by y_pad and extend height by y_pad
     nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
     if (length(nums) == 4) {
-      nums[2] <- nums[2] - y_pad   # minY becomes negative -> adds top space
-      nums[4] <- nums[4] + y_pad   # increase viewBox height
+      nums[2] <- nums[2] - y_pad
+      nums[4] <- nums[4] + y_pad
       xml2::xml_attr(root, "viewBox") <- paste(nums, collapse = " ")
     }
 
-    # If explicit pixel height is set, bump it so nothing is clipped when exporting
     old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
     if (!is.na(old_h)) {
       xml2::xml_attr(root, "height") <- paste0(old_h + y_pad, "px")
@@ -499,7 +493,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     # === Solid white background behind everything (robust) ===
     root <- xml2::xml_root(svg)
 
-    # 1) Ensure viewBox exists, then parse it
     vb <- xml2::xml_attr(root, "viewBox")
     if (is.na(vb) || !nzchar(vb)) {
       w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
@@ -512,13 +505,9 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     stopifnot(length(nums) == 4)
     minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
 
-    # 2) Remove any previous bg rect(s)
     xml2::xml_find_all(root, ".//rect[@id='svg-bg-rect']") |> xml2::xml_remove()
-
-    # 3) Find the FIRST non-<defs> child directly under <svg>
     first_draw <- xml2::xml_find_first(root, "./*[not(self::defs)][1]")
 
-    # 4) Build the background node as a tiny fragment and insert it
     bg_markup <- sprintf(
       "<rect id='svg-bg-rect' x='%g' y='%g' width='%g' height='%g' fill='#ffffff' fill-opacity='1' stroke='none' pointer-events='none'/>",
       minX, minY, vw, vh
@@ -526,13 +515,13 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     bg_node <- xml2::read_xml(bg_markup)
 
     if (!inherits(first_draw, "xml_missing")) {
-      # Insert BEFORE the first drawable child so it paints underneath everything else
       xml2::xml_add_sibling(first_draw, bg_node, .where = "before")
     } else {
-      # No drawable children? Just append under <svg>; it will be the only child anyway
       xml2::xml_add_child(root, bg_node)
     }
+
     svg <- crop_svg_by_bottom_margin(svg, cut_px = 350)
+
     # --- save & return ---
     xml2::write_xml(svg, "chromosome.svg")
     file.rename("chromosome.svg", out_svg)
@@ -550,6 +539,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
   # ---------- batch vs single ----------
   outs <- character(0)
 
+  # -------- batch mode --------
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
     for (i in seq_len(nrow(df))) {
@@ -579,16 +569,16 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
         D <- .augment_with_coords(D, s_map, "subject_id", "s")
 
         # Optional normalization of chr labels in the intermediate (opt-in; raw by default)
-        D$q_chr <- .normalize_chr(D$q_chr,
-                                  strip_chr0 = chr_strip_leading_chr0,
-                                  strip_lead = chr_strip_leading,
-                                  strip_trail= chr_strip_trailing,
-                                  ci = chr_case_insensitive)
-        D$s_chr <- .normalize_chr(D$s_chr,
-                                  strip_chr0 = chr_strip_leading_chr0,
-                                  strip_lead = chr_strip_leading,
-                                  strip_trail= chr_strip_trailing,
-                                  ci = chr_case_insensitive)
+        D$q_gff_seqname <- .normalize_chr(D$q_gff_seqname,
+                                          strip_chr0 = chr_strip_leading_chr0,
+                                          strip_lead = chr_strip_leading,
+                                          strip_trail= chr_strip_trailing,
+                                          ci = chr_case_insensitive)
+        D$s_gff_seqname <- .normalize_chr(D$s_gff_seqname,
+                                          strip_chr0 = chr_strip_leading_chr0,
+                                          strip_lead = chr_strip_leading,
+                                          strip_trail= chr_strip_trailing,
+                                          ci = chr_case_insensitive)
 
         utils::write.table(D, inter_path, sep = "\t", row.names = FALSE, quote = FALSE)
       } else {
@@ -613,16 +603,52 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     return(invisible(stats::na.omit(outs)))
   }
 
-  # single mode (expects a prebuilt intermediate with q_/s_ coords; choose exactly one side)
-  #if (is.null(dnds_merged_file)) die("Provide either comparison_file (batch) OR dnds_merged_file (single).")
-  #if (!file.exists(dnds_merged_file)) die("dnds_merged_file not found: %s", dnds_merged_file)
-  #if (length(sides) != 1L) die("Single mode requires exactly one 'side' in 'sides'.")
+  # -------- single mode --------
   if (is.null(dnds_annot_file)) die("Provide either comparison_file (batch) OR dnds_annot_file (single).")
   if (!file.exists(dnds_annot_file)) die("dnds_annot_file not found: %s", dnds_annot_file)
-  if (length(sides) != 1L) die("Single mode requires exactly one 'side' in 'sides'.")
 
-  # Require caller to provide the correct side's FASTA via a wrapper/CLI; this
-  # exported function is primarily intended for batch mode.
-  stop("Single-mode expects prebuilt intermediate and a FASTA supplied by a wrapper. ",
-       "Run via batch (comparison_file) or build your own wrapper that calls .one_side().")
+  for (sd in sides) {
+    if (sd == "query") {
+      if (is.null(query_fasta) || !file.exists(query_fasta)) {
+        die("Single mode: sides includes 'query' but query_fasta is missing or not found.")
+      }
+      outs <- c(outs, .one_side(
+        merged_path = dnds_annot_file,
+        side = "query",
+        fasta = query_fasta,
+        window_size = window_size,
+        max_dnds = max_dnds,
+        filter_expr = filter_expr,
+        make_png = make_png,
+        overwrite = overwrite,
+        chr_strip_leading_chr0 = chr_strip_leading_chr0,
+        chr_strip_leading = chr_strip_leading,
+        chr_strip_trailing = chr_strip_trailing,
+        chr_case_insensitive = chr_case_insensitive,
+        ideogram_args = ideogram_dots
+      ))
+    } else if (sd == "subject") {
+      if (is.null(subject_fasta) || !file.exists(subject_fasta)) {
+        die("Single mode: sides includes 'subject' but subject_fasta is missing or not found.")
+      }
+      outs <- c(outs, .one_side(
+        merged_path = dnds_annot_file,
+        side = "subject",
+        fasta = subject_fasta,
+        window_size = window_size,
+        max_dnds = max_dnds,
+        filter_expr = filter_expr,
+        make_png = make_png,
+        overwrite = overwrite,
+        chr_strip_leading_chr0 = chr_strip_leading_chr0,
+        chr_strip_leading = chr_strip_leading,
+        chr_strip_trailing = chr_strip_trailing,
+        chr_case_insensitive = chr_case_insensitive,
+        ideogram_args = ideogram_dots
+      ))
+    }
+  }
+
+  if (verbose) message("Single-mode ideogram(s) complete.")
+  return(invisible(stats::na.omit(outs)))
 }
