@@ -176,10 +176,28 @@ go_enrichment <- function(dnds_annot_file = NULL,
     objs <- AnnotationDbi::mget(ids, GO.db::GOTERM, ifnotfound = NA)
 
     keep <- vapply(objs, function(o) {
-      if (all(is.na(o))) return(FALSE)       # missing from GO.db
-      oo <- o[[1L]]
-      if (isTRUE(GO.db::Obsolete(oo))) return(FALSE)
-      identical(GO.db::Ontology(oo), ont)
+      # o can be:
+      # - an S4 GOTerms object
+      # - NA
+      # - a list (older behavior) whose first element is GOTerms or NA
+
+      # unwrap list if needed
+      if (is.list(o)) {
+        if (!length(o)) return(FALSE)
+        o <- o[[1L]]
+      }
+
+      # missing?
+      if (length(o) == 1L && isTRUE(is.na(o))) return(FALSE)
+
+      # must be a GOTerms S4 object
+      if (!methods::is(o, "GOTerms")) return(FALSE)
+
+      # drop obsolete
+      if (isTRUE(GO.db::Obsolete(o))) return(FALSE)
+
+      # ontology match
+      identical(GO.db::Ontology(o), ont)
     }, logical(1))
 
     ids[keep]
