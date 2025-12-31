@@ -139,6 +139,7 @@ Can use special characters or spaces in path if quoted in the comparison_file
 - ggplot::aes_string deprecated
 - Update Rvignette with test dataset
 - Cleanup documentation
+- List global short flags in help (-C comparison_file, -t threads, etc)
 - Add forest plot function and other grand analyses
 - Remove helper functions from help in CLI
 - Ensure docker image contains all dependencies of all optional functions
