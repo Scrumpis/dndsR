@@ -172,35 +172,39 @@ go_enrichment <- function(dnds_annot_file = NULL,
     ids <- unique(as.character(ids))
     ids <- ids[!is.na(ids) & nzchar(ids)]
     if (!length(ids)) return(character(0))
-
-    objs <- AnnotationDbi::mget(ids, GO.db::GOTERM, ifnotfound = NA)
-
+  
+    # 1) Obsolete IDs (GOOBSOLETE maps GOID -> obsolete term string)
+    # If an ID is present as a key in GOOBSOLETE, treat it as obsolete.
+    is_obsolete <- setNames(rep(FALSE, length(ids)), ids)
+    obs <- AnnotationDbi::mget(ids, GO.db::GOOBSOLETE, ifnotfound = NA)
+    is_obsolete[names(obs)] <- vapply(obs, function(x) {
+      # x may be NA (atomic) or character; never S4
+      is.atomic(x) && length(x) == 1L && isTRUE(is.na(x)) == FALSE
+    }, logical(1))
+  
+    ids2 <- ids[!is_obsolete[ids]]
+    if (!length(ids2)) return(character(0))
+  
+    # 2) Fetch GO term objects and keep only those that exist + match ontology
+    objs <- AnnotationDbi::mget(ids2, GO.db::GOTERM, ifnotfound = NA)
+  
     keep <- vapply(objs, function(o) {
-      # o can be:
-      # - an S4 GOTerms object
-      # - NA
-      # - a list (older behavior) whose first element is GOTerms or NA
-
-      # unwrap list if needed
+      # unwrap list if needed (older behaviors)
       if (is.list(o)) {
         if (!length(o)) return(FALSE)
         o <- o[[1L]]
       }
-
-      # missing?
-      if (length(o) == 1L && isTRUE(is.na(o))) return(FALSE)
-
-      # must be a GOTerms S4 object
+  
+      # missing term: atomic NA (avoid is.na on S4)
+      if (is.atomic(o) && length(o) == 1L && isTRUE(is.na(o))) return(FALSE)
+  
+      # must be GOTerms S4 object
       if (!methods::is(o, "GOTerms")) return(FALSE)
-
-      # drop obsolete
-      if (isTRUE(GO.db::Obsolete(o))) return(FALSE)
-
-      # ontology match
+  
       identical(GO.db::Ontology(o), ont)
     }, logical(1))
-
-    ids[keep]
+  
+    ids2[keep]
   }
 
   # Build gene2GO mapping, ontology-aware and GO.db-aware
