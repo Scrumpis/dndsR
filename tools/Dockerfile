@@ -44,7 +44,7 @@ ENV BSPM_DISABLE=1
 ENV MAKEFLAGS="-j$(nproc)"
 
 # ============================================================
-# R dependencies (CRAN FIRST -> fail early if RIdeogram/graphics stack breaks)
+# R dependencies
 # ============================================================
 
 # remotes + BiocManager (cheap)
