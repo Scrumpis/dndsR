@@ -7,17 +7,20 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # ============================================================
 # Base system libs (graphics + dev headers)
+#   - Add pkg-config + librsvg2-dev + libwebp-dev to fix rsvg/ragg/RIdeogram
 # ============================================================
 RUN set -eux; \
   apt-get update -qq; \
   apt-get install -y --no-install-recommends \
     ca-certificates gnupg2 curl wget git make g++ \
+    pkg-config \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     zlib1g-dev libbz2-dev liblzma-dev \
     libpcre2-dev libreadline-dev \
-    libpng-dev libjpeg-dev libtiff5-dev \
+    libpng-dev libjpeg-dev libtiff5-dev libwebp-dev \
     libcairo2-dev libxt-dev libfontconfig1-dev libfreetype6-dev \
     libharfbuzz-dev libfribidi-dev bzip2 \
+    librsvg2-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
@@ -34,6 +37,57 @@ RUN set -eux; \
     fi; \
   done
 ENV BSPM_DISABLE=1
+
+# ============================================================
+# Fail-fast + faster compilation (when it must compile)
+# ============================================================
+ENV MAKEFLAGS="-j$(nproc)"
+
+# ============================================================
+# R dependencies (CRAN FIRST -> fail early if RIdeogram/graphics stack breaks)
+# ============================================================
+
+# remotes + BiocManager (cheap)
+RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); install.packages(c('remotes','BiocManager'))"
+
+# ---- CRAN first (runtime deps only; remove dev-only packages) ----
+# Note: devtools/pkgdown are not needed for a production/runtime deps image.
+RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
+  install.packages(c( \
+    'cli','data.table','optparse','xml2','ggplot2','dplyr','testthat','knitr','rmarkdown', \
+    'RIdeogram','doParallel','foreach','ape','Rdpack','benchmarkme','svglite', \
+    'sysfonts','showtext','showtextdb' \
+  )); \
+  missing <- c('RIdeogram','svglite','sysfonts','showtext')[ \
+    !vapply(c('RIdeogram','svglite','sysfonts','showtext'), requireNamespace, logical(1), quietly=TRUE) ]; \
+  if (length(missing)) stop('Missing CRAN packages after install: ', paste(missing, collapse=', '))"
+
+# ---- Bioconductor (slow, after CRAN succeeds) ----
+RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
+  BiocManager::install(c( \
+    'AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures', \
+    'GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO', \
+    'IHW','qvalue','rtracklayer','pwalign','txdbmaker' \
+  ), update=FALSE, ask=FALSE); \
+  missing <- c('AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures','GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO','IHW','qvalue','rtracklayer','pwalign','txdbmaker')[ \
+    !vapply(c('AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures','GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO','IHW','qvalue','rtracklayer','pwalign','txdbmaker'), requireNamespace, logical(1), quietly=TRUE) ]; \
+  if (length(missing)) stop('Missing Bioc packages after install: ', paste(missing, collapse=', '))"
+
+# ---- GitHub runtime deps (fail fast) ----
+RUN R -q -e "options(warn=2); remotes::install_github(c( \
+    'drostlab/metablastr','drostlab/rdiamond','drostlab/orthologr' \
+  ), upgrade='never'); \
+  missing <- c('metablastr','rdiamond','orthologr')[ \
+    !vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE) ]; \
+  if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
+
+# Final sanity check (cheap)
+RUN Rscript -e "stopifnot( \
+  requireNamespace('RIdeogram', quietly=TRUE), \
+  requireNamespace('topGO', quietly=TRUE), \
+  requireNamespace('GO.db', quietly=TRUE), \
+  requireNamespace('GenomicFeatures', quietly=TRUE) \
+)"
 
 # ============================================================
 # Micromamba environment (python + OrthoFinder toolchain)
@@ -65,30 +119,9 @@ RUN set -eux; \
 
 ENV PATH=/usr/local/bin:$MAMBA_ROOT_PREFIX/envs/tools/bin:$PATH
 
-# ============================================================
-# R/Bioconductor dependencies
-# ============================================================
-RUN R -q -e "install.packages(c('remotes','BiocManager'), Ncpus=2)"
-
-RUN R -q -e "BiocManager::install(c( \
-    'AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures', \
-    'GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO', \
-    'IHW','qvalue','rtracklayer','pwalign','txdbmaker' \
-  ), update=FALSE, ask=FALSE, Ncpus=2)"
-
-RUN R -q -e "install.packages(c( \
-    'cli','data.table','optparse','xml2','ggplot2','dplyr','testthat','knitr','rmarkdown', \
-    'RIdeogram','doParallel','foreach','ape','Rdpack','benchmarkme','devtools','svglite', \
-    'sysfonts','showtext','showtextdb' \
-  ), Ncpus=2)"
-
-RUN R -q -e "remotes::install_github(c( \
-    'drostlab/metablastr','drostlab/rdiamond','drostlab/orthologr' \
-  ), upgrade='never')"
-
 WORKDIR /work
 CMD ["bash"]
 
 LABEL \
   org.opencontainers.image.source="https://github.com/scrumpis/dndsr" \
-  org.opencontainers.image.description="dndsR runtime (R 4.5 + Bioconductor + OrthoFinder toolchain)"
+  org.opencontainers.image.description="dndsR runtime dependencies (R/Bioc + OrthoFinder toolchain)"
