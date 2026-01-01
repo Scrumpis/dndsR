@@ -15,7 +15,7 @@
 #' @param pos_threshold Numeric; dNdS > pos_threshold defines "positive" (default 1).
 #' @param max_dnds Drop rows with dNdS >= max_dnds or NA (default 10).
 #' @param filter_expr Optional character filter evaluated in the data
-#'   (e.g., "q_seqname == s_seqname").
+#'   (e.g., "q_gff_seqname == s_gff_seqname").
 #' @param drop_rows_without_go If TRUE (default), universe is genes with >=1 GO for that side.
 #' @param node_min Minimum term size (topGO nodeSize) to keep (default 10).
 #' @param node_max Maximum term size (filtered after test; default Inf).
@@ -36,7 +36,7 @@
 #'   `ties.method`, etc. Core arguments `object`, `algorithm`, and `statistic`
 #'   are always set by dndsR and cannot be overridden.
 #'
-#' @return Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
+#' @return Invisibly: vector of output TSV paths (batch or single).
 #' @export
 go_enrichment <- function(
   dnds_annot_file = NULL,
@@ -76,14 +76,27 @@ go_enrichment <- function(
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
 
+  # NOTE: topGO creates required GO term environments (GOBPTerm/GOMFTerm/GOCCTerm)
+  # only when attached; requireNamespace() is insufficient.
+  suppressPackageStartupMessages(require("topGO", character.only = TRUE))
+  suppressPackageStartupMessages(require("GO.db", character.only = TRUE))
+
+  ok_terms <- exists("GOBPTerm", envir = as.environment("package:topGO"), inherits = FALSE) &&
+              exists("GOMFTerm", envir = as.environment("package:topGO"), inherits = FALSE) &&
+              exists("GOCCTerm", envir = as.environment("package:topGO"), inherits = FALSE)
+
+  if (!ok_terms) {
+    stop("topGO term environments (GOBPTerm/GOMFTerm/GOCCTerm) were not created on attach.", call. = FALSE)
+  }
+
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
 
-  sides      <- match.arg(sides, c("query", "subject"), several.ok = TRUE)
-  ontologies <- match.arg(ontologies, c("BP", "MF", "CC"), several.ok = TRUE)
-  algorithm  <- match.arg(algorithm)
-  statistic  <- match.arg(statistic)
-  p_adjust   <- match.arg(p_adjust, c("none", "BH"))
+  sides      <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
+  ontologies <- match.arg(ontologies, choices = c("BP", "MF", "CC"), several.ok = TRUE)
+  algorithm  <- match.arg(algorithm, choices = c("weight01", "elim", "classic", "weight"))
+  statistic  <- match.arg(statistic, choices = c("fisher", "ks"))
+  p_adjust   <- match.arg(p_adjust, choices = c("none", "BH"))
 
   # --- helpers ---
   .read_ws <- function(path, header_try = TRUE) {
@@ -118,15 +131,26 @@ go_enrichment <- function(
 
   .apply_filter <- function(d) {
     keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
+
     if (!is.null(filter_expr) && nzchar(filter_expr)) {
-      ok <- try(
-        eval(parse(text = filter_expr), envir = d, enclos = parent.frame()),
-        silent = TRUE
-      )
-      if (!inherits(ok, "try-error")) {
-        keep <- keep & isTRUE(as.vector(ok))
+      ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
+
+      if (inherits(ok, "try-error")) {
+        warning("[go_enrichment] filter_expr failed: ", filter_expr, call. = FALSE)
+      } else {
+        ok <- as.logical(ok)
+
+        if (length(ok) == 1L) ok <- rep(ok, nrow(d))
+
+        if (length(ok) != nrow(d)) {
+          warning("[go_enrichment] filter_expr returned length ", length(ok),
+                  " but expected ", nrow(d), "; ignoring filter.", call. = FALSE)
+        } else {
+          keep <- keep & ok
+        }
       }
     }
+
     d[keep, , drop = FALSE]
   }
 
@@ -171,7 +195,8 @@ go_enrichment <- function(
           sprintf(
             "Descendant exclusion capped at %d nodes for ontology %s.",
             limit, ontology
-          )
+          ),
+          call. = FALSE
         )
         seen <- unique(seen)[seq_len(limit)]
         break
@@ -198,7 +223,7 @@ go_enrichment <- function(
     ids
   }
 
-  # Filter GO IDs to (exists in GO.db::GOTERM) AND (not obsolete) AND (matches ontology)
+  # Filter GO IDs to: not obsolete (GOOBSOLETE) and ontology matches (GO.db via select()).
   .filter_go_ids_to_ontology <- function(ids, ont) {
     ids <- unique(as.character(ids))
     ids <- ids[!is.na(ids) & nzchar(ids)]
@@ -262,12 +287,6 @@ go_enrichment <- function(
           ont, raw_n, filt_n, sum(keep), length(ids)
         )
       )
-      message(
-        sprintf(
-          "  [go_enrichment] %s: raw_GO_tokens=%d kept_GO_tokens=%d genes_with_%s_GO=%d/%d",
-          ont, raw_n, filt_n, ont, sum(keep), length(ids)
-        )
-      )
     }
 
     list(
@@ -302,24 +321,24 @@ go_enrichment <- function(
 
   base_exclude_set <- .build_exclude_set(exclude_gos)
 
-  .run_one <- function(d, side, ont, comp, comp_dir, topgo_args = NULL) {
+  .run_one <- function(d, side, ont, comp, comp_dir, runTest_args = NULL) {
     ont <- as.character(ont)
     if (length(ont) != 1L) ont <- ont[[1L]]
 
-    prefix <- if (side == "query") "q_" else "s_"
     id_col <- if (side == "query") "query_id" else "subject_id"
-    go_col <- paste0(prefix, "go")
-    if (!(go_col %in% names(d)) || !is.character(d[[go_col]])) return(NULL)
+    go_col <- if (side == "query") "q_go" else "s_go"
+    if (!(go_col %in% names(d))) return(NULL)
+    d[[go_col]] <- as.character(d[[go_col]])
 
     d <- .apply_filter(d)
     if (!nrow(d)) return(NULL)
-
-    pos_ids <- d[[id_col]][d$dNdS > pos_threshold]
 
     if (drop_rows_without_go) {
       d <- d[!is.na(d[[go_col]]) & d[[go_col]] != "", , drop = FALSE]
     }
     if (!nrow(d)) return(NULL)
+
+    pos_ids <- d[[id_col]][d$dNdS > pos_threshold]
 
     exclude_set_run <- base_exclude_set
     if (isTRUE(exclude_descendants) &&
@@ -346,6 +365,8 @@ go_enrichment <- function(
     if (!length(gene2GO)) return(NULL)
 
     universe <- unique(names(gene2GO))
+    pos_ids <- intersect(pos_ids, universe)
+
     geneList <- factor(as.integer(universe %in% pos_ids))
     names(geneList) <- universe
 
@@ -358,15 +379,16 @@ go_enrichment <- function(
       nodeSize = as.integer(node_min)
     )
 
-    if (is.null(topgo_args)) topgo_args <- list()
+    if (is.null(runTest_args)) runTest_args <- list()
     protected <- c("object", "algorithm", "statistic")
-    bad <- intersect(names(topgo_args), protected)
+    bad <- intersect(names(runTest_args), protected)
     if (length(bad)) {
       warning(
         "[dndsR::go_enrichment] Ignoring arguments in ... that conflict with core topGO::runTest params: ",
-        paste(bad, collapse = ", ")
+        paste(bad, collapse = ", "),
+        call. = FALSE
       )
-      topgo_args[bad] <- NULL
+      runTest_args[bad] <- NULL
     }
 
     run_args <- list(
@@ -374,7 +396,7 @@ go_enrichment <- function(
       algorithm = algorithm,
       statistic = statistic
     )
-    res <- do.call(topGO::runTest, c(run_args, topgo_args))
+    res <- do.call(topGO::runTest, c(run_args, runTest_args))
 
     raw_scores <- topGO::score(res)
     all_terms <- names(raw_scores)
@@ -441,6 +463,7 @@ go_enrichment <- function(
     }
 
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
+    if (n_pos == 0L) return(NULL)
     n_all <- length(geneList)
     enrichment <- (sig_counts / n_pos) / (annotated / n_all)
 
@@ -529,7 +552,7 @@ go_enrichment <- function(
   .run_comp <- function(comp, comp_dir) {
     in_file <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) {
-      warning("Missing annotated file: ", in_file)
+      warning("Missing annotated file: ", in_file, call. = FALSE)
       return(character(0))
     }
     d <- utils::read.table(
@@ -543,7 +566,7 @@ go_enrichment <- function(
     paths <- character(0)
     for (sd in sides) {
       for (ont in ontologies) {
-        p <- .run_one(d, sd, ont, comp, comp_dir, topgo_args = topgo_dots)
+        p <- .run_one(d, sd, ont, comp, comp_dir, runTest_args = topgo_dots)
         if (!is.null(p)) paths <- c(paths, p)
       }
     }
@@ -586,7 +609,7 @@ go_enrichment <- function(
   outs <- character(0)
   for (sd in sides) {
     for (ont in ontologies) {
-      p <- .run_one(d, sd, ont, comp_name, comp_dir, topgo_args = topgo_dots)
+      p <- .run_one(d, sd, ont, comp_name, comp_dir, runTest_args = topgo_dots)
       if (!is.null(p)) outs <- c(outs, p)
     }
   }
