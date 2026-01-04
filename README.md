@@ -143,7 +143,6 @@ Can use special characters or spaces in path if quoted in the comparison_file
 - Add forest plot function and other grand analyses
 - Remove helper functions from help in CLI
 - Ensure docker image contains all dependencies of all optional functions
-- Verify these are unusused and rebuild image: Biogenerics, IRanges, S4Vectors, optparse, readr
 - Change regional analysis name. Can focus regions, but can do whole genome summaries too.
   - Change default to regions_bed = NULL
 - Check if below is needed anymore
