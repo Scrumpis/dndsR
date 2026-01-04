@@ -246,18 +246,30 @@ go_enrichment <- function(
 
     # ---- keep only IDs that exist in GO.db and match ontology via select() ----
     tab <- try(
-      AnnotationDbi::select(
-        GO.db::GO.db,
-        keys = ids2,
-        keytype = "GOID",
-        columns = c("ONTOLOGY")
-      ),
+      if (isTRUE(verbose)) {
+        AnnotationDbi::select(
+          GO.db::GO.db,
+          keys = ids2,
+          keytype = "GOID",
+          columns = c("ONTOLOGY")
+        )
+      } else {
+        suppressMessages(
+          AnnotationDbi::select(
+            GO.db::GO.db,
+            keys = ids2,
+            keytype = "GOID",
+            columns = c("ONTOLOGY")
+          )
+        )
+      },
       silent = TRUE
     )
+    
     if (inherits(tab, "try-error") || is.null(tab) || !nrow(tab)) {
       return(character(0))
     }
-
+    
     tab <- tab[
       !is.na(tab$GOID) & !is.na(tab$ONTOLOGY),
       c("GOID", "ONTOLOGY"),
@@ -430,15 +442,26 @@ go_enrichment <- function(
     if (isTRUE(include_definition)) cols_want <- c("TERM", "DEFINITION")
 
     term_map <- try(
-      AnnotationDbi::select(
-        GO.db::GO.db,
-        keys = all_terms,
-        keytype = "GOID",
-        columns = cols_want
-      ),
+      if (isTRUE(verbose)) {
+        AnnotationDbi::select(
+          GO.db::GO.db,
+          keys = all_terms,
+          keytype = "GOID",
+          columns = cols_want
+        )
+      } else {
+        suppressMessages(
+          AnnotationDbi::select(
+            GO.db::GO.db,
+            keys = all_terms,
+            keytype = "GOID",
+            columns = cols_want
+          )
+        )
+      },
       silent = TRUE
     )
-
+    
     if (inherits(term_map, "try-error") || is.null(term_map) || !nrow(term_map)) {
       term_name <- rep(NA_character_, length(all_terms))
       term_def <- rep(NA_character_, length(all_terms))
