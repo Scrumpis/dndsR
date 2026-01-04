@@ -79,22 +79,22 @@ dndsr append_annotations -C comparison_file.txt -t 8
 Enrichment of IPR terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 #### ipr_enrichment
 ```
-dndsr ipr_enrichment -C comparison_file.txt -t 8
+dndsr ipr_enrichment -C comparison_file.txt
 ```
 #### go_enrichment
 TopGO enrichment of GO terms under positive selection.
 ```
-dndsr go_enrichment -C comparison_file.txt -t 8
+dndsr go_enrichment -C comparison_file.txt
 ```
 #### term_enrichment
 General term enrichment. Fisher's Exact Test and multiple testing correction. Looks for non-IPR or GO terms like KEGG, PANTHER, etc. Optionally takes as input a custom pattern of interest to test for enrichment. 
 ```
-dndsr term_enrichment -C comparison_file.txt -t 8
+dndsr term_enrichment -C comparison_file.txt
 ```
 ### 6. Selection pressure ideogram
 Visualizes dN/dS binned values accross a genome in an ideogram.
 ```
-dndsr dnds_ideogram -C comparison_file.txt -t 8
+dndsr dnds_ideogram -C comparison_file.txt
 ```
 ### 7. Comparative Analysis
 The below is for making comparisons between dN/dS outputs.
