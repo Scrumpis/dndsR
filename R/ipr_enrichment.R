@@ -522,7 +522,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                    size = pos_count, color = p_adj)
     ) +
       ggplot2::geom_point() +
-      ggplot2::scale_x_continuous(limits = x_limits, expand = ggplot2::expansion(mult = c(0, 0))) +
+      #ggplot2::scale_x_continuous(limits = x_limits, expand = ggplot2::expansion(mult = c(0, 0))) +
       .padj_scale(alpha_val, upper) +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos") +
       ggplot2::theme_minimal(base_size = 13, base_family = base_family)
