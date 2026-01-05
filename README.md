@@ -94,7 +94,7 @@ Visualizes dN/dS binned values accross a genome in an ideogram.
 ```
 dndsr dnds_ideogram -C comparison_file.txt
 ```
-### 7. Comparative Analysis
+### 7. Comparative Analysis (under development)
 The below is for making comparisons between dN/dS outputs.
 Outputs dN/dS distributions and stats between comparisons. Requires regions.bed of interest for analysis (will update to default to regionless, whole genome analysis with regional option).
 regions.bed (seq_name, start, end, feature_name (optional)  
