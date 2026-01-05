@@ -441,7 +441,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   # ---------- font & plotting helpers ----------
   .bundled_arial_path <- function() {
-    ttf <- system.file("fonts", "Arial-Bold.ttf", package = "dndsR")
+    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
