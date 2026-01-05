@@ -64,6 +64,8 @@
 #' @param ancestor_novel_frac Keep parent only if >= this fraction of unclaimed genes (default 0.20).
 #'
 #' @param x_axis_min,x_axis_max Optional fixed x-axis limits for plots.
+#' @param x_axis_pad_right Numeric. Extra units to extend the x-axis beyond the
+#'   maximum observed enrichment when x_axis_max is not set (default 3).
 #'
 #' @param interpro_release Optional string (e.g. "94.0") to pin archived InterPro release.
 #' @param auto_detect_release Logical; auto-pick best archived release by IPR coverage (default TRUE).
@@ -115,7 +117,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            ancestor_novel_frac = 0.20,
                            x_axis_min = NULL,
                            x_axis_max = NULL,
-                           # NEW: release pinning + parent-child retrieval
+                           x_axis_pad_right = 3,
                            interpro_release = NULL,
                            auto_detect_release = TRUE,
                            release_candidates = c("92.0","94.0","96.0","98.0","100.0"),
@@ -496,7 +498,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     )
   }
   .write_plot <- function(df, ylab, out_svg, alpha_val = alpha,
-                          x_axis_min = x_axis_min, x_axis_max = x_axis_max) {
+                          x_axis_min = x_axis_min,
+                          x_axis_max = x_axis_max,
+                          x_axis_pad_right = x_axis_pad_right) {
     if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) return(invisible(NULL))
     top <- df[order(df$p_adj, -df$enrichment, df$IPR), , drop = FALSE]
     top <- utils::head(top, top_n)
@@ -508,8 +512,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     x_min_pt <- min(x_vals, na.rm = TRUE)
     x_max_pt <- max(x_vals, na.rm = TRUE)
     left_gap   <- max(x_min_pt - x_min_ax, 0)
-    base_right <- if (!is.null(x_axis_max)) x_axis_max else (x_max_pt + left_gap)
-    x_limits   <- c(x_min_ax, base_right + 1)
+    base_right <- if (!is.null(x_axis_max)) x_axis_max else (x_max_pt + left_gap + x_axis_pad_right)
+    x_limits <- c(x_min_ax, base_right)
     base_family <- .pick_sans_family()
     upper <- .upper_padj(top, alpha_val)
     gg <- ggplot2::ggplot(
@@ -1021,7 +1025,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
           utils::write.table(sub, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
           out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
           .write_plot(sub, sprintf("IPR (%s, %s) [%s]", tp, sd, method),
-                      out_svg, x_axis_min = x_axis_min, x_axis_max = x_axis_max)
+                      out_svg, x_axis_min = x_axis_min, x_axis_max = x_axis_max, x_axis_pad_right = x_axis_pad_right)
           outs <- c(outs, out_tsv)
         }
       } else {
@@ -1032,7 +1036,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
         out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
         .write_plot(res, sprintf("IPR (%s) [%s]", sd, method),
-                    out_svg, x_axis_min = x_axis_min, x_axis_max = x_axis_max)
+                    out_svg, x_axis_min = x_axis_min, x_axis_max = x_axis_max, x_axis_pad_right = x_axis_pad_right)
         outs <- c(outs, out_tsv)
       }
     }
