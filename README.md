@@ -46,11 +46,8 @@ source ~/.zshrc
 ```
 
 ## CLI Usage
-Recommended for large-scale analysis. All commands allow single or batch comparisons. All functions will produce outputs for both the query and subject of a comparison by default.    
-
+Recommended for large-scale analysis. All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
 ### Sample comparison_file
-dndsR was built to run batches of comparisons and can optionally take as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
-Example:
 ```
 Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
