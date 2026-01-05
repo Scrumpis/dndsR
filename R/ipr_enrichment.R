@@ -4,8 +4,6 @@
 #' among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
 #' Adds InterPro metadata (ENTRY_TYPE/ENTRY_NAME) and supports pooled vs per-type analyses.
 #'
-#' Plotting is harmonized with GO/term: x = Enrichment (pos/bg), size = # pos, color = adj p.
-#'
 #' @param dnds_annot_file Path to a single <comp>_dnds_annot.tsv (single mode).
 #' @param comparison_file Path to whitespace-delimited file (tabs/spaces; header or not)
 #'   with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
