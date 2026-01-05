@@ -497,40 +497,59 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       oob     = scales::squish, name = "adj p"
     )
   }
+                                                            
   .write_plot <- function(df, ylab, out_svg, alpha_val = alpha,
                           x_axis_min = x_axis_min,
                           x_axis_max = x_axis_max,
                           x_axis_pad_right = x_axis_pad_right) {
-    if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) return(invisible(NULL))
+
+    if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) {
+      return(invisible(NULL))
+    }
+
     top <- df[order(df$p_adj, -df$enrichment, df$IPR), , drop = FALSE]
     top <- utils::head(top, top_n)
+
     yvar <- if ("label" %in% names(top)) "label" else "IPR"
     top$y_lab <- top[[yvar]]
-    x_vals <- top$enrichment[is.finite(top$enrichment)]
-    if (!length(x_vals)) x_vals <- 0
-    x_min_ax <- if (!is.null(x_axis_min)) x_axis_min else 0
-    x_min_pt <- min(x_vals, na.rm = TRUE)
-    x_max_pt <- max(x_vals, na.rm = TRUE)
-    left_gap   <- max(x_min_pt - x_min_ax, 0)
-    base_right <- if (!is.null(x_axis_max)) x_axis_max else (x_max_pt + left_gap + x_axis_pad_right)
-    x_limits <- c(x_min_ax, base_right)
+
     base_family <- .pick_sans_family()
     upper <- .upper_padj(top, alpha_val)
+
     gg <- ggplot2::ggplot(
       top,
-      ggplot2::aes(x = enrichment, y = stats::reorder(y_lab, -p_adj),
-                   size = pos_count, color = p_adj)
+      ggplot2::aes(
+        x = enrichment,
+        y = stats::reorder(y_lab, -p_adj),
+        size = pos_count,
+        color = p_adj
+      )
     ) +
       ggplot2::geom_point() +
-      #ggplot2::scale_x_continuous(limits = x_limits, expand = ggplot2::expansion(mult = c(0, 0))) +
       .padj_scale(alpha_val, upper) +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos") +
       ggplot2::theme_minimal(base_size = 13, base_family = base_family)
+
+    # Only apply explicit x bounds if the user provided them.
+    # coord_cartesian() avoids "hard clipping" behavior from scale_* limits.
+    if (!is.null(x_axis_min) || !is.null(x_axis_max)) {
+      xmin <- x_axis_min
+      xmax <- x_axis_max
+      if (is.null(xmin)) xmin <- -Inf
+      if (is.null(xmax)) xmax <-  Inf
+      gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax))
+    }
+
     dev_fun <- .svg_device()
-    if (!is.null(dev_fun)) ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
-    else ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+    if (!is.null(dev_fun)) {
+      ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
+    } else {
+      ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+    }
+
     invisible(NULL)
   }
+
 
   # ---------- InterPro entry.list (existing minimal) ----------
   .read_entries <- function(path) .read_tsv_strict(path)
