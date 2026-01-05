@@ -656,7 +656,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       res$ENTRY_NAME <- unname(ifelse(is.na(nm), NA_character_, nm))
     }
     res$label <- ifelse(is.na(res$ENTRY_NAME) | !nzchar(res$ENTRY_NAME),
-                        res$IPR, paste0(res$IPR, " -- ", res$ENTRY_NAME))
+                        res$IPR, paste0(res$IPR, " ", res$ENTRY_NAME))
     res
   }
 
@@ -820,7 +820,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE]
   }
 
-  # ---------- Decide release & load InterPro resources (NEW) ----------
+  # ---------- Decide release & load InterPro resources ----------
   .collect_all_iprs_from_comp <- function(path, term_sep = ";") {
     if (!file.exists(path)) return(character(0))
     d <- utils::read.table(path, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
