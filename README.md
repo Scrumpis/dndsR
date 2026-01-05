@@ -53,7 +53,7 @@ Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
 ```
 ### 1. split_comparisons.R (optional)
-Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. This is generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
+Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
 dndsr split_comparisons -C comparison_file.txt
 ```
