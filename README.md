@@ -9,7 +9,7 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
 - Analyzes specified retgions for overall differences in dN/dS (i.e., do Dkmer regions of B and C have dN/dS>1 significantly more frequently than
   
-dndsR is built for both containerized command line usage and as a loadable library in R.
+dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
 ## Setup
 Note: We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in R. See Dockerfile for dependencies.
@@ -76,18 +76,19 @@ Appends GFF annotation attributes, functional terms, seqname, start, and end val
 dndsr append_annotations -C comparison_file.txt -t 8
 ```
 ### 5. Annotation term enrichment
-Enrichment of IPR terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
-#### ipr_enrichment
+Enrichment of various gene annotation functional terms under positive selection (dN/dS > 1).
+#### InterPro (IPR) term enrichment
+Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 ```
 dndsr ipr_enrichment -C comparison_file.txt
 ```
-#### go_enrichment
+#### Gene Ontology (GO) term enrichment
 TopGO enrichment of GO terms under positive selection.
 ```
 dndsr go_enrichment -C comparison_file.txt
 ```
-#### term_enrichment
-General term enrichment. Fisher's Exact Test and multiple testing correction. Looks for non-IPR or GO terms like KEGG, PANTHER, etc. Optionally takes as input a custom pattern of interest to test for enrichment. 
+#### General term enrichment
+Fisher's Exact Test and multiple testing correction. Tests non-IPR and non-GO terms like KEGG, PANTHER, etc. Optionally receives a custom pattern of interest to test for enrichment. 
 ```
 dndsr term_enrichment -C comparison_file.txt
 ```
