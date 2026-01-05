@@ -12,7 +12,7 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
 ## Setup
-Note: We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in R. See Dockerfile for dependencies.
+Note: We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage.
   
 ### Clone the Repo
 ```
@@ -35,7 +35,7 @@ Singularity:
 ```
 tools/dndsr-install install --engine singularity --sif dndsr.sif
 ```
-Make dndsR findable and allow tab completion  
+#### Make dndsR findable and allow tab completion  
 Unix:
 ```
 source ~/.bashrc
@@ -46,7 +46,7 @@ source ~/.zshrc
 ```
 
 ## CLI Usage
-Recommended for large-scale analysis. There is also an [R.md vignette](https://github.com/Scrumpis/dndsR/blob/main/dndsR-test-vignette.Rmd) for users who want to work in Rstudio or similar. All commands allow single or batch comparisons. All functions will produce outputs for both the query and subject of a comparison by default.    
+Recommended for large-scale analysis. All commands allow single or batch comparisons. All functions will produce outputs for both the query and subject of a comparison by default.    
 
 ### Sample comparison_file
 dndsR was built to run batches of comparisons and can optionally take as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3". 
@@ -56,7 +56,7 @@ Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
 ```
 ### 1. split_comparisons.R (optional)
-Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. This is generally recommended for calculations between polyploid species so best matches occur between the same subgenome. If needed, [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
+Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. This is generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
 dndsr split_comparisons -C comparison_file.txt
 ```
@@ -76,7 +76,7 @@ Appends GFF annotation attributes, functional terms, seqname, start, and end val
 dndsr append_annotations -C comparison_file.txt -t 8
 ```
 ### 5. Annotation term enrichment
-Enrichment of various gene annotation functional terms under positive selection (dN/dS > 1).
+Enrichment of various gene annotation functional terms under positive selection (dN/dS>1).
 #### InterPro (IPR) term enrichment
 Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 ```
@@ -109,7 +109,7 @@ Chr01B 73000000 74000000 SG3
 ```
 #### Run regional_dnds_summary
 ```
-singularity exec dndsr.sif ./dndsR-launcher run regional_dnds_summary \
+dndsr regional_dnds_summary \
 -C comparison_file.txt \
 --regions-bed regions.bed \
 -O .
@@ -124,7 +124,7 @@ BCvsCD CalbumBvC subject CalbumUkCvD query
 ```
 Run regional_dnds_contrasts
 ```
-singularity exec dndsr.sif ./dndsR-launcher run regional_dnds_contrasts \
+dndsr regional_dnds_contrasts \
 -C comparison_file.txt \
 --regions-bed regions.bed \
 --contrast-file contrast_file.txt \
