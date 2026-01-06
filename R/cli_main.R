@@ -32,10 +32,10 @@ cli_lookup_command <- function(cmd) {
 #' @keywords internal
 .dndsr_global_flags <- list(
   # name = c("syntax", "description")
-  threads      = c("-t, --threads <int>", "Threads to use (also sets options(dndsR.threads))."),
-  verbose      = c("-v, --verbose",       "Verbose logging (sets options(dndsR.verbose = TRUE))."),
-  warnings     = c("--warnings <mode>",   "Warnings: off|summary|all (sets options(dndsR.warnings))."),
-  warnings_max = c("--warnings-max <int>","Max warnings to print (<=0 or non-int = no cap).")
+  comparison_file = c("-c, -C, --comparison-file <int>", "Workers to assign to a job."),
+  threads         = c("-t, -T, --threads <int>",         "Workers to assign to a job."),
+  verbose         = c("-v, -V, --verbose",               "Verbose logging."),
+  warnings        = c("-w, -W, --warnings <mode>",       "Prints R warnings: off|summary|all (default: off).")
 )
 
 #' @keywords internal
