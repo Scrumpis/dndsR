@@ -2,7 +2,7 @@
 #' @keywords internal
 .dnds_cli_aliases <- function() {
   # map of tokens -> canonical key (snake_case)
-  # include both short and long forms you want to accept
+  # shorthand definitions:
   c(
     "-c" = "comparison_file",
     "-C" = "comparison_file",
