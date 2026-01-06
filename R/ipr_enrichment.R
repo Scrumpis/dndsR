@@ -524,11 +524,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   
     if (any(top$is_inf_enrichment)) top$enrichment_plot[top$is_inf_enrichment] <- cap_x
   
-    # ---- Make it explicit in the label (NOT "...") ----
-    top$y_lab_plot <- top$y_lab
-    if (any(top$is_inf_enrichment)) {
-      top$y_lab_plot[top$is_inf_enrichment] <- paste0(top$y_lab_plot[top$is_inf_enrichment], " (Inf)")
-    }
+    # ---- Make it explicit in the label ----
+    #top$y_lab_plot <- top$y_lab
+    #if (any(top$is_inf_enrichment)) {
+    #  top$y_lab_plot[top$is_inf_enrichment] <- paste0(top$y_lab_plot[top$is_inf_enrichment], " (Inf)")
+    #}
   
     # ---- Drop only rows that truly can't be mapped (pos_count/p_adj) ----
     keep <- !is.na(top$pos_count) & is.finite(top$pos_count) &
