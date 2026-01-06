@@ -68,14 +68,33 @@ abspath(){
     (cd "$d" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$p")")
   fi
 }
+
 path_has_local_bin(){
   case ":$PATH:" in
     *":$HOME/.local/bin:"*) return 0 ;;
     *) return 1 ;;
   esac
 }
+
 detect_shell(){
   if [[ -n "${SHELL:-}" ]]; then basename "$SHELL"; else echo "sh"; fi
+}
+
+ensure_zsh_completion(){
+  local zshrc="${HOME}/.zshrc"
+
+  # Ensure zshrc exists
+  [[ -f "$zshrc" ]] || : > "$zshrc"
+
+  # Ensure fpath includes our completion dir + initialize completion
+  if ! grep -q 'fpath+=("\$HOME/.zsh/completions")' "$zshrc" 2>/dev/null; then
+    cat >> "$zshrc" <<'ZSH'
+
+# dndsr completion
+fpath+=("$HOME/.zsh/completions")
+autoload -Uz compinit && compinit
+ZSH
+  fi
 }
 
 write_config(){
@@ -493,6 +512,7 @@ case "$cmd" in
     write_shim
     write_commands_cache
     install_completion || true
+    ensure_zsh_completion || true
 
     echo
     echo "Installed dndsr CLI to:"
@@ -501,7 +521,7 @@ case "$cmd" in
     echo "Cached subcommands for completion:"
     echo "  $CMDS_FILE"
     echo
-    
+
     if path_has_local_bin; then
       echo "~/.local/bin is already on PATH"
     else
@@ -529,7 +549,7 @@ case "$cmd" in
       esac
       echo
     fi
-    
+
     echo "To enable completion in this shell, either open a new terminal or run:"
     echo "  source ~/.bashrc   # bash"
     echo "  source ~/.zshrc    # zsh"
