@@ -511,10 +511,31 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     yvar <- if ("label" %in% names(top)) "label" else "IPR"
     top$y_lab <- top[[yvar]]
 
-    # ---- Reduce warnings: drop unplottable rows ----
-    keep <- is.finite(top$enrichment) & !is.na(top$enrichment) &
-            is.finite(top$p_adj)      & !is.na(top$p_adj) &
-            is.finite(top$pos_count)  & !is.na(top$pos_count)
+    # ---- Plot-safe enrichment: keep Inf terms but cap for plotting only ----
+    top$enrichment_plot <- top$enrichment
+
+    finite_x <- top$enrichment_plot[is.finite(top$enrichment_plot)]
+    max_finite <- if (length(finite_x)) max(finite_x, na.rm = TRUE) else 1
+
+    # cap used only when enrichment is non-finite/NA so it can be drawn
+    cap_x <- max_finite * 1.05
+    if (!is.finite(cap_x) || cap_x <= 0) cap_x <- 1
+
+    bad_x <- !is.finite(top$enrichment_plot) | is.na(top$enrichment_plot)
+    if (any(bad_x)) top$enrichment_plot[bad_x] <- cap_x
+
+    # optional: mark capped points in the label so it’s obvious on the plot
+    # (comment out if you don't want it)
+    top$y_lab_plot <- top$y_lab
+    if (any(bad_x)) {
+      top$y_lab_plot[bad_x] <- paste0(top$y_lab_plot[bad_x], " (capped)")
+    } else {
+      top$y_lab_plot <- top$y_lab
+    }
+
+    # ---- Drop only rows that truly can't be mapped (pos_count/p_adj) ----
+    keep <- !is.na(top$pos_count) & is.finite(top$pos_count) &
+            !is.na(top$p_adj)     & is.finite(top$p_adj)
     top_plot <- top[keep, , drop = FALSE]
     if (!nrow(top_plot)) return(invisible(NULL))
 
@@ -524,8 +545,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     gg <- ggplot2::ggplot(
       top_plot,
       ggplot2::aes(
-        x = enrichment,
-        y = stats::reorder(y_lab, -p_adj),
+        x = enrichment_plot,
+        y = stats::reorder(y_lab_plot, -p_adj),
         size = pos_count,
         color = p_adj
       )
@@ -534,14 +555,17 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       .padj_scale(alpha_val, upper) +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos") +
       ggplot2::theme_minimal(base_size = 13, base_family = base_family) +
-      # Explicitly enforce "normal" ggplot x padding so points at max x aren't bisected
-      ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0))
+      # Ensure some breathing room even if a global theme set expand=0 somewhere
+      ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0)) +
+      # Avoid clipping at panel boundary + add a bit of right-side margin
+      ggplot2::coord_cartesian(clip = "off") +
+      ggplot2::theme(plot.margin = ggplot2::margin(5.5, 18, 5.5, 5.5))
 
-    # Only enforce x-limits if the user asked for them
+    # Only enforce x limits if the user explicitly asks for them (still no hard clipping)
     if (!is.null(x_axis_min) || !is.null(x_axis_max)) {
       xmin <- if (is.null(x_axis_min)) -Inf else x_axis_min
       xmax <- if (is.null(x_axis_max))  Inf else x_axis_max
-      gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax))
+      gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax), clip = "off")
     }
 
     dev_fun <- .svg_device()
@@ -553,7 +577,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     invisible(NULL)
   }
-
+                                                            
   # ---------- InterPro entry.list (existing minimal) ----------
   .read_entries <- function(path) .read_tsv_strict(path)
   .bundled_path <- function() {
