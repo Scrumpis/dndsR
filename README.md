@@ -12,7 +12,7 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
 ## Setup
-Note: We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage.
+We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage.
   
 ### Clone the Repo
 ```
@@ -130,7 +130,9 @@ dndsr regional_dnds_contrasts \
 
 
 ## Notes
+If conducting annotation term enrichment, ensure term version are the same in each comparison (i.e., both IPR 83.0) to avoid erroneous results
 Can use special characters or spaces in path if quoted in the comparison_file
+
 
 
 ## Future Improvements
