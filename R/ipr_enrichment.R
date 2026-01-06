@@ -525,10 +525,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (any(bad_x)) top$enrichment_plot[bad_x] <- cap_x
 
     # optional: mark capped points in the label so it’s obvious on the plot
-    # (comment out if you don't want it)
     top$y_lab_plot <- top$y_lab
     if (any(bad_x)) {
-      top$y_lab_plot[bad_x] <- paste0(top$y_lab_plot[bad_x], " (capped)")
+      top$y_lab_plot[bad_x] <- paste0(top$y_lab_plot[bad_x], "...")
     } else {
       top$y_lab_plot <- top$y_lab
     }
