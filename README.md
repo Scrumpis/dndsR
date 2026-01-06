@@ -130,8 +130,8 @@ dndsr regional_dnds_contrasts \
 
 
 ## Notes
-If conducting annotation term enrichment, ensure term version are the same in each comparison (i.e., both IPR 83.0) to avoid erroneous results
-Can use special characters or spaces in path if quoted in the comparison_file
+- If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results
+- Can use special characters or spaces in path if quoted in the comparison_file
 
 
 
