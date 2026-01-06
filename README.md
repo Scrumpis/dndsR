@@ -148,9 +148,3 @@ dndsr regional_dnds_contrasts \
 - Ensure docker image contains all dependencies of all optional functions
 - Change regional analysis name. Can focus regions, but can do whole genome summaries too.
   - Change default to regions_bed = NULL
-- Check if below is needed anymore
-### Install dndsR library
-#### Singularity
-```
-singularity exec dndsr.sif ./dndsR-launcher install
-```
