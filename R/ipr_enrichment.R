@@ -511,11 +511,18 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     yvar <- if ("label" %in% names(top)) "label" else "IPR"
     top$y_lab <- top[[yvar]]
 
+    # ---- Reduce warnings: drop unplottable rows ----
+    keep <- is.finite(top$enrichment) & !is.na(top$enrichment) &
+            is.finite(top$p_adj)      & !is.na(top$p_adj) &
+            is.finite(top$pos_count)  & !is.na(top$pos_count)
+    top_plot <- top[keep, , drop = FALSE]
+    if (!nrow(top_plot)) return(invisible(NULL))
+
     base_family <- .pick_sans_family()
-    upper <- .upper_padj(top, alpha_val)
+    upper <- .upper_padj(top_plot, alpha_val)
 
     gg <- ggplot2::ggplot(
-      top,
+      top_plot,
       ggplot2::aes(
         x = enrichment,
         y = stats::reorder(y_lab, -p_adj),
@@ -526,15 +533,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       ggplot2::geom_point() +
       .padj_scale(alpha_val, upper) +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos") +
-      ggplot2::theme_minimal(base_size = 13, base_family = base_family)
+      ggplot2::theme_minimal(base_size = 13, base_family = base_family) +
+      # Explicitly enforce "normal" ggplot x padding so points at max x aren't bisected
+      ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0))
 
-    # Only apply explicit x bounds if the user provided them.
-    # coord_cartesian() avoids "hard clipping" behavior from scale_* limits.
+    # Only enforce x-limits if the user asked for them
     if (!is.null(x_axis_min) || !is.null(x_axis_max)) {
-      xmin <- x_axis_min
-      xmax <- x_axis_max
-      if (is.null(xmin)) xmin <- -Inf
-      if (is.null(xmax)) xmax <-  Inf
+      xmin <- if (is.null(x_axis_min)) -Inf else x_axis_min
+      xmax <- if (is.null(x_axis_max))  Inf else x_axis_max
       gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax))
     }
 
@@ -547,7 +553,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     invisible(NULL)
   }
-
 
   # ---------- InterPro entry.list (existing minimal) ----------
   .read_entries <- function(path) .read_tsv_strict(path)
