@@ -217,71 +217,18 @@ need_install(){
 
 # Build engine-specific bind args.
 build_bind_args(){
-  local -n _out=$1
-  _out=()
+  BIND_ARGS=()
 
-  # user-defined binds
   if [[ -n "$BINDS" ]]; then
     IFS=',' read -r -a pairs <<< "$BINDS"
     for p in "${pairs[@]}"; do
       [[ -n "$p" ]] || continue
       case "$ENGINE" in
-        apptainer|singularity) _out+=( --bind "$p" ) ;;
-        docker) _out+=( -v "$p" ) ;;
+        apptainer|singularity) BIND_ARGS+=( --bind "$p" ) ;;
+        docker)                BIND_ARGS+=( -v "$p" ) ;;
       esac
     done
   fi
-}
-
-# Run a command inside container with repo + rlib mounted
-run_in_container(){
-  local -a bind_args extra_args
-  build_bind_args bind_args
-
-  # shellcheck disable=SC2206
-  extra_args=(${EXTRA:-})
-
-  local pwd_real; pwd_real="$(pwd -P)"
-
-  case "$ENGINE" in
-    apptainer|singularity)
-      have "$ENGINE" || die "Engine not found: $ENGINE"
-      [[ -n "$SIF" ]] || die "DNDSR_SIF is empty in config"
-      [[ -f "$SIF" ]] || die "SIF not found: $SIF"
-      [[ -d "$REPO" ]] || die "Repo not found: $REPO (needed to install/update)"
-
-      exec "$ENGINE" exec \
-        "${extra_args[@]}" \
-        --bind "${pwd_real}:${WORKDIR}" \
-        --bind "${RLIB}:${RLIB}" \
-        --bind "${REPO}:${REPO}" \
-        "${bind_args[@]}" \
-        "$SIF" \
-        bash -lc "$1" bash
-      ;;
-
-    docker)
-      have docker || die "docker not found"
-      [[ -n "$IMAGE" ]] || die "DNDSR_IMAGE is empty in config"
-      [[ -d "$REPO" ]] || die "Repo not found: $REPO (needed to install/update)"
-
-      exec docker run --rm \
-        "${platform_args[@]}" \
-        -u "$(id -u)":"$(id -g)" \
-        -v "${pwd_real}:${WORKDIR}" \
-        -v "${RLIB}:${RLIB}" \
-        -v "${REPO}:${REPO}" \
-        -w "${WORKDIR}" \
-        "${bind_args[@]}" \
-        "${extra_args[@]}" \
-        "$IMAGE" \
-        bash -lc "$1"
-      ;;
-
-    *)
-      die "Unknown engine: $ENGINE"
-      ;;
-  esac
 }
 
 install_if_needed(){
@@ -370,7 +317,7 @@ install_if_needed
 [[ -x "$RUNNER" ]] || die "Runner not found after install: $RUNNER"
 
 # Build binds for runtime and execute
-build_bind_args bind_args
+build_bind_args
 # shellcheck disable=SC2206
 extra_args=(${EXTRA:-})
 pwd_real="$(pwd -P)"
@@ -381,7 +328,7 @@ case "$ENGINE" in
       "${extra_args[@]}" \
       --bind "${pwd_real}:${WORKDIR}" \
       --bind "${RLIB}:${RLIB}" \
-      "${bind_args[@]}" \
+      "${BIND_ARGS[@]}" \
       "${SIF}" \
       bash -lc "export R_LIBS_USER='${RLIB}'; cd '${WORKDIR}'; '${RUNNER}' \"\$@\"" bash "$@"
     ;;
@@ -392,7 +339,7 @@ case "$ENGINE" in
       -v "${pwd_real}:${WORKDIR}" \
       -v "${RLIB}:${RLIB}" \
       -w "${WORKDIR}" \
-      "${bind_args[@]}" \
+      "${BIND_ARGS[@]}" \
       "${extra_args[@]}" \
       "${IMAGE}" \
       bash -lc "export R_LIBS_USER='${RLIB}'; '${RUNNER}' \"\$@\"" bash "$@"
