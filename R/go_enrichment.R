@@ -502,7 +502,7 @@ go_enrichment <- function(
       label = ifelse(
         is.na(term_name) | !nzchar(term_name),
         all_terms,
-        paste0(all_terms, " -- ", term_name)
+        paste0(all_terms, " ", term_name)
       ),
       side = side,
       ontology = ont,
