@@ -306,36 +306,6 @@ go_enrichment <- function(
     if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
     NULL
   }
-
-  .with_job_log <- function(comp_dir, comp, side, expr) {
-    dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
-  
-    log_file <- file.path(comp_dir, sprintf("%s_%s_topGO.log", comp, side))
-    con <- file(log_file, open = "wt")
-  
-    # record current sink depth so we can restore exactly
-    out_n <- sink.number(type = "output")
-    msg_n <- sink.number(type = "message")
-  
-    on.exit({
-      # unwind any sinks we added (back to original depth)
-      while (sink.number(type = "message") > msg_n) {
-        try(sink(type = "message"), silent = TRUE)
-      }
-      while (sink.number(type = "output") > out_n) {
-        try(sink(type = "output"), silent = TRUE)
-      }
-      try(close(con), silent = TRUE)
-    }, add = TRUE)
-  
-    sink(con, type = "output")
-    sink(con, type = "message")
-  
-    cat(sprintf("[go_enrichment] comp=%s side=%s\n", comp, side))
-    cat(sprintf("[go_enrichment] started=%s\n\n", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
-  
-    force(expr)
-  }
                                              
   # ---- FAST ontology/obsolete cache (preserves logic, avoids per-gene select()) ----
   .build_go_cache <- function(go_vec, exclude_set = NULL, verbose = FALSE) {
@@ -723,9 +693,19 @@ go_enrichment <- function(
       # Clean, non-jumbled progress line in the main console:
       message(sprintf("[go_enrichment] %s %s (logging to %s/%s_%s_topGO.log)",
                       comp, side, comp_dir, comp, side))
-      .with_job_log(comp_dir, comp, side, {
-        .run_comp_side(comp, comp_dir, side)
-      })
+      log_file <- file.path(comp_dir, sprintf("%s_%s_topGO.log", comp, side))
+      
+      .dndsr_with_log(
+        log_file = log_file,
+        tag = "go_enrichment",
+        header = c(
+          sprintf("[go_enrichment] comp=%s side=%s", comp, side)
+          sprintf("[go_enrichment] pid=%d threads=%d", Sys.getpid(), threads)
+        ),
+        expr = {
+          .run_comp_side(comp, comp_dir, side)
+        }
+      )
     }
 
     if (threads > 1L && .Platform$OS.type != "windows") {
@@ -770,15 +750,25 @@ go_enrichment <- function(
   run_one_side <- function(sd) {
     message(sprintf("[go_enrichment] %s %s (logging to %s/%s_%s_topGO.log)",
                     comp_name, sd, comp_dir, comp_name, sd))
-  
-    .with_job_log(comp_dir, comp_name, sd, {
-      paths <- character(0)
-      for (ont in ontologies) {
-        p <- .run_one(d, sd, ont, comp_name, comp_dir, runTest_args = topgo_dots)
-        if (!is.null(p)) paths <- c(paths, p)
+    
+    log_file <- file.path(comp_dir, sprintf("%s_%s_topGO.log", comp_name, sd))
+    
+    .dndsr_with_log(
+      log_file = log_file,
+      tag = "go_enrichment",
+      header = c(
+        sprintf("[go_enrichment] comp=%s side=%s", comp_name, sd)
+      ),
+      expr = {
+        paths <- character(0)
+        for (ont in ontologies) {
+          p <- .run_one(d, sd, ont, comp_name, comp_dir, runTest_args = topgo_dots)
+          if (!is.null(p)) paths <- c(paths, p)
+        }
+        paths
       }
-      paths
-    })
+    )
+
   }
 
   if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
