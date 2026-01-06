@@ -103,6 +103,7 @@ go_enrichment <- function(
   p_adjust   <- match.arg(p_adjust, choices = c("none", "BH"))
   threads <- suppressWarnings(as.integer(threads))
   if (is.na(threads) || threads < 1L) threads <- 1L
+  message(sprintf("[go_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))
   if (isTRUE(make_plots) && threads > 8L && !is.null(comparison_file)) {
     warning(
       "[go_enrichment] make_plots=TRUE with threads>8 may be I/O-heavy (many SVG writes). ",
