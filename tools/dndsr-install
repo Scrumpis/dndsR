@@ -20,7 +20,7 @@ cat <<'EOF'
 dndsr-install — install host 'dndsr' shim that runs dndsR via container deps
 
 USAGE
-  tools/dndsr-install install --engine auto|apptainer|singularity|docker [--sif PATH | --image REF] [--rlib PATH]
+  tools/dndsr-install install --engine auto|apptainer|singularity|docker [--sif PATH | --image REF] [--rlib PATH] [--docker-platform PLATFORM]
   tools/dndsr-install doctor
   tools/dndsr-install uninstall
 
@@ -98,7 +98,7 @@ ZSH
 }
 
 write_config(){
-  local engine="$1" sif="$2" image="$3" rlib="$4"
+  local engine="$1" sif="$2" image="$3" rlib="$4" docker_platform="${5:-}"
   mkdir -p "$CONF_DIR" "$BIN_DIR" "$rlib" || die "Failed to create install dirs"
 
   # Canonicalize paths so config works from ANY working directory
@@ -112,9 +112,10 @@ write_config(){
 
   cat >"$CONF_FILE" <<EOF
 # dndsr host shim config
-DNDSR_ENGINE=$engine
-DNDSR_SIF=$sif_abs
-DNDSR_IMAGE=$image
+DNDSR_ENGINE=${engine}
+DNDSR_SIF=${sif_abs}
+DNDSR_IMAGE=${image}
+DNDSR_DOCKER_PLATFORM=${docker_platform}
 
 # Host library where dndsR will be installed (MUST be writable)
 DNDSR_RLIB=$rlib_abs
@@ -157,6 +158,9 @@ REPO="${DNDSR_REPO:-}"
 WORKDIR="${DNDSR_WORKDIR:-/work}"
 BINDS="${DNDSR_BINDS:-}"
 EXTRA="${DNDSR_EXTRA_ARGS:-}"
+DOCKER_PLATFORM="${DNDSR_DOCKER_PLATFORM:-}"
+platform_args=()
+[[ -n "$DOCKER_PLATFORM" ]] && platform_args=( --platform "$DOCKER_PLATFORM" )
 
 [[ -n "$ENGINE" ]] || die "DNDSR_ENGINE not set in config"
 [[ -n "$RLIB" ]]   || die "DNDSR_RLIB not set in config"
@@ -262,6 +266,7 @@ run_in_container(){
       [[ -d "$REPO" ]] || die "Repo not found: $REPO (needed to install/update)"
 
       exec docker run --rm \
+        "${platform_args[@]}" \
         -u "$(id -u)":"$(id -g)" \
         -v "${pwd_real}:${WORKDIR}" \
         -v "${RLIB}:${RLIB}" \
@@ -307,6 +312,7 @@ CMD
     # Run and return to current shell (do not exec so we can continue)
     if [[ "$ENGINE" == "docker" ]]; then
       docker run --rm \
+        "${platform_args[@]}" \
         -u "$(id -u)":"$(id -g)" \
         -v "${RLIB}:${RLIB}" \
         -v "${REPO}:${REPO}" \
@@ -343,6 +349,7 @@ case "${1:-}" in
     echo "rlib:     $RLIB"
     echo "repo:     ${REPO:-<none>}"
     echo "runner:   $RUNNER"
+    echo "docker_platform: ${DOCKER_PLATFORM:-<default>}"
     echo "auto-install: ${DNDSR_AUTO_INSTALL:-1}"
     echo
     if [[ -x "$RUNNER" ]]; then
@@ -380,6 +387,7 @@ case "$ENGINE" in
     ;;
   docker)
     exec docker run --rm \
+      "${platform_args[@]}" \
       -u "$(id -u)":"$(id -g)" \
       -v "${pwd_real}:${WORKDIR}" \
       -v "${RLIB}:${RLIB}" \
@@ -463,6 +471,7 @@ doctor(){
   echo "image:   ${DNDSR_IMAGE:-<unset>}"
   echo "rlib:    ${DNDSR_RLIB:-<unset>}"
   echo "repo:    ${DNDSR_REPO:-<unset>}"
+  echo "docker_platform: ${DNDSR_DOCKER_PLATFORM:-<default>}"
   echo
   echo "PATH has ~/.local/bin?  $(echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin" && echo yes || echo no)"
 }
@@ -482,13 +491,14 @@ shift || true
 
 case "$cmd" in
   install)
-    engine="auto"; sif=""; image=""; rlib="${HOME}/.dndsr/rlib"
+    engine="auto"; sif=""; image=""; rlib="${HOME}/.dndsr/rlib"; docker_platform=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --engine) engine="${2:-}"; shift 2 ;;
         --sif)    sif="${2:-}"; shift 2 ;;
         --image)  image="${2:-}"; shift 2 ;;
         --rlib)   rlib="${2:-}"; shift 2 ;;
+        --docker-platform) docker_platform="${2:-}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "Unknown arg: $1" ;;
       esac
@@ -508,7 +518,7 @@ case "$cmd" in
       *) die "Invalid engine: $engine" ;;
     esac
 
-    write_config "$engine" "$sif" "$image" "$rlib"
+    write_config "$engine" "$sif" "$image" "$rlib" "$docker_platform"
     write_shim
     write_commands_cache
     install_completion || true
