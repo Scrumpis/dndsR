@@ -27,12 +27,44 @@ cli_lookup_command <- function(cmd) {
   get(fn_name, envir = ns, inherits = FALSE)
 }
 
+# ---- Global CLI flags footer -------------------------------------------------
+
+#' @keywords internal
+.dndsr_global_flags <- list(
+  # name = c("syntax", "description")
+  threads      = c("-t, --threads <int>", "Threads to use (also sets options(dndsR.threads))."),
+  verbose      = c("-v, --verbose",       "Verbose logging (sets options(dndsR.verbose = TRUE))."),
+  warnings     = c("--warnings <mode>",   "Warnings: off|summary|all (sets options(dndsR.warnings))."),
+  warnings_max = c("--warnings-max <int>","Max warnings to print (<=0 or non-int = no cap).")
+)
+
+#' @keywords internal
+cli_print_global_flags <- function() {
+  cat("\nGlobal options (available for all commands):\n")
+  # Nice aligned two-column print
+  rows <- lapply(.dndsr_global_flags, function(x) {
+    stopifnot(length(x) == 2L)
+    x
+  })
+  rows <- do.call(rbind, rows)
+
+  width <- max(nchar(rows[, 1, drop = TRUE]), 1L)
+  for (i in seq_len(nrow(rows))) {
+    cat(sprintf("  %-*s  %s\n", width, rows[i, 1], rows[i, 2]))
+  }
+}
+
+#-----------------------
+
 #' @keywords internal
 cli_print_usage <- function() {
   cmds <- cli_list_commands()
   cat("Usage: dndsr <command> [--key value] [--flag]\n\nCommands:\n")
   cat(paste0("  ", cmds), sep = "\n")
   cat("\nRun: dndsr <command> --help\n")
+
+  # Always show the global footer on top-level help too
+  cli_print_global_flags()
 }
 
 #' @keywords internal
@@ -55,11 +87,17 @@ cli_print_command_help <- function(cmd) {
       "or map this CLI command to a documented topic.\n",
       sep = ""
     )
+
+    # Still print global footer even when docs are missing
+    cli_print_global_flags()
     return(invisible(NULL))
   }
 
   txt <- utils::capture.output(utils::help(topic, package = "dndsR"))
   if (length(txt)) cat(paste0(txt, collapse = "\n"), "\n")
+
+  # Always append footer after command help
+  cli_print_global_flags()
   invisible(NULL)
 }
 
