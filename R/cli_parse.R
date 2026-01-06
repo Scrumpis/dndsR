@@ -34,8 +34,8 @@
 #' @keywords internal
 .dnds_cli_defaults <- function() {
   list(
-    output_dir = ".",
-    threads = 4
+    output_dir = "."
+    #threads = 4
   )
 }
 
