@@ -62,44 +62,44 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
-dndsr split_comparisons -C comparison_file.txt
+dndsr split_comparisons -c comparison_file.txt
 ```
 ### 2. Extract CDS or Proteins
 Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff files for each species of each comparison in comparison_file.
 ```
-dndsr extract_cds -C comparison_file.txt
+dndsr extract_cds -c comparison_file.txt
 ```
 ### 3. Calculate dN/dS
 Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
 ```
-dndsr calculate_dnds -C comparison_file.txt -t 80
+dndsr calculate_dnds -c comparison_file.txt -t 80
 ```
 ### 4. Append annotations
 Appends GFF annotation attributes, functional terms, seqname, start, and end values for both query and subject to dN/dS calculations based on gene_id.
 ```
-dndsr append_annotations -C comparison_file.txt -t 8
+dndsr append_annotations -c comparison_file.txt -t 8
 ```
 ### 5. Annotation term enrichment
 Enrichment of various gene annotation functional terms under positive selection (dN/dS>1).
 #### InterPro (IPR) term enrichment
 Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 ```
-dndsr ipr_enrichment -C comparison_file.txt
+dndsr ipr_enrichment -c comparison_file.txt
 ```
 #### Gene Ontology (GO) term enrichment
 TopGO enrichment of GO terms under positive selection.
 ```
-dndsr go_enrichment -C comparison_file.txt
+dndsr go_enrichment -c comparison_file.txt
 ```
 #### General term enrichment
 Fisher's Exact Test and multiple testing correction. Tests non-IPR and non-GO terms like KEGG, PANTHER, etc. Optionally receives a custom pattern of interest to test for enrichment. 
 ```
-dndsr term_enrichment -C comparison_file.txt
+dndsr term_enrichment -c comparison_file.txt
 ```
 ### 6. Selection pressure ideogram
 Visualizes dN/dS binned values accross a genome in an ideogram.
 ```
-dndsr dnds_ideogram -C comparison_file.txt
+dndsr dnds_ideogram -c comparison_file.txt
 ```
 ### 7. Comparative Analysis (under development)
 The below is for making comparisons between dN/dS outputs.
@@ -114,7 +114,7 @@ Chr01B 73000000 74000000 SG3
 #### Run regional_dnds_summary
 ```
 dndsr regional_dnds_summary \
--C comparison_file.txt \
+-c comparison_file.txt \
 --regions-bed regions.bed \
 -O .
 ```
@@ -129,7 +129,7 @@ BCvsCD CalbumBvC subject CalbumUkCvD query
 Run regional_dnds_contrasts
 ```
 dndsr regional_dnds_contrasts \
--C comparison_file.txt \
+-c comparison_file.txt \
 --regions-bed regions.bed \
 --contrast-file contrast_file.txt \
 -O .
@@ -146,7 +146,7 @@ dndsr regional_dnds_contrasts \
 - ggplot::aes_string deprecated
 - Update Rvignette with test dataset
 - Cleanup documentation
-- List global short flags in help (-C comparison_file, -t threads, etc)
+- List global short flags in help (-c comparison_file, -t threads, etc)
 - Add forest plot function and other grand analyses
 - Remove internal marked functions from help in CLI
 - Ensure docker image contains all dependencies of all optional functions
