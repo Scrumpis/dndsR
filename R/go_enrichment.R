@@ -32,6 +32,9 @@
 #' @param include_definition If TRUE (default), append TERM definition from GO.db.
 #' @param alpha Numeric FDR reference level for color scale (default 0.05).
 #' @param verbose If TRUE, prints summary of GO filtering (default FALSE).
+#' @param threads Integer; maximum number of parallel workers (forked processes; default 4). 
+#'   In batch mode, workers are applied across (comparison, side) jobs. 
+#'   On Windows, runs sequentially (no forking).
 #' @param ... Additional arguments passed on to 'topGO::runTest()', e.g. `score`,
 #'   `ties.method`, etc. Core arguments `object`, `algorithm`, and `statistic`
 #'   are always set by dndsR and cannot be overridden.
@@ -62,6 +65,7 @@ go_enrichment <- function(
   include_definition = TRUE,
   alpha = 0.05,
   verbose = FALSE,
+  threads = 4,
   ...
 ) {
 
@@ -97,6 +101,15 @@ go_enrichment <- function(
   algorithm  <- match.arg(algorithm, choices = c("weight01", "elim", "classic", "weight"))
   statistic  <- match.arg(statistic, choices = c("fisher", "ks"))
   p_adjust   <- match.arg(p_adjust, choices = c("none", "BH"))
+  threads <- suppressWarnings(as.integer(threads))
+  if (is.na(threads) || threads < 1L) threads <- 1L
+  if (isTRUE(make_plots) && threads > 8L && !is.null(comparison_file)) {
+    warning(
+      "[go_enrichment] make_plots=TRUE with threads>8 may be I/O-heavy (many SVG writes). ",
+      "Consider lowering threads.",
+      call. = FALSE
+    )
+  }
 
   # --- helpers ---
   .read_ws <- function(path, header_try = TRUE) {
@@ -223,92 +236,6 @@ go_enrichment <- function(
     ids
   }
 
-  # Filter GO IDs to: not obsolete (GOOBSOLETE) and ontology matches (GO.db via select()).
-  .filter_go_ids_to_ontology <- function(ids, ont) {
-    ids <- unique(as.character(ids))
-    ids <- ids[!is.na(ids) & nzchar(ids)]
-    if (!length(ids)) return(character(0))
-
-    ont <- as.character(ont)[1L]
-
-    # ---- drop obsolete using GOOBSOLETE keys ----
-    obs <- AnnotationDbi::mget(ids, GO.db::GOOBSOLETE, ifnotfound = NA)
-    is_obs <- vapply(
-      obs,
-      function(x) {
-        is.character(x) && length(x) >= 1L && nzchar(x[1L])
-      },
-      logical(1)
-    )
-
-    ids2 <- ids[!is_obs]
-    if (!length(ids2)) return(character(0))
-
-    # ---- keep only IDs that exist in GO.db and match ontology via select() ----
-    tab <- try(
-      if (isTRUE(verbose)) {
-        AnnotationDbi::select(
-          GO.db::GO.db,
-          keys = ids2,
-          keytype = "GOID",
-          columns = c("ONTOLOGY")
-        )
-      } else {
-        suppressMessages(
-          AnnotationDbi::select(
-            GO.db::GO.db,
-            keys = ids2,
-            keytype = "GOID",
-            columns = c("ONTOLOGY")
-          )
-        )
-      },
-      silent = TRUE
-    )
-    
-    if (inherits(tab, "try-error") || is.null(tab) || !nrow(tab)) {
-      return(character(0))
-    }
-    
-    tab <- tab[
-      !is.na(tab$GOID) & !is.na(tab$ONTOLOGY),
-      c("GOID", "ONTOLOGY"),
-      drop = FALSE
-    ]
-    unique(tab$GOID[tab$ONTOLOGY == ont])
-  }
-
-  # Build gene2GO mapping, ontology-aware and GO.db-aware
-  .make_gene2go <- function(ids, go_vec, ont, exclude_set = NULL, verbose = FALSE) {
-    ids <- as.character(ids)
-    go_vec <- as.character(go_vec)
-
-    raw_list <- lapply(go_vec, .extract_go_ids, exclude_set = exclude_set)
-    raw_n <- sum(lengths(raw_list))
-
-    filt_list <- lapply(raw_list, .filter_go_ids_to_ontology, ont = ont)
-    filt_n <- sum(lengths(filt_list))
-
-    keep <- lengths(filt_list) > 0L
-    mapping <- setNames(filt_list[keep], ids[keep])
-
-    if (isTRUE(verbose)) {
-      message(
-        sprintf(
-          "  [go_enrichment] %s: GO tokens=%d, kept_after_filter=%d, genes_with_go=%d/%d",
-          ont, raw_n, filt_n, sum(keep), length(ids)
-        )
-      )
-    }
-
-    list(
-      mapping = mapping,
-      genes = ids[keep],
-      raw_token_count = raw_n,
-      kept_token_count = filt_n
-    )
-  }
-
   # ---- plotting helpers (match IPR style) ----
   .upper_padj <- function(d, alpha) {
     max_p <- suppressWarnings(max(d$p_adj, na.rm = TRUE))
@@ -331,6 +258,152 @@ go_enrichment <- function(
     )
   }
 
+  # ---------- font & plotting helpers (match ipr_enrichment) ----------
+  .bundled_arial_path <- function() {
+    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
+    if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
+    ttf
+  }
+
+  .setup_showtext <- function() {
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+
+    if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
+    if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
+
+    ok <- try({
+      sysfonts::font_add(family = "Arial Bold", regular = ttf)
+      showtext::showtext_auto(TRUE)
+      TRUE
+    }, silent = TRUE)
+
+    if (isTRUE(ok)) "Arial Bold" else NULL
+  }
+
+  .register_svglite_mapping <- function() {
+    if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+
+    function(file, ...) svglite::svglite(
+      file,
+      system_fonts = list(`Arial Bold` = ttf),
+      ...
+    )
+  }
+
+  .pick_sans_family <- function() {
+    fam <- .setup_showtext()
+    if (!is.null(fam)) return(fam)
+    "sans"
+  }
+
+  .svg_device <- function() {
+    dev_map <- .register_svglite_mapping()
+    if (!is.null(dev_map)) return(dev_map)
+    if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
+    NULL
+  }
+
+  # ---- FAST ontology/obsolete cache (preserves logic, avoids per-gene select()) ----
+  .build_go_cache <- function(go_vec, exclude_set = NULL, verbose = FALSE) {
+    go_vec <- as.character(go_vec)
+
+    raw_list <- lapply(go_vec, .extract_go_ids, exclude_set = exclude_set)
+    all_ids <- unique(unlist(raw_list, use.names = FALSE))
+    all_ids <- all_ids[!is.na(all_ids) & nzchar(all_ids)]
+
+    if (!length(all_ids)) {
+      return(list(raw_list = raw_list, id2ont = character(0)))
+    }
+
+    # Drop obsolete ONCE
+    obs <- AnnotationDbi::mget(all_ids, GO.db::GOOBSOLETE, ifnotfound = NA)
+    is_obs <- vapply(
+      obs,
+      function(x) is.character(x) && length(x) >= 1L && nzchar(x[1L]),
+      logical(1)
+    )
+    ids2 <- all_ids[!is_obs]
+    if (!length(ids2)) {
+      return(list(raw_list = raw_list, id2ont = character(0)))
+    }
+
+    # Lookup ontology ONCE
+    tab <- try(
+      if (isTRUE(verbose)) {
+        AnnotationDbi::select(
+          GO.db::GO.db,
+          keys = ids2,
+          keytype = "GOID",
+          columns = "ONTOLOGY"
+        )
+      } else {
+        suppressMessages(
+          AnnotationDbi::select(
+            GO.db::GO.db,
+            keys = ids2,
+            keytype = "GOID",
+            columns = "ONTOLOGY"
+          )
+        )
+      },
+      silent = TRUE
+    )
+
+    if (inherits(tab, "try-error") || is.null(tab) || !nrow(tab)) {
+      return(list(raw_list = raw_list, id2ont = character(0)))
+    }
+
+    tab <- tab[!is.na(tab$GOID) & !is.na(tab$ONTOLOGY), c("GOID", "ONTOLOGY"), drop = FALSE]
+    # If select() returns duplicates, keep the first ONTOLOGY per GOID deterministically
+    tab <- tab[order(tab$GOID), , drop = FALSE]
+    tab <- tab[!duplicated(tab$GOID), , drop = FALSE]
+    id2ont <- stats::setNames(as.character(tab$ONTOLOGY), as.character(tab$GOID))
+
+    list(raw_list = raw_list, id2ont = id2ont)
+  }
+
+  # Build gene2GO mapping, ontology-aware and GO.db-aware (cached)
+  .make_gene2go_cached <- function(ids, go_vec, ont, exclude_set = NULL, verbose = FALSE) {
+    ids <- as.character(ids)
+    go_vec <- as.character(go_vec)
+    ont <- as.character(ont)[1L]
+
+    cache <- .build_go_cache(go_vec, exclude_set = exclude_set, verbose = verbose)
+    raw_list <- cache$raw_list
+    id2ont <- cache$id2ont
+
+    raw_n <- sum(lengths(raw_list))
+
+    filt_list <- lapply(raw_list, function(x) {
+      if (!length(x) || !length(id2ont)) return(character(0))
+      o <- id2ont[x]
+      x[!is.na(o) & o == ont]
+    })
+    filt_n <- sum(lengths(filt_list))
+
+    keep <- lengths(filt_list) > 0L
+    mapping <- setNames(filt_list[keep], ids[keep])
+
+    if (isTRUE(verbose)) {
+      message(
+        sprintf(
+          "  [go_enrichment] %s: GO tokens=%d, kept_after_filter=%d, genes_with_go=%d/%d",
+          ont, raw_n, filt_n, sum(keep), length(ids)
+        )
+      )
+    }
+
+    list(
+      mapping = mapping,
+      genes = ids[keep],
+      raw_token_count = raw_n,
+      kept_token_count = filt_n
+    )
+  }                                                            
+                                                            
   base_exclude_set <- .build_exclude_set(exclude_gos)
 
   .run_one <- function(d, side, ont, comp, comp_dir, runTest_args = NULL) {
@@ -366,7 +439,7 @@ go_enrichment <- function(
       exclude_set_run <- .build_exclude_set(seeds_exp)
     }
 
-    g2 <- .make_gene2go(
+    g2 <- .make_gene2go_cached(
       d[[id_col]],
       d[[go_col]],
       ont = ont,
@@ -542,6 +615,8 @@ go_enrichment <- function(
         plt <- utils::head(plt, top_n)
         upper <- .upper_padj(plt, alpha)
 
+        base_family <- .pick_sans_family()
+
         gg <- ggplot2::ggplot(
           plt,
           ggplot2::aes(
@@ -558,21 +633,22 @@ go_enrichment <- function(
             y = sprintf("GO %s (%s)", ont, side),
             size = "# pos"
           ) +
-          ggplot2::theme_minimal(base_size = 12)
+          ggplot2::theme_minimal(base_size = 12, base_family = base_family)
 
-        ggplot2::ggsave(
-          sub("\\.tsv$", "_topN.svg", out_file),
-          gg,
-          width = 11,
-          height = 9
-        )
+        out_svg <- sub("\\.tsv$", "_topN.svg", out_file)
+        dev_fun <- .svg_device()
+
+        if (!is.null(dev_fun)) {
+          ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
+        } else {
+          ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+        }
       }
     }
-
     out_file
   }
 
-  .run_comp <- function(comp, comp_dir) {
+  .run_comp_side <- function(comp, comp_dir, side) {
     in_file <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) {
       warning("Missing annotated file: ", in_file, call. = FALSE)
@@ -586,31 +662,56 @@ go_enrichment <- function(
       quote = "",
       comment.char = ""
     )
+
     paths <- character(0)
-    for (sd in sides) {
-      for (ont in ontologies) {
-        p <- .run_one(d, sd, ont, comp, comp_dir, runTest_args = topgo_dots)
-        if (!is.null(p)) paths <- c(paths, p)
-      }
+    for (ont in ontologies) {
+      p <- .run_one(d, side, ont, comp, comp_dir, runTest_args = topgo_dots)
+      if (!is.null(p)) paths <- c(paths, p)
     }
-    if (!length(paths)) message("No GO enrichments produced for ", comp)
+    if (!length(paths)) message("No GO enrichments produced for ", comp, " side=", side)
     paths
   }
-
+                                                            
   # ---- batch vs single ----
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
-    outs <- character(0)
-    for (i in seq_len(nrow(df))) {
+
+    jobs <- expand.grid(
+      i = seq_len(nrow(df)),
+      side = sides,
+      KEEP.OUT.ATTRS = FALSE,
+      stringsAsFactors = FALSE
+    )
+
+    run_one_job <- function(k) {
+      i <- jobs$i[k]
+      side <- jobs$side[k]
       comp <- df$comparison_name[i]
       comp_dir <- file.path(output_dir, comp)
       dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
-      outs <- c(outs, .run_comp(comp, comp_dir))
+      .run_comp_side(comp, comp_dir, side)
     }
+
+    if (threads > 1L && .Platform$OS.type != "windows") {
+      outs_list <- parallel::mclapply(
+        seq_len(nrow(jobs)),
+        run_one_job,
+        mc.cores = threads,
+        mc.preschedule = FALSE
+      )
+    } else {
+      if (threads > 1L && .Platform$OS.type == "windows") {
+        warning("[go_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+      }
+      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
+    }
+
+    outs <- unlist(outs_list, use.names = FALSE)
     message("All topGO enrichments complete.")
     return(invisible(outs))
   }
-
+                                                            
+  # ---- single mode ----
   if (is.null(dnds_annot_file)) {
     stop(
       "Provide either comparison_file (batch) OR dnds_annot_file (single).",
@@ -620,6 +721,7 @@ go_enrichment <- function(
 
   comp_dir <- dirname(dnds_annot_file)
   comp_name <- sub("_dnds_annot\\.tsv$", "", basename(dnds_annot_file))
+
   d <- utils::read.table(
     dnds_annot_file,
     sep = "\t",
@@ -629,13 +731,30 @@ go_enrichment <- function(
     comment.char = ""
   )
 
-  outs <- character(0)
-  for (sd in sides) {
+  run_one_side <- function(sd) {
+    paths <- character(0)
     for (ont in ontologies) {
       p <- .run_one(d, sd, ont, comp_name, comp_dir, runTest_args = topgo_dots)
-      if (!is.null(p)) outs <- c(outs, p)
+      if (!is.null(p)) paths <- c(paths, p)
     }
+    paths
   }
+
+  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
+    outs_list <- parallel::mclapply(
+      sides,
+      run_one_side,
+      mc.cores = min(threads, length(sides)),
+      mc.preschedule = FALSE
+    )
+  } else {
+    if (threads > 1L && .Platform$OS.type == "windows") {
+      warning("[go_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+    }
+    outs_list <- lapply(sides, run_one_side)
+  }
+                                                                                                                    
+  outs <- unlist(outs_list, use.names = FALSE)
   message("topGO enrichment complete for: ", dnds_annot_file)
-  invisible(outs)
+  invisible(outs)                                                            
 }
