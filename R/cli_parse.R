@@ -14,7 +14,7 @@
     "-T" = "threads",
 
     "-w" = "warnings",
-    "-W" = "warnings",
+    "-W" = "warnings"
   )
 }
 
