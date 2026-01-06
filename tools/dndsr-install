@@ -168,7 +168,7 @@ declare -a BIND_ARGS=()
 mkdir -p "$RLIB" || die "Failed to create DNDSR_RLIB: $RLIB"
 [[ -w "$RLIB" ]] || die "DNDSR_RLIB not writable: $RLIB"
 
-RUNNER="${RLIB}/dndsR/exec/dndsr"
+RUNNER="${RLIB}/dndsR/scripts/dndsr"
 META="${RLIB}/.dndsR.installmeta"
 
 # Compute source hash (best-effort) from repo to detect changes

@@ -40,6 +40,7 @@ ipr_enrichment(
   ancestor_novel_frac = 0.2,
   x_axis_min = NULL,
   x_axis_max = NULL,
+  x_axis_pad_right = 3,
   interpro_release = NULL,
   auto_detect_release = TRUE,
   release_candidates = c("92.0", "94.0", "96.0", "98.0", "100.0"),
@@ -138,6 +139,9 @@ accidental mass exclusion (default 5000).}
 
 \item{x_axis_min, x_axis_max}{Optional fixed x-axis limits for plots.}
 
+\item{x_axis_pad_right}{Numeric. Extra units to extend the x-axis beyond the
+maximum observed enrichment when x_axis_max is not set (default 3).}
+
 \item{interpro_release}{Optional string (e.g. "94.0") to pin archived InterPro release.}
 
 \item{auto_detect_release}{Logical; auto-pick best archived release by IPR coverage (default TRUE).}
@@ -165,7 +169,4 @@ label, side, comparison.
 Reads \if{html}{\out{<comp>}}/\if{html}{\out{<comp>}}_dnds_annot.tsv and tests enrichment of IPR terms (q_ipr / s_ipr)
 among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
 Adds InterPro metadata (ENTRY_TYPE/ENTRY_NAME) and supports pooled vs per-type analyses.
-}
-\details{
-Plotting is harmonized with GO/term: x = Enrichment (pos/bg), size = # pos, color = adj p.
 }

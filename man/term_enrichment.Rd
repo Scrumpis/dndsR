@@ -25,7 +25,7 @@ term_enrichment(
   term_blocklist = c("attributes", "attribute", "attr", "notes", "note", "description",
     "product", "name", "id", "gene_id", "transcript_id", "parent", "dbxref", "source",
     "target", "type", "seqname", "seqid", "start", "end", "strand", "phase", "biotype",
-    "class", "len"),
+    "class", "len", "gff_start", "gff_end", "gff_seqname"),
   exclude_ids = NULL,
   term_trees = NULL,
   exclude_descendants = FALSE,

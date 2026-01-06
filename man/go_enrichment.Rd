@@ -27,6 +27,8 @@ go_enrichment(
   exclude_descendants_limit = 5000,
   include_definition = TRUE,
   alpha = 0.05,
+  verbose = FALSE,
+  threads = 4,
   ...
 )
 }
@@ -51,7 +53,7 @@ columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 \item{max_dnds}{Drop rows with dNdS >= max_dnds or NA (default 10).}
 
 \item{filter_expr}{Optional character filter evaluated in the data
-(e.g., "q_seqname == s_seqname").}
+(e.g., "q_gff_seqname == s_gff_seqname").}
 
 \item{drop_rows_without_go}{If TRUE (default), universe is genes with >=1 GO for that side.}
 
@@ -80,13 +82,18 @@ run to avoid accidentally nuking huge swaths (default 5000).}
 
 \item{alpha}{Numeric FDR reference level for color scale (default 0.05).}
 
+\item{verbose}{If TRUE, prints summary of GO filtering (default FALSE).}
+
+\item{threads}{Integer; maximum number of parallel workers (forked processes; default 4).
+In batch mode, workers are applied across (comparison, side) jobs.
+On Windows, runs sequentially (no forking).}
+
 \item{...}{Additional arguments passed on to 'topGO::runTest()', e.g. \code{score},
-\code{ties.method}, or other topGO tuning parameters. Core arguments
-\code{object}, \code{algorithm}, and \code{statistic} are always set by dndsR and
-cannot be overridden.}
+\code{ties.method}, etc. Core arguments \code{object}, \code{algorithm}, and \code{statistic}
+are always set by dndsR and cannot be overridden.}
 }
 \value{
-Invisibly: vector of output TSV paths (batch) or a data.frame list (single if make_plots=FALSE).
+Invisibly: vector of output TSV paths (batch or single).
 }
 \description{
 Uses topGO algorithms (classic/elim/weight/weight01) to test enrichment of GO terms

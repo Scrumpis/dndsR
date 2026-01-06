@@ -22,19 +22,15 @@ Imports:
     GenomicFeatures,
     GenomeInfoDb,
     ggplot2,
-    GO.db,
     jsonlite,
-    metablastr,
     methods,
     orthologr,
-    rdiamond,
     Rsamtools,
     scales,
     showtext,
     stats,
     svglite,
     sysfonts,
-    topGO,
     utils,
     xml2
 Remotes:
@@ -44,18 +40,22 @@ Remotes:
 Suggests:
     dplyr,
     knitr,
+    GO.db,
     IHW,
     IRanges,
     lme4,
+    metablastr,
     optparse,
     pwalign,
     qvalue,
+    rdiamond,
     readr,
     RIdeogram,
     S4Vectors,
     systemfonts,
     rmarkdown,
     testthat,
+    topGO,
     txdbmaker
 SystemRequirements:
     DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)

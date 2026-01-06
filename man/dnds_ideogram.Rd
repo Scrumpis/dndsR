@@ -7,6 +7,8 @@
 dnds_ideogram(
   dnds_annot_file = NULL,
   comparison_file = NULL,
+  query_fasta = NULL,
+  subject_fasta = NULL,
   output_dir = getwd(),
   sides = c("query", "subject"),
   window_size = 3e+05,
@@ -25,9 +27,10 @@ dnds_ideogram(
 )
 }
 \arguments{
-\item{dnds_annot_file}{Path to a single prebuilt intermediate table that
-already contains \code{q_chr/q_gene_start} or \code{s_chr/s_gene_start}
-(single mode). Most users should prefer batch mode via \code{comparison_file}.}
+\item{dnds_annot_file}{Path to a single prebuilt table that already contains
+\code{q_gff_seqname/q_gff_start} and/or \code{s_gff_seqname/s_gff_start}
+(single mode), such as a \code{<comp>_dnds_annot.tsv}. Most users should prefer
+batch mode via \code{comparison_file}.}
 
 \item{comparison_file}{Whitespace-delimited file with columns:
 \code{comparison_name}, \code{query_fasta}, \code{query_gff},
@@ -36,6 +39,10 @@ the function will look for the dN/dS table inside
 \code{file.path(output_dir, comparison_name)} using the first existing among
 \code{<comp>_dnds.tsv}, \code{<comp>_dnds_annot.tsv}, \code{<comp>_merged.tsv},
 build the intermediate by joining coordinates from the GFFs, and plot.}
+
+\item{query_fasta}{Single mode: FASTA for the query side (required if \code{sides} includes "query").}
+
+\item{subject_fasta}{Single mode: FASTA for the subject side (required if \code{sides} includes "subject").}
 
 \item{output_dir}{Root directory containing per-comparison folders in batch
 mode. Default: current working directory.}
@@ -47,7 +54,7 @@ mode. Default: current working directory.}
 \item{max_dnds}{Drop rows with \code{dNdS >= max_dnds} or \code{NA} (default \code{10}).}
 
 \item{filter_expr}{Optional character with a logical expression evaluated in
-the augmented table (e.g. \code{"q_chr == s_chr"}). Rows failing are removed.
+the augmented table (e.g. \code{"q_gff_seqname == s_gff_seqname"}). Rows failing are removed.
 (No chromosome mapping is performed; this is a raw filter.)}
 
 \item{make_png}{Logical; if \code{TRUE} (default) also write a PNG via \code{convertSVG()}.}
@@ -86,8 +93,8 @@ For each comparison, reads a dN/dS table (first existing among
 \code{<comp>_dnds.tsv}, \code{<comp>_dnds_annot.tsv}, or \code{<comp>_merged.tsv}),
 derives genomic coordinates for \code{query_id}/\code{subject_id} from the
 provided GFFs (first attribute match per ID), writes a temporary
-\code{<comp>/<comp>_ideogram_input.tsv} containing \code{q_chr},
-\code{q_gene_start}, \code{s_chr}, \code{s_gene_start}, and then generates
+\code{<comp>/<comp>_ideogram_input.tsv} containing \code{q_gff_seqname},
+\code{q_gff_start}, \code{s_gff_seqname}, \code{s_gff_start}, and then generates
 chromosome ideograms per side with two heatmaps: inverted negative selection
 (\code{dNdS < 1}) overlaid, and positive selection (\code{dNdS >= 1}) as the
 label heatmap. Outputs are \code{<comp>_{query|subject}_ideogram.{svg,png}}.

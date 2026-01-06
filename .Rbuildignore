@@ -3,3 +3,4 @@
 ^\.dockerignore$
 ^\.dndsR.Rproj$
 ^INSTALL\.md$
+^\.Rhistory$
