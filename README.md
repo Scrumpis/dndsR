@@ -12,7 +12,10 @@ A scalable dN/dS analysis R package. For single or multiple pairwise comparisons
 dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
 ## Setup
-We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage.
+We currently recommend Docker and Singularity with CLI usage, however, if Orthofinder 2.5.4 and Diamond 2.1.14 are present on your system and R dependencies are installed, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage.  
+
+### Before you start:
+- If conducting annotation term enrichment, ensure term versions in GFFs are the same at least within each comparison (i.e., both genomes annotated with IPR 83.0) to avoid erroneous results
   
 ### Clone the Repo
 ```
