@@ -282,7 +282,7 @@ CMD
     # Run and return to current shell (do not exec so we can continue)
     if [[ "$ENGINE" == "docker" ]]; then
       docker run --rm \
-        "${platform_args[@]}" \
+        "${platform_args[@]+"${platform_args[@]}"}" \
         -u "$(id -u)":"$(id -g)" \
         -v "${RLIB}:${RLIB}" \
         -v "${REPO}:${REPO}" \
@@ -348,22 +348,22 @@ pwd_real="$(pwd -P)"
 case "$ENGINE" in
   apptainer|singularity)
     exec "$ENGINE" exec \
-      "${extra_args[@]}" \
+      "${extra_args[@]+"${extra_args[@]}"}" \
       --bind "${pwd_real}:${WORKDIR}" \
       --bind "${RLIB}:${RLIB}" \
-      "${BIND_ARGS[@]}" \
+      "${BIND_ARGS[@]+"${BIND_ARGS[@]}"}" \
       "${SIF}" \
       bash -lc "export R_LIBS_USER='${RLIB}'; cd '${WORKDIR}'; '${RUNNER}' \"\$@\"" bash "$@"
     ;;
   docker)
     exec docker run --rm \
-      "${platform_args[@]}" \
+      "${platform_args[@]+"${platform_args[@]}"}" \
       -u "$(id -u)":"$(id -g)" \
       -v "${pwd_real}:${WORKDIR}" \
       -v "${RLIB}:${RLIB}" \
       -w "${WORKDIR}" \
-      "${BIND_ARGS[@]}" \
-      "${extra_args[@]}" \
+      "${BIND_ARGS[@]+"${BIND_ARGS[@]}"}" \
+      "${extra_args[@]+"${extra_args[@]}"}" \
       "${IMAGE}" \
       bash -lc "export R_LIBS_USER='${RLIB}'; '${RUNNER}' \"\$@\"" bash "$@"
     ;;
