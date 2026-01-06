@@ -34,9 +34,13 @@ Docker
 docker pull scrumpis/dndsr:latest
 ```
 ### Install
-Singularity:
+Singularity (can call Apptainer too):
 ```
 tools/dndsr-install install --engine singularity --sif dndsr.sif
+```
+Docker (on Mac):
+```
+tools/dndsr-install install --engine docker --image scrumpis/dndsr:latest --docker-platform linux/amd64
 ```
 #### Make dndsR findable and allow tab completion  
 Unix:
