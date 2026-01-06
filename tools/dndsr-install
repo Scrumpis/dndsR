@@ -161,6 +161,7 @@ EXTRA="${DNDSR_EXTRA_ARGS:-}"
 DOCKER_PLATFORM="${DNDSR_DOCKER_PLATFORM:-}"
 platform_args=()
 [[ -n "$DOCKER_PLATFORM" ]] && platform_args=( --platform "$DOCKER_PLATFORM" )
+declare -a BIND_ARGS=()
 
 [[ -n "$ENGINE" ]] || die "DNDSR_ENGINE not set in config"
 [[ -n "$RLIB" ]]   || die "DNDSR_RLIB not set in config"
@@ -171,20 +172,42 @@ RUNNER="${RLIB}/dndsR/exec/dndsr"
 META="${RLIB}/.dndsR.installmeta"
 
 # Compute source hash (best-effort) from repo to detect changes
+# Portable across Linux/macOS; hashes a stable tar stream of selected files.
 src_hash(){
-  local sum=""
-  if have sha256sum; then sum="sha256sum"
-  elif have shasum; then sum="shasum -a 256"
-  elif have md5sum; then sum="md5sum"
-  else echo ""; return 0; fi
+  local repo="$REPO"
+  [[ -d "$repo" ]] || { echo ""; return 0; }
+
+  local hasher kind=""
+  if have sha256sum; then
+    hasher="sha256sum"; kind="coreutils"
+  elif have shasum; then
+    hasher="shasum -a 256"; kind="shasum"
+  elif have openssl; then
+    hasher="openssl dgst -sha256"; kind="openssl"
+  else
+    echo ""
+    return 0
+  fi
 
   (
-    cd "$REPO" 2>/dev/null || exit 1
-    find DESCRIPTION NAMESPACE R inst man tools -type f 2>/dev/null \
+    cd "$repo" 2>/dev/null || exit 1
+
+    # Hash concatenated contents of key files in stable order.
+    # This avoids tar header nondeterminism.
+    find DESCRIPTION NAMESPACE R inst man tools \
+      -type f 2>/dev/null \
       | LC_ALL=C sort \
-      | xargs $sum \
-      | ${sum%% *} \
-      | awk '{print $1}'
+      | while IFS= read -r f; do
+          # Include file path separator so swaps/renames change the hash too
+          printf '==FILE==%s\n' "$f"
+          cat "$f"
+          printf '\n'
+        done \
+      | if [[ "$kind" == "openssl" ]]; then
+          $hasher | awk '{print $NF}'
+        else
+          $hasher | awk '{print $1}'
+        fi
   ) 2>/dev/null || true
 }
 
