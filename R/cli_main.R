@@ -1,6 +1,7 @@
 #' @keywords internal
 .dnds_cli_internal <- c(
   "bootstrap_path",
+  "cast",
   "list_commands",
   "lookup_command",
   "main",
