@@ -156,12 +156,27 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   }
   
   # Global options (do not forward as args)
+  #if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
+  #if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
+  
+  # Remove globals so they never reach target functions
+  #parsed$threads <- NULL
+  #parsed$verbose <- NULL
+
+  # Global options
   if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
   if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
   
-  # Remove globals so they never reach target functions
-  parsed$threads <- NULL
-  parsed$verbose <- NULL
+  # Forward --threads to target functions that have a 'threads' formal (or have ...)
+  if (!is.null(parsed$threads)) {
+    if (!("threads" %in% fmls) && !has_dots) {
+      # target can't accept threads; keep it global-only
+      parsed$threads <- NULL
+    }
+  }
+  # Always drop verbose unless target explicitly supports it (most won't)
+  if (!("verbose" %in% fmls) && !has_dots) parsed$verbose <- NULL
+
   
   # If target does not have ..., only pass arguments it explicitly accepts
   if (!has_dots) {
