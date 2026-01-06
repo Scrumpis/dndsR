@@ -70,18 +70,13 @@ cli_print_command_help <- function(cmd) {
 #'
 #' @export
 cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
-  # Do NOT attach packages inside package code
   if (!requireNamespace("cli", quietly = TRUE)) {
     stop("Package 'cli' is required for the dndsR CLI. Please install it.", call. = FALSE)
   }
 
-  # This function is running inside dndsR; ensure namespace is loaded so asNamespace() is valid.
-  # (In practice, calling dndsR::cli_main() already loads it, but this is harmless.)
   loadNamespace("dndsR")
-
   ns <- asNamespace("dndsR")
 
-  # Optional bootstrap hook (kept internal)
   if (exists("cli_bootstrap_path", envir = ns, inherits = FALSE)) {
     get("cli_bootstrap_path", envir = ns, inherits = FALSE)()
   }
@@ -90,12 +85,11 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     argv <- argv[-1]
   }
 
-  # Hidden: print subcommands (for shell completion)
   if (length(argv) > 0 && identical(argv[1], "__commands")) {
     cat(paste(cli_list_commands(), collapse = "\n"), "\n")
     return(invisible(NULL))
   }
-  
+
   if (length(argv) == 0 || argv[1] %in% c("-h", "--help", "help")) {
     cli_print_usage()
     return(invisible(NULL))
@@ -104,19 +98,16 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   cmd  <- argv[1]
   args <- argv[-1]
 
-  # If the user runs `dndsr <command>` with no args, show help instead of error
   if (length(args) == 0) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
   }
-  
-  # Command help
+
   if (any(args %in% c("-h", "--help", "--usage", "help"))) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
   }
 
-  # Special-case "doctor" if you want it independent of the usual dispatch
   if (identical(cmd, "doctor")) {
     if (exists("cli_doctor", envir = ns, inherits = FALSE)) {
       get("cli_doctor", envir = ns, inherits = FALSE)()
@@ -131,13 +122,8 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     stop(sprintf("Unknown command: %s", cmd), call. = FALSE)
   }
 
-  if (any(args %in% c("-h", "--help", "help"))) {
-    cli_print_command_help(cmd)
-    return(invisible(NULL))
-  }
-
   if (!exists("parse_dnds_opts", envir = ns, inherits = FALSE)) {
-  stop("Internal error: parse_dnds_opts() not found in dndsR namespace.", call. = FALSE)
+    stop("Internal error: parse_dnds_opts() not found in dndsR namespace.", call. = FALSE)
   }
   parsed <- get("parse_dnds_opts", envir = ns, inherits = FALSE)(args = args)
 
@@ -145,40 +131,53 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   target <- attr(fn, "target", exact = TRUE)
   if (is.null(target) || !nzchar(target)) target <- cmd
   target_fn <- get(target, envir = ns, inherits = TRUE)
+
   fmls <- names(formals(target_fn))
   has_dots <- "..." %in% fmls
-  
+
   # Special-case: map CLI --threads to calculate_dnds(comp_cores)
   if (identical(target, "calculate_dnds")) {
     if (!is.null(parsed$threads) && is.null(parsed$comp_cores)) {
       parsed$comp_cores <- parsed$threads
     }
   }
-  
-  # Global options (do not forward as args)
-  #if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
-  #if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
-  
-  # Remove globals so they never reach target functions
-  #parsed$threads <- NULL
-  #parsed$verbose <- NULL
 
   # Global options
   if (!is.null(parsed$threads)) options(dndsR.threads = as.integer(parsed$threads))
   if (isTRUE(parsed$verbose))   options(dndsR.verbose = TRUE)
-  
-  # Forward --threads to target functions that have a 'threads' formal (or have ...)
+
+  if (!is.null(parsed$warnings)) {
+    w <- tolower(as.character(parsed$warnings))[1L]
+    if (!(w %in% c("off", "summary", "all"))) {
+      stop("Invalid --warnings. Use: off|summary|all", call. = FALSE)
+    }
+    options(dndsR.warnings = w)
+  }
+
+  if (!is.null(parsed$warnings_max)) {
+    wm <- suppressWarnings(as.integer(parsed$warnings_max))
+    if (is.na(wm) || wm < 1L) {
+      options(dndsR.warnings_max = NULL)  # NULL = no cap (print all)
+    } else {
+      options(dndsR.warnings_max = wm)
+    }
+  }
+
+  # Forward --threads to targets that accept it (or have ...)
   if (!is.null(parsed$threads)) {
     if (!("threads" %in% fmls) && !has_dots) {
-      # target can't accept threads; keep it global-only
       parsed$threads <- NULL
     }
   }
-  # Always drop verbose unless target explicitly supports it (most won't)
+
+  # Only forward verbose if supported
   if (!("verbose" %in% fmls) && !has_dots) parsed$verbose <- NULL
 
-  
-  # If target does not have ..., only pass arguments it explicitly accepts
+  # Never forward warnings controls to target functions
+  parsed$warnings <- NULL
+  parsed$warnings_max <- NULL
+
+  # If target does not have ..., only pass args it explicitly accepts
   if (!has_dots) {
     parsed <- parsed[intersect(names(parsed), fmls)]
   }
@@ -190,5 +189,6 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
       stop(conditionMessage(e), call. = FALSE)
     }
   )
+
   invisible(NULL)
 }
