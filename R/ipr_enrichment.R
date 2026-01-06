@@ -979,14 +979,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         if (method == "fisher") {
           res <- .pooled_enrichment(df2, side, allowed_types = tp)
           if (!is.null(res) && nrow(res)) { res$ENTRY_TYPE <- tp; results[[tp]] <- res }
-          else message(sprintf("[ipr_enrichment] No rows for type=%s side=%s", tp, side, comp))
+          else message(sprintf("[ipr_enrichment] No rows for type=%s side=%s in %s", tp, side, comp))
         } else {
           res <- .parent_child_enrich(df2, term_col, tp, type_by_ipr, name_by_ipr,
                                       min_total, min_pos, max_prop,
                                       fdr_method, alpha,
                                       term_trees_df = tree_df)
           if (!is.null(res) && nrow(res)) results[[tp]] <- res
-          else message(sprintf("[ipr_enrichment] No rows (hierarchy mode) for type=%s side=%s", tp, side, comp))
+          else message(sprintf("[ipr_enrichment] No rows (hierarchy mode) for type=%s side=%s in %s", tp, side, comp))
         }
       }
       return(results)
