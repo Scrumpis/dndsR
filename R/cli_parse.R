@@ -6,17 +6,15 @@
   c(
     "-c" = "comparison_file",
     "-C" = "comparison_file",
-    "--comparison_file" = "comparison_file",
-    "--comparison-file" = "comparison_file",
 
     "-o" = "output_dir",
     "-O" = "output_dir",
-    "--output_dir" = "output_dir",
-    "--output-dir" = "output_dir",
 
     "-t" = "threads",
     "-T" = "threads",
-    "--threads" = "threads"
+
+    "-w" = "warnings",
+    "-W" = "warnings",
   )
 }
 
