@@ -550,20 +550,17 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         shape = is_inf_enrichment
       )
     ) +
-      # Use filled shapes so we can outline Inf points without changing the p_adj color mapping
-      ggplot2::geom_point(ggplot2::aes(stroke = is_inf_enrichment), fill = NA) +
+      ggplot2::geom_point(stroke = 1.2) +
       .padj_scale(alpha_val, upper) +
       ggplot2::scale_shape_manual(
         values = c(`FALSE` = 16, `TRUE` = 1),
         name = "Enrichment"
       ) +
       ggplot2::scale_size_continuous(name = "# pos") +
-      ggplot2::scale_stroke_manual(values = c(`FALSE` = 0.4, `TRUE` = 1.2), guide = "none") +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab) +
       ggplot2::theme_minimal(base_size = 13, base_family = base_family) +
       ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0)) +
       ggplot2::coord_cartesian(clip = "off") +
-      # Give extra right margin because labels now carry "(Inf)"
       ggplot2::theme(plot.margin = ggplot2::margin(5.5, 50, 5.5, 5.5))
   
     # ---- Optional fixed x limits (still no hard clipping) ----
