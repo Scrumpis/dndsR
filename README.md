@@ -59,7 +59,7 @@ Recommended for large-scale analysis. All functions will produce outputs for bot
 Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
 ```
-**Use dndsr --help or dndsr _function_ --help for more information on any commands.**
+**Use ```dndsr --help``` or ```dndsr <function> --help``` for more information on any commands.**
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
