@@ -544,7 +544,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       top_plot,
       ggplot2::aes(
         x = enrichment_plot,
-        y = stats::reorder(y_lab_plot, -p_adj),
+        y = stats::reorder(y_lab, -p_adj),
         size = pos_count,
         color = p_adj,
         shape = is_inf_enrichment
