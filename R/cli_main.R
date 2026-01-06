@@ -1,8 +1,21 @@
 #' @keywords internal
+.dnds_cli_internal <- c(
+  "bootstrap_path",
+  "list_commands",
+  "lookup_command",
+  "main",
+  "parse_args",
+  "print_command_help",
+  "print_usage"
+)
+
+#' @keywords internal
 cli_list_commands <- function() {
-  ns <- asNamespace("dndsR")  # safe after loadNamespace
+  ns <- asNamespace("dndsR")
   fns <- ls(ns, pattern = "^cli_", all.names = TRUE)
-  sort(sub("^cli_", "", fns))
+  cmds <- sub("^cli_", "", fns)
+  cmds <- setdiff(cmds, .dnds_cli_internal)
+  sort(cmds)
 }
 
 #' @keywords internal
