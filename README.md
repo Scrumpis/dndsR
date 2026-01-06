@@ -2,7 +2,7 @@
 
 ***Pre-release. Still performing tests before publication. Use at your own risk.***  
   
-An R package for scalable calculations and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between pairs of genomes. For single or multiple pairwise comparisons of genomes, dndsR...
+An R package for scalable calculation and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairs of genomes. For single or multiple pairwise comparisons of genomes, dndsR...
 - Extracts CDS or proteins using input genome FASTAs and gene annotation GFF3s
 - Calculates dN/dS
 - Visualizes selection pressures across the genomes through an ideogram
