@@ -80,7 +80,7 @@ detect_shell(){
 
 write_config(){
   local engine="$1" sif="$2" image="$3" rlib="$4"
-  mkdir -p "$CONF_DIR" "$BIN_DIR" || die "Failed to create install dirs"
+  mkdir -p "$CONF_DIR" "$BIN_DIR" "$rlib" || die "Failed to create install dirs"
 
   # Canonicalize paths so config works from ANY working directory
   local repo_abs rlib_abs sif_abs
