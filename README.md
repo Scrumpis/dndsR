@@ -7,7 +7,7 @@ An R package for scalable calculation and analysis of the ratio of non-synonymou
 - Calculates dN/dS
 - Visualizes selection pressures across the genomes through an ideogram
 - Calculates enrichment of gene functional annotation terms (IPR, GO, etc.) for biological functions under positive/diversifying selection
-- Analyzes specified retgions for overall differences in dN/dS (i.e., do Dkmer regions of B and C have dN/dS>1 significantly more frequently than
+- Analyzes broad dN/dS patterns across genomes or regions of genomes (under development)
   
 dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
