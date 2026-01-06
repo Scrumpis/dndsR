@@ -699,7 +699,7 @@ go_enrichment <- function(
         log_file = log_file,
         tag = "go_enrichment",
         header = c(
-          sprintf("[go_enrichment] comp=%s side=%s", comp, side)
+          sprintf("[go_enrichment] comp=%s side=%s", comp, side),
           sprintf("[go_enrichment] pid=%d threads=%d", Sys.getpid(), threads)
         ),
         expr = {
