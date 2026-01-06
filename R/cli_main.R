@@ -32,7 +32,7 @@ cli_lookup_command <- function(cmd) {
 #' @keywords internal
 .dndsr_global_flags <- list(
   # name = c("syntax", "description")
-  comparison_file = c("-c, -C, --comparison-file <int>", "Workers to assign to a job."),
+  comparison_file = c("-c, -C, --comparison-file <int>", "Comparison file for batch mode."),
   threads         = c("-t, -T, --threads <int>",         "Workers to assign to a job."),
   verbose         = c("-v, -V, --verbose",               "Verbose logging."),
   warnings        = c("-w, -W, --warnings <mode>",       "Prints R warnings: off|summary|all (default: off).")
