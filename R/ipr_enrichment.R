@@ -554,7 +554,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       .padj_scale(alpha_val, upper) +
       ggplot2::scale_shape_manual(
         values = c(`FALSE` = 16, `TRUE` = 1),
-        name = "Enrichment"
+        labels = c(`FALSE` = "Finite", `TRUE` = "Inf"),
+        name = "Enrichment (pos/bg)"
       ) +
       ggplot2::scale_size_continuous(name = "# pos") +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab) +
