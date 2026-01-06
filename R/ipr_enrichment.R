@@ -500,80 +500,86 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                           x_axis_min = x_axis_min,
                           x_axis_max = x_axis_max,
                           x_axis_pad_right = x_axis_pad_right) {
-
+  
     if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) {
       return(invisible(NULL))
     }
-
+  
     top <- df[order(df$p_adj, -df$enrichment, df$IPR), , drop = FALSE]
     top <- utils::head(top, top_n)
-
+  
     yvar <- if ("label" %in% names(top)) "label" else "IPR"
     top$y_lab <- top[[yvar]]
-
-    # ---- Plot-safe enrichment: keep Inf terms but cap for plotting only ----
+  
+    # ---- Identify non-finite enrichments (Inf/NA) and create plot-safe x ----
+    top$is_inf_enrichment <- !is.finite(top$enrichment) | is.na(top$enrichment)
     top$enrichment_plot <- top$enrichment
-
+  
     finite_x <- top$enrichment_plot[is.finite(top$enrichment_plot)]
     max_finite <- if (length(finite_x)) max(finite_x, na.rm = TRUE) else 1
-
+  
     # cap used only when enrichment is non-finite/NA so it can be drawn
     cap_x <- max_finite * 1.05
     if (!is.finite(cap_x) || cap_x <= 0) cap_x <- 1
-
-    bad_x <- !is.finite(top$enrichment_plot) | is.na(top$enrichment_plot)
-    if (any(bad_x)) top$enrichment_plot[bad_x] <- cap_x
-
-    # optional: mark capped points in the label so it’s obvious on the plot
+  
+    if (any(top$is_inf_enrichment)) top$enrichment_plot[top$is_inf_enrichment] <- cap_x
+  
+    # ---- Make it explicit in the label (NOT "...") ----
     top$y_lab_plot <- top$y_lab
-    if (any(bad_x)) {
-      top$y_lab_plot[bad_x] <- paste0(top$y_lab_plot[bad_x], "...")
-    } else {
-      top$y_lab_plot <- top$y_lab
+    if (any(top$is_inf_enrichment)) {
+      top$y_lab_plot[top$is_inf_enrichment] <- paste0(top$y_lab_plot[top$is_inf_enrichment], " (Inf)")
     }
-
+  
     # ---- Drop only rows that truly can't be mapped (pos_count/p_adj) ----
     keep <- !is.na(top$pos_count) & is.finite(top$pos_count) &
             !is.na(top$p_adj)     & is.finite(top$p_adj)
     top_plot <- top[keep, , drop = FALSE]
     if (!nrow(top_plot)) return(invisible(NULL))
-
+  
     base_family <- .pick_sans_family()
     upper <- .upper_padj(top_plot, alpha_val)
-
+  
+    # ---- Base plot: map Inf-flag to shape + stroke, keep color = p_adj ----
     gg <- ggplot2::ggplot(
       top_plot,
       ggplot2::aes(
         x = enrichment_plot,
         y = stats::reorder(y_lab_plot, -p_adj),
         size = pos_count,
-        color = p_adj
+        color = p_adj,
+        shape = is_inf_enrichment
       )
     ) +
-      ggplot2::geom_point() +
+      # Use filled shapes so we can outline Inf points without changing the p_adj color mapping
+      ggplot2::geom_point(ggplot2::aes(stroke = is_inf_enrichment), fill = NA) +
       .padj_scale(alpha_val, upper) +
-      ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos") +
+      ggplot2::scale_shape_manual(
+        values = c(`FALSE` = 16, `TRUE` = 1),
+        name = "Enrichment"
+      ) +
+      ggplot2::scale_size_continuous(name = "# pos") +
+      ggplot2::scale_stroke_manual(values = c(`FALSE` = 0.4, `TRUE` = 1.2), guide = "none") +
+      ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab) +
       ggplot2::theme_minimal(base_size = 13, base_family = base_family) +
-      # Ensure some breathing room even if a global theme set expand=0 somewhere
       ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0)) +
-      # Avoid clipping at panel boundary + add a bit of right-side margin
       ggplot2::coord_cartesian(clip = "off") +
-      ggplot2::theme(plot.margin = ggplot2::margin(5.5, 18, 5.5, 5.5))
-
-    # Only enforce x limits if the user explicitly asks for them (still no hard clipping)
+      # Give extra right margin because labels now carry "(Inf)"
+      ggplot2::theme(plot.margin = ggplot2::margin(5.5, 50, 5.5, 5.5))
+  
+    # ---- Optional fixed x limits (still no hard clipping) ----
     if (!is.null(x_axis_min) || !is.null(x_axis_max)) {
       xmin <- if (is.null(x_axis_min)) -Inf else x_axis_min
       xmax <- if (is.null(x_axis_max))  Inf else x_axis_max
       gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax), clip = "off")
     }
-
+  
     dev_fun <- .svg_device()
     if (!is.null(dev_fun)) {
       ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
     } else {
       ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
     }
-
+  
     invisible(NULL)
   }
                                                             
