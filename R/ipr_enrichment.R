@@ -74,6 +74,10 @@
 #' @param tree_url Optional explicit URL to ParentChildTree (raw txt or TSV).
 #' @param tree_timeout_s Numeric timeout (seconds) for tree fetch (default 20).
 #'
+#' @param threads Integer; maximum number of parallel workers (forked processes; default 4).
+#'   In batch mode, workers are applied across (comparison, side) jobs.
+#'   On Windows, runs sequentially (no forking).
+#'
 #' @return In single mode: (invisibly) list of output TSV paths.
 #'         In batch mode:  (invisibly) vector of output TSV paths across comparisons.
 #'         Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
@@ -123,7 +127,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            tree_source = c("auto","local","remote","none"),
                            tree_path = NULL,
                            tree_url = "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt",
-                           tree_timeout_s = 20) {
+                           tree_timeout_s = 20,
+                           threads = 4) {
 
   sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
   fdr_method <- match.arg(fdr_method)
@@ -131,6 +136,17 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   entries_source <- match.arg(entries_source)
   tree_source <- match.arg(tree_source)
   method <- match.arg(method)
+
+  threads <- suppressWarnings(as.integer(threads))
+  if (is.na(threads) || threads < 1L) threads <- 1L
+  message(sprintf("[ipr_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))
+  if (isTRUE(make_plots) && threads > 8L && !is.null(comparison_file)) {
+    warning(
+      "[ipr_enrichment] make_plots=TRUE with threads>8 may be I/O-heavy (many SVG writes). ",
+      "Consider lowering threads.",
+      call. = FALSE
+    )
+  }
 
   # ---- normalize possibly-NA flags from CLI ----
   .normalize_flag <- function(x, default) if (is.na(x)) default else x
@@ -356,7 +372,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .num <- function(x) suppressWarnings(as.numeric(x))
 
   .detect_current_release <- function(timeout_s = 30) {
-    # Try to read the current release notes and parse a version like "100.0"
     tf <- tempfile(fileext = ".txt")
     if (.download_quiet(.current_urls$notes, tf, timeout_s)) {
       txt <- paste(readLines(tf, warn = FALSE), collapse = "\n")
@@ -388,8 +403,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                                             max_backtrack = 12L,
                                             timeout_s = 30) {
     tried <- character(0); covv <- numeric(0)
-
-    # 1) Evaluate the start (often current) first
     rels <- unique(c(start_release, .seq_desc_releases(start_release, step, max_backtrack)))
     for (rel in rels) {
       if (!nzchar(rel)) next
@@ -399,14 +412,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         return(list(release = rel, coverage = cvr, tried = tried, coverages = covv))
       }
     }
-
-    # 2) No 100% hit; choose the best non-NA coverage among tried
     if (!length(covv)) return(list(release = NULL, coverage = NA_real_, tried = tried, coverages = covv))
     idx <- which.max(replace(covv, is.na(covv), -Inf))
     list(release = tried[idx], coverage = covv[idx], tried = tried, coverages = covv)
   }
-
-  # -------------------------------------------------------------------------------
 
   # ---------- generic helpers (existing) ----------
   .read_ws <- function(path, header_try = TRUE) {
@@ -426,23 +435,23 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   .apply_filter <- function(d, filter_expr) {
     keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
-  
+
     if (!is.null(filter_expr) && nzchar(filter_expr)) {
       ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-  
+
       if (inherits(ok, "try-error")) {
         stop("filter_expr evaluation failed: ", as.character(ok))
       }
-  
+
       ok <- as.vector(ok)
       if (length(ok) != nrow(d)) {
         stop("filter_expr must evaluate to length nrow(d).")
       }
-  
+
       ok <- as.logical(ok)
       keep <- keep & !is.na(ok) & ok
     }
-  
+
     d[keep, , drop = FALSE]
   }
   .split_terms_unique <- function(x) {
@@ -485,7 +494,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   # ---------- logging helper (MATCH go_enrichment behavior) ----------
   .with_log <- function(log_file, tag, header = NULL, expr) {
-    # If dndsR internal logger exists, use it. Otherwise just run.
     if (exists(".dndsr_with_log", mode = "function", inherits = TRUE)) {
       .dndsr_with_log(
         log_file = log_file,
@@ -496,7 +504,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     } else {
       force(expr)
     }
-  }                                         
+  }
 
   # ---------- font & plotting helpers (MATCH go_enrichment) ----------
   .bundled_arial_path <- function() {
@@ -504,41 +512,33 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
-
   .setup_showtext <- function() {
     ttf <- .bundled_arial_path()
     if (is.null(ttf)) return(NULL)
-
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
     if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
-
     ok <- try({
       sysfonts::font_add(family = "Arial Bold", regular = ttf)
       showtext::showtext_auto(TRUE)
       TRUE
     }, silent = TRUE)
-
     if (isTRUE(ok)) "Arial Bold" else NULL
   }
-
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
     ttf <- .bundled_arial_path()
     if (is.null(ttf)) return(NULL)
-
     function(file, ...) svglite::svglite(
       file,
       user_fonts = list(`Arial Bold` = ttf),
       ...
     )
   }
-
   .pick_sans_family <- function() {
     fam <- .setup_showtext()
     if (!is.null(fam)) return(fam)
     "sans"
   }
-
   .svg_device <- function() {
     dev_map <- .register_svglite_mapping()
     if (!is.null(dev_map)) return(dev_map)
@@ -560,51 +560,41 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       oob     = scales::squish, name = "adj p"
     )
   }
-                                                            
+
   .write_plot <- function(df, ylab, out_svg, alpha_val = alpha,
                           x_axis_min = x_axis_min,
                           x_axis_max = x_axis_max,
                           x_axis_pad_right = x_axis_pad_right) {
-  
+
     if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) {
       return(invisible(NULL))
     }
-  
+
     top <- df[order(df$p_adj, -df$enrichment, df$IPR), , drop = FALSE]
     top <- utils::head(top, top_n)
-  
+
     yvar <- if ("label" %in% names(top)) "label" else "IPR"
     top$y_lab <- top[[yvar]]
-  
-    # ---- Identify non-finite enrichments (Inf/NA) and create plot-safe x ----
+
     top$is_inf_enrichment <- !is.finite(top$enrichment) | is.na(top$enrichment)
     top$enrichment_plot <- top$enrichment
-  
+
     finite_x <- top$enrichment_plot[is.finite(top$enrichment_plot)]
     max_finite <- if (length(finite_x)) max(finite_x, na.rm = TRUE) else 1
-  
-    # cap used only when enrichment is non-finite/NA so it can be drawn
+
     cap_x <- max_finite * 1.05
     if (!is.finite(cap_x) || cap_x <= 0) cap_x <- 1
-  
+
     if (any(top$is_inf_enrichment)) top$enrichment_plot[top$is_inf_enrichment] <- cap_x
-  
-    # ---- Make it explicit in the label ----
-    #top$y_lab_plot <- top$y_lab
-    #if (any(top$is_inf_enrichment)) {
-    #  top$y_lab_plot[top$is_inf_enrichment] <- paste0(top$y_lab_plot[top$is_inf_enrichment], " (Inf)")
-    #}
-  
-    # ---- Drop only rows that truly can't be mapped (pos_count/p_adj) ----
+
     keep <- !is.na(top$pos_count) & is.finite(top$pos_count) &
-            !is.na(top$p_adj)     & is.finite(top$p_adj)
+      !is.na(top$p_adj)     & is.finite(top$p_adj)
     top_plot <- top[keep, , drop = FALSE]
     if (!nrow(top_plot)) return(invisible(NULL))
-  
+
     base_family <- .pick_sans_family()
     upper <- .upper_padj(top_plot, alpha_val)
-  
-    # ---- Base plot: map Inf-flag to shape + stroke, keep color = p_adj ----
+
     gg <- ggplot2::ggplot(
       top_plot,
       ggplot2::aes(
@@ -628,24 +618,23 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0)) +
       ggplot2::coord_cartesian(clip = "off") +
       ggplot2::theme(plot.margin = ggplot2::margin(5.5, 50, 5.5, 5.5))
-  
-    # ---- Optional fixed x limits (still no hard clipping) ----
+
     if (!is.null(x_axis_min) || !is.null(x_axis_max)) {
       xmin <- if (is.null(x_axis_min)) -Inf else x_axis_min
       xmax <- if (is.null(x_axis_max))  Inf else x_axis_max
       gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax), clip = "off")
     }
-  
+
     dev_fun <- .svg_device()
     if (!is.null(dev_fun)) {
       ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
     } else {
       ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
     }
-  
+
     invisible(NULL)
   }
-                                                            
+
   # ---------- InterPro entry.list (existing minimal) ----------
   .read_entries <- function(path) .read_tsv_strict(path)
   .bundled_path <- function() {
@@ -835,8 +824,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       depth[[n]] <<- d; d
     }
     for (n in nodes) rec(n)
-    nodes[order(depth[nodes])]  # leaves (most specific) first
+    nodes[order(depth[nodes])]
   }
+
   .parent_child_enrich <- function(df, term_col, type_label, type_by_ipr, name_by_ipr,
                                    min_total, min_pos, max_prop,
                                    fdr_method, alpha,
@@ -946,7 +936,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   backtrack_meta <- list()
 
   if (isTRUE(auto_detect_release) && is.null(interpro_release)) {
-    # Collect IPRs from input(s)
     iprs_all <- character(0)
     if (!is.null(comparison_file)) {
       df_cf <- .read_comparisons(comparison_file)
@@ -959,7 +948,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       iprs_all <- unique(c(iprs_all, .collect_all_iprs_from_comp(dnds_annot_file, term_sep)))
     }
 
-    # 1) Get "current" release number if possible; else fall back to highest candidate or a sane default
     cur_rel <- .detect_current_release(timeout_s = max(entries_timeout_s, tree_timeout_s))
     if (!nzchar(cur_rel) || !is.finite(.num(cur_rel))) {
       stop("[ipr_enrichment] Auto-detection of current InterPro release failed. ",
@@ -967,10 +955,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
            "'entry.list' and 'ParentChildTreeFile.txt'.")
     }
 
-    # 2) Evaluate "current" coverage first (even if backtracking later)
     cur_cov <- .coverage_for_current(iprs_all, timeout_s = max(entries_timeout_s, tree_timeout_s))
 
-    # 3) Walk downwards until 100% coverage, else keep best
     step_sz <- 2.0
     max_back <- 12L
     bt <- .backtrack_release_until_full(iprs_all, cur_rel, step = step_sz, max_backtrack = max_back,
@@ -997,12 +983,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
   }
 
-
   el <- .load_interpro_entry_list(entries_source = entries_source,
-                                  entries_path   = entries_path,
-                                  entries_url    = if (!is.null(entries_url)) entries_url else NULL,
-                                  interpro_release = chosen_release,
-                                  timeout_s = entries_timeout_s)
+                                 entries_path   = entries_path,
+                                 entries_url    = if (!is.null(entries_url)) entries_url else NULL,
+                                 interpro_release = chosen_release,
+                                 timeout_s = entries_timeout_s)
   entries <- el$df
   maps <- .build_ipr_maps(entries)
   type_by_ipr <- maps$type_by_ipr
@@ -1030,8 +1015,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   if (isTRUE(exclude_descendants) && length(exclude_seeds)) {
     if (!is.null(tree_df) && ncol(tree_df) >= 2) {
       exclude_seeds <- .expand_descendants(exclude_seeds, tree_df,
-                                           depth = exclude_descendants_depth,
-                                           limit = exclude_descendants_limit)
+                                          depth = exclude_descendants_depth,
+                                          limit = exclude_descendants_limit)
     } else {
       warning("exclude_descendants requested but no parent-child tree available; skipping expansion.")
     }
@@ -1067,8 +1052,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!term_col %in% names(d) || !is.character(d[[term_col]])) return(list())
     df <- .apply_filter(d, filter_expr); if (!nrow(df)) return(list())
     filter_fun <- function(v, keep_types = NULL) vapply(v, .filter_terms_string, FUN.VALUE = character(1),
-                                                        allowed_types = keep_types, type_by_ipr = type_by_ipr,
-                                                        exclude_set = exclude_set, keep_unmatched = keep_unmatched)
+                                                       allowed_types = keep_types, type_by_ipr = type_by_ipr,
+                                                       exclude_set = exclude_set, keep_unmatched = keep_unmatched)
     results <- list()
     if (!is.null(stratified_types)) {
       for (tp in stratified_types) {
@@ -1094,131 +1079,244 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     list(pooled = res)
   }
 
-  # ---------- comparison runner ----------
-  .run_one_comparison <- function(comp_name, comp_dir) {
+  # ---------- NEW: strat-type inference helper (per comparison) ----------
+  .infer_strat_types <- function(d) {
+    if (!isTRUE(stratify_by_type)) return(NULL)
+
+    if (is.null(type_by_ipr)) stop("stratify_by_type=TRUE requires InterPro metadata (entries_source != 'none').")
+
+    if (!is.null(types)) {
+      st <- intersect(types, unique(type_by_ipr))
+      if (!length(st)) return(NULL)
+      return(st)
+    }
+
+    all_terms <- character(0)
+    if ("q_ipr" %in% names(d) && is.character(d$q_ipr))
+      all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$q_ipr)), term_sep, fixed = TRUE)))
+    if ("s_ipr" %in% names(d) && is.character(d$s_ipr))
+      all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$s_ipr)), term_sep, fixed = TRUE)))
+    all_terms <- unique(all_terms[nzchar(all_terms)])
+    if (!is.null(exclude_ids) && length(exclude_ids)) all_terms <- setdiff(all_terms, exclude_ids)
+
+    st <- sort(unique(type_by_ipr[all_terms]))
+    st <- st[!is.na(st)]
+    if (!length(st)) return(NULL)
+    st
+  }
+
+  # ---------- NEW: run a single (comparison, side) ----------
+  .run_comp_side <- function(comp_name, comp_dir, side) {
     in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
-    if (!file.exists(in_file)) stop("Annotated dN/dS file not found: ", in_file)
+    if (!file.exists(in_file)) {
+      warning("Annotated dN/dS file not found: ", in_file, call. = FALSE)
+      return(character(0))
+    }
+
     d <- utils::read.table(in_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
 
-    outs <- character(0)
-    strat_types <- NULL
-    if (isTRUE(stratify_by_type)) {
-      if (is.null(type_by_ipr)) stop("stratify_by_type=TRUE requires InterPro metadata (entries_source != 'none').")
-      if (is.null(types)) {
-        all_terms <- character(0)
-        if ("q_ipr" %in% names(d) && is.character(d$q_ipr))
-          all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$q_ipr)), term_sep, fixed = TRUE)))
-        if ("s_ipr" %in% names(d) && is.character(d$s_ipr))
-          all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$s_ipr)), term_sep, fixed = TRUE)))
-        all_terms <- unique(all_terms[nzchar(all_terms)])
-        if (!is.null(exclude_ids) && length(exclude_ids)) all_terms <- setdiff(all_terms, exclude_ids)
-        strat_types <- sort(unique(type_by_ipr[all_terms])); strat_types <- strat_types[!is.na(strat_types)]
-      } else {
-        strat_types <- intersect(types, unique(type_by_ipr))
-      }
-      if (!length(strat_types)) {
-        message("No InterPro ENTRY_TYPEs detected in ", in_file, "; skipping stratified analysis.")
-        return(character(0))
-      }
+    strat_types <- .infer_strat_types(d)
+    if (isTRUE(stratify_by_type) && (is.null(strat_types) || !length(strat_types))) {
+      message("No InterPro ENTRY_TYPEs detected in ", in_file, "; skipping stratified analysis.")
+      # still write provenance (once) below in batch/single wrapper if desired
+      return(character(0))
     }
 
-    for (sd in sides) {
-      slices <- .enrich_side_ipr(d, side = sd, comp = comp_name, comp_dir = comp_dir,
-                                 stratified_types = if (isTRUE(stratify_by_type)) strat_types else NULL)
-      if (!length(slices)) next
-      if (isTRUE(stratify_by_type)) {
-        allres <- do.call(rbind, Filter(function(x) is.data.frame(x) && nrow(x) > 0, slices))
-        if (!nrow(allres)) next
-        allres$side <- sd; allres$comparison <- comp_name
-        for (tp in unique(allres$ENTRY_TYPE)) {
-          sub <- allres[allres$ENTRY_TYPE == tp, , drop = FALSE]
-          if (!nrow(sub)) next
-          sub <- sub[order(sub$p_adj, -sub$enrichment, sub$IPR), , drop = FALSE]
-          out_tsv <- file.path(comp_dir, sprintf("%s_%s_IPR_%s_enrichment.tsv",
-                                                 comp_name, if (sd=="query") "q" else "s", .sanitize_type(tp)))
-          utils::write.table(sub, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
-          out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
-          .write_plot(sub, sprintf("IPR (%s, %s) [%s]", tp, sd, method),
-                      out_svg, x_axis_min = x_axis_min, x_axis_max = x_axis_max, x_axis_pad_right = x_axis_pad_right)
-          outs <- c(outs, out_tsv)
-        }
-      } else {
-        res <- slices[[1]]; if (is.null(res) || !nrow(res)) next
-        res$side <- sd; res$comparison <- comp_name
-        res <- res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE]
-        out_tsv <- file.path(comp_dir, sprintf("%s_%s_IPR_enrichment.tsv", comp_name, if (sd=="query") "q" else "s"))
-        utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
+    outs <- character(0)
+
+    slices <- .enrich_side_ipr(
+      d,
+      side = side,
+      comp = comp_name,
+      comp_dir = comp_dir,
+      stratified_types = if (isTRUE(stratify_by_type)) strat_types else NULL
+    )
+    if (!length(slices)) return(character(0))
+
+    if (isTRUE(stratify_by_type)) {
+      allres <- do.call(rbind, Filter(function(x) is.data.frame(x) && nrow(x) > 0, slices))
+      if (!nrow(allres)) return(character(0))
+      allres$side <- side
+      allres$comparison <- comp_name
+
+      for (tp in unique(allres$ENTRY_TYPE)) {
+        sub <- allres[allres$ENTRY_TYPE == tp, , drop = FALSE]
+        if (!nrow(sub)) next
+        sub <- sub[order(sub$p_adj, -sub$enrichment, sub$IPR), , drop = FALSE]
+
+        out_tsv <- file.path(
+          comp_dir,
+          sprintf(
+            "%s_%s_IPR_%s_enrichment.tsv",
+            comp_name,
+            if (side == "query") "q" else "s",
+            .sanitize_type(tp)
+          )
+        )
+
+        utils::write.table(sub, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
+
         out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
-        .write_plot(res, sprintf("IPR (%s) [%s]", sd, method),
-                    out_svg, x_axis_min = x_axis_min, x_axis_max = x_axis_max, x_axis_pad_right = x_axis_pad_right)
+        .write_plot(
+          sub,
+          sprintf("IPR (%s, %s) [%s]", tp, side, method),
+          out_svg,
+          x_axis_min = x_axis_min,
+          x_axis_max = x_axis_max,
+          x_axis_pad_right = x_axis_pad_right
+        )
         outs <- c(outs, out_tsv)
       }
+    } else {
+      res <- slices[[1]]
+      if (is.null(res) || !nrow(res)) return(character(0))
+      res$side <- side
+      res$comparison <- comp_name
+      res <- res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE]
+
+      out_tsv <- file.path(
+        comp_dir,
+        sprintf("%s_%s_IPR_enrichment.tsv", comp_name, if (side == "query") "q" else "s")
+      )
+      utils::write.table(res, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
+
+      out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
+      .write_plot(
+        res,
+        sprintf("IPR (%s) [%s]", side, method),
+        out_svg,
+        x_axis_min = x_axis_min,
+        x_axis_max = x_axis_max,
+        x_axis_pad_right = x_axis_pad_right
+      )
+      outs <- c(outs, out_tsv)
     }
 
-    if (!length(outs)) message("No IPR enrichments produced for ", comp_name)
-
-    # NEW: provenance sidecar
-    prov <- c(.prov_common, list(comparison = comp_name,
-                                 timestamp  = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")))
-    .write_provenance(comp_dir, comp_name, prov)
-
+    if (!length(outs)) message("No IPR enrichments produced for ", comp_name, " side=", side)
     outs
   }
 
-  # ---------- batch vs single ----------
+  # ---------- NEW: provenance writer with simple lock to avoid clobber in parallel ----------
+  .write_prov_once <- function(comp_dir, comp_name) {
+    prov <- c(.prov_common, list(comparison = comp_name,
+                                 timestamp  = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")))
+    lock <- file.path(comp_dir, sprintf(".%s_interpro_provenance.lock", comp_name))
+
+    got_lock <- FALSE
+    try({
+      got_lock <- isTRUE(file.create(lock))
+    }, silent = TRUE)
+
+    if (isTRUE(got_lock)) {
+      on.exit(try(unlink(lock), silent = TRUE), add = TRUE)
+      .write_provenance(comp_dir, comp_name, prov)
+    }
+    invisible(NULL)
+  }
+
+  # ---------- batch vs single (PARALLELIZED LIKE go_enrichment) ----------
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
-    outs <- character(0)
 
-    for (i in seq_len(nrow(df))) {
+    jobs <- expand.grid(
+      i = seq_len(nrow(df)),
+      side = sides,
+      KEEP.OUT.ATTRS = FALSE,
+      stringsAsFactors = FALSE
+    )
+
+    run_one_job <- function(k) {
+      i <- jobs$i[k]
+      side <- jobs$side[k]
       comp <- df$comparison_name[i]
       comp_dir <- file.path(output_dir, comp)
       dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
 
-      message(sprintf("[ipr_enrichment] %s (logging to %s/%s_ipr_enrichment.log)",
-                      comp, comp_dir, comp))
+      message(sprintf("[ipr_enrichment] %s %s (logging to %s/%s_%s_ipr_enrichment.log)",
+                      comp, side, comp_dir, comp, side))
 
-      log_file <- file.path(comp_dir, sprintf("%s_ipr_enrichment.log", comp))
+      log_file <- file.path(comp_dir, sprintf("%s_%s_ipr_enrichment.log", comp, side))
 
-      out_i <- .with_log(
+      out_k <- .with_log(
         log_file = log_file,
         tag = "ipr_enrichment",
         header = c(
-          sprintf("[ipr_enrichment] comp=%s", comp),
-          sprintf("[ipr_enrichment] pid=%d", Sys.getpid())
+          sprintf("[ipr_enrichment] comp=%s side=%s", comp, side),
+          sprintf("[ipr_enrichment] pid=%d threads=%d", Sys.getpid(), threads)
         ),
         expr = {
-          .run_one_comparison(comp, comp_dir)
+          .run_comp_side(comp, comp_dir, side)
         }
       )
 
-      outs <- c(outs, out_i)
+      # provenance sidecar: write once per comparison (best-effort lock)
+      .write_prov_once(comp_dir, comp)
+
+      out_k
     }
 
+    if (threads > 1L && .Platform$OS.type != "windows") {
+      outs_list <- parallel::mclapply(
+        seq_len(nrow(jobs)),
+        run_one_job,
+        mc.cores = threads,
+        mc.preschedule = FALSE
+      )
+    } else {
+      if (threads > 1L && .Platform$OS.type == "windows") {
+        warning("[ipr_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+      }
+      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
+    }
+
+    outs <- unlist(outs_list, use.names = FALSE)
     message("All IPR enrichments complete.")
     return(invisible(outs))
   }
 
   if (is.null(dnds_annot_file)) stop("Provide either comparison_file (batch) OR dnds_annot_file (single).")
   if (!file.exists(dnds_annot_file)) stop("dnds_annot_file not found: ", dnds_annot_file)
-  d <- utils::read.table(dnds_annot_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
+
   comp_dir  <- dirname(dnds_annot_file)
   comp_name <- sub("_dnds_annot\\.tsv$", "", basename(dnds_annot_file))
 
-  message(sprintf("[ipr_enrichment] %s (logging to %s/%s_ipr_enrichment.log)",
-                  comp_name, comp_dir, comp_name))
+  run_one_side <- function(sd) {
+    message(sprintf("[ipr_enrichment] %s %s (logging to %s/%s_%s_ipr_enrichment.log)",
+                    comp_name, sd, comp_dir, comp_name, sd))
 
-  log_file <- file.path(comp_dir, sprintf("%s_ipr_enrichment.log", comp_name))
+    log_file <- file.path(comp_dir, sprintf("%s_%s_ipr_enrichment.log", comp_name, sd))
 
-  outs <- .with_log(
-    log_file = log_file,
-    tag = "ipr_enrichment",
-    header = c(sprintf("[ipr_enrichment] comp=%s", comp_name)),
-    expr = {
-      .run_one_comparison(comp_name, comp_dir)
+    out_sd <- .with_log(
+      log_file = log_file,
+      tag = "ipr_enrichment",
+      header = c(
+        sprintf("[ipr_enrichment] comp=%s side=%s", comp_name, sd),
+        sprintf("[ipr_enrichment] pid=%d threads=%d", Sys.getpid(), threads)
+      ),
+      expr = {
+        .run_comp_side(comp_name, comp_dir, sd)
+      }
+    )
+
+    .write_prov_once(comp_dir, comp_name)
+    out_sd
+  }
+
+  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
+    outs_list <- parallel::mclapply(
+      sides,
+      run_one_side,
+      mc.cores = min(threads, length(sides)),
+      mc.preschedule = FALSE
+    )
+  } else {
+    if (threads > 1L && .Platform$OS.type == "windows") {
+      warning("[ipr_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
     }
-  )
+    outs_list <- lapply(sides, run_one_side)
+  }
 
+  outs <- unlist(outs_list, use.names = FALSE)
   message("IPR enrichment complete for: ", dnds_annot_file)
   invisible(outs)
 }
