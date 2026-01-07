@@ -15,7 +15,7 @@ dndsR is primarily built for containerized command line usage but is also a load
 CLI usage with Docker or Singularity is recommended, however, if Orthofinder 2.5.4, Diamond 2.1.14, and R dependencies are present on your system, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage.  
 
 ### Before you start:
-- If conducting annotation term enrichment, ensure term versions in GFFs are the same at least within each comparison (i.e., both genomes annotated with IPR 83.0) to avoid erroneous results
+- If conducting annotation term enrichment, ensure term versions in GFFs are the same (i.e., both genomes annotated with IPR 83.0), at least within each comparison, to avoid erroneous results
   
 ### Clone the Repo
 ```
