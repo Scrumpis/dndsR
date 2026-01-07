@@ -51,6 +51,13 @@ Mac:
 ```
 source ~/.zshrc
 ```
+### Update (if needed)
+Used to update to current repo version if using older version.  
+While in the dndsR cloned repo:
+```
+git pull
+dndsr --help
+```
 
 ## CLI Usage
 Recommended for large-scale analysis. All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3".
