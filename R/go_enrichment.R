@@ -79,30 +79,6 @@ go_enrichment <- function(
   if (!requireNamespace("AnnotationDbi", quietly = TRUE)) {
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
-  
-  # topGO term envs may not be built at namespace load time in some installs.
-  # Build them explicitly (without attaching) if needed.
-  topgo_ns <- asNamespace("topGO")
-  
-  have_terms <- function() {
-    exists("GOBPTerm", envir = topgo_ns, inherits = FALSE) &&
-      exists("GOMFTerm", envir = topgo_ns, inherits = FALSE) &&
-      exists("GOCCTerm", envir = topgo_ns, inherits = FALSE)
-  }
-  
-  if (!have_terms()) {
-    # groupGOTerms() splits GO.db::GOTERM into BP/MF/CC envs in the provided 'where'
-    # (this is what you normally see happening on package attach).
-    topGO::groupGOTerms(where = topgo_ns)
-  }
-  
-  if (!have_terms()) {
-    stop(
-      "topGO term environments (GOBPTerm/GOMFTerm/GOCCTerm) could not be created. ",
-      "Try reinstalling 'topGO' and 'GO.db'.",
-      call. = FALSE
-    )
-  }
 
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
