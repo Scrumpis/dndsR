@@ -80,6 +80,26 @@ go_enrichment <- function(
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
 
+  # Ensure topGO is ATTACHED so its on-attach side effects (GOBPTerm/GOMFTerm/GOCCTerm)
+  # exist for topGO internals that refer to them as plain symbols.
+  if (!"package:topGO" %in% search()) {
+    suppressMessages(base::attachNamespace("topGO"))
+  }
+  
+  # sanity check (now safe to look in the attached package env)
+  topgo_pkg <- as.environment("package:topGO")
+  ok_terms <- exists("GOBPTerm", envir = topgo_pkg, inherits = FALSE) &&
+              exists("GOMFTerm", envir = topgo_pkg, inherits = FALSE) &&
+              exists("GOCCTerm", envir = topgo_pkg, inherits = FALSE)
+  
+  if (!ok_terms) {
+    stop(
+      "topGO did not create GOBPTerm/GOMFTerm/GOCCTerm on attach. ",
+      "This usually indicates a broken/partial topGO installation.",
+      call. = FALSE
+    )
+  }
+
   # extra args to pass to topGO::runTest()
   topgo_dots <- list(...)
 
