@@ -3,53 +3,89 @@
 #' Reads <comp>/<comp>_dnds_annot.tsv and tests enrichment of IPR terms (q_ipr / s_ipr)
 #' among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
 #' Adds InterPro metadata (ENTRY_TYPE/ENTRY_NAME) and supports pooled vs per-type analyses.
+#' Plots enrichment.
+#'
+#' @section Input and execution modes:
+#' - Single mode: provide `dnds_annot_file`.
+#' - Batch mode: provide `comparison_file`; per-comparison inputs are read from
+#'   `file.path(output_dir, comparison_name, "<comparison>_dnds_annot.tsv")`.
 #'
 #' @param dnds_annot_file Path to a single <comp>_dnds_annot.tsv (single mode).
 #' @param comparison_file Path to whitespace-delimited file (tabs/spaces; header or not)
 #'   with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
-#'   If provided, batch mode reads:
-#'   file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv")).
 #' @param output_dir Root directory containing per-comparison folders (batch mode).
 #' @param sides Character vector among c("query","subject"). Default both.
+#' @param threads Integer; maximum number of parallel workers (forked processes; default 4).
+#'   In batch mode, workers are applied across (comparison, side) jobs.
+#'   On Windows, runs sequentially (no forking).
+#'
+#' @section Defining positives and the enrichment universe:
+#' - Positives are rows with dNdS > pos_threshold.
+#' - Background is the filtered set after applying dNdS limits and optional expressions.
+#'
 #' @param pos_threshold Numeric. dNdS > pos_threshold defines "positive" (default 1).
 #' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds (default 10) or NA dNdS.
 #' @param filter_expr Optional character with a logical expression evaluated in the data
 #'   (e.g., "q_seqname == s_seqname").
-#' @param make_plots Logical; if TRUE, write a top-N bubble plot per result (default TRUE).
-#' @param top_n Integer; number of rows for plot (default 20).
 #' @param drop_rows_without_term Logical; if TRUE (default), rows with no IPR term are
 #'   removed from BOTH positives and background (annotation-aware universe).
+#'
+#' @section Term frequency and multiple-testing filters:
+#' - Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
+#'
 #' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 2).
 #' @param min_pos   Minimum positive occurrences required for a term (default 2).
+#' @param max_prop Maximum allowed proportion of the background annotated set
+#'   that may be assigned to a term (default 0.20). Terms with
+#'   (pos_count + nonpos_count) / (pos_total + nonpos_total) > max_prop
+#'   are filtered out to avoid overly broad terms dominating enrichment.
+#'
+#' @section Multiple testing adjustment:
+#'
 #' @param fdr_method One of "BH","BY","IHW","qvalue","none". Defaults to "BH".
 #' @param alpha FDR level for IHW weighting (default 0.05).
-#' @param term_sep Separator used in q_ipr/s_ipr strings (default ";").
 #'
+#' @section InterPro term parsing and stratification:
+#'
+#' @param term_sep Separator used in q_ipr/s_ipr strings (default ";").
 #' @param include_types Optional character vector of InterPro ENTRY_TYPE values to keep
 #'   in pooled mode (e.g., c("Domain","Homologous_superfamily")). Ignored if stratified.
 #' @param stratify_by_type Logical. If TRUE, run separate analyses per ENTRY_TYPE with
 #'   type-specific backgrounds (recommended). Default TRUE.
 #' @param types Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 #'   = infer from data present in q_ipr/s_ipr (after exclusions).
-#' @param adjust_scope When stratified, "global" (one BH across all tests) or "per_type" (not implemented currently).
+#' @param adjust_scope When stratified, "global" (one BH across all tests) or "per_type"
+#'   (not implemented currently).
+#'
+#' @section InterPro metadata and release handling:
 #'
 #' @param entries_source Where to load InterPro entries from:
 #'   "auto" (bundled static; default), "local" (use entries_path),
 #'   "remote" (download; falls back to bundled), or "none" (skip metadata).
 #' @param entries_path Optional path to a TSV copy of InterPro entry.list
 #'   (columns: ENTRY_AC, ENTRY_TYPE, ENTRY_NAME). Used for "auto"/"local".
-#' @param entries_url  Remote URL for current InterPro entry.list (default EBI).
+#' @param entries_url Remote URL for current InterPro entry.list.
+#'   If NULL (default), uses the EMBL-EBI current release endpoint.
 #' @param entries_timeout_s Numeric timeout (seconds) for remote fetch (default 20).
 #' @param keep_unmatched Keep IPRs not found in entry.list when filtering (default TRUE).
+#'
+#' @param interpro_release Optional string (e.g. "94.0") to pin archived InterPro release.
+#' @param auto_detect_release Logical; auto-pick best archived release by IPR coverage (default TRUE).
+#' @param release_candidates Character vector of releases to test
+#'   (default c("92.0","94.0","96.0","98.0","100.0")).
+#' @param strict_coverage Numeric in \eqn{[0,1]}; fail if best coverage < this (default 0.90).
+#'
+#' @param tree_source Where to load ParentChildTree from: "auto","local","remote","none".
+#' @param tree_path Optional local ParentChildTreeFile.txt or 2-col TSV edgelist.
+#' @param tree_url Optional explicit URL to the InterPro ParentChildTree file.
+#'   If NULL (default), uses the EMBL-EBI current release endpoint.
+#' @param tree_timeout_s Numeric timeout (seconds) for tree fetch (default 20).
+#'
+#' @section Excluding terms and hierarchy expansion:
 #'
 #' @param exclude_ids Character vector of IPR accessions (e.g. "IPR000123") to exclude
 #'   globally from both positives and background before enrichment. Preferred name.
 #' @param exclude_iprs Deprecated alias of `exclude_ids` for backward compatibility.
-#' @param max_prop Maximum allowed proportion of the background annotated set
-#'   that may be assigned to a term (default 0.20). Terms with
-#'   (pos_count + nonpos_count) / (pos_total + nonpos_total) > max_prop
-#'   are filtered out to avoid overly broad terms dominating enrichment.
-#'
 #' @param term_trees Optional path or data.frame of a parent/child edgelist for IPRs.
 #'   (High-priority local override if provided; two columns parent,child).
 #' @param exclude_descendants If TRUE, expand `exclude_ids` using tree. Default FALSE.
@@ -58,31 +94,35 @@
 #' @param exclude_descendants_limit Hard cap on the number of excluded IPRs to avoid
 #'   accidental mass exclusion (default 5000).
 #'
-#' @param method Enrichment mode: "fisher" (default), "parent_child" (elim-like), "weight01".
-#' @param ancestor_novel_frac Keep parent only if >= this fraction of unclaimed genes (default 0.20).
+#' @section Hierarchy-aware enrichment modes:
 #'
+#' @param method Enrichment mode: "fisher" (default), "parent_child" (elim-like), "weight01".
+#' @param ancestor_novel_frac Keep parent only if >= this fraction of unclaimed genes
+#'   (default 0.20).
+#'
+#' @section Plotting:
+#'
+#' @param make_plots Logical; if TRUE, write a top-N bubble plot per result (default TRUE).
+#' @param top_n Integer; number of rows for plot (default 20).
 #' @param x_axis_min,x_axis_max Optional fixed x-axis limits for plots.
 #' @param x_axis_pad_right Numeric. Extra units to extend the x-axis beyond the
 #'   maximum observed enrichment when x_axis_max is not set (default 3).
 #'
-#' @param interpro_release Optional string (e.g. "94.0") to pin archived InterPro release.
-#' @param auto_detect_release Logical; auto-pick best archived release by IPR coverage (default TRUE).
-#' @param release_candidates Character vector of releases to test (default c("92.0","94.0","96.0","98.0","100.0")).
-#' @param strict_coverage Numeric in \eqn{[0,1]}; fail if best coverage < this (default 0.90).
-#' @param tree_source Where to load ParentChildTree from: "auto","local","remote","none".
-#' @param tree_path Optional local ParentChildTreeFile.txt or 2-col TSV edgelist.
-#' @param tree_url Optional explicit URL to ParentChildTree (raw txt or TSV).
-#' @param tree_timeout_s Numeric timeout (seconds) for tree fetch (default 20).
-#'
-#' @param threads Integer; maximum number of parallel workers (forked processes; default 4).
-#'   In batch mode, workers are applied across (comparison, side) jobs.
-#'   On Windows, runs sequentially (no forking).
+#' @details
+#' Default InterPro resources (EMBL-EBI):
+#' \itemize{
+#'   \item Entry list:
+#'     \url{https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list}
+#'   \item Parent–child tree:
+#'     \url{https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt}
+#' }
 #'
 #' @return In single mode: (invisibly) list of output TSV paths.
-#'         In batch mode:  (invisibly) vector of output TSV paths across comparisons.
-#'         Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
-#'         pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment,
-#'         label, side, comparison.
+#'   In batch mode: (invisibly) vector of output TSV paths across comparisons.
+#'   Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
+#'   pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment,
+#'   label, side, comparison.
+#'
 #' @export
 ipr_enrichment <- function(dnds_annot_file = NULL,
                            comparison_file = NULL,
@@ -106,8 +146,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            adjust_scope = c("global","per_type"),
                            entries_source = c("auto","local","remote","none"),
                            entries_path   = NULL,
-                           entries_url    = 
-                           "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list",
+                           entries_url    = NULL,
                            entries_timeout_s = 20,
                            keep_unmatched = TRUE,
                            exclude_ids = NULL,
@@ -127,8 +166,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            strict_coverage = 0.90,
                            tree_source = c("auto","local","remote","none"),
                            tree_path = NULL,
-                           tree_url = 
-                           "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt",
+                           tree_url = NULL,
                            tree_timeout_s = 20,
                            threads = 4) {
 
@@ -164,7 +202,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     exclude_ids <- exclude_iprs
   }
 
-  # -------------------------- NEW: InterPro release & tree helpers ----------------
+  # -------------------------- InterPro release & tree helpers ----------------
   .release_path <- function(rel) sprintf("https://ftp.ebi.ac.uk/pub/databases/interpro/releases/%s", rel)
   .release_urls <- function(rel) {
     b <- .release_path(rel)
@@ -184,12 +222,16 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (inherits(ok, "try-error") || (!is.null(ok) && ok != 0)) return(FALSE)
     file.exists(file) && file.info(file)$size > 0
   }
+  # ---- defaults for long URLs (keep Rd \usage lines short) ----
+  if (is.null(entries_url) || !nzchar(entries_url)) entries_url <- .current_urls$entry_list
+  if (is.null(tree_url)    || !nzchar(tree_url))    tree_url    <- .current_urls$parent_child
+  
   .read_tsv_strict <- function(path) {
     utils::read.table(path, header = TRUE, sep = "\t", quote = "",
                       stringsAsFactors = FALSE, comment.char = "", check.names = FALSE)
   }
 
-  # ---- NEW: entry.list reader that supports both headered TSV (your bundled file)
+  # ---- entry.list reader that supports both headered TSV (your bundled file)
   #          and headerless FTP entry.list format. Returns standardized columns. ----
   .read_interpro_entry_list <- function(path) {
     first <- readLines(path, n = 1, warn = FALSE)
