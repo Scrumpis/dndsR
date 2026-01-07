@@ -16,8 +16,11 @@
 #' @param query_gff Path to the query GFF3.
 #' @param subject_gff Path to the subject GFF3 (optional in single-genome mode).
 #' @param output_dir Output directory; one subdir per comparison.
-#' @param overwrite Overwrite existing outputs if TRUE.
-#' @param verbose Print progress messages if TRUE.
+#' @param overwrite Overwrite existing outputs if TRUE (default FALSE).
+#' @param verbose Print progress messages if TRUE (default FALSE).
+#' @param threads Integer; maximum number of parallel workers (forked processes; default 1).
+#'   In batch mode, workers are applied across unique genome extraction tasks.
+#'   On Windows, runs sequentially (no forking).
 #' @param comparison_file Optional comparison table path or data.frame.
 #' @param group_by "gene" or "tx" for how CDS are grouped/named.
 #' @param export_proteins If TRUE, also write translated proteins as AA FASTA.
@@ -25,6 +28,9 @@
 #' @param keep_internal_stops If FALSE, drop sequences with internal stops (post-translation).
 #' @param cds_suffix Filename suffix for CDS FASTA outputs. Default "_CDS.fasta".
 #' @param protein_suffix Filename suffix for AA FASTA outputs. Default "_AA.fasta".
+#'
+#' @details
+#' TxDb genome build metadata is not required for CDS extraction and is intentionally ignored.
 #'
 #' @return A list (or list-of-lists in batch) with paths to CDS/protein files and metadata.
 #' @export
@@ -35,7 +41,8 @@ extract_cds <- function(comparison_name = NULL,
                         subject_gff = NULL,
                         output_dir = ".",
                         overwrite = FALSE,
-                        verbose = TRUE,
+                        verbose = FALSE,
+                        threads = 1,
                         comparison_file = NULL,
                         group_by = c("gene", "tx"),
                         export_proteins = FALSE,
@@ -45,6 +52,9 @@ extract_cds <- function(comparison_name = NULL,
                         protein_suffix = "_AA.fasta") {
 
   group_by <- match.arg(group_by)
+
+  threads <- suppressWarnings(as.integer(threads))
+  if (is.na(threads) || threads < 1L) threads <- 1L
 
   # ---- dependency guards with clear errors ----
   .need_pkg <- function(pkg) {
@@ -59,8 +69,11 @@ extract_cds <- function(comparison_name = NULL,
   .need_pkg("Rsamtools")
   .need_pkg("GenomeInfoDb")
   .need_pkg("tools")
+  .need_pkg("parallel")
 
   vmsg <- function(...) if (isTRUE(verbose)) message(...)
+
+  message(sprintf("[extract_cds] starting (threads=%d)", threads))
 
   # ---- helper: ensure FASTA is indexed; return FaFile and available seqnames ----
   .open_indexed_fasta <- function(fa) {
@@ -73,11 +86,37 @@ extract_cds <- function(comparison_name = NULL,
   }
 
   # ---- helper: build TxDb and group CDS ----
+  # - If verbose=FALSE: muffle ONLY the known harmless genome-metadata warning.
+  # - If verbose=TRUE: print that warning immediately (full text) and muffle it so it
+  #   doesn't get repeated in the end-of-run "Warning messages:" block.
   .cds_groups <- function(gff, by = "gene") {
     if (!file.exists(gff)) stop("GFF not found: ", gff, call. = FALSE)
-    txdb <- txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character())
+
+    meta_pat <- "genome version information is not available for this TxDb object"
+
+    txdb <- withCallingHandlers(
+      txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character()),
+      warning = function(w) {
+        msg <- conditionMessage(w)
+        is_meta <- grepl(meta_pat, msg, fixed = TRUE)
+
+        if (is_meta) {
+          if (isTRUE(verbose)) vmsg("  [TxDb note] ", msg)
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
+
+    # Optional, concise note (only when metadata truly absent)
+    if (isTRUE(verbose)) {
+      gi <- try(GenomeInfoDb::genome(txdb), silent = TRUE)
+      if (inherits(gi, "try-error") || all(is.na(gi)) || !any(nzchar(trimws(gi)))) {
+        vmsg("  - TxDb genome metadata not provided by GFF; safe to ignore for CDS extraction")
+      }
+    }
+
     if (by == "gene") {
-      GenomicFeatures::cdsBy(txdb, by = "gene")  # names may exist but are not guaranteed
+      GenomicFeatures::cdsBy(txdb, by = "gene")
     } else {
       GenomicFeatures::cdsBy(txdb, by = "tx", use.names = TRUE)
     }
@@ -153,7 +192,6 @@ extract_cds <- function(comparison_name = NULL,
       }
     }
 
-    # ensure required cols exist (subject cols may be NA/blank)
     miss <- setdiff(req, names(df))
     if (length(miss)) {
       stop("comparison_file missing columns: ", paste(miss, collapse = ", "), call. = FALSE)
@@ -180,8 +218,6 @@ extract_cds <- function(comparison_name = NULL,
 
     vmsg("  - Indexing/opening FASTA: ", basename(fasta_path))
     h <- .open_indexed_fasta(fasta_path)
-
-    # Ensure FaFile is closed even if something errors
     on.exit(try(close(h$fafile), silent = TRUE), add = TRUE)
 
     vmsg("  - Parsing GFF and grouping CDS by ", group_by)
@@ -189,7 +225,7 @@ extract_cds <- function(comparison_name = NULL,
 
     cds_groups2 <- .keep_valid_groups(cds_groups, h$chroms)
     if (length(cds_groups2) == 0L) {
-      warning("No CDS groups matched chromosomes in FASTA for: ", out_base)
+      warning("No CDS groups matched chromosomes in FASTA for: ", out_base, call. = FALSE)
       return(res)
     }
 
@@ -218,7 +254,7 @@ extract_cds <- function(comparison_name = NULL,
     res
   }
 
-  # ---- orchestrate one comparison ----
+  # ---- orchestrate one comparison (used for single mode and for batch return assembly) ----
   run_extraction <- function(comparison_name, query_fasta, subject_fasta, query_gff, subject_gff) {
     comp_dir <- file.path(output_dir, comparison_name)
     dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
@@ -254,27 +290,128 @@ extract_cds <- function(comparison_name = NULL,
     )
   }
 
-  # ---- batch mode ----
+  # ---- batch mode (unique-task scheduling) ----
   if (!is.null(comparison_file)) {
     comparisons <- .read_comparisons(comparison_file)
 
-    return(lapply(seq_len(nrow(comparisons)), function(i) {
-      row <- comparisons[i, , drop = FALSE]
+    vmsg(sprintf("[extract_cds] threads=%d (pid=%d)", threads, Sys.getpid()))
+    if (threads > 1L && .Platform$OS.type == "windows") {
+      warning("[extract_cds] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+      threads <- 1L
+    }
 
-      # allow blank/NA subjects for query-only
+    # Build task table: all (comp, fasta, gff, out_base)
+    make_tasks <- function(df) {
+      q <- data.frame(
+        comparison_name = df$comparison_name,
+        fasta = df$query_fasta,
+        gff = df$query_gff,
+        stringsAsFactors = FALSE
+      )
+      s <- data.frame(
+        comparison_name = df$comparison_name,
+        fasta = df$subject_fasta,
+        gff = df$subject_gff,
+        stringsAsFactors = FALSE
+      )
+      tasks <- rbind(q, s)
+
+      # Drop blank/NA tasks (covers query-only cases + headerless weirdness)
+      tasks <- tasks[!is.na(tasks$fasta) & nzchar(tasks$fasta) &
+                       !is.na(tasks$gff) & nzchar(tasks$gff), , drop = FALSE]
+
+      tasks$comp_dir <- file.path(output_dir, tasks$comparison_name)
+      tasks$out_base <- file.path(tasks$comp_dir, tools::file_path_sans_ext(basename(tasks$fasta)))
+
+      tasks$cds_path <- paste0(tasks$out_base, cds_suffix)
+      tasks$prot_path <- paste0(tasks$out_base, protein_suffix)
+      tasks
+    }
+
+    tasks <- make_tasks(comparisons)
+
+    # Deduplicate by the actual outputs this run would generate
+    dedup_key <- if (isTRUE(export_proteins)) tasks$prot_path else tasks$cds_path
+    uniq <- !duplicated(dedup_key)
+    tasks_unique <- tasks[uniq, , drop = FALSE]
+
+    # Ensure directories exist
+    udirs <- unique(tasks_unique$comp_dir)
+    for (d in udirs) dir.create(d, showWarnings = FALSE, recursive = TRUE)
+
+    vmsg(sprintf("[extract_cds] genome_tasks=%d (unique) from %d (raw)",
+                 nrow(tasks_unique), nrow(tasks)))
+
+    run_task <- function(i) {
+      t <- tasks_unique[i, , drop = FALSE]
+      vmsg("== ", t$comparison_name, " ==")
+      .extract_one(t$fasta, t$gff, t$out_base)
+    }
+
+    if (threads > 1L && nrow(tasks_unique) > 1L) {
+      results_unique <- parallel::mclapply(
+        seq_len(nrow(tasks_unique)),
+        run_task,
+        mc.cores = min(threads, nrow(tasks_unique)),
+        mc.preschedule = FALSE
+      )
+    } else {
+      results_unique <- lapply(seq_len(nrow(tasks_unique)), run_task)
+    }
+
+    # Map results by out_base for fast per-comparison assembly
+    res_by_outbase <- setNames(results_unique, tasks_unique$out_base)
+
+    # Assemble return per comparison (no re-extraction; just attach known paths/status)
+    out <- lapply(seq_len(nrow(comparisons)), function(i) {
+      row <- comparisons[i, , drop = FALSE]
+      comp <- row$comparison_name
+      comp_dir <- file.path(output_dir, comp)
+
+      q_base <- file.path(comp_dir, tools::file_path_sans_ext(basename(row$query_fasta)))
+      q_res <- res_by_outbase[[q_base]]
+      if (is.null(q_res)) {
+        # Shouldn't happen unless inputs were blank; keep a consistent structure
+        q_res <- list(
+          cds_path = paste0(q_base, cds_suffix),
+          prot_path = paste0(q_base, protein_suffix),
+          cds_written = FALSE,
+          prot_written = FALSE,
+          dropped_with_internal_stops = 0L
+        )
+      }
+
       sf <- row$subject_fasta
       sg <- row$subject_gff
-      if (is.na(sf) || !nzchar(sf)) sf <- NULL
-      if (is.na(sg) || !nzchar(sg)) sg <- NULL
+      has_subject <- !is.na(sf) && nzchar(sf) && !is.na(sg) && nzchar(sg)
 
-      run_extraction(
-        comparison_name = row$comparison_name,
-        query_fasta     = row$query_fasta,
-        subject_fasta   = sf,
-        query_gff       = row$query_gff,
-        subject_gff     = sg
+      s_res <- NULL
+      if (has_subject) {
+        s_base <- file.path(comp_dir, tools::file_path_sans_ext(basename(sf)))
+        s_res <- res_by_outbase[[s_base]]
+        if (is.null(s_res)) {
+          s_res <- list(
+            cds_path = paste0(s_base, cds_suffix),
+            prot_path = paste0(s_base, protein_suffix),
+            cds_written = FALSE,
+            prot_written = FALSE,
+            dropped_with_internal_stops = 0L
+          )
+        }
+      }
+
+      list(
+        comparison_name = comp,
+        query = q_res,
+        subject = s_res,
+        group_by = group_by,
+        export_proteins = export_proteins,
+        cds_suffix = cds_suffix,
+        protein_suffix = protein_suffix
       )
-    }))
+    })
+
+    return(out)
   }
 
   # ---- single / single-genome mode ----
