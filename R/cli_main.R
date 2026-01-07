@@ -7,6 +7,7 @@
   "main",
   "parse_args",
   "print_command_help",
+  "print_global_flags",
   "print_usage"
 )
 
