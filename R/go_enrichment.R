@@ -289,7 +289,7 @@ go_enrichment <- function(
 
     function(file, ...) svglite::svglite(
       file,
-      system_fonts = list(`Arial Bold` = ttf),
+      user_fonts = list(`Arial Bold` = ttf),
       ...
     )
   }
