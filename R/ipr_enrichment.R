@@ -19,8 +19,8 @@
 #' @param top_n Integer; number of rows for plot (default 20).
 #' @param drop_rows_without_term Logical; if TRUE (default), rows with no IPR term are
 #'   removed from BOTH positives and background (annotation-aware universe).
-#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 0).
-#' @param min_pos   Minimum positive occurrences required for a term (default 0).
+#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 2).
+#' @param min_pos   Minimum positive occurrences required for a term (default 2).
 #' @param fdr_method One of "BH","BY","IHW","qvalue","none". Defaults to "BH".
 #' @param alpha FDR level for IHW weighting (default 0.05).
 #' @param term_sep Separator used in q_ipr/s_ipr strings (default ";").
@@ -28,10 +28,10 @@
 #' @param include_types Optional character vector of InterPro ENTRY_TYPE values to keep
 #'   in pooled mode (e.g., c("Domain","Homologous_superfamily")). Ignored if stratified.
 #' @param stratify_by_type Logical. If TRUE, run separate analyses per ENTRY_TYPE with
-#'   type-specific backgrounds (recommended). Default FALSE.
+#'   type-specific backgrounds (recommended). Default TRUE.
 #' @param types Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 #'   = infer from data present in q_ipr/s_ipr (after exclusions).
-#' @param adjust_scope When stratified, "global" (one BH across all tests) or "per_type".
+#' @param adjust_scope When stratified, "global" (one BH across all tests) or "per_type" (not implemented currently).
 #'
 #' @param entries_source Where to load InterPro entries from:
 #'   "auto" (bundled static; default), "local" (use entries_path),
@@ -170,6 +170,37 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     utils::read.table(path, header = TRUE, sep = "\t", quote = "",
                       stringsAsFactors = FALSE, comment.char = "", check.names = FALSE)
   }
+
+  # ---- NEW: entry.list reader that supports both headered TSV (your bundled file)
+  #          and headerless FTP entry.list format. Returns standardized columns. ----
+  .read_interpro_entry_list <- function(path) {
+    first <- readLines(path, n = 1, warn = FALSE)
+    has_header <- length(first) == 1L &&
+      grepl("^\\s*ENTRY_AC\\tENTRY_TYPE\\tENTRY_NAME\\s*$", first)
+
+    if (has_header) {
+      df <- utils::read.table(
+        path, header = TRUE, sep = "\t", quote = "",
+        stringsAsFactors = FALSE, comment.char = "", check.names = FALSE
+      )
+    } else {
+      df <- utils::read.table(
+        path, header = FALSE, sep = "\t", quote = "",
+        stringsAsFactors = FALSE, comment.char = "", check.names = FALSE
+      )
+      if (ncol(df) < 3) stop("InterPro entry.list parse error: expected >= 3 tab-separated columns.")
+      df <- df[, 1:3, drop = FALSE]
+      names(df) <- c("ENTRY_AC", "ENTRY_TYPE", "ENTRY_NAME")
+    }
+
+    req <- c("ENTRY_AC","ENTRY_TYPE","ENTRY_NAME")
+    if (!all(req %in% names(df))) {
+      stop("InterPro entry.list missing required columns: ",
+           paste(setdiff(req, names(df)), collapse = ", "))
+    }
+    df
+  }
+
   .collect_iprs_from_df <- function(d, term_sep = ";") {
     cols <- intersect(c("q_ipr","s_ipr"), names(d))
     if (!length(cols)) return(character(0))
@@ -181,7 +212,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     u <- .release_urls(release)$entry_list
     tf <- tempfile(fileext = ".tsv")
     if (!.download_quiet(u, tf, timeout_s)) return(NA_real_)
-    el <- try(.read_tsv_strict(tf), silent = TRUE)
+    el <- try(.read_interpro_entry_list(tf), silent = TRUE)
     if (inherits(el, "try-error") || !"ENTRY_AC" %in% names(el)) return(NA_real_)
     if (!length(iprs)) return(1.0)
     round(sum(iprs %in% el$ENTRY_AC) / length(iprs), 6)
@@ -201,26 +232,26 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (entries_source == "none") return(list(df = NULL, provenance = list()))
     if (!is.null(entries_path) && file.exists(entries_path) &&
         entries_source %in% c("auto","local"))
-      return(list(df = .read_tsv_strict(entries_path),
+      return(list(df = .read_interpro_entry_list(entries_path),
                   provenance = list(mode = "local", path = normalizePath(entries_path, winslash = "/"))))
     if (entries_source == "local")
       stop("entries_source='local' but entries_path is missing or not found.")
     if (!is.null(entries_url)) {
       tf <- tempfile(fileext = ".tsv")
       if (.download_quiet(entries_url, tf, timeout_s))
-        return(list(df = .read_tsv_strict(tf),
+        return(list(df = .read_interpro_entry_list(tf),
                     provenance = list(mode = "remote-url", url = entries_url)))
     }
     url <- if (!is.null(interpro_release)) .release_urls(interpro_release)$entry_list else .current_urls$entry_list
     tf <- tempfile(fileext = ".tsv")
     if (.download_quiet(url, tf, timeout_s))
-      return(list(df = .read_tsv_strict(tf),
+      return(list(df = .read_interpro_entry_list(tf),
                   provenance = list(mode = if (is.null(interpro_release)) "remote-current" else "remote-release",
                                     url = url, release = interpro_release)))
     if (entries_source == "auto") {
       bp <- system.file("extdata", "interpro_entry.list.tsv", package = "dndsR")
       if (nzchar(bp) && file.exists(bp))
-        return(list(df = .read_tsv_strict(bp),
+        return(list(df = .read_interpro_entry_list(bp),
                     provenance = list(mode = "bundled", path = normalizePath(bp, winslash = "/"))))
     }
     stop("Failed to load InterPro entry.list from remote/bundled sources.")
@@ -345,7 +376,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .coverage_for_current <- function(iprs, timeout_s = 30) {
     tf <- tempfile(fileext = ".tsv")
     if (!.download_quiet(.current_urls$entry_list, tf, timeout_s)) return(NA_real_)
-    el <- try(.read_tsv_strict(tf), silent = TRUE)
+    el <- try(.read_interpro_entry_list(tf), silent = TRUE)
     if (inherits(el, "try-error") || !"ENTRY_AC" %in% names(el)) return(NA_real_)
     if (!length(iprs)) return(1.0)
     round(sum(iprs %in% el$ENTRY_AC) / length(iprs), 6)
@@ -395,10 +426,23 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   .apply_filter <- function(d, filter_expr) {
     keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
+  
     if (!is.null(filter_expr) && nzchar(filter_expr)) {
       ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-      if (!inherits(ok, "try-error")) keep <- keep & isTRUE(as.vector(ok))
+  
+      if (inherits(ok, "try-error")) {
+        stop("filter_expr evaluation failed: ", as.character(ok))
+      }
+  
+      ok <- as.vector(ok)
+      if (length(ok) != nrow(d)) {
+        stop("filter_expr must evaluate to length nrow(d).")
+      }
+  
+      ok <- as.logical(ok)
+      keep <- keep & !is.na(ok) & ok
     }
+  
     d[keep, , drop = FALSE]
   }
   .split_terms_unique <- function(x) {
@@ -439,7 +483,22 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     res
   }
 
-  # ---------- font & plotting helpers ----------
+  # ---------- logging helper (MATCH go_enrichment behavior) ----------
+  .with_log <- function(log_file, tag, header = NULL, expr) {
+    # If dndsR internal logger exists, use it. Otherwise just run.
+    if (exists(".dndsr_with_log", mode = "function", inherits = TRUE)) {
+      .dndsr_with_log(
+        log_file = log_file,
+        tag = tag,
+        header = header,
+        expr = expr
+      )
+    } else {
+      force(expr)
+    }
+  }                                         
+
+  # ---------- font & plotting helpers (MATCH go_enrichment) ----------
   .bundled_arial_path <- function() {
     ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
@@ -464,23 +523,29 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
-    ttf <- .bundled_arial_path(); if (is.null(ttf)) return(NULL)
-    function(file, ...) svglite::svglite(file, system_fonts = list(`Arial Bold` = ttf), ...)
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+
+    function(file, ...) svglite::svglite(
+      file,
+      user_fonts = list(`Arial Bold` = ttf),
+      ...
+    )
   }
+
   .pick_sans_family <- function() {
-    fam <- .setup_showtext(); if (!is.null(fam)) return(fam)
-    if (!requireNamespace("systemfonts", quietly = TRUE)) return("sans")
-    for (f in c("Arial Bold","DejaVu Sans","Liberation Sans","Noto Sans","Arial","sans")) {
-      info <- try(systemfonts::match_font(f), silent = TRUE)
-      if (!inherits(info, "try-error") && is.list(info) && !is.null(info$path) && nzchar(info$path)) return(f)
-    }
+    fam <- .setup_showtext()
+    if (!is.null(fam)) return(fam)
     "sans"
   }
+
   .svg_device <- function() {
-    dev_map <- .register_svglite_mapping(); if (!is.null(dev_map)) return(dev_map)
+    dev_map <- .register_svglite_mapping()
+    if (!is.null(dev_map)) return(dev_map)
     if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
     NULL
   }
+
   .upper_padj <- function(d, alpha) {
     max_p <- suppressWarnings(max(d$p_adj, na.rm = TRUE))
     if (!is.finite(max_p)) max_p <- alpha
@@ -555,7 +620,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       ggplot2::scale_shape_manual(
         values = c(`FALSE` = 16, `TRUE` = 1),
         labels = c(`FALSE` = "finite", `TRUE` = "inf"),
-        name = "pos/bg"
+        name = "enrichment"
       ) +
       ggplot2::scale_size_continuous(name = "# pos") +
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab) +
@@ -1104,12 +1169,32 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
     outs <- character(0)
+
     for (i in seq_len(nrow(df))) {
       comp <- df$comparison_name[i]
       comp_dir <- file.path(output_dir, comp)
       dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
-      outs <- c(outs, .run_one_comparison(comp, comp_dir))
+
+      message(sprintf("[ipr_enrichment] %s (logging to %s/%s_ipr_enrichment.log)",
+                      comp, comp_dir, comp))
+
+      log_file <- file.path(comp_dir, sprintf("%s_ipr_enrichment.log", comp))
+
+      out_i <- .with_log(
+        log_file = log_file,
+        tag = "ipr_enrichment",
+        header = c(
+          sprintf("[ipr_enrichment] comp=%s", comp),
+          sprintf("[ipr_enrichment] pid=%d", Sys.getpid())
+        ),
+        expr = {
+          .run_one_comparison(comp, comp_dir)
+        }
+      )
+
+      outs <- c(outs, out_i)
     }
+
     message("All IPR enrichments complete.")
     return(invisible(outs))
   }
@@ -1120,7 +1205,20 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   comp_dir  <- dirname(dnds_annot_file)
   comp_name <- sub("_dnds_annot\\.tsv$", "", basename(dnds_annot_file))
 
-  outs <- .run_one_comparison(comp_name, comp_dir)
+  message(sprintf("[ipr_enrichment] %s (logging to %s/%s_ipr_enrichment.log)",
+                  comp_name, comp_dir, comp_name))
+
+  log_file <- file.path(comp_dir, sprintf("%s_ipr_enrichment.log", comp_name))
+
+  outs <- .with_log(
+    log_file = log_file,
+    tag = "ipr_enrichment",
+    header = c(sprintf("[ipr_enrichment] comp=%s", comp_name)),
+    expr = {
+      .run_one_comparison(comp_name, comp_dir)
+    }
+  )
+
   message("IPR enrichment complete for: ", dnds_annot_file)
   invisible(outs)
 }
