@@ -70,9 +70,15 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 
 ## Notes
 - If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results
-- Can use special characters or spaces in path if quoted in the comparison_file
+- Can use special characters or spaces in path if double-quoted in the comparison_file
 - All flags are called with ```--```
+- ```-``` or ```_``` are recognized flag separators (```--min_pos``` and ```--min-pos``` both work)
 - Tab completion for dndsr and subcommands available
+- Global short-hand flags (case-insensitive):
+  - ```-c``` = ```--comparison_file``` Comparison file for batch mode.
+  - ```-t``` = ```--threads``` Workers to assign to a job.
+  - ```-v``` = ```--verbose``` Verbose logging.
+  - ```-w``` = ```--warnings``` Prints R warnings: off|summary|all (default: off).
 
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
