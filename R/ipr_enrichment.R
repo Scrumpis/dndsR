@@ -106,7 +106,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            adjust_scope = c("global","per_type"),
                            entries_source = c("auto","local","remote","none"),
                            entries_path   = NULL,
-                           entries_url    = "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list",
+                           entries_url    = 
+                           "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list",
                            entries_timeout_s = 20,
                            keep_unmatched = TRUE,
                            exclude_ids = NULL,
@@ -126,7 +127,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            strict_coverage = 0.90,
                            tree_source = c("auto","local","remote","none"),
                            tree_path = NULL,
-                           tree_url = "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt",
+                           tree_url = 
+                           "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt",
                            tree_timeout_s = 20,
                            threads = 4) {
 
