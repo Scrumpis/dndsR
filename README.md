@@ -67,6 +67,13 @@ Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
 ```
 **Use** ```dndsr --help``` **or** ```dndsr <function> --help``` **for more information on any commands.**
+
+## Notes
+- If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results
+- Can use special characters or spaces in path if quoted in the comparison_file
+- All flags are called with ```--```
+- Tab completion for dndsr and subcommands available
+
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
@@ -92,12 +99,12 @@ Enrichment of various gene annotation functional terms under positive selection 
 #### InterPro (IPR) term enrichment
 Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 ```
-dndsr ipr_enrichment -c comparison_file.txt
+dndsr ipr_enrichment -c comparison_file.txt -t 8
 ```
 #### Gene Ontology (GO) term enrichment
 TopGO enrichment of GO terms under positive selection.
 ```
-dndsr go_enrichment -c comparison_file.txt
+dndsr go_enrichment -c comparison_file.txt -t 8
 ```
 #### General term enrichment
 Fisher's Exact Test and multiple testing correction. Tests non-IPR and non-GO terms like KEGG, PANTHER, etc. Optionally receives a custom pattern of interest to test for enrichment. 
@@ -142,12 +149,6 @@ dndsr regional_dnds_contrasts \
 --contrast-file contrast_file.txt \
 -O .
 ```
-
-
-## Notes
-- If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results
-- Can use special characters or spaces in path if quoted in the comparison_file
-
 
 
 ## Future Improvements
