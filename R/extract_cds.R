@@ -73,8 +73,6 @@ extract_cds <- function(comparison_name = NULL,
 
   vmsg <- function(...) if (isTRUE(verbose)) message(...)
 
-  message(sprintf("[extract_cds] starting (threads=%d)", threads))
-
   # ---- helper: ensure FASTA is indexed; return FaFile and available seqnames ----
   .open_indexed_fasta <- function(fa) {
     if (!file.exists(fa)) stop("FASTA not found: ", fa, call. = FALSE)
@@ -86,9 +84,8 @@ extract_cds <- function(comparison_name = NULL,
   }
 
   # ---- helper: build TxDb and group CDS ----
-  # - If verbose=FALSE: muffle ONLY the known harmless genome-metadata warning.
-  # - If verbose=TRUE: print that warning immediately (full text) and muffle it so it
-  #   doesn't get repeated in the end-of-run "Warning messages:" block.
+  # - Always muffle the known harmless genome-metadata warning.
+  # - If verbose=TRUE, print it immediately as an informational note.
   .cds_groups <- function(gff, by = "gene") {
     if (!file.exists(gff)) stop("GFF not found: ", gff, call. = FALSE)
 
@@ -107,7 +104,6 @@ extract_cds <- function(comparison_name = NULL,
       }
     )
 
-    # Optional, concise note (only when metadata truly absent)
     if (isTRUE(verbose)) {
       gi <- try(GenomeInfoDb::genome(txdb), silent = TRUE)
       if (inherits(gi, "try-error") || all(is.na(gi)) || !any(nzchar(trimws(gi)))) {
@@ -135,7 +131,6 @@ extract_cds <- function(comparison_name = NULL,
   .translate_cds <- function(dna, genetic_code = 1L, keep_internal_stops = FALSE) {
     aa <- Biostrings::translate(dna, if.fuzzy.codon = "X", genetic.code = genetic_code)
 
-    # detect internal stops: any '*' before the last position
     aa_chr <- as.character(aa)
     has_internal_stop <- vapply(aa_chr, function(s) {
       n <- nchar(s)
@@ -150,7 +145,6 @@ extract_cds <- function(comparison_name = NULL,
       aa_chr <- aa_chr[!has_internal_stop]
     }
 
-    # strip trailing stop '*', preserve names
     aa_chr <- sub("\\*$", "", aa_chr)
     aa_out <- Biostrings::AAStringSet(aa_chr)
     names(aa_out) <- names(aa)
@@ -232,7 +226,6 @@ extract_cds <- function(comparison_name = NULL,
     vmsg("  - Extracting CDS sequences (", length(cds_groups2), " groups)")
     cds <- GenomicFeatures::extractTranscriptSeqs(h$fafile, cds_groups2)
 
-    # If cdsBy(by="gene") didn’t set names, try to propagate list names
     if (is.null(names(cds)) || all(!nzchar(names(cds)))) {
       nm <- names(cds_groups2)
       if (!is.null(nm) && length(nm) == length(cds) && any(nzchar(nm))) {
@@ -254,7 +247,7 @@ extract_cds <- function(comparison_name = NULL,
     res
   }
 
-  # ---- orchestrate one comparison (used for single mode and for batch return assembly) ----
+  # ---- orchestrate one comparison (single mode only; batch uses unique tasks) ----
   run_extraction <- function(comparison_name, query_fasta, subject_fasta, query_gff, subject_gff) {
     comp_dir <- file.path(output_dir, comparison_name)
     dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
@@ -290,88 +283,100 @@ extract_cds <- function(comparison_name = NULL,
     )
   }
 
-  # ---- batch mode (unique-task scheduling) ----
+  # ---- batch vs single ----
   if (!is.null(comparison_file)) {
-    comparisons <- .read_comparisons(comparison_file)
+    df <- .read_comparisons(comparison_file)
 
-    vmsg(sprintf("[extract_cds] threads=%d (pid=%d)", threads, Sys.getpid()))
+    # Build unique genome extraction tasks
+    q <- data.frame(
+      comparison_name = df$comparison_name,
+      role = "query",
+      fasta = df$query_fasta,
+      gff = df$query_gff,
+      stringsAsFactors = FALSE
+    )
+    s <- data.frame(
+      comparison_name = df$comparison_name,
+      role = "subject",
+      fasta = df$subject_fasta,
+      gff = df$subject_gff,
+      stringsAsFactors = FALSE
+    )
+    tasks <- rbind(q, s)
+
+    tasks <- tasks[!is.na(tasks$fasta) & nzchar(tasks$fasta) &
+                     !is.na(tasks$gff) & nzchar(tasks$gff), , drop = FALSE]
+
+    tasks$comp_dir <- file.path(output_dir, tasks$comparison_name)
+    tasks$out_base <- file.path(tasks$comp_dir, tools::file_path_sans_ext(basename(tasks$fasta)))
+    tasks$cds_path <- paste0(tasks$out_base, cds_suffix)
+    tasks$prot_path <- paste0(tasks$out_base, protein_suffix)
+
+    # Deduplicate by the actual output file target
+    dedup_key <- if (isTRUE(export_proteins)) tasks$prot_path else tasks$cds_path
+    tasks_unique <- tasks[!duplicated(dedup_key), , drop = FALSE]
+
+    message(sprintf("[extract_cds] threads=%d (pid=%d)", threads, Sys.getpid()))
     if (threads > 1L && .Platform$OS.type == "windows") {
       warning("[extract_cds] threads>1 requested on Windows; running sequentially.", call. = FALSE)
       threads <- 1L
     }
 
-    # Build task table: all (comp, fasta, gff, out_base)
-    make_tasks <- function(df) {
-      q <- data.frame(
-        comparison_name = df$comparison_name,
-        fasta = df$query_fasta,
-        gff = df$query_gff,
-        stringsAsFactors = FALSE
+    # Ensure comp dirs exist
+    for (d in unique(tasks_unique$comp_dir)) dir.create(d, showWarnings = FALSE, recursive = TRUE)
+
+    run_one_task <- function(k) {
+      t <- tasks_unique[k, , drop = FALSE]
+      comp <- t$comparison_name
+      comp_dir <- t$comp_dir
+
+      out_stub <- basename(t$out_base)
+      log_file <- file.path(comp_dir, sprintf("%s_%s_extract_cds.log", comp, out_stub))
+
+      # Clean, non-jumbled progress line in the main console:
+      message(sprintf("[extract_cds] %s %s (logging to %s/%s_%s_extract_cds.log)",
+                      comp, t$role, comp_dir, comp, out_stub))
+
+      .dndsr_with_log(
+        log_file = log_file,
+        tag = "extract_cds",
+        header = c(
+          sprintf("[extract_cds] comp=%s role=%s", comp, t$role),
+          sprintf("[extract_cds] fasta=%s", basename(t$fasta)),
+          sprintf("[extract_cds] gff=%s", basename(t$gff)),
+          sprintf("[extract_cds] pid=%d threads=%d", Sys.getpid(), threads)
+        ),
+        expr = {
+          .extract_one(t$fasta, t$gff, t$out_base)
+        }
       )
-      s <- data.frame(
-        comparison_name = df$comparison_name,
-        fasta = df$subject_fasta,
-        gff = df$subject_gff,
-        stringsAsFactors = FALSE
-      )
-      tasks <- rbind(q, s)
-
-      # Drop blank/NA tasks (covers query-only cases + headerless weirdness)
-      tasks <- tasks[!is.na(tasks$fasta) & nzchar(tasks$fasta) &
-                       !is.na(tasks$gff) & nzchar(tasks$gff), , drop = FALSE]
-
-      tasks$comp_dir <- file.path(output_dir, tasks$comparison_name)
-      tasks$out_base <- file.path(tasks$comp_dir, tools::file_path_sans_ext(basename(tasks$fasta)))
-
-      tasks$cds_path <- paste0(tasks$out_base, cds_suffix)
-      tasks$prot_path <- paste0(tasks$out_base, protein_suffix)
-      tasks
     }
 
-    tasks <- make_tasks(comparisons)
-
-    # Deduplicate by the actual outputs this run would generate
-    dedup_key <- if (isTRUE(export_proteins)) tasks$prot_path else tasks$cds_path
-    uniq <- !duplicated(dedup_key)
-    tasks_unique <- tasks[uniq, , drop = FALSE]
-
-    # Ensure directories exist
-    udirs <- unique(tasks_unique$comp_dir)
-    for (d in udirs) dir.create(d, showWarnings = FALSE, recursive = TRUE)
-
-    vmsg(sprintf("[extract_cds] genome_tasks=%d (unique) from %d (raw)",
-                 nrow(tasks_unique), nrow(tasks)))
-
-    run_task <- function(i) {
-      t <- tasks_unique[i, , drop = FALSE]
-      vmsg("== ", t$comparison_name, " ==")
-      .extract_one(t$fasta, t$gff, t$out_base)
-    }
-
-    if (threads > 1L && nrow(tasks_unique) > 1L) {
-      results_unique <- parallel::mclapply(
+    if (threads > 1L && nrow(tasks_unique) > 1L && .Platform$OS.type != "windows") {
+      res_list <- parallel::mclapply(
         seq_len(nrow(tasks_unique)),
-        run_task,
+        run_one_task,
         mc.cores = min(threads, nrow(tasks_unique)),
         mc.preschedule = FALSE
       )
     } else {
-      results_unique <- lapply(seq_len(nrow(tasks_unique)), run_task)
+      if (threads > 1L && .Platform$OS.type == "windows") {
+        warning("[extract_cds] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+      }
+      res_list <- lapply(seq_len(nrow(tasks_unique)), run_one_task)
     }
 
     # Map results by out_base for fast per-comparison assembly
-    res_by_outbase <- setNames(results_unique, tasks_unique$out_base)
+    res_by_outbase <- setNames(res_list, tasks_unique$out_base)
 
-    # Assemble return per comparison (no re-extraction; just attach known paths/status)
-    out <- lapply(seq_len(nrow(comparisons)), function(i) {
-      row <- comparisons[i, , drop = FALSE]
+    out <- lapply(seq_len(nrow(df)), function(i) {
+      row <- df[i, , drop = FALSE]
       comp <- row$comparison_name
       comp_dir <- file.path(output_dir, comp)
 
       q_base <- file.path(comp_dir, tools::file_path_sans_ext(basename(row$query_fasta)))
       q_res <- res_by_outbase[[q_base]]
       if (is.null(q_res)) {
-        # Shouldn't happen unless inputs were blank; keep a consistent structure
         q_res <- list(
           cds_path = paste0(q_base, cds_suffix),
           prot_path = paste0(q_base, protein_suffix),
@@ -411,10 +416,11 @@ extract_cds <- function(comparison_name = NULL,
       )
     })
 
+    message("All extract_cds tasks complete.")
     return(out)
   }
 
-  # ---- single / single-genome mode ----
+  # ---- single mode ----
   if (is.null(comparison_name) || !nzchar(comparison_name) ||
       is.null(query_fasta) || !nzchar(query_fasta) ||
       is.null(query_gff) || !nzchar(query_gff)) {
@@ -422,5 +428,23 @@ extract_cds <- function(comparison_name = NULL,
          call. = FALSE)
   }
 
-  run_extraction(comparison_name, query_fasta, subject_fasta, query_gff, subject_gff)
+  comp_dir <- file.path(output_dir, comparison_name)
+  dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
+  out_stub <- tools::file_path_sans_ext(basename(query_fasta))
+  log_file <- file.path(comp_dir, sprintf("%s_%s_extract_cds.log", comparison_name, out_stub))
+
+  message(sprintf("[extract_cds] %s (logging to %s/%s_%s_extract_cds.log)",
+                  comparison_name, comp_dir, comparison_name, out_stub))
+
+  .dndsr_with_log(
+    log_file = log_file,
+    tag = "extract_cds",
+    header = c(
+      sprintf("[extract_cds] comp=%s", comparison_name),
+      sprintf("[extract_cds] pid=%d threads=%d", Sys.getpid(), threads)
+    ),
+    expr = {
+      run_extraction(comparison_name, query_fasta, subject_fasta, query_gff, subject_gff)
+    }
+  )
 }
