@@ -79,18 +79,15 @@ go_enrichment <- function(
   if (!requireNamespace("AnnotationDbi", quietly = TRUE)) {
     stop("Package 'AnnotationDbi' is required. Install via Bioconductor.", call. = FALSE)
   }
-
-  # NOTE: topGO creates required GO term environments (GOBPTerm/GOMFTerm/GOCCTerm)
-  # only when attached; requireNamespace() is insufficient.
-  suppressPackageStartupMessages(require("topGO", character.only = TRUE))
-  suppressPackageStartupMessages(require("GO.db", character.only = TRUE))
-
-  ok_terms <- exists("GOBPTerm", envir = as.environment("package:topGO"), inherits = FALSE) &&
-              exists("GOMFTerm", envir = as.environment("package:topGO"), inherits = FALSE) &&
-              exists("GOCCTerm", envir = as.environment("package:topGO"), inherits = FALSE)
-
+  
+  # topGO should create these in its namespace when loaded
+  topgo_ns <- asNamespace("topGO")
+  ok_terms <- exists("GOBPTerm", envir = topgo_ns, inherits = FALSE) &&
+              exists("GOMFTerm", envir = topgo_ns, inherits = FALSE) &&
+              exists("GOCCTerm", envir = topgo_ns, inherits = FALSE)
+  
   if (!ok_terms) {
-    stop("topGO term environments (GOBPTerm/GOMFTerm/GOCCTerm) were not created on attach.", call. = FALSE)
+    stop("topGO term environments (GOBPTerm/GOMFTerm/GOCCTerm) were not created on load.", call. = FALSE)
   }
 
   # extra args to pass to topGO::runTest()
