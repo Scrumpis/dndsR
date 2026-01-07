@@ -1,9 +1,8 @@
-#' InterPro (IPR) enrichment (Fisher) for query/subject terms in dNdS results
+#' InterPro (IPR) term enrichment (Fisher) under positive selection and visualization
 #'
-#' Reads <comp>/<comp>_dnds_annot.tsv and tests enrichment of IPR terms (q_ipr / s_ipr)
-#' among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
-#' Adds InterPro metadata (ENTRY_TYPE/ENTRY_NAME) and supports pooled vs per-type analyses.
-#' Plots enrichment.
+#' Reads either dnds_annot.tsv (single) or comparison_file (batch) and tests enrichment
+#' of IPR terms (q_ipr / s_ipr) among positively selected pairs (dNdS > pos_threshold)
+#' vs the filtered background and plots enrichment.
 #'
 #' @section Input and execution modes:
 #' - Single mode: provide `dnds_annot_file`.
