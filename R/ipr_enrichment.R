@@ -375,7 +375,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!is.null(tree_path) && file.exists(tree_path) && tree_source %in% c("auto","local")) {
       headl <- readLines(tree_path, n = 5, warn = FALSE)
       looks_tsv <- grepl("\t", paste(headl, collapse = "")) &&
-        !inherits(try(read.table(text = paste(headl, collapse = "\n"), sep = "\t"), silent = TRUE), "try-error")
+        !inherits(try(utils::read.table(text = paste(headl, collapse = "\n"), sep = "\t"), silent = TRUE), "try-error")
       if (looks_tsv) {
         ed <- .read_tsv_strict(tree_path); colnames(ed)[1:2] <- c("parent","child")
         return(list(df = ed, provenance = list(mode = "local-tsv", path = normalizePath(tree_path, winslash = "/"))))
