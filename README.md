@@ -162,8 +162,7 @@ dndsr regional_dnds_contrasts \
 - Cleanup documentation
 - Add forest plot function and other grand analyses
 - Ensure docker image contains all dependencies of all optional functions
-- Change regional analysis name. Can focus regions, but can do whole genome summaries too.
-  - Change default to regions_bed = NULL
+- Overhaul regional analyses and gene contrast functions
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
