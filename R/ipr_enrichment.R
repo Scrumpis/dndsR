@@ -1312,8 +1312,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         if (is.null(tree_df) || !is.data.frame(tree_df) || nrow(tree_df) == 0L) {
           stop(
             sprintf(
-              "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
-              "Provide tree_path/term_trees/tree_url, or rerun with method='fisher'. (comp=%s side=%s)",
+              paste0(
+                "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
+                "Provide tree_path/term_trees/tree_url, or rerun with method='fisher'. (comp=%s side=%s)"
+              ),
               comp, side
             ),
             call. = FALSE
