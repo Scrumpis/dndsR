@@ -307,7 +307,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     d$ln_neg_dNdS  <- ifelse(d$dNdS >= 1, NA_real_, ln)
     d$ln_pos_dNdS  <- ifelse(d$dNdS <  1, NA_real_, ln)
 
-    win <- aggregate(
+    win <- stats::aggregate(
       list(total_raw_dNdS    = d$dNdS,
            total_ln_dNdS     = d$ln_dNdS,
            total_ln_neg_dNdS = d$ln_neg_dNdS,
@@ -350,7 +350,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     # Align to karyotype; clamp windows to chrom ends
     win <- win[win$Chr %in% karyotype$Chr, , drop = FALSE]
     if (!nrow(win)) { req_cli("No windows remain after matching chromosomes to FASTA -> skip"); return(character(0)) }
-    chr_len <- setNames(karyotype$End, karyotype$Chr)
+    chr_len <- stats::setNames(karyotype$End, karyotype$Chr)
     win$End <- pmin(win$End, chr_len[win$Chr])
     win$Start[is.na(win$Start)] <- 0L
     win$End[is.na(win$End)]     <- win$Start[is.na(win$End)]
