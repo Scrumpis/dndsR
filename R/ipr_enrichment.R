@@ -538,15 +538,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   # ---------- logging helper (MATCH go_enrichment behavior) ----------
   .with_log <- function(log_file, tag, header = NULL, expr) {
     if (exists(".dndsr_with_log", mode = "function", inherits = TRUE)) {
-      .dndsr_with_log(
+      return(.dndsr_with_log(
         log_file = log_file,
         tag = tag,
         header = header,
         expr = expr
-      )
-    } else {
-      force(expr)
+      ))
     }
+    force(expr)
   }
 
   # ---------- font & plotting helpers (MATCH go_enrichment) ----------
