@@ -75,6 +75,7 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
   - ```-t``` = ```--threads``` Workers to assign to a job.
   - ```-o``` = ```--output_dir``` Output directory.
   - ```-w``` = ```--warnings``` Prints R warnings: off|summary|all (default: off).
+- If warnings are not being logged while multi-threading, try single-threading to debug.
 
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
