@@ -329,8 +329,17 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     lines <- lines[keep_idx]
     ipr   <- regmatches(lines, regexpr(rx, lines))
     indent <- vapply(lines, function(s) {
-      s2 <- gsub("\t", "  ", s, fixed = TRUE)
-      nchar(s2) - nchar(sub("^\\s+", "", s2))
+      # Depth indicated by leading '-' (possibly preceded by whitespace)
+      m <- regexpr("^\\s*-+", s)
+      if (m == 1L) {
+        dash_run <- regmatches(s, m)
+        # Count only '-' characters (ignore any leading whitespace)
+        nchar(gsub("[^\\-]", "", dash_run))
+      } else {
+        # Fallback: whitespace indentation (tabs/spaces)
+        s2 <- gsub("\t", "  ", s, fixed = TRUE)
+        nchar(s2) - nchar(sub("^\\s+", "", s2))
+      }
     }, integer(1))
     parent_stack <- character(0); indent_stack <- integer(0)
     edges_p <- character(0); edges_c <- character(0)
