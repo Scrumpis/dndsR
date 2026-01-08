@@ -27,8 +27,9 @@
 #' @param filter_expr Optional character with a logical expression evaluated in the data
 #'   (e.g., "q_seqname == s_seqname").
 #' @param drop_rows_without_term Logical; if TRUE (default), rows with no retained IPR term
-#'   (after filtering by type/exclusions) are removed from BOTH positives and background for
-#'   that side (annotation-aware universe).
+#'   (after filtering by type/exclusions) are removed from the enrichment universe (both
+#'   positives and background) for that side. When stratify_by_type=TRUE, this filtering
+#'   is applied independently within each ENTRY_TYPE analysis.
 #'
 #' @section Term frequency and multiple-testing filters:
 #' - Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
@@ -88,7 +89,7 @@
 #' @param tree_path Optional local ParentChildTreeFile.txt or 2-col TSV edgelist.
 #' @param tree_url Optional explicit URL to the InterPro ParentChildTree file.
 #'   If NULL (default), uses the EMBL-EBI current release endpoint.
-#' @param tree_timeout_s Numeric timeout (seconds) for tree fetch (default 20).
+#' @param tree_timeout_s Numeric timeout (seconds) for tree fetch (default 120).
 #'
 #' @section Excluding terms and hierarchy expansion:
 #' Configure global exclusions and (optionally) expand exclusions over descendants using
@@ -133,7 +134,8 @@
 #'
 #' @return In single mode: (invisibly) list of output TSV paths.
 #'   In batch mode: (invisibly) vector of output TSV paths across comparisons.
-#'   Each TSV includes: IPR, ENTRY(see below) --- rest unchanged.
+#'   Each TSV includes enrichment statistics plus InterPro metadata columns:
+#'   IPR, ENTRY_TYPE, ENTRY_NAME, label, side, comparison.
 #'
 #' @export
 ipr_enrichment <- function(dnds_annot_file = NULL,
@@ -178,7 +180,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            tree_source = c("auto","local","remote","none"),
                            tree_path = NULL,
                            tree_url = NULL,
-                           tree_timeout_s = 20,
+                           tree_timeout_s = 120,
                            threads = 4) {
 
   sides <- intersect(unique(as.character(sides)), c("query","subject"))
@@ -939,10 +941,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     nodes[order(depth[nodes])]
   }
 
-  .parent_child_enrich <- function(df, term_col, type_label, type_by_ipr, name_by_ipr,
-                                   min_total, min_pos, max_prop,
-                                   fdr_method, alpha, parent_child_alpha,
-                                   term_trees_df = NULL) {
+    .parent_child_enrich <- function(df, term_col, type_label, type_by_ipr, name_by_ipr,
+                                     min_total, min_pos, max_prop,
+                                     fdr_method, alpha, parent_child_alpha,
+                                     term_trees_df = NULL,
+                                     comp = NA_character_, side = NA_character_) {
     if (isTRUE(drop_rows_without_term)) {
       keep_rows <- !is.na(df[[term_col]]) & nzchar(df[[term_col]])
       df <- df[keep_rows, , drop = FALSE]
@@ -958,18 +961,16 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (is.null(children_map)) children_map <- .dag_infer_by_subset(term2rows, type_terms)
 
     if (is.null(children_map) || !length(children_map)) {
-      stop(
-        sprintf(
-          paste0(
-            "[ipr_enrichment] method='parent_child' could not construct a usable term hierarchy for type=%s. ",
-            "This can happen if there are no parent-child edges among the retained terms after filtering ",
-            "(min_total=%d, min_pos=%d, max_prop=%.3f) and exclusions. ",
-            "Rerun with method='fisher' explicitly, or relax filters / provide a more complete tree."
-          ),
-          type_label, min_total, min_pos, max_prop
+    stop(
+      sprintf(
+        paste0(
+          "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
+          "Provide tree_path/term_trees/tree_url, or rerun with method='fisher'. (comp=%s side=%s)"
         ),
-        call. = FALSE
-      )
+        comp, side
+      ),
+      call. = FALSE
+    )
     }
 
     order_terms <- .topo_specific_first(children_map)
@@ -1173,12 +1174,24 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   type_by_ipr <- maps$type_by_ipr
   name_by_ipr <- maps$name_by_ipr
 
-  tr <- .load_interpro_tree(tree_source = tree_source,
-                            term_trees  = term_trees,
-                            tree_path   = tree_path,
-                            tree_url    = if (!is.null(tree_url)) tree_url else NULL,
-                            interpro_release = chosen_release,
-                            timeout_s = tree_timeout_s)
+  # Only load the tree if we actually need it:
+  # - parent_child method needs it
+  # - exclude_descendants expansion needs it
+  need_tree <- identical(method, "parent_child") || isTRUE(exclude_descendants)
+
+  if (need_tree) {
+    tr <- .load_interpro_tree(
+      tree_source = tree_source,
+      term_trees  = term_trees,
+      tree_path   = tree_path,
+      tree_url    = if (!is.null(tree_url)) tree_url else NULL,
+      interpro_release = chosen_release,
+      timeout_s = tree_timeout_s
+    )
+  } else {
+    tr <- list(df = NULL, provenance = list(mode = "skipped", reason = "method/exclude_descendants not using tree"))
+  }
+
   tree_df <- tr$df
 
   .prov_common <- list(
@@ -1311,13 +1324,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
           }
 
         } else if (identical(method, "parent_child")) {
-          res <- .parent_child_enrich(
-            df2, term_col, tp, type_by_ipr, name_by_ipr,
-            min_total, min_pos, max_prop,
-            fdr_method, alpha,
-            parent_child_alpha = parent_child_alpha,
-            term_trees_df = tree_df
-          )
+        res <- .parent_child_enrich(
+          df2, term_col, tp, type_by_ipr, name_by_ipr,
+          min_total, min_pos, max_prop,
+          fdr_method, alpha,
+          parent_child_alpha = parent_child_alpha,
+          term_trees_df = tree_df,
+          comp = comp, side = side
+        )
           if (!is.null(res) && nrow(res)) {
             results[[tp]] <- res
           } else {
