@@ -40,11 +40,14 @@
 #'   are filtered out to avoid overly broad terms dominating enrichment.
 #'
 #' @section Multiple testing adjustment:
+#' Controls how p-values are adjusted after testing, including optional weighting methods.
 #'
 #' @param fdr_method One of "BH","BY","IHW","qvalue","none". Defaults to "BH".
 #' @param alpha FDR level for IHW weighting (default 0.05).
 #'
 #' @section InterPro term parsing and stratification:
+#' Defines how IPR accessions are split from q_ipr/s_ipr and whether results are pooled
+#' or analyzed separately by InterPro ENTRY_TYPE.
 #'
 #' @param term_sep Separator used in q_ipr/s_ipr strings (default ";").
 #' @param include_types Optional character vector of InterPro ENTRY_TYPE values to keep
@@ -57,6 +60,8 @@
 #'   (not implemented currently).
 #'
 #' @section InterPro metadata and release handling:
+#' Options for attaching InterPro names/types from entry.list and (optionally) selecting
+#' or pinning an InterPro release for better term coverage.
 #'
 #' @param entries_source Where to load InterPro entries from:
 #'   "auto" (bundled static; default), "local" (use entries_path),
@@ -81,6 +86,8 @@
 #' @param tree_timeout_s Numeric timeout (seconds) for tree fetch (default 20).
 #'
 #' @section Excluding terms and hierarchy expansion:
+#' Configure global exclusions and (optionally) expand exclusions over descendants using
+#' an InterPro parent-child tree.
 #'
 #' @param exclude_ids Character vector of IPR accessions (e.g. "IPR000123") to exclude
 #'   globally from both positives and background before enrichment. Preferred name.
@@ -94,12 +101,15 @@
 #'   accidental mass exclusion (default 5000).
 #'
 #' @section Hierarchy-aware enrichment modes:
+#' Select alternative enrichment strategies that attempt to account for term hierarchy
+#' (e.g., parent-child style filtering).
 #'
 #' @param method Enrichment mode: "fisher" (default), "parent_child" (elim-like), "weight01".
 #' @param ancestor_novel_frac Keep parent only if >= this fraction of unclaimed genes
 #'   (default 0.20).
 #'
 #' @section Plotting:
+#' Controls writing per-result plots (top-N bubble plots) and plot axis behavior.
 #'
 #' @param make_plots Logical; if TRUE, write a top-N bubble plot per result (default TRUE).
 #' @param top_n Integer; number of rows for plot (default 20).
