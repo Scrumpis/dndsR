@@ -865,8 +865,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   .topo_specific_first <- function(children_map) {
     nodes <- unique(c(names(children_map), unlist(children_map, use.names = FALSE)))
-    depth <- setNames(integer(length(nodes)), nodes)
-    visited <- setNames(logical(length(nodes)), nodes)
+    depth <- stats::setNames(integer(length(nodes)), nodes)
+    visited <- stats::setNames(logical(length(nodes)), nodes)
     rec <- function(n) {
       if (visited[[n]]) return(depth[[n]])
       visited[[n]] <<- TRUE
@@ -907,10 +907,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
 
     order_terms <- .topo_specific_first(children_map)
-    claimed <- setNames(vector("list", length(order_terms)), order_terms)
+    claimed <- stats::setNames(vector("list", length(order_terms)), order_terms)
     for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
     rows <- list(); n_pos <- length(pos_id); n_bg <- n_all - n_pos
-    sig <- setNames(logical(length(order_terms)), order_terms)
+    sig <- stats::setNames(logical(length(order_terms)), order_terms)
 
     for (t in order_terms) {
       members <- intersect(term2rows[[t]], all_id)
@@ -941,9 +941,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
 
     nodes <- unique(c(names(children_map), unlist(children_map, use.names = FALSE)))
-    parents_map <- setNames(vector("list", length(nodes)), nodes)
+    parents_map <- stats::setNames(vector("list", length(nodes)), nodes)
     for (p in names(children_map)) for (c in children_map[[p]]) parents_map[[c]] <- c(parents_map[[c]], p)
-    claimed <- setNames(vector("list", length(nodes)), nodes)
+    claimed <- stats::setNames(vector("list", length(nodes)), nodes)
     for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
     for (t in order_terms) {
       r <- rows[[t]]; if (is.null(r)) next
