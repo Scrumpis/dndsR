@@ -77,7 +77,7 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 - Global short-hand flags (case-insensitive):
   - ```-c``` = ```--comparison_file``` Comparison file for batch mode.
   - ```-t``` = ```--threads``` Workers to assign to a job.
-  - ```-v``` = ```--verbose``` Verbose logging.
+  - ```-o``` = ```--output_dir``` Output directory.
   - ```-w``` = ```--warnings``` Prints R warnings: off|summary|all (default: off).
 
 ### 1. split_comparisons.R (optional)
