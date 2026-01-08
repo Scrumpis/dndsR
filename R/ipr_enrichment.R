@@ -273,7 +273,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .collect_iprs_from_df <- function(d, term_sep = ";") {
     cols <- intersect(c("q_ipr","s_ipr"), names(d))
     if (!length(cols)) return(character(0))
-    vals <- unlist(lapply(cols, function(cn) na.omit(as.character(d[[cn]]))), use.names = FALSE)
+    vals <- unlist(lapply(cols, function(cn) stats::na.omit(as.character(d[[cn]]))), use.names = FALSE)
     parts <- unlist(strsplit(vals, term_sep, fixed = TRUE), use.names = FALSE)
     unique(parts[nzchar(parts)])
   }
@@ -1145,9 +1145,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     all_terms <- character(0)
     if ("q_ipr" %in% names(d) && is.character(d$q_ipr))
-      all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$q_ipr)), term_sep, fixed = TRUE)))
+      all_terms <- c(all_terms, unlist(strsplit(paste(stats::na.omit(d$q_ipr)), term_sep, fixed = TRUE)))
     if ("s_ipr" %in% names(d) && is.character(d$s_ipr))
-      all_terms <- c(all_terms, unlist(strsplit(paste(na.omit(d$s_ipr)), term_sep, fixed = TRUE)))
+      all_terms <- c(all_terms, unlist(strsplit(paste(stats::na.omit(d$s_ipr)), term_sep, fixed = TRUE)))
     all_terms <- unique(all_terms[nzchar(all_terms)])
     if (!is.null(exclude_ids) && length(exclude_ids)) all_terms <- setdiff(all_terms, exclude_ids)
 
