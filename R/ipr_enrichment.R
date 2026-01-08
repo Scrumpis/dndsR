@@ -1,4 +1,4 @@
-#' InterPro (IPR) term enrichment (Fisher) under positive selection and visualization
+#' InterPro (IPR) term enrichment (Fisher/hierarchy-aware) under positive selection and visualization
 #'
 #' Reads either dnds_annot.tsv (single) or comparison_file (batch) and tests enrichment
 #' of IPR terms (q_ipr / s_ipr) among positively selected pairs (dNdS > pos_threshold)
@@ -43,7 +43,7 @@
 #' Controls how p-values are adjusted after testing, including optional weighting methods.
 #'
 #' @param fdr_method One of "BH","BY","IHW","qvalue","none". Defaults to "BH".
-#' @param alpha FDR level for IHW weighting (default 0.05).
+#' @param alpha FDR level for IHW weighting (default 0.05). Ignored unless fdr_method="IHW".
 #'
 #' @section InterPro term parsing and stratification:
 #' Defines how IPR accessions are split from q_ipr/s_ipr and whether results are pooled
@@ -54,10 +54,13 @@
 #'   in pooled mode (e.g., c("Domain","Homologous_superfamily")). Ignored if stratified.
 #' @param stratify_by_type Logical. If TRUE, run separate analyses per ENTRY_TYPE with
 #'   type-specific backgrounds (recommended). Default TRUE.
+#'   Note: method="parent_child" is currently implemented only when stratify_by_type=TRUE.
 #' @param types Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 #'   = infer from data present in q_ipr/s_ipr (after exclusions).
-#' @param adjust_scope When stratified, "global" (one BH across all tests) or "per_type"
-#'   (not implemented currently).
+#' @param adjust_scope When stratified, "per_type" (adjust within each ENTRY_TYPE; default)
+#'   or "global" (adjust once across all ENTRY_TYPE results for a given comparison+side).
+#'   Note: method="parent_child" always uses per-type adjustment because the elim/claim
+#'   procedure depends on within-type adjusted p-values.
 #'
 #' @section InterPro metadata and release handling:
 #' Options for attaching InterPro names/types from entry.list and (optionally) selecting
@@ -72,14 +75,15 @@
 #'   If NULL (default), uses the EMBL-EBI current release endpoint.
 #' @param entries_timeout_s Numeric timeout (seconds) for remote fetch (default 20).
 #' @param keep_unmatched Keep IPRs not found in entry.list when filtering (default TRUE).
+#'   Note: if keep_unmatched=FALSE and drop_rows_without_term=TRUE, rows whose only terms
+#'   are unmatched may be removed from the enrichment universe.
 #'
 #' @param interpro_release Optional string (e.g. "94.0") to pin archived InterPro release.
 #' @param auto_detect_release Logical; auto-pick best archived release by IPR coverage (default TRUE).
-#' @param release_candidates Character vector of releases to test
-#'   (default c("92.0","94.0","96.0","98.0","100.0")).
 #' @param strict_coverage Numeric in \eqn{[0,1]}; fail if best coverage < this (default 0.90).
 #'
 #' @param tree_source Where to load ParentChildTree from: "auto","local","remote","none".
+#'   If "none", hierarchy features are disabled and term_trees/tree_path/tree_url are ignored.
 #' @param tree_path Optional local ParentChildTreeFile.txt or 2-col TSV edgelist.
 #' @param tree_url Optional explicit URL to the InterPro ParentChildTree file.
 #'   If NULL (default), uses the EMBL-EBI current release endpoint.
@@ -104,9 +108,11 @@
 #' Select alternative enrichment strategies that attempt to account for term hierarchy
 #' (e.g., parent-child style filtering).
 #'
-#' @param method Enrichment mode: "fisher" (default), "parent_child" (elim-like), "weight01".
+#' @param method Enrichment mode: "fisher" (default) or "parent_child" (elim-like).
 #' @param ancestor_novel_frac Keep parent only if >= this fraction of unclaimed genes
 #'   (default 0.20).
+#' @param parent_child_alpha Significance cutoff used by method="parent_child" for
+#'   claiming/elim logic and novelty filtering (default = alpha).
 #'
 #' @section Plotting:
 #' Controls writing per-result plots (top-N bubble plots) and plot axis behavior.
@@ -114,8 +120,6 @@
 #' @param make_plots Logical; if TRUE, write a top-N bubble plot per result (default TRUE).
 #' @param top_n Integer; number of rows for plot (default 20).
 #' @param x_axis_min,x_axis_max Optional fixed x-axis limits for plots.
-#' @param x_axis_pad_right Numeric. Extra units to extend the x-axis beyond the
-#'   maximum observed enrichment when x_axis_max is not set (default 3).
 #'
 #' @details
 #' Default InterPro resources (EMBL-EBI):
@@ -152,7 +156,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            include_types = NULL,
                            stratify_by_type = TRUE,
                            types = NULL,
-                           adjust_scope = c("global","per_type"),
+                           adjust_scope = c("per_type","global"),
                            entries_source = c("auto","local","remote","none"),
                            entries_path   = NULL,
                            entries_url    = NULL,
@@ -164,14 +168,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            exclude_descendants = FALSE,
                            exclude_descendants_depth = Inf,
                            exclude_descendants_limit = 5000,
-                           method = c("fisher","parent_child","weight01"),
+                           method = c("fisher","parent_child"),
                            ancestor_novel_frac = 0.20,
+                           parent_child_alpha = alpha,
                            x_axis_min = NULL,
                            x_axis_max = NULL,
-                           x_axis_pad_right = 3,
                            interpro_release = NULL,
                            auto_detect_release = TRUE,
-                           release_candidates = c("92.0","94.0","96.0","98.0","100.0"),
                            strict_coverage = 0.90,
                            tree_source = c("auto","local","remote","none"),
                            tree_path = NULL,
@@ -179,7 +182,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            tree_timeout_s = 20,
                            threads = 4) {
 
-  sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
+  sides <- intersect(unique(as.character(sides)), c("query","subject"))
+  if (!length(sides)) stop("sides must include at least one of: 'query','subject'")
   fdr_method <- match.arg(fdr_method)
   adjust_scope <- match.arg(adjust_scope)
   entries_source <- match.arg(entries_source)
@@ -231,10 +235,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (inherits(ok, "try-error") || (!is.null(ok) && ok != 0)) return(FALSE)
     file.exists(file) && file.info(file)$size > 0
   }
-  # ---- defaults for long URLs (keep Rd \usage lines short) ----
-  if (is.null(entries_url) || !nzchar(entries_url)) entries_url <- .current_urls$entry_list
-  if (is.null(tree_url)    || !nzchar(tree_url))    tree_url    <- .current_urls$parent_child
-  
   .read_tsv_strict <- function(path) {
     utils::read.table(path, header = TRUE, sep = "\t", quote = "",
                       stringsAsFactors = FALSE, comment.char = "", check.names = FALSE)
@@ -286,12 +286,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!length(iprs)) return(1.0)
     round(sum(iprs %in% el$ENTRY_AC) / length(iprs), 6)
   }
-  .pick_best_release <- function(iprs, candidates, timeout_s = 30) {
-    if (!length(candidates)) return(list(release = NULL, coverage = NA_real_))
-    cov <- vapply(candidates, function(r) .coverage_for_release(iprs, r, timeout_s), numeric(1))
-    best <- which.max(replace(cov, is.na(cov), -Inf))
-    list(release = candidates[best], coverage = cov[best])
-  }
   .load_interpro_entry_list <- function(entries_source = c("auto","local","remote","none"),
                                         entries_path = NULL,
                                         entries_url  = NULL,
@@ -325,6 +319,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
     stop("Failed to load InterPro entry.list from remote/bundled sources.")
   }
+
   .parse_parent_child_tree_txt <- function(path) {
     lines <- readLines(path, warn = FALSE)
     rx <- "(IPR\\d{6,})"
@@ -353,6 +348,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
     data.frame(parent = edges_p, child = edges_c, stringsAsFactors = FALSE)
   }
+
   .load_interpro_tree <- function(tree_source = c("auto","local","remote","none"),
                                   term_trees = NULL,
                                   tree_path = NULL,
@@ -360,18 +356,23 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                                   interpro_release = NULL,
                                   timeout_s = 30) {
     tree_source <- match.arg(tree_source)
+
+    # UPDATE (4): "none" means NONE: do not honor term_trees/tree_path/tree_url
     if (tree_source == "none") {
-      if (is.data.frame(term_trees) && ncol(term_trees) >= 2) {
-        colnames(term_trees)[1:2] <- c("parent","child")
-        return(list(df = term_trees, provenance = list(mode = "provided-df")))
-      }
-      return(list(df = NULL, provenance = list()))
+      return(list(df = NULL, provenance = list(mode = "none")))
     }
+
     if (is.character(term_trees) && length(term_trees) == 1L && file.exists(term_trees) &&
         tree_source %in% c("auto","local")) {
       ed <- .read_tsv_strict(term_trees); colnames(ed)[1:2] <- c("parent","child")
       return(list(df = ed, provenance = list(mode = "provided-tsv", path = normalizePath(term_trees, winslash = "/"))))
     }
+
+    if (is.data.frame(term_trees) && ncol(term_trees) >= 2 && tree_source %in% c("auto","local")) {
+      colnames(term_trees)[1:2] <- c("parent","child")
+      return(list(df = term_trees, provenance = list(mode = "provided-df")))
+    }
+
     if (!is.null(tree_path) && file.exists(tree_path) && tree_source %in% c("auto","local")) {
       headl <- readLines(tree_path, n = 5, warn = FALSE)
       looks_tsv <- grepl("\t", paste(headl, collapse = "")) &&
@@ -384,8 +385,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         return(list(df = ed, provenance = list(mode = "local-txt", path = normalizePath(tree_path, winslash = "/"))))
       }
     }
+
     if (tree_source == "local")
-      stop("tree_source='local' but neither term_trees TSV nor tree_path was supplied.")
+      stop("tree_source='local' but neither term_trees nor tree_path was supplied.")
+
     if (!is.null(tree_url)) {
       tf <- tempfile(fileext = ".txt")
       if (.download_quiet(tree_url, tf, timeout_s)) {
@@ -398,6 +401,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         return(list(df = ed, provenance = list(mode = "remote-url", url = tree_url)))
       }
     }
+
     url <- if (is.null(interpro_release)) .current_urls$parent_child else .release_urls(interpro_release)$parent_child
     tf <- tempfile(fileext = ".txt")
     if (.download_quiet(url, tf, timeout_s)) {
@@ -405,6 +409,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       return(list(df = ed, provenance = list(mode = if (is.null(interpro_release)) "remote-current" else "remote-release",
                                              url = url, release = interpro_release)))
     }
+
     if (tree_source == "auto") {
       bp <- system.file("extdata", "InterPro_ParentChildTreeFile.txt", package = "dndsR")
       if (nzchar(bp) && file.exists(bp)) {
@@ -412,9 +417,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         return(list(df = ed, provenance = list(mode = "bundled", path = normalizePath(bp, winslash = "/"))))
       }
     }
+
     warning("Failed to load InterPro parent-child tree; hierarchy features will be disabled.")
     list(df = NULL, provenance = list(error = "load-failed"))
   }
+
   .write_provenance <- function(out_dir, comp_name, prov_list) {
     if (!requireNamespace("jsonlite", quietly = TRUE)) return(invisible(NULL))
     fn <- file.path(out_dir, sprintf("%s_interpro_provenance.json", comp_name))
@@ -521,42 +528,59 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   # Although NAs appear to not affect BH, we set all NA pvals to 1
   # before all pval adjustments for consistency across tests,
-  # as qvalue and other tests are NA intolerant                                           
+  # as qvalue and other tests are NA intolerant
   .adjust_pvals <- function(res, method, alpha) {
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
-  
+
     p <- res$p_value
-  
+
     # Define validity ONCE, used for all methods
     ok <- is.finite(p) & !is.na(p) & p >= 0 & p <= 1
-  
+
     # Default: invalid tests are not significant
     res$p_adj <- rep(1, length(p))
-  
+
     if (!any(ok)) {
       warning("[ipr_enrichment] No valid p-values; setting all p_adj=1.", call. = FALSE)
       return(res)
     }
-  
+
     if (method == "BH") {
       res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
-  
+
     } else if (method == "BY") {
       res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BY")
-  
+
     } else if (method == "qvalue") {
       if (requireNamespace("qvalue", quietly = TRUE)) {
-        p_use <- p[ok]
-        # avoid exact 0 (can upset pi0 estimation)
-        p_use <- pmax(p_use, .Machine$double.xmin)
-        p_use <- pmin(p_use, 1)
+
+        p_use <- suppressWarnings(as.numeric(p[ok]))
+
+        ok_use <- is.finite(p_use) & !is.na(p_use) & p_use >= 0 & p_use <= 1
+        if (!all(ok_use)) {
+          # If coercion created NA/Inf (should be rare), treat those as invalid tests
+          ok_idx <- which(ok)
+          ok <- ok_idx[ok_use]            # convert to absolute indices for assignment
+          p_use <- p_use[ok_use]
+        } else {
+          ok <- which(ok)                 # absolute indices for assignment
+        }
+
+        if (!length(p_use)) {
+          warning("[ipr_enrichment] qvalue: no valid p-values; setting all p_adj=1.", call. = FALSE)
+          return(res)
+        }
+
+        p_use <- pmin(pmax(p_use, .Machine$double.xmin), 1)
         qv <- qvalue::qvalue(p_use)
+
         res$p_adj[ok] <- as.numeric(qv$qvalues)
+
       } else {
         warning("qvalue not installed; falling back to BH.", call. = FALSE)
         res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
       }
-  
+
     } else if (method == "IHW") {
       if (requireNamespace("IHW", quietly = TRUE)) {
         # Need finite covariate too
@@ -572,12 +596,12 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         warning("IHW not installed; falling back to BH.", call. = FALSE)
         res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
       }
-  
+
     } else { # "none"
       res$p_adj[ok] <- p[ok]
       res$p_adj[!ok] <- 1
     }
-  
+
     res
   }
 
@@ -600,33 +624,38 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
+
+  # UPDATE (5): use a single family name ("Arial") and explicitly map bold to the bundled TTF
   .setup_showtext <- function() {
     ttf <- .bundled_arial_path()
     if (is.null(ttf)) return(NULL)
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
     if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
     ok <- try({
-      sysfonts::font_add(family = "Arial Bold", regular = ttf)
+      sysfonts::font_add(family = "Arial", regular = ttf, bold = ttf)
       showtext::showtext_auto(TRUE)
       TRUE
     }, silent = TRUE)
-    if (isTRUE(ok)) "Arial Bold" else NULL
+    if (isTRUE(ok)) "Arial" else NULL
   }
+
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
     ttf <- .bundled_arial_path()
     if (is.null(ttf)) return(NULL)
     function(file, ...) svglite::svglite(
       file,
-      user_fonts = list(`Arial Bold` = ttf),
+      user_fonts = list(`Arial` = ttf),
       ...
     )
   }
+
   .pick_sans_family <- function() {
     fam <- .setup_showtext()
     if (!is.null(fam)) return(fam)
     "sans"
   }
+
   .svg_device <- function() {
     dev_map <- .register_svglite_mapping()
     if (!is.null(dev_map)) return(dev_map)
@@ -641,18 +670,19 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     max(max_p, alpha + eps)
   }
   .padj_scale <- function(alpha, upper) {
-    ggplot2::scale_color_gradientn(
-      colours = c("red", "grey80", "steelblue"),
-      values  = scales::rescale(c(0, alpha, upper), to = c(0,1), from = c(0, upper)),
-      limits  = c(0, upper),
-      oob     = scales::squish, name = "adj p"
+    oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
+    ggplot2::scale_color_viridis_c(
+      option = "viridis",
+      direction = -1,
+      limits = c(0, upper),
+      oob = oob_fun,
+      name = "adj p"
     )
   }
 
   .write_plot <- function(df, ylab, out_svg, alpha_val = alpha,
                           x_axis_min = x_axis_min,
-                          x_axis_max = x_axis_max,
-                          x_axis_pad_right = x_axis_pad_right) {
+                          x_axis_max = x_axis_max) {
 
     if (!make_plots || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) {
       return(invisible(NULL))
@@ -854,9 +884,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   # ---------- hierarchy ----------
   .build_term2rows <- function(df, term_col) {
     ids <- seq_len(nrow(df))
-    id_col <- if (grepl("^q_", term_col) && "q_id" %in% names(df)) "q_id" else
-      if (grepl("^s_", term_col) && "s_id" %in% names(df)) "s_id" else NULL
-    if (!is.null(id_col)) ids <- df[[id_col]]
     term2rows <- list()
     for (i in seq_len(nrow(df))) {
       ts <- .split_terms_unique(df[[term_col]][i])
@@ -917,7 +944,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   .parent_child_enrich <- function(df, term_col, type_label, type_by_ipr, name_by_ipr,
                                    min_total, min_pos, max_prop,
-                                   fdr_method, alpha,
+                                   fdr_method, alpha, parent_child_alpha,
                                    term_trees_df = NULL) {
     n_all <- nrow(df); if (!n_all) return(NULL)
     pos_id <- which(df$dNdS > pos_threshold); all_id <- seq_len(n_all)
@@ -928,88 +955,130 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     children_map <- .dag_from_term_trees(term2rows, type_terms, term_trees_df)
     if (is.null(children_map)) children_map <- .dag_infer_by_subset(term2rows, type_terms)
-    if (is.null(children_map)) {
-      vec_all <- vapply(df[[term_col]], function(s) {
-        parts <- .split_terms_unique(s); parts <- parts[parts %in% type_terms]
-        if (!length(parts)) "" else paste(unique(parts), collapse = term_sep)
-      }, FUN.VALUE = character(1))
-      vec_pos <- vec_all[pos_id]
-      res <- .fisher_from_vectors(vec_all, vec_pos, drop_rows_without_term)
-      if (is.null(res) || !nrow(res)) return(NULL)
-      res <- res[res$IPR %in% type_terms, , drop = FALSE]
-      res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr); res$ENTRY_TYPE <- type_label
-      res <- .adjust_pvals(res, fdr_method, alpha)
-      return(res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE])
+
+    if (is.null(children_map) || !length(children_map)) {
+      stop(
+        sprintf(
+          paste0(
+            "[ipr_enrichment] method='parent_child' could not construct a usable term hierarchy for type=%s. ",
+            "This can happen if there are no parent-child edges among the retained terms after filtering ",
+            "(min_total=%d, min_pos=%d, max_prop=%.3f) and exclusions. ",
+            "Rerun with method='fisher' explicitly, or relax filters / provide a more complete tree."
+          ),
+          type_label, min_total, min_pos, max_prop
+        ),
+        call. = FALSE
+      )
     }
 
     order_terms <- .topo_specific_first(children_map)
-    claimed <- stats::setNames(vector("list", length(order_terms)), order_terms)
-    for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
-    rows <- list(); n_pos <- length(pos_id); n_bg <- n_all - n_pos
-    sig <- stats::setNames(logical(length(order_terms)), order_terms)
-
-    for (t in order_terms) {
-      members <- intersect(term2rows[[t]], all_id)
-      if (!length(members)) next
-      kids <- children_map[[t]]
-      if (!is.null(kids) && length(kids)) {
-        kids_sig <- kids[kids %in% names(sig)[sig]]
-        if (length(kids_sig)) {
-          kids_claimed <- unique(unlist(claimed[kids_sig], use.names = FALSE))
-          members <- setdiff(members, kids_claimed)
-        }
-      }
-      tot <- length(members); if (tot < min_total) next
-      a <- length(intersect(members, pos_id)); c <- tot - a
-      b <- n_pos - a; d <- n_bg - c
-      if (a < min_pos) next
-      ft <- try(stats::fisher.test(matrix(c(a,b,c,d), nrow = 2), alternative = "greater"), silent = TRUE)
-      ci <- c(NA_real_, NA_real_); or <- NA_real_; p <- NA_real_
-      if (!inherits(ft, "try-error")) {
-        p  <- ft$p.value; or <- as.numeric(ft$estimate)
-        if (!is.null(ft$conf.int)) ci <- as.numeric(ft$conf.int)[1:2]
-      }
-      rows[[t]] <- data.frame(IPR = t, pos_count = a, nonpos_count = c,
-                              pos_total = n_pos, nonpos_total = n_bg,
-                              odds_ratio = or, ci_lower = ci[1], ci_upper = ci[2],
-                              p_value = p, total_count = tot, stringsAsFactors = FALSE)
-      if (is.finite(p) && !is.na(p) && p <= alpha) sig[t] <- TRUE
-    }
 
     nodes <- unique(c(names(children_map), unlist(children_map, use.names = FALSE)))
     parents_map <- stats::setNames(vector("list", length(nodes)), nodes)
     for (p in names(children_map)) for (c in children_map[[p]]) parents_map[[c]] <- c(parents_map[[c]], p)
-    claimed <- stats::setNames(vector("list", length(nodes)), nodes)
-    for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
-    for (t in order_terms) {
-      r <- rows[[t]]; if (is.null(r)) next
-      if (!isTRUE(sig[[t]])) next
-      members <- term2rows[[t]]; an <- parents_map[[t]]
-      if (length(an)) for (a_name in an) claimed[[a_name]] <- unique(c(claimed[[a_name]], members))
+
+    .pc_pass <- function(order_terms, term2rows, all_id, pos_id, children_map,
+                         sig_terms = character(0), claimed = NULL) {
+      rows <- list()
+      n_pos <- length(pos_id); n_bg <- length(all_id) - n_pos
+      if (is.null(claimed)) {
+        claimed <- stats::setNames(vector("list", length(nodes)), nodes)
+        for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
+      }
+
+      for (t in order_terms) {
+        members <- intersect(term2rows[[t]], all_id)
+        if (!length(members)) next
+
+        kids <- children_map[[t]]
+        if (!is.null(kids) && length(kids)) {
+          kids_sig <- intersect(kids, sig_terms)
+          if (length(kids_sig)) {
+            kids_claimed <- unique(unlist(claimed[kids_sig], use.names = FALSE))
+            members <- setdiff(members, kids_claimed)
+          }
+        }
+
+        tot <- length(members); if (tot < min_total) next
+        a <- length(intersect(members, pos_id)); c <- tot - a
+        b <- n_pos - a; d <- n_bg - c
+        if (a < min_pos) next
+
+        ft <- try(stats::fisher.test(matrix(c(a,b,c,d), nrow = 2), alternative = "greater"), silent = TRUE)
+        ci <- c(NA_real_, NA_real_); or <- NA_real_; p <- NA_real_
+        if (!inherits(ft, "try-error")) {
+          p  <- ft$p.value; or <- as.numeric(ft$estimate)
+          if (!is.null(ft$conf.int)) ci <- as.numeric(ft$conf.int)[1:2]
+        }
+
+        rows[[t]] <- data.frame(IPR = t, pos_count = a, nonpos_count = c,
+                                pos_total = n_pos, nonpos_total = n_bg,
+                                odds_ratio = or, ci_lower = ci[1], ci_upper = ci[2],
+                                p_value = p, total_count = tot, stringsAsFactors = FALSE)
+      }
+
+      if (!length(rows)) return(NULL)
+      do.call(rbind, unname(rows))
     }
 
-    if (!length(rows)) return(NULL)
-    res <- do.call(rbind, unname(rows))
-    pc <- pmax(res$pos_count, 0); pt <- pmax(res$pos_total, 1)
-    nc <- pmax(res$nonpos_count, 0); nt <- pmax(res$nonpos_total, 1)
-    bg_rate  <- nc / nt; pos_rate <- pc / pt
-    res$enrichment <- ifelse(bg_rate == 0 & pos_rate > 0, Inf,
-                             ifelse(bg_rate == 0 & pos_rate == 0, 1, pos_rate / bg_rate))
-    res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr); res$ENTRY_TYPE <- type_label
-    res <- .adjust_pvals(res, fdr_method, alpha)
+    .pc_finalize <- function(res) {
+      if (is.null(res) || !nrow(res)) return(NULL)
+      pc <- pmax(res$pos_count, 0); pt <- pmax(res$pos_total, 1)
+      nc <- pmax(res$nonpos_count, 0); nt <- pmax(res$nonpos_total, 1)
+      bg_rate  <- nc / nt; pos_rate <- pc / pt
+      res$enrichment <- ifelse(bg_rate == 0 & pos_rate > 0, Inf,
+                               ifelse(bg_rate == 0 & pos_rate == 0, 1, pos_rate / bg_rate))
+      res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr); res$ENTRY_TYPE <- type_label
+      res <- .adjust_pvals(res, fdr_method, alpha)
+      res
+    }
+
+    .pc_sig_terms <- function(res) {
+      if (is.null(res) || !nrow(res)) return(character(0))
+      res$IPR[is.finite(res$p_adj) & !is.na(res$p_adj) & res$p_adj <= parent_child_alpha]
+    }
+
+    .pc_claimed_from_sig <- function(sig_terms) {
+      claimed <- stats::setNames(vector("list", length(nodes)), nodes)
+      for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
+      if (!length(sig_terms)) return(claimed)
+
+      for (t in order_terms) {
+        if (!(t %in% sig_terms)) next
+        members <- term2rows[[t]]
+        an <- parents_map[[t]]
+        if (length(an)) for (a_name in an) claimed[[a_name]] <- unique(c(claimed[[a_name]], members))
+      }
+      claimed
+    }
+
+    res1 <- .pc_pass(order_terms, term2rows, all_id, pos_id, children_map)
+    res1 <- .pc_finalize(res1)
+    if (is.null(res1) || !nrow(res1)) return(NULL)
+
+    sig_terms1 <- .pc_sig_terms(res1)
+    claimed1 <- .pc_claimed_from_sig(sig_terms1)
+
+    res2 <- .pc_pass(order_terms, term2rows, all_id, pos_id, children_map,
+                     sig_terms = sig_terms1, claimed = claimed1)
+    res2 <- .pc_finalize(res2)
+    if (is.null(res2) || !nrow(res2)) return(NULL)
+
+    sig_terms2 <- .pc_sig_terms(res2)
 
     if (!is.null(children_map) && length(children_map)) {
-      novelty_ok <- rep(TRUE, nrow(res)); names(novelty_ok) <- res$IPR
-      for (t in res$IPR) {
+      novelty_ok <- rep(TRUE, nrow(res2)); names(novelty_ok) <- res2$IPR
+      for (t in res2$IPR) {
         kids <- children_map[[t]]; if (!length(kids)) next
-        kids_sig <- intersect(kids, res$IPR[res$p_adj <= alpha]); if (!length(kids_sig)) next
+        kids_sig <- intersect(kids, sig_terms2); if (!length(kids_sig)) next
         members <- term2rows[[t]]; kids_union <- unique(unlist(term2rows[kids_sig], use.names = FALSE))
         frac <- length(setdiff(members, kids_union)) / max(length(members), 1)
         if (frac < ancestor_novel_frac) novelty_ok[[t]] <- FALSE
       }
-      res <- res[novelty_ok[res$IPR], , drop = FALSE]
+      res2 <- res2[novelty_ok[res2$IPR], , drop = FALSE]
     }
-    res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE]
+
+    res2[order(res2$p_adj, -res2$enrichment, res2$IPR), , drop = FALSE]
   }
 
   # ---------- Decide release & load InterPro resources ----------
@@ -1023,17 +1092,35 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   best_cov <- NA_real_
   backtrack_meta <- list()
 
+  # UPDATE (6): cap how much we scan/collect for auto-detect so huge batches don’t thrash I/O
+  .MAX_FILES_FOR_AUTODETECT <- 50L
+  .MAX_IPRS_FOR_AUTODETECT  <- 50000L
+
   if (isTRUE(auto_detect_release) && is.null(interpro_release)) {
     iprs_all <- character(0)
+
     if (!is.null(comparison_file)) {
       df_cf <- .read_comparisons(comparison_file)
+
+      files_seen <- 0L
       for (i in seq_len(nrow(df_cf))) {
         comp <- df_cf$comparison_name[i]
         in_file <- file.path(output_dir, comp, paste0(comp, "_dnds_annot.tsv"))
-        if (file.exists(in_file)) iprs_all <- unique(c(iprs_all, .collect_all_iprs_from_comp(in_file, term_sep)))
+        if (!file.exists(in_file)) next
+
+        files_seen <- files_seen + 1L
+        iprs_all <- unique(c(iprs_all, .collect_all_iprs_from_comp(in_file, term_sep)))
+
+        if (length(iprs_all) >= .MAX_IPRS_FOR_AUTODETECT) {
+          iprs_all <- iprs_all[seq_len(.MAX_IPRS_FOR_AUTODETECT)]
+          break
+        }
+        if (files_seen >= .MAX_FILES_FOR_AUTODETECT) break
       }
+
     } else if (!is.null(dnds_annot_file)) {
       iprs_all <- unique(c(iprs_all, .collect_all_iprs_from_comp(dnds_annot_file, term_sep)))
+      if (length(iprs_all) >= .MAX_IPRS_FOR_AUTODETECT) iprs_all <- iprs_all[seq_len(.MAX_IPRS_FOR_AUTODETECT)]
     }
 
     cur_rel <- .detect_current_release(timeout_s = max(entries_timeout_s, tree_timeout_s))
@@ -1056,7 +1143,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       current_release_detected = cur_rel,
       current_coverage_estimate = cur_cov,
       attempted_releases = bt$tried,
-      attempted_coverages = bt$coverages
+      attempted_coverages = bt$coverages,
+      autodetect_caps = list(
+        max_files_scanned = .MAX_FILES_FOR_AUTODETECT,
+        max_iprs_collected = .MAX_IPRS_FOR_AUTODETECT
+      )
     )
 
     if (is.na(best_cov)) {
@@ -1112,24 +1203,35 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   exclude_set <- .build_exclude_set(exclude_seeds)
 
   # ---------- pooled helper ----------
-  .pooled_enrichment <- function(df, side, allowed_types = NULL) {
+  .pooled_enrichment <- function(df, side, allowed_types = NULL, do_adjust = TRUE) {
     prefix <- if (side == "query") "q_" else "s_"
     col <- paste0(prefix, "ipr")
     if (!col %in% names(df) || !is.character(df[[col]])) return(NULL)
+
     vec_all <- vapply(df[[col]], .filter_terms_string, FUN.VALUE = character(1),
                       allowed_types = allowed_types, type_by_ipr = type_by_ipr,
                       exclude_set = exclude_set, keep_unmatched = keep_unmatched)
+
     pos <- df$dNdS > pos_threshold
     vec_pos <- vec_all[pos]
+
     res <- .fisher_from_vectors(vec_all, vec_pos, drop_rows_without_term)
     if (is.null(res) || !nrow(res)) return(NULL)
+
     n_all <- length(vec_all)
     prop  <- res$total_count / max(n_all, 1)
     keep  <- (res$total_count >= min_total) & (res$pos_count >= min_pos) & (prop <= max_prop)
     res <- res[keep, , drop = FALSE]
     if (!nrow(res)) return(NULL)
+
     res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
-    res <- .adjust_pvals(res, fdr_method, alpha)
+
+    if (isTRUE(do_adjust)) {
+      res <- .adjust_pvals(res, fdr_method, alpha)
+    } else {
+      res$p_adj <- NA_real_
+    }
+
     res
   }
 
@@ -1137,37 +1239,121 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .enrich_side_ipr <- function(d, side, comp, comp_dir, stratified_types = NULL) {
     prefix <- if (side == "query") "q_" else "s_"
     term_col <- paste0(prefix, "ipr")
+
     if (!term_col %in% names(d) || !is.character(d[[term_col]])) return(list())
-    df <- .apply_filter(d, filter_expr); if (!nrow(df)) return(list())
-    filter_fun <- function(v, keep_types = NULL) vapply(v, .filter_terms_string, FUN.VALUE = character(1),
-                                                       allowed_types = keep_types, type_by_ipr = type_by_ipr,
-                                                       exclude_set = exclude_set, keep_unmatched = keep_unmatched)
+
+    df <- .apply_filter(d, filter_expr)
+    if (!nrow(df)) return(list())
+
+    filter_fun <- function(v, keep_types = NULL) {
+      vapply(
+        v,
+        .filter_terms_string,
+        FUN.VALUE = character(1),
+        allowed_types = keep_types,
+        type_by_ipr = type_by_ipr,
+        exclude_set = exclude_set,
+        keep_unmatched = keep_unmatched
+      )
+    }
+
     results <- list()
+
     if (!is.null(stratified_types)) {
-      for (tp in stratified_types) {
-        df2 <- df; df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp)
-        if (method == "fisher") {
-          res <- .pooled_enrichment(df2, side, allowed_types = tp)
-          if (!is.null(res) && nrow(res)) { res$ENTRY_TYPE <- tp; results[[tp]] <- res }
-          else message(sprintf("[ipr_enrichment] No rows for type=%s side=%s in %s", tp, side, comp))
-        } else {
-          res <- .parent_child_enrich(df2, term_col, tp, type_by_ipr, name_by_ipr,
-                                      min_total, min_pos, max_prop,
-                                      fdr_method, alpha,
-                                      term_trees_df = tree_df)
-          if (!is.null(res) && nrow(res)) results[[tp]] <- res
-          else message(sprintf("[ipr_enrichment] No rows (hierarchy mode) for type=%s side=%s in %s", tp, side, comp))
+      if (identical(method, "parent_child")) {
+        if (is.null(tree_df) || !is.data.frame(tree_df) || nrow(tree_df) == 0L) {
+          stop(
+            sprintf(
+              "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
+              "Provide tree_path/term_trees/tree_url, or rerun with method='fisher'. (comp=%s side=%s)",
+              comp, side
+            ),
+            call. = FALSE
+          )
         }
       }
+
+      if (identical(method, "parent_child") && identical(adjust_scope, "global")) {
+        warning("[ipr_enrichment] adjust_scope='global' is not supported for method='parent_child'; using per_type.", call. = FALSE)
+      }
+
+      for (tp in stratified_types) {
+        df2 <- df
+        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp)
+
+        if (identical(method, "fisher")) {
+          res <- .pooled_enrichment(df2, side, allowed_types = tp, do_adjust = FALSE)
+          if (!is.null(res) && nrow(res)) {
+            res$ENTRY_TYPE <- tp
+            results[[tp]] <- res
+          } else {
+            message(sprintf("[ipr_enrichment] No rows for type=%s side=%s in %s", tp, side, comp))
+          }
+
+        } else if (identical(method, "parent_child")) {
+          res <- .parent_child_enrich(
+            df2, term_col, tp, type_by_ipr, name_by_ipr,
+            min_total, min_pos, max_prop,
+            fdr_method, alpha,
+            parent_child_alpha = parent_child_alpha,
+            term_trees_df = tree_df
+          )
+          if (!is.null(res) && nrow(res)) {
+            results[[tp]] <- res
+          } else {
+            message(sprintf(
+              "[ipr_enrichment] No rows (hierarchy mode) for type=%s side=%s in %s",
+              tp, side, comp
+            ))
+          }
+
+        } else {
+          stop("[ipr_enrichment] Unknown method: ", method, call. = FALSE)
+        }
+      }
+
+      if (identical(method, "fisher") && length(results)) {
+        allres <- do.call(rbind, Filter(function(x) is.data.frame(x) && nrow(x) > 0, results))
+
+        if (!is.null(allres) && nrow(allres)) {
+          if (identical(adjust_scope, "global")) {
+            allres <- .adjust_pvals(allres, fdr_method, alpha)
+            results <- split(allres, allres$ENTRY_TYPE)
+          } else {
+            results <- lapply(results, function(x) {
+              if (is.null(x) || !nrow(x)) return(x)
+              .adjust_pvals(x, fdr_method, alpha)
+            })
+          }
+        }
+      }
+
       return(results)
     }
+
+    if (!identical(method, "fisher")) {
+      stop(
+        sprintf(
+          "[ipr_enrichment] method='%s' is only implemented for stratify_by_type=TRUE in this function. ",
+          "Rerun with method='fisher' or enable stratify_by_type=TRUE. (comp=%s side=%s)",
+          method, comp, side
+        ),
+        call. = FALSE
+      )
+    }
+
     df[[term_col]] <- filter_fun(df[[term_col]], keep_types = include_types)
     res <- .pooled_enrichment(df, side, allowed_types = include_types)
-    if (is.null(res) || !nrow(res)) { message(sprintf("[ipr_enrichment] No rows for pooled side=%s", side)); return(list()) }
+
+    if (is.null(res) || !nrow(res)) {
+      message(sprintf("[ipr_enrichment] No rows for pooled side=%s", side))
+      return(list())
+    }
+
     list(pooled = res)
   }
 
-  # ---------- NEW: strat-type inference helper (per comparison) ----------
+  # ---------- strat-type inference helper (per comparison) ----------
   .infer_strat_types <- function(d) {
     if (!isTRUE(stratify_by_type)) return(NULL)
 
@@ -1206,7 +1392,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     strat_types <- .infer_strat_types(d)
     if (isTRUE(stratify_by_type) && (is.null(strat_types) || !length(strat_types))) {
       message("No InterPro ENTRY_TYPEs detected in ", in_file, "; skipping stratified analysis.")
-      # still write provenance (once) below in batch/single wrapper if desired
       return(character(0))
     }
 
@@ -1244,14 +1429,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
         utils::write.table(sub, file = out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
 
-        out_svg <- sub("_enrichment.tsv$", "_enrichment_top20.svg", out_tsv)
+        out_svg <- sub("_enrichment.tsv$", sprintf("_enrichment_top%d.svg", top_n), out_tsv)
         .write_plot(
           sub,
           sprintf("IPR (%s, %s) [%s]", tp, side, method),
           out_svg,
           x_axis_min = x_axis_min,
-          x_axis_max = x_axis_max,
-          x_axis_pad_right = x_axis_pad_right
+          x_axis_max = x_axis_max
         )
         outs <- c(outs, out_tsv)
       }
@@ -1274,8 +1458,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         sprintf("IPR (%s) [%s]", side, method),
         out_svg,
         x_axis_min = x_axis_min,
-        x_axis_max = x_axis_max,
-        x_axis_pad_right = x_axis_pad_right
+        x_axis_max = x_axis_max
       )
       outs <- c(outs, out_tsv)
     }
@@ -1284,7 +1467,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     outs
   }
 
-  # ---------- NEW: provenance writer with simple lock to avoid clobber in parallel ----------
+  # ---------- provenance writer with simple lock to avoid clobber in parallel ----------
   .write_prov_once <- function(comp_dir, comp_name) {
     prov <- c(.prov_common, list(comparison = comp_name,
                                  timestamp  = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")))
@@ -1337,7 +1520,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         }
       )
 
-      # provenance sidecar: write once per comparison (best-effort lock)
       .write_prov_once(comp_dir, comp)
 
       out_k
