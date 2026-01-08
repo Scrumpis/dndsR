@@ -460,7 +460,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   .backtrack_release_until_full <- function(iprs,
                                             start_release,
-                                            step = 2.0,
+                                            step = 1.0,
                                             max_backtrack = 12L,
                                             timeout_s = 30) {
     tried <- character(0); covv <- numeric(0)
