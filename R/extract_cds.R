@@ -367,7 +367,7 @@ extract_cds <- function(comparison_name = NULL,
     }
 
     # Map results by out_base for fast per-comparison assembly
-    res_by_outbase <- setNames(res_list, tasks_unique$out_base)
+    res_by_outbase <- stats::setNames(res_list, tasks_unique$out_base)
 
     out <- lapply(seq_len(nrow(df)), function(i) {
       row <- df[i, , drop = FALSE]
