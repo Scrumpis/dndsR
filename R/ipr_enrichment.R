@@ -959,18 +959,35 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     children_map <- .dag_from_term_trees(term2rows, type_terms, term_trees_df)
     if (is.null(children_map)) children_map <- .dag_infer_by_subset(term2rows, type_terms)
-
+    
     if (is.null(children_map) || !length(children_map)) {
-    stop(
-      sprintf(
-        paste0(
-          "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
-          "Provide tree_path/term_trees/tree_url, or rerun with method='fisher'. (comp=%s side=%s)"
+      warning(
+        sprintf(
+          paste0(
+            "[ipr_enrichment] method='parent_child': no parent-child relationships found among retained terms; ",
+            "falling back to Fisher for this slice. (comp=%s side=%s type=%s)"
+          ),
+          comp, side, type_label
         ),
-        comp, side
-      ),
-      call. = FALSE
-    )
+        call. = FALSE
+      )
+    
+      # fallback: standard fisher on this filtered universe
+      vec_all <- df[[term_col]]
+      vec_pos <- df[[term_col]][df$dNdS > pos_threshold]
+      res <- .fisher_from_vectors(vec_all, vec_pos, drop_empty = FALSE)
+      if (is.null(res) || !nrow(res)) return(NULL)
+    
+      # thresholds, metadata, adjust
+      prop <- res$total_count / max(length(vec_all), 1)
+      keep <- (res$total_count >= min_total) & (res$pos_count >= min_pos) & (prop <= max_prop)
+      res <- res[keep, , drop = FALSE]
+      if (!nrow(res)) return(NULL)
+    
+      res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
+      res$ENTRY_TYPE <- type_label
+      res <- .adjust_pvals(res, fdr_method, alpha)
+      return(res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE])
     }
 
     order_terms <- .topo_specific_first(children_map)
