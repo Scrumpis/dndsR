@@ -144,7 +144,7 @@ split_comparisons <- function(comparison_file,
 
     map_outfile <- function(path, labels) {
       se <- .split_ext(path)
-      setNames(file.path(dirname(path), sprintf("%s_%s%s", se$base, labels, se$ext)), labels)
+      stats::setNames(file.path(dirname(path), sprintf("%s_%s%s", se$base, labels, se$ext)), labels)
     }
     qfa_map  <- map_outfile(qfa, q_labels)
     qgff_map <- map_outfile(qgff, q_labels)
