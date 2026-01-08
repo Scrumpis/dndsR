@@ -66,7 +66,6 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 **Use** ```dndsr --help``` **or** ```dndsr <function> --help``` **for more information on any commands.**
 
 ## Notes
-- If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results
 - Can use special characters or spaces in path if double-quoted in the comparison_file
 - All flags are called with ```--```
 - ```-``` or ```_``` are recognized flag separators (```--min_pos``` and ```--min-pos``` both work)
@@ -98,7 +97,10 @@ Appends GFF annotation attributes, functional terms, seqname, start, and end val
 dndsr append_annotations -c comparison_file.txt -t 8
 ```
 ### 5. Annotation term enrichment
-Enrichment of various gene annotation functional terms under positive selection (dN/dS>1).
+Enrichment of various gene annotation functional terms under positive selection (dN/dS>1).  
+  
+***If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results***  
+  
 #### InterPro (IPR) term enrichment
 Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 ```
