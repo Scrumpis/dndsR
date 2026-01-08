@@ -101,17 +101,17 @@ Enrichment of various gene annotation functional terms under positive selection 
   
 ***If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results***  
   
-#### InterPro (IPR) term enrichment
+#### InterPro (IPR) term enrichment:
 Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
 ```
 dndsr ipr_enrichment -c comparison_file.txt -t 8
 ```
-#### Gene Ontology (GO) term enrichment
+#### Gene Ontology (GO) term enrichment:
 TopGO enrichment of GO terms under positive selection.
 ```
 dndsr go_enrichment -c comparison_file.txt -t 8
 ```
-#### General term enrichment
+#### General term enrichment:
 Fisher's Exact Test and multiple testing correction. Tests non-IPR and non-GO terms like KEGG, PANTHER, etc. Optionally receives a custom pattern of interest to test for enrichment. 
 ```
 dndsr term_enrichment -c comparison_file.txt
