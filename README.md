@@ -163,3 +163,9 @@ dndsr regional_dnds_contrasts \
 - Ensure docker image contains all dependencies of all optional functions
 - Change regional analysis name. Can focus regions, but can do whole genome summaries too.
   - Change default to regions_bed = NULL
+
+## Contributing
+dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
+If you are using dndsR in your research and encounter issues or have ideas
+for improvement, please feel free to open an issue, start a discussion, or contact Nick Johnson directly.
+
