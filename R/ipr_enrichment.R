@@ -26,8 +26,9 @@
 #' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds (default 10) or NA dNdS.
 #' @param filter_expr Optional character with a logical expression evaluated in the data
 #'   (e.g., "q_seqname == s_seqname").
-#' @param drop_rows_without_term Logical; if TRUE (default), rows with no IPR term are
-#'   removed from BOTH positives and background (annotation-aware universe).
+#' @param drop_rows_without_term Logical; if TRUE (default), rows with no retained IPR term
+#'   (after filtering by type/exclusions) are removed from BOTH positives and background for
+#'   that side (annotation-aware universe).
 #'
 #' @section Term frequency and multiple-testing filters:
 #' - Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
@@ -132,9 +133,7 @@
 #'
 #' @return In single mode: (invisibly) list of output TSV paths.
 #'   In batch mode: (invisibly) vector of output TSV paths across comparisons.
-#'   Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
-#'   pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment,
-#'   label, side, comparison.
+#'   Each TSV includes: IPR, ENTRY(see below) --- rest unchanged.
 #'
 #' @export
 ipr_enrichment <- function(dnds_annot_file = NULL,
@@ -827,13 +826,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
 
   # ---------- core fisher ----------
+  # NOTE: filtering is done upstream so positives/background share the same universe.
+  # `drop_empty` is intentionally ignored here.
   .fisher_from_vectors <- function(vec_all, vec_pos, drop_empty) {
     vec_all <- as.character(vec_all)
     vec_pos <- as.character(vec_pos)
-    if (drop_empty) {
-      vec_all <- vec_all[!is.na(vec_all) & nzchar(vec_all)]
-      vec_pos <- vec_pos[!is.na(vec_pos) & nzchar(vec_pos)]
-    }
     n_pos <- length(vec_pos); n_all <- length(vec_all); n_bg <- n_all - n_pos
     if (n_pos == 0L || n_all == 0L || n_bg < 0L) return(NULL)
     all_tab <- .count_terms_from_vec(vec_all)
@@ -946,6 +943,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                                    min_total, min_pos, max_prop,
                                    fdr_method, alpha, parent_child_alpha,
                                    term_trees_df = NULL) {
+    if (isTRUE(drop_rows_without_term)) {
+      keep_rows <- !is.na(df[[term_col]]) & nzchar(df[[term_col]])
+      df <- df[keep_rows, , drop = FALSE]
+    }
     n_all <- nrow(df); if (!n_all) return(NULL)
     pos_id <- which(df$dNdS > pos_threshold); all_id <- seq_len(n_all)
     term2rows_all <- .build_term2rows(df, term_col); if (!length(term2rows_all)) return(NULL)
@@ -1208,14 +1209,31 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     col <- paste0(prefix, "ipr")
     if (!col %in% names(df) || !is.character(df[[col]])) return(NULL)
 
-    vec_all <- vapply(df[[col]], .filter_terms_string, FUN.VALUE = character(1),
-                      allowed_types = allowed_types, type_by_ipr = type_by_ipr,
-                      exclude_set = exclude_set, keep_unmatched = keep_unmatched)
-
+    vec_all <- vapply(
+      df[[col]],
+      .filter_terms_string,
+      FUN.VALUE = character(1),
+      allowed_types = allowed_types,
+      type_by_ipr = type_by_ipr,
+      exclude_set = exclude_set,
+      keep_unmatched = keep_unmatched
+    )
+    
+    # Filter rows once so pos/bg share the same annotation-aware universe
+    if (isTRUE(drop_rows_without_term)) {
+      keep_rows <- !is.na(vec_all) & nzchar(vec_all)
+      df <- df[keep_rows, , drop = FALSE]
+      vec_all <- vec_all[keep_rows]
+    }
+    
+    if (!length(vec_all)) return(NULL)
+    
     pos <- df$dNdS > pos_threshold
     vec_pos <- vec_all[pos]
+    
+    # vec_all / vec_pos
+    res <- .fisher_from_vectors(vec_all, vec_pos, drop_empty = FALSE)
 
-    res <- .fisher_from_vectors(vec_all, vec_pos, drop_rows_without_term)
     if (is.null(res) || !nrow(res)) return(NULL)
 
     n_all <- length(vec_all)
@@ -1278,11 +1296,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       }
 
       for (tp in stratified_types) {
+        tp_use <- c(tp)
+
         df2 <- df
-        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp)
+        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp_use)
 
         if (identical(method, "fisher")) {
-          res <- .pooled_enrichment(df2, side, allowed_types = tp, do_adjust = FALSE)
+          res <- .pooled_enrichment(df2, side, allowed_types = NULL, do_adjust = FALSE)
           if (!is.null(res) && nrow(res)) {
             res$ENTRY_TYPE <- tp
             results[[tp]] <- res
