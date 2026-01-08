@@ -393,7 +393,7 @@ go_enrichment <- function(
     filt_n <- sum(lengths(filt_list))
 
     keep <- lengths(filt_list) > 0L
-    mapping <- setNames(filt_list[keep], ids[keep])
+    mapping <- stats::setNames(filt_list[keep], ids[keep])
 
     if (isTRUE(verbose)) {
       message(
