@@ -518,30 +518,66 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     tabs <- table(unlist(lapply(v, .split_terms_unique), use.names = FALSE))
     tabs[names(tabs) != ""]
   }
+
+  # Although NAs appear to not affect BH, we set all NA pvals to 1
+  # before all pval adjustments for consistency across tests,
+  # as qvalue and other tests are NA intolerant                                           
   .adjust_pvals <- function(res, method, alpha) {
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
+  
+    p <- res$p_value
+  
+    # Define validity ONCE, used for all methods
+    ok <- is.finite(p) & !is.na(p) & p >= 0 & p <= 1
+  
+    # Default: invalid tests are not significant
+    res$p_adj <- rep(1, length(p))
+  
+    if (!any(ok)) {
+      warning("[ipr_enrichment] No valid p-values; setting all p_adj=1.", call. = FALSE)
+      return(res)
+    }
+  
     if (method == "BH") {
-      res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+      res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
+  
     } else if (method == "BY") {
-      res$p_adj <- stats::p.adjust(res$p_value, method = "BY")
+      res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BY")
+  
     } else if (method == "qvalue") {
       if (requireNamespace("qvalue", quietly = TRUE)) {
-        res$p_adj <- as.numeric(qvalue::qvalue(res$p_value)$qvalues)
+        p_use <- p[ok]
+        # avoid exact 0 (can upset pi0 estimation)
+        p_use <- pmax(p_use, .Machine$double.xmin)
+        p_use <- pmin(p_use, 1)
+        qv <- qvalue::qvalue(p_use)
+        res$p_adj[ok] <- as.numeric(qv$qvalues)
       } else {
-        warning("qvalue not installed; falling back to BH.")
-        res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+        warning("qvalue not installed; falling back to BH.", call. = FALSE)
+        res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
       }
+  
     } else if (method == "IHW") {
       if (requireNamespace("IHW", quietly = TRUE)) {
-        ihw_obj <- IHW::ihw(res$p_value ~ res$total_count, alpha = alpha)
-        res$p_adj <- as.numeric(IHW::adj_pvalues(ihw_obj))
+        # Need finite covariate too
+        w <- res$total_count
+        ok2 <- ok & is.finite(w) & !is.na(w)
+        if (any(ok2)) {
+          ihw_obj <- IHW::ihw(p[ok2] ~ w[ok2], alpha = alpha)
+          res$p_adj[ok2] <- as.numeric(IHW::adj_pvalues(ihw_obj))
+        } else {
+          warning("[ipr_enrichment] No valid rows for IHW; setting all p_adj=1.", call. = FALSE)
+        }
       } else {
-        warning("IHW not installed; falling back to BH.")
-        res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+        warning("IHW not installed; falling back to BH.", call. = FALSE)
+        res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
       }
-    } else {
-      res$p_adj <- res$p_value
+  
+    } else { # "none"
+      res$p_adj[ok] <- p[ok]
+      res$p_adj[!ok] <- 1
     }
+  
     res
   }
 
