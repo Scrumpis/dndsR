@@ -53,7 +53,7 @@ Used to update to current repo version if using older version.
 While in the dndsR cloned repo:
 ```
 git pull
-dndsr --help
+dndsr
 ```
 
 ## CLI Usage
