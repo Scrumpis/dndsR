@@ -88,7 +88,7 @@ dndsr split_comparisons -c comparison_file.txt
 ### 2. Extract CDS or Proteins
 Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff files for each species of each comparison in comparison_file.
 ```
-dndsr extract_cds -c comparison_file.txt
+dndsr extract_cds -c comparison_file.txt -t 8
 ```
 ### 3. Calculate dN/dS
 Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
