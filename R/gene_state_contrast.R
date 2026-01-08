@@ -216,7 +216,7 @@ gene_state_contrast <- function(dnds_annot_files   = NULL,
     use_re <- !is.null(random_effect_col) &&
       random_effect_col %in% names(d) &&
       any(!is.na(d[[random_effect_col]])) &&
-      length(unique(na.omit(d[[random_effect_col]]))) >= 2L
+      length(unique(stats::na.omit(d[[random_effect_col]]))) >= 2L
 
     if (use_re) {
       if (!requireNamespace("lme4", quietly = TRUE)) {
