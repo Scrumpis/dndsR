@@ -1433,7 +1433,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if ("s_ipr" %in% names(d) && is.character(d$s_ipr))
       all_terms <- c(all_terms, unlist(strsplit(paste(stats::na.omit(d$s_ipr)), term_sep, fixed = TRUE)))
     all_terms <- unique(all_terms[nzchar(all_terms)])
-    if (!is.null(exclude_ids) && length(exclude_ids)) all_terms <- setdiff(all_terms, exclude_ids)
+    if (!is.null(exclude_seeds) && length(exclude_seeds)) all_terms <- setdiff(all_terms, exclude_seeds)
 
     st <- sort(unique(type_by_ipr[all_terms]))
     st <- st[!is.na(st)]
