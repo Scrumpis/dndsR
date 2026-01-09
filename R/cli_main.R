@@ -235,9 +235,84 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     parsed <- parsed[intersect(names(parsed), fmls)]
   }
 
+  # ---- global warnings handling (-w off|summary|all) ----
+  w_mode <- getOption("dndsR.warnings", "off")
+  w_mode <- tolower(as.character(w_mode))[1L]
+  if (!(w_mode %in% c("off", "summary", "all"))) w_mode <- "off"
+
+  w_max <- getOption("dndsR.warnings_max", NULL)
+  if (!is.null(w_max)) {
+    w_max <- suppressWarnings(as.integer(w_max))
+    if (is.na(w_max) || w_max < 1L) w_max <- NULL
+  }
+
+  collected_warnings <- character(0)
+
+  emit_warning_summary <- function(tag = NULL) {
+    if (!length(collected_warnings)) return(invisible(NULL))
+
+    # de-dup but preserve first-seen order
+    uniq <- collected_warnings[!duplicated(collected_warnings)]
+    n_total <- length(uniq)
+
+    n_show <- n_total
+    if (!is.null(w_max)) n_show <- min(n_total, w_max)
+
+    hdr <- if (!is.null(tag) && nzchar(tag)) {
+      sprintf(
+        "[warnings] (%s) %d warning(s)%s",
+        tag, n_total,
+        if (!is.null(w_max) && n_total > w_max) sprintf(" (showing first %d)", n_show) else ""
+      )
+    } else {
+      sprintf(
+        "[warnings] %d warning(s)%s",
+        n_total,
+        if (!is.null(w_max) && n_total > w_max) sprintf(" (showing first %d)", n_show) else ""
+      )
+    }
+    message(hdr)
+
+    for (i in seq_len(n_show)) {
+      message(sprintf("  %d) %s", i, uniq[i]))
+    }
+
+    if (!is.null(w_max) && n_total > w_max) {
+      message(sprintf("  ... %d more omitted (set --warnings-max to change).", n_total - w_max))
+    }
+
+    invisible(NULL)
+  }
+
   tryCatch(
-    do.call(fn, parsed),
+    {
+      out <- withCallingHandlers(
+        do.call(fn, parsed),
+        warning = function(w) {
+          msg <- conditionMessage(w)
+          if (nzchar(msg)) collected_warnings <<- c(collected_warnings, msg)
+
+          if (identical(w_mode, "all")) {
+            message("[warning] ", msg)
+            invokeRestart("muffleWarning")
+          } else if (identical(w_mode, "summary")) {
+            invokeRestart("muffleWarning")
+          } else {
+            invokeRestart("muffleWarning")
+          }
+        }
+      )
+
+      if (w_mode %in% c("summary", "all")) {
+        emit_warning_summary(tag = cmd)
+      }
+
+      out
+    },
     error = function(e) {
+      if (w_mode %in% c("summary", "all")) {
+        emit_warning_summary(tag = cmd)
+      }
       cli::cli_alert_danger(conditionMessage(e))
       stop(conditionMessage(e), call. = FALSE)
     }
