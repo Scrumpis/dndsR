@@ -129,42 +129,51 @@ calculate_dnds <- function(comparison_file = NULL,
       "into the 'pwalign' package."
     )
   )
-  # ---- Biostrings >= 2.77.1 compatibility shim (CRAN-safe) ----
-  # Biostrings moved pairwiseAlignment helpers into pwalign.
-  # Some orthologr versions still call them unqualified *inside dNdS()*.
-  # Instead of patching orthologr's namespace (unsafe/locked), we wrap dNdS
-  # in a function whose environment provides the missing symbols.
+  # ---- Biostrings >= 2.77.1 compatibility shim (CRAN-safe; no namespace edits) ----
+  # orthologr currently has pairwiseAlignment bound to Biostrings (defunct).
+  # We avoid unlocking/rewriting orthologr's namespace (CRAN-unsafe) by running
+  # patched *copies* of the relevant orthologr functions in a shim environment
+  # that shadows pairwiseAlignment et al with pwalign implementations.
   .orthologr_dNdS <- orthologr::dNdS
 
-  if (requireNamespace("Biostrings", quietly = TRUE)) {
-    bs_ver <- utils::packageVersion("Biostrings")
+  if (requireNamespace("Biostrings", quietly = TRUE) &&
+      utils::packageVersion("Biostrings") >= "2.77.1") {
 
-    if (bs_ver >= "2.77.1") {
-      .need_pkg(
-        "pwalign",
-        paste0(
-          "Biostrings ", bs_ver,
-          " moved pairwiseAlignment()/pattern()/subject()/writePairwiseAlignments() into 'pwalign'."
-        )
-      )
+    .need_pkg(
+      "pwalign",
+      "Biostrings >= 2.77.1 moved pairwiseAlignment helpers into the 'pwalign' package."
+    )
 
-      base_fun <- orthologr::dNdS
-      shim_env <- new.env(parent = environment(base_fun))
+    ortho_ns <- asNamespace("orthologr")
+    pw_ns    <- asNamespace("pwalign")
 
-      # Provide the symbols that older orthologr code expects to resolve lexically
-      shim_funs <- c("pairwiseAlignment", "pattern", "subject", "writePairwiseAlignments")
-      for (fn in shim_funs) {
-        if (exists(fn, envir = asNamespace("pwalign"), inherits = FALSE)) {
-          assign(fn, get(fn, envir = asNamespace("pwalign"), inherits = FALSE), envir = shim_env)
-        }
+    # Env that shadows orthologr's imported Biostrings binding
+    shim_env <- new.env(parent = ortho_ns)
+
+    # Shadow moved helpers with pwalign implementations
+    for (nm in c("pairwiseAlignment", "pattern", "subject", "writePairwiseAlignments")) {
+      if (exists(nm, envir = pw_ns, inherits = FALSE)) {
+        assign(nm, get(nm, envir = pw_ns, inherits = FALSE), envir = shim_env)
       }
+    }
 
-      .orthologr_dNdS <- base_fun
-      environment(.orthologr_dNdS) <- shim_env
-
-      if (isTRUE(getOption("dndsR.verbose_shims", FALSE))) {
-        message("Biostrings ", bs_ver, " detected; wrapped orthologr::dNdS with pwalign alignment helpers.")
+    # Patch orthologr helpers known to reference pairwiseAlignment()
+    # (you found these via your "hits" scan)
+    for (nm in c("pairwise_aln", "promotor_divergence_estimation")) {
+      if (exists(nm, envir = ortho_ns, inherits = FALSE)) {
+        f <- get(nm, envir = ortho_ns, inherits = FALSE)
+        environment(f) <- shim_env
+        assign(nm, f, envir = shim_env)
       }
+    }
+
+    # Patch dNdS itself so it resolves patched helpers + pwalign symbols
+    f <- orthologr::dNdS
+    environment(f) <- shim_env
+    .orthologr_dNdS <- f
+
+    if (isTRUE(getOption("dndsR.verbose_shims", FALSE))) {
+      message("Using pwalign pairwiseAlignment shim for orthologr under Biostrings >= 2.77.1.")
     }
   }
 
