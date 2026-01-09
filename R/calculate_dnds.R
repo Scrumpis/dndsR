@@ -123,21 +123,46 @@ calculate_dnds <- function(comparison_file = NULL,
       "into the 'pwalign' package."
     )
   )
-  # ---- Version guard: avoid runtime patching of Biostrings namespace ----
+  # ---- Biostrings >= 2.77.1 compatibility shim (pairwiseAlignment moved to pwalign) ----
   if (requireNamespace("Biostrings", quietly = TRUE)) {
     bs_ver <- utils::packageVersion("Biostrings")
+
     if (bs_ver >= "2.77.1") {
-      stop(
-        paste0(
-          "Biostrings ", bs_ver, " detected. For Biostrings >= 2.77.1, pairwiseAlignment helpers moved to 'pwalign',\n",
-          "and some orthologr versions may not be compatible without patching.\n\n",
-          "Recommended fix: run inside the dndsR container (with Biostrings pinned <= 2.77.0),\n",
-          "or install a compatible orthologr/Biostrings stack."
-        ),
-        call. = FALSE
+      # Biostrings >= 2.77.1 moved these helpers into pwalign.
+      # Some orthologr versions still call them unqualified (via imports),
+      # so we rebind them inside orthologr's namespace to pwalign.
+      shim_funs <- c(
+        "pairwiseAlignment",
+        "pattern",
+        "subject",
+        "writePairwiseAlignments"
+      )
+
+      ortho_ns   <- asNamespace("orthologr")
+      pwalign_ns <- asNamespace("pwalign")
+
+      for (fn in shim_funs) {
+        if (exists(fn, envir = pwalign_ns, inherits = FALSE)) {
+
+          if (exists(fn, envir = ortho_ns, inherits = FALSE)) {
+            if (bindingIsLocked(fn, ortho_ns)) unlockBinding(fn, ortho_ns)
+            assign(fn, get(fn, envir = pwalign_ns, inherits = FALSE), envir = ortho_ns)
+            if (!bindingIsLocked(fn, ortho_ns)) lockBinding(fn, ortho_ns)
+
+          } else {
+            # define if orthologr doesn't already bind it
+            assign(fn, get(fn, envir = pwalign_ns, inherits = FALSE), envir = ortho_ns)
+          }
+        }
+      }
+
+      if (isTRUE(getOption("dndsR.verbose_shims", FALSE))) message(
+        "Biostrings ", bs_ver,
+        " detected; using pwalign for pairwiseAlignment helpers."
       )
     }
   }
+
   # ---- Optional: if using DIAMOND, confirm the binary is on PATH ----
   if (identical(tolower(aligner), "diamond")) {
     if (Sys.which("diamond") == "") {
