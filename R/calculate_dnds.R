@@ -146,9 +146,7 @@ calculate_dnds <- function(comparison_file = NULL,
     # Helpers that moved out of Biostrings
     moved <- c("pairwiseAlignment", "pattern", "subject", "writePairwiseAlignments")
     for (nm in moved) {
-      if (exists(nm, envir = asNamespace("pwalign"), inherits = FALSE)) {
-        assign(nm, get(nm, envir = asNamespace("pwalign"), inherits = FALSE), envir = shim_env)
-      }
+      assign(nm, get(nm, envir = asNamespace("pwalign"), inherits = FALSE), envir = shim_env)
     }
 
     # Rewrite any explicit Biostrings:: calls to pwalign:: (and also catch bare calls)
