@@ -582,8 +582,23 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         }
 
         p_use <- pmin(pmax(p_use, .Machine$double.xmin), 1)
-        qv <- qvalue::qvalue(p_use)
-
+        qv <- try(qvalue::qvalue(p_use), silent = TRUE)
+        if (inherits(qv, "try-error")) {
+          stop(
+            sprintf(
+              paste0(
+                "[ipr_enrichment] fdr_method='qvalue' failed. ",
+                "This usually happens when there are too few valid tests, many tied/extreme p-values, ",
+                "or an irregular p-value distribution.\n",
+                "Details: n_valid_p=%d\n",
+                "Fix: rerun with --fdr-method BH (recommended), BY, IHW, or none; ",
+                "or relax filters (min_total/min_pos/max_prop) / use adjust_scope='global' (fisher mode)."
+              ),
+              length(p_use)
+            ),
+            call. = FALSE
+          )
+        }
         res$p_adj[ok] <- as.numeric(qv$qvalues)
 
       } else {
