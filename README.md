@@ -88,7 +88,7 @@ Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff 
 dndsr extract_cds -c comparison_file.txt -t 8
 ```
 ### 3. Calculate dN/dS
-Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
+Uses [orthologr](https://github.com/drostlab/orthologr) and has access to all Orthologr::dNdS functionality. Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
 ```
 dndsr calculate_dnds -c comparison_file.txt -t 80
 ```
