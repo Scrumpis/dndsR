@@ -143,11 +143,8 @@ calculate_dnds <- function(comparison_file = NULL,
     ortho_ns <- asNamespace("orthologr")
     shim_env <- new.env(parent = ortho_ns)
 
-    # Helpers that moved out of Biostrings
+    # Helpers that moved out of Biostrings (names used by the patcher)
     moved <- c("pairwiseAlignment", "pattern", "subject", "writePairwiseAlignments")
-    for (nm in moved) {
-      assign(nm, get(nm, envir = asNamespace("pwalign"), inherits = FALSE), envir = shim_env)
-    }
 
     # Rewrite any explicit Biostrings:: calls to pwalign:: (and also catch bare calls)
     .patch_fun_text <- function(fun, from_pkg = "Biostrings", to_pkg = "pwalign") {
