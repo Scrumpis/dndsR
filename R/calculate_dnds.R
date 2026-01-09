@@ -339,9 +339,6 @@ calculate_dnds <- function(comparison_file = NULL,
     comp_dir <- file.path(output_dir, comparison_basename)
     dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
 
-    # Per-comparison log file (matches go_enrichment style)
-    log_file <- file.path(comp_dir, sprintf("%s_dnds.log", comparison_basename))
-
     out_tsv <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
 
     if (!isTRUE(overwrite) && file.exists(out_tsv) && file.info(out_tsv)$size > 0) {
@@ -434,46 +431,23 @@ calculate_dnds <- function(comparison_file = NULL,
       }
     }
 
-    message(sprintf(
-      "[calculate_dnds] %s (logging to %s)",
-      comparison_basename, log_file
-    ))
-
-    .dndsr_with_log(
-      log_file = log_file,
-      tag = "calculate_dnds",
-      header = c(
-        sprintf("[calculate_dnds] comp=%s", comparison_basename),
-        sprintf("[calculate_dnds] pid=%d", Sys.getpid()),
-        sprintf("[calculate_dnds] seq_type=%s mode=%s", seq_type, inp$mode),
-        sprintf(
-          "[calculate_dnds] comp_cores=%d aligner=%s sensitivity_mode=%s dnds_method=%s",
-          as.integer(comp_cores), aligner, sensitivity_mode, dnds_method
-        ),
-        sprintf("[calculate_dnds] query_file=%s", normalizePath(q_in)),
-        sprintf("[calculate_dnds] subject_file=%s", normalizePath(s_in)),
-        sprintf("[calculate_dnds] out_tsv=%s", out_tsv)
-      ),
-      expr = {
-        message(
-          "Running dN/dS for: ", comparison_basename,
-          " (seq_type=", seq_type, ", mode=", inp$mode, ")"
-        )
-
-        res <- do.call(orthologr::dNdS, args)
-
-        utils::write.table(
-          res,
-          file = out_tsv,
-          sep = "\t",
-          quote = FALSE,
-          row.names = FALSE
-        )
-
-        message("Finished: ", comparison_basename)
-        out_tsv
-      }
+    message(
+      "[calculate_dnds] Running dN/dS for: ", comparison_basename,
+      " (seq_type=", seq_type, ", mode=", inp$mode, ")"
     )
+
+    res <- do.call(orthologr::dNdS, args)
+
+    utils::write.table(
+      res,
+      file = out_tsv,
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+
+    message("[calculate_dnds] Finished: ", comparison_basename)
+    out_tsv
   }
   
   # ---- batch vs single ----
