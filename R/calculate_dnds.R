@@ -123,40 +123,21 @@ calculate_dnds <- function(comparison_file = NULL,
       "into the 'pwalign' package."
     )
   )
-
-  # ---- Shim: re-point Biostrings alignment helpers to pwalign when needed ----
-  .fix_pwalign_shim <- function() {
-    if (!requireNamespace("Biostrings", quietly = TRUE) ||
-        !requireNamespace("pwalign", quietly = TRUE)) {
-      return(invisible())
-    }
-
+  # ---- Version guard: avoid runtime patching of Biostrings namespace ----
+  if (requireNamespace("Biostrings", quietly = TRUE)) {
     bs_ver <- utils::packageVersion("Biostrings")
-    if (bs_ver < "2.77.1") return(invisible())
-
-    ns <- asNamespace("Biostrings")
-
-    rebind_if_exists <- function(name, fun) {
-      if (!is.function(fun)) return(invisible())
-      if (!exists(name, envir = ns, inherits = FALSE)) return(invisible())
-
-      locked <- tryCatch(bindingIsLocked(name, ns),
-                         error = function(e) FALSE)
-      if (isTRUE(locked)) unlockBinding(name, ns)
-
-      assign(name, fun, envir = ns)
-      invisible()
+    if (bs_ver >= "2.77.1") {
+      stop(
+        paste0(
+          "Biostrings ", bs_ver, " detected. For Biostrings >= 2.77.1, pairwiseAlignment helpers moved to 'pwalign',\n",
+          "and some orthologr versions may not be compatible without patching.\n\n",
+          "Recommended fix: run inside the dndsR container (with Biostrings pinned <= 2.77.0),\n",
+          "or install a compatible orthologr/Biostrings stack."
+        ),
+        call. = FALSE
+      )
     }
-
-    rebind_if_exists("pairwiseAlignment",       pwalign::pairwiseAlignment)
-    rebind_if_exists("pattern",                 pwalign::pattern)
-    rebind_if_exists("subject",                 pwalign::subject)
-    rebind_if_exists("writePairwiseAlignments", pwalign::writePairwiseAlignments)
-
-    invisible()
   }
-  .fix_pwalign_shim()
-
   # ---- Optional: if using DIAMOND, confirm the binary is on PATH ----
   if (identical(tolower(aligner), "diamond")) {
     if (Sys.which("diamond") == "") {
