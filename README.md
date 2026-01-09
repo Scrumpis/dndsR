@@ -76,6 +76,7 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
   - ```-o``` = ```--output_dir``` Output directory.
   - ```-w``` = ```--warnings``` Prints R warnings: off|summary|all (default: off).
 - If warnings are not being logged while multi-threading, try single-threading to debug.
+- All functionality from called packages like orthologr can be called even if not specified in docs.
 
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
@@ -103,12 +104,12 @@ Enrichment of various gene annotation functional terms under positive selection 
 ***If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results***  
   
 #### InterPro (IPR) term enrichment:
-Enrichment of InterPro terms under positive selection. Comparable to topGO in function. Handles parent-child relationships of IPR terms.
+Enrichment of IPR terms under positive selection. Fisher's Exact Test, or optionally account for parent-child relationships, with multiple testing correction.
 ```
 dndsr ipr_enrichment -c comparison_file.txt -t 8
 ```
 #### Gene Ontology (GO) term enrichment:
-TopGO enrichment of GO terms under positive selection.
+[TopGO](https://bioconductor.org/packages/release/bioc/html/topGO.html) enrichment of GO terms under positive selection.
 ```
 dndsr go_enrichment -c comparison_file.txt -t 8
 ```
@@ -118,7 +119,7 @@ Fisher's Exact Test and multiple testing correction. Tests non-IPR and non-GO te
 dndsr term_enrichment -c comparison_file.txt
 ```
 ### 6. Selection pressure ideogram
-Visualizes dN/dS binned values accross a genome in an ideogram.
+Custom [RIdeogram](https://cran.r-project.org/web/packages/RIdeogram/) visualization of dN/dS binned values accross a genome in an ideogram.
 ```
 dndsr dnds_ideogram -c comparison_file.txt
 ```
