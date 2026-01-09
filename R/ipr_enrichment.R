@@ -928,8 +928,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   .dag_from_term_trees <- function(term2rows, type_terms, tree_df) {
     if (is.null(tree_df) || ncol(tree_df) < 2) return(NULL)
-    parent <- as.character(tree_df[[1]]); child <- as.character(tree_df[[2]])
-    parent <- parent[parent %in% type_terms]; child <- child[child %in% type_terms]
+  
+    parent <- as.character(tree_df[[1]])
+    child  <- as.character(tree_df[[2]])
+  
+    keep <- (parent %in% type_terms) & (child %in% type_terms)
+    parent <- parent[keep]
+    child  <- child[keep]
+  
     if (!length(parent)) return(NULL)
     split(child, parent)
   }
