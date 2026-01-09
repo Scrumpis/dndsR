@@ -158,11 +158,12 @@ dndsr regional_dnds_contrasts \
 
 
 ## Future Improvements
-- Update Rvignette with test dataset
-- Cleanup documentation
-- Add forest plot function and other grand analyses
-- Ensure docker image contains all dependencies of all optional functions
 - Overhaul regional analyses and gene contrast functions
+- Add forest plot function and other grand analyses
+- Update Rvignette with test dataset
+- Ensure docker image contains all dependencies of all optional functions
+- Add parallelization to term_enrichment and dnds_ideogram
+- Cleanup documentation
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
