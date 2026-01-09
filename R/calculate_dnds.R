@@ -66,8 +66,8 @@
 #' \strong{Pipeline mode file resolution:} when \code{query_fasta}/\code{subject_fasta} are used,
 #' the input FASTAs are resolved as:
 #' \itemize{
-#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(query_fasta_noext), <suffix>))}
-#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(subject_fasta_noext), <suffix>))}
+#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(query_fasta), <suffix>))}
+#'   \item \code{file.path(output_dir, comparison_name, paste0(basename(subject_fasta), <suffix>))}
 #' }
 #' where \code{<suffix>} is \code{cds_suffix} or \code{protein_suffix} depending on \code{seq_type}.
 #'
