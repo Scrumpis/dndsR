@@ -142,17 +142,18 @@ calculate_dnds <- function(comparison_file = NULL,
       pwalign_ns <- asNamespace("pwalign")
 
       for (fn in shim_funs) {
-        if (exists(fn, envir = pwalign_ns, inherits = FALSE)) {
+        # Only patch if:
+        # 1) pwalign provides it, AND
+        # 2) orthologr already has a binding for it (we can't add new symbols to a locked namespace)
+        if (exists(fn, envir = pwalign_ns, inherits = FALSE) &&
+            exists(fn, envir = ortho_ns,   inherits = FALSE)) {
 
-          if (exists(fn, envir = ortho_ns, inherits = FALSE)) {
-            if (bindingIsLocked(fn, ortho_ns)) unlockBinding(fn, ortho_ns)
-            assign(fn, get(fn, envir = pwalign_ns, inherits = FALSE), envir = ortho_ns)
-            if (!bindingIsLocked(fn, ortho_ns)) lockBinding(fn, ortho_ns)
+          was_locked <- bindingIsLocked(fn, ortho_ns)
+          if (was_locked) unlockBinding(fn, ortho_ns)
 
-          } else {
-            # define if orthologr doesn't already bind it
-            assign(fn, get(fn, envir = pwalign_ns, inherits = FALSE), envir = ortho_ns)
-          }
+          assign(fn, get(fn, envir = pwalign_ns, inherits = FALSE), envir = ortho_ns)
+
+          if (was_locked) lockBinding(fn, ortho_ns)
         }
       }
 
