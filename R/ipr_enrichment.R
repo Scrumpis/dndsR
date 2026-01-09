@@ -367,7 +367,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                                   timeout_s = 30) {
     tree_source <- match.arg(tree_source)
 
-    # UPDATE (4): "none" means NONE: do not honor term_trees/tree_path/tree_url
+    # "none" means NONE: do not honor term_trees/tree_path/tree_url
     if (tree_source == "none") {
       return(list(df = NULL, provenance = list(mode = "none")))
     }
@@ -650,7 +650,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     ttf
   }
 
-  # UPDATE (5): use a single family name ("Arial") and explicitly map bold to the bundled TTF
+  # use a single family name ("Arial") and explicitly map bold to the bundled TTF
   .setup_showtext <- function() {
     ttf <- .bundled_arial_path()
     if (is.null(ttf)) return(NULL)
@@ -928,32 +928,16 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   .dag_from_term_trees <- function(term2rows, type_terms, tree_df) {
     if (is.null(tree_df) || ncol(tree_df) < 2) return(NULL)
-  
+
     parent <- as.character(tree_df[[1]])
     child  <- as.character(tree_df[[2]])
-  
+
     keep <- (parent %in% type_terms) & (child %in% type_terms)
     parent <- parent[keep]
     child  <- child[keep]
-  
+
     if (!length(parent)) return(NULL)
     split(child, parent)
-  }
-  .dag_infer_by_subset <- function(term2rows, type_terms) {
-    if (!length(type_terms)) return(NULL)
-    children <- lapply(type_terms, function(x) character(0)); names(children) <- type_terms
-    for (i in seq_along(type_terms)) {
-      ti <- type_terms[i]; si <- term2rows[[ti]]
-      if (!length(si)) next
-      for (j in seq_along(type_terms)) {
-        if (i == j) next
-        tj <- type_terms[j]; sj <- term2rows[[tj]]
-        if (!length(sj)) next
-        if (length(sj) <= length(si) && all(sj %in% si) && !all(si %in% sj))
-          children[[ti]] <- c(children[[ti]], tj)
-      }
-    }
-    lapply(children, unique)
   }
   .topo_specific_first <- function(children_map) {
     nodes <- unique(c(names(children_map), unlist(children_map, use.names = FALSE)))
@@ -971,11 +955,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     nodes[order(depth[nodes])]
   }
 
-    .parent_child_enrich <- function(df, term_col, type_label, type_by_ipr, name_by_ipr,
-                                     min_total, min_pos, max_prop,
-                                     fdr_method, alpha, parent_child_alpha,
-                                     term_trees_df = NULL,
-                                     comp = NA_character_, side = NA_character_) {
+  .parent_child_enrich <- function(df, term_col, type_label, type_by_ipr, name_by_ipr,
+                                   min_total, min_pos, max_prop,
+                                   fdr_method, alpha, parent_child_alpha,
+                                   term_trees_df = NULL,
+                                   comp = NA_character_, side = NA_character_) {
     if (isTRUE(drop_rows_without_term)) {
       keep_rows <- !is.na(df[[term_col]]) & nzchar(df[[term_col]])
       df <- df[keep_rows, , drop = FALSE]
@@ -987,28 +971,21 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!length(term2rows)) return(NULL)
     type_terms <- names(term2rows)
 
+    # No fallback DAG inference: hierarchy-aware mode requires the official InterPro tree.
     children_map <- .dag_from_term_trees(term2rows, type_terms, term_trees_df)
-    if (is.null(children_map)) children_map <- .dag_infer_by_subset(term2rows, type_terms)
-    
+
     if (is.null(children_map) || !length(children_map) || !any(lengths(children_map) > 0L)) {
-      stop(
-        sprintf(
-          paste0(
-            "[ipr_enrichment] method='parent_child' could not run for this slice because ",
-            "no parent-child relationships were found among retained terms.\n",
-            "This usually means your retained term set has no edges after filtering ",
-            "(min_total/min_pos/max_prop/exclusions/type filtering), or the tree doesn't overlap ",
-            "the retained terms.\n",
-            "Fix options:\n",
-            "  - Relax filters (min_total/min_pos/max_prop)\n",
-            "  - Verify tree_source/tree_path/tree_url points to the correct ParentChildTreeFile\n",
-            "  - Or rerun with method='fisher'\n",
-            "Slice: comp=%s side=%s type=%s"
-          ),
-          comp, side, type_label
+      msg <- sprintf(
+        paste0(
+          "[ipr_enrichment] method='parent_child' skipped slice because no parent-child relationships were found among retained terms. ",
+          "(comp=%s side=%s type=%s)\n",
+          "Reason: retained term set has no edges after filtering or the tree doesn't overlap.\n",
+          "Tip: relax filters (min_total/min_pos/max_prop) or use method='fisher' for this type."
         ),
-        call. = FALSE
+        comp, side, type_label
       )
+      message(msg)
+      return(NULL)
     }
 
     order_terms <- .topo_specific_first(children_map)
@@ -1132,7 +1109,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   best_cov <- NA_real_
   backtrack_meta <- list()
 
-  # UPDATE (6): cap how much we scan/collect for auto-detect so huge batches don’t thrash I/O
+  # cap how much we scan/collect for auto-detect so huge batches don’t thrash I/O
   .MAX_FILES_FOR_AUTODETECT <- 50L
   .MAX_IPRS_FOR_AUTODETECT  <- 50000L
 
@@ -1232,6 +1209,15 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
   tree_df <- tr$df
 
+  # STRICT: parent_child requires an official parent-child tree loaded
+  if (identical(method, "parent_child") && is.null(tree_df)) {
+    stop(
+      "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
+      "Set tree_source='remote' (recommended) or provide tree_path to ParentChildTreeFile.txt.",
+      call. = FALSE
+    )
+  }
+
   .prov_common <- list(
     chosen_release = chosen_release,
     auto_detect_release = auto_detect_release,
@@ -1269,22 +1255,20 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       exclude_set = exclude_set,
       keep_unmatched = keep_unmatched
     )
-    
+
     # Filter rows once so pos/bg share the same annotation-aware universe
     if (isTRUE(drop_rows_without_term)) {
       keep_rows <- !is.na(vec_all) & nzchar(vec_all)
       df <- df[keep_rows, , drop = FALSE]
       vec_all <- vec_all[keep_rows]
     }
-    
+
     if (!length(vec_all)) return(NULL)
-    
+
     pos <- df$dNdS > pos_threshold
     vec_pos <- vec_all[pos]
-    
-    # vec_all / vec_pos
-    res <- .fisher_from_vectors(vec_all, vec_pos, drop_empty = FALSE)
 
+    res <- .fisher_from_vectors(vec_all, vec_pos, drop_empty = FALSE)
     if (is.null(res) || !nrow(res)) return(NULL)
 
     n_all <- length(vec_all)
@@ -1329,24 +1313,12 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     results <- list()
 
     if (!is.null(stratified_types)) {
-      if (identical(method, "parent_child")) {
-        if (is.null(tree_df) || !is.data.frame(tree_df) || nrow(tree_df) == 0L) {
-          stop(
-            sprintf(
-              paste0(
-                "[ipr_enrichment] method='parent_child' requires an InterPro parent-child tree, but none was loaded. ",
-                "Provide tree_path/term_trees/tree_url, or rerun with method='fisher'. (comp=%s side=%s)"
-              ),
-              comp, side
-            ),
-            call. = FALSE
-          )
-        }
-      }
-
       if (identical(method, "parent_child") && identical(adjust_scope, "global")) {
         warning("[ipr_enrichment] adjust_scope='global' is not supported for method='parent_child'; using per_type.", call. = FALSE)
       }
+
+      skipped_types <- character(0)
+      ran_types <- character(0)
 
       for (tp in stratified_types) {
         tp_use <- c(tp)
@@ -1364,26 +1336,42 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
           }
 
         } else if (identical(method, "parent_child")) {
-        res <- .parent_child_enrich(
-          df2, term_col, tp, type_by_ipr, name_by_ipr,
-          min_total, min_pos, max_prop,
-          fdr_method, alpha,
-          parent_child_alpha = parent_child_alpha,
-          term_trees_df = tree_df,
-          comp = comp, side = side
-        )
+          res <- .parent_child_enrich(
+            df2, term_col, tp, type_by_ipr, name_by_ipr,
+            min_total, min_pos, max_prop,
+            fdr_method, alpha,
+            parent_child_alpha = parent_child_alpha,
+            term_trees_df = tree_df,
+            comp = comp, side = side
+          )
+
+          ran_types <- c(ran_types, tp)
+
           if (!is.null(res) && nrow(res)) {
             results[[tp]] <- res
           } else {
-            message(sprintf(
-              "[ipr_enrichment] No rows (hierarchy mode) for type=%s side=%s in %s",
-              tp, side, comp
-            ))
+            skipped_types <- c(skipped_types, tp)
+            message(sprintf("[ipr_enrichment] Skipped type=%s side=%s in %s (no runnable relationships/results).", tp, side, comp))
           }
 
         } else {
           stop("[ipr_enrichment] Unknown method: ", method, call. = FALSE)
         }
+      }
+
+      if (identical(method, "parent_child") && !length(results)) {
+        stop(
+          sprintf(
+            paste0(
+              "[ipr_enrichment] method='parent_child' could not run for ANY ENTRY_TYPE in this slice (comp=%s side=%s).\n",
+              "Attempted types: %s\n",
+              "Fix: relax filters (min_total/min_pos/max_prop) and/or ensure the official tree overlaps retained terms; ",
+              "or rerun with method='fisher'."
+            ),
+            comp, side, paste(stratified_types, collapse = ", ")
+          ),
+          call. = FALSE
+        )
       }
 
       if (identical(method, "fisher") && length(results)) {
