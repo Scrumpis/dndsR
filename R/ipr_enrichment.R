@@ -990,34 +990,25 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     children_map <- .dag_from_term_trees(term2rows, type_terms, term_trees_df)
     if (is.null(children_map)) children_map <- .dag_infer_by_subset(term2rows, type_terms)
     
-    if (is.null(children_map) || !length(children_map)) {
-      warning(
+    if (is.null(children_map) || !length(children_map) || !any(lengths(children_map) > 0L)) {
+      stop(
         sprintf(
           paste0(
-            "[ipr_enrichment] method='parent_child': no parent-child relationships found among retained terms; ",
-            "falling back to Fisher for this slice. (comp=%s side=%s type=%s)"
+            "[ipr_enrichment] method='parent_child' could not run for this slice because ",
+            "no parent-child relationships were found among retained terms.\n",
+            "This usually means your retained term set has no edges after filtering ",
+            "(min_total/min_pos/max_prop/exclusions/type filtering), or the tree doesn't overlap ",
+            "the retained terms.\n",
+            "Fix options:\n",
+            "  - Relax filters (min_total/min_pos/max_prop)\n",
+            "  - Verify tree_source/tree_path/tree_url points to the correct ParentChildTreeFile\n",
+            "  - Or rerun with method='fisher'\n",
+            "Slice: comp=%s side=%s type=%s"
           ),
           comp, side, type_label
         ),
         call. = FALSE
       )
-    
-      # fallback: standard fisher on this filtered universe
-      vec_all <- df[[term_col]]
-      vec_pos <- df[[term_col]][df$dNdS > pos_threshold]
-      res <- .fisher_from_vectors(vec_all, vec_pos, drop_empty = FALSE)
-      if (is.null(res) || !nrow(res)) return(NULL)
-    
-      # thresholds, metadata, adjust
-      prop <- res$total_count / max(length(vec_all), 1)
-      keep <- (res$total_count >= min_total) & (res$pos_count >= min_pos) & (prop <= max_prop)
-      res <- res[keep, , drop = FALSE]
-      if (!nrow(res)) return(NULL)
-    
-      res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
-      res$ENTRY_TYPE <- type_label
-      res <- .adjust_pvals(res, fdr_method, alpha)
-      return(res[order(res$p_adj, -res$enrichment, res$IPR), , drop = FALSE])
     }
 
     order_terms <- .topo_specific_first(children_map)
