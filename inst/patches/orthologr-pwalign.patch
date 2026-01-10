@@ -1,5 +1,5 @@
---- /tmp/orthologr-orig/R/pairwise_aln.R        2026-01-10 00:44:17
-+++ /tmp/orthologr-new/R/pairwise_aln.R 2026-01-10 00:44:17
+--- a/R/pairwise_aln.R  2026-01-10 00:57:18
++++ b/R/pairwise_aln.R  2026-01-10 00:57:19
 @@ -85,7 +85,7 @@
                          )
          }
