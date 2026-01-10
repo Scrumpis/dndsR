@@ -161,6 +161,7 @@ dndsr regional_dnds_contrasts \
 ## Future Improvements
 - Overhaul regional analyses and gene contrast functions
 - Add forest plot function and other grand analyses
+- Add --help-more/-hm flag for CLI to expand dependency args (dndsr calculate_dnds -hm gives ?orthologr::dNdS()). 
 - Update Rvignette with test dataset
 - Ensure docker image contains all dependencies of all optional functions
 - Add parallelization to term_enrichment and dnds_ideogram
