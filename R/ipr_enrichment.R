@@ -694,14 +694,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     eps <- max(1e-12, alpha * 1e-6)
     max(max_p, alpha + eps)
   }
-  .padj_scale <- function(alpha, upper) {
+  .padj_scale <- function(upper, legend_name) {
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
     ggplot2::scale_color_viridis_c(
       option = "viridis",
       direction = -1,
       limits = c(0, upper),
       oob = oob_fun,
-      name = "adj p"
+      name = legend_name
     )
   }
 
@@ -738,18 +738,45 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     base_family <- .pick_sans_family()
     upper <- .upper_padj(top_plot, alpha_val)
 
+    # What are we actually showing on the color scale?
+    legend_name <- if (identical(fdr_method, "none")) "p" else "adj p"
+    sig_label   <- legend_name
+
+    # Order rows: most significant first (smallest p_adj first)
+    top_plot <- top_plot[order(top_plot$p_adj, -top_plot$enrichment, top_plot$IPR), , drop = FALSE]
+
+    # Explicit discrete y order (top = most significant)
+    top_plot$y_lab <- factor(top_plot$y_lab, levels = rev(top_plot$y_lab))
+
+    # Significance boundary: below last term with p_adj <= alpha (in THIS plotted order)
+    top_plot$is_significant <- is.finite(top_plot$p_adj) & !is.na(top_plot$p_adj) & (top_plot$p_adj <= alpha_val)
+
+    cut_y <- NULL
+    sig_idx <- which(top_plot$is_significant)
+    if (length(sig_idx) > 0L && max(sig_idx) < nrow(top_plot)) {
+      i_last_sig <- max(sig_idx)
+
+      # With levels=rev(y_lab), ggplot numeric positions are:
+      # position(i) = n - i + 1
+      n <- nrow(top_plot)
+      pos_last_sig <- n - i_last_sig + 1
+
+      # boundary between last significant and next term (below) is halfway:
+      cut_y <- pos_last_sig - 0.5
+    }
+
     gg <- ggplot2::ggplot(
       top_plot,
       ggplot2::aes(
         x = enrichment_plot,
-        y = stats::reorder(y_lab, -p_adj),
+        y = y_lab,
         size = pos_count,
         color = p_adj,
         shape = is_inf_enrichment
       )
     ) +
       ggplot2::geom_point(stroke = 1.2) +
-      .padj_scale(alpha_val, upper) +
+      .padj_scale(alpha_val, upper, legend_name = legend_name) +
       ggplot2::scale_shape_manual(
         values = c(`FALSE` = 16, `TRUE` = 1),
         labels = c(`FALSE` = "finite", `TRUE` = "inf"),
@@ -762,10 +789,27 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       ggplot2::coord_cartesian(clip = "off") +
       ggplot2::theme(plot.margin = ggplot2::margin(5.5, 50, 5.5, 5.5))
 
+    # Keep your optional fixed x-axis limits logic
     if (!is.null(x_axis_min) || !is.null(x_axis_max)) {
       xmin <- if (is.null(x_axis_min)) -Inf else x_axis_min
       xmax <- if (is.null(x_axis_max))  Inf else x_axis_max
       gg <- gg + ggplot2::coord_cartesian(xlim = c(xmin, xmax), clip = "off")
+    }
+
+    # Add significance line + label (same style as go_enrichment)
+    if (!is.null(cut_y)) {
+      gg <- gg +
+        ggplot2::geom_hline(yintercept = cut_y, linetype = "dashed", linewidth = 0.6) +
+        ggplot2::annotate(
+          "text",
+          x = -Inf,
+          y = cut_y,
+          label = sprintf("%s \u2264 %.3g", sig_label, alpha_val),
+          hjust = -0.05,
+          vjust = -0.4,
+          size = 3.5
+        ) +
+        ggplot2::coord_cartesian(clip = "off")
     }
 
     dev_fun <- .svg_device()
