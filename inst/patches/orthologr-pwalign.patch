@@ -1,19 +1,24 @@
-diff --git a/R/pairwise_aln.R b/R/pairwise_aln.R
-index 0d3a1ab..c1e8b7f 100644
---- a/R/pairwise_aln.R
-+++ b/R/pairwise_aln.R
-@@ -122,9 +122,9 @@ pairwise_aln <- function(file,
-                 }
- 
+--- /tmp/orthologr-orig/R/pairwise_aln.R        2026-01-10 00:44:17
++++ /tmp/orthologr-new/R/pairwise_aln.R 2026-01-10 00:44:17
+@@ -85,7 +85,7 @@
+                         )
+         }
+         
+-        # Needleman-Wunsch using Biostrings::pairwiseAlignment( type=global)
++        # Needleman-Wunsch using pwalign::pairwiseAlignment( type=global)
+         if (tool == "NW") {
+                 #read file
+                 if (is.element(seq_type, c("dna", "cds"))) {
+@@ -122,7 +122,7 @@
+                 
                  # align
                  aln  <-
 -                        Biostrings::pairwiseAlignment(pattern = seqs[[1]],
 +                        pwalign::pairwiseAlignment(pattern = seqs[[1]],
                                                        subject = seqs[[2]],
                                                        type    = "global")
- 
-                 #write file -> comment Hajk: what does pattern() and subject() do in pattern(aln), subject(aln) ?
-@@ -130,7 +130,7 @@ pairwise_aln <- function(file,
+                 
+@@ -130,17 +130,17 @@
                  # pattern(aln) == get aligned sequence that was set as pattern input
                  # subject(aln) == get aligned sequence that was set as subject input
                  seqinr::write.fasta(
@@ -22,7 +27,7 @@ index 0d3a1ab..c1e8b7f 100644
                          names     = names,
                          file.out  = file.out
                  )
-@@ -137,12 +137,12 @@ pairwise_aln <- function(file,
+                 
                  if (store_locally) {
                          local_store_path <- file.path("orthologr_alignment_files", "_pairwise_alignment_with_score")
 -                        Biostrings::writePairwiseAlignments(aln, file.path(local_store_path, paste0(pairwise_aln_name, "_", tool, "_", seqtype, ".aln")))
@@ -32,3 +37,5 @@ index 0d3a1ab..c1e8b7f 100644
 -                        Biostrings::writePairwiseAlignments(aln, file.path(local_store_path, paste0(pairwise_aln_name, "_", tool, "_", seqtype, ".aln")))
 +                        pwalign::writePairwiseAlignments(aln, file.path(local_store_path, paste0(pairwise_aln_name, "_", tool, "_", seqtype, ".aln")))
                  }
+                 
+                 if (!quiet) {
