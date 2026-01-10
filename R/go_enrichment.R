@@ -252,15 +252,14 @@ go_enrichment <- function(
     max(max_p, alpha + eps)
   }
 
-  .padj_scale <- function(alpha) {
-    # Clamp colors above alpha to alpha (so everything non-significant shares the same top color)
+  .padj_scale <- function(upper, legend_name) {
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
     ggplot2::scale_color_viridis_c(
       option = "viridis",
       direction = -1,
-      limits = c(0, alpha),
+      limits = c(0, upper),
       oob = oob_fun,
-      name = "adj p"
+      name = legend_name
     )
   }
 
@@ -616,23 +615,38 @@ go_enrichment <- function(
         call. = FALSE
       )
     } else {
-                plt <- out[order(out$p_adj, -out$enrichment, out$GO_ID), , drop = FALSE]
+        plt <- out[order(out$p_adj, -out$enrichment, out$GO_ID), , drop = FALSE]
         plt <- utils::head(plt, top_n)
 
-        # Explicit ordering for the y-axis: top = most significant (smallest p_adj)
+        # What are we actually plotting?
+        legend_name <- if (p_adjust == "BH") "adj p" else "p"
+        sig_label   <- if (p_adjust == "BH") "adj p" else "p"
+
+        # define significance using whatever p_adj contains (BH-adjusted or raw)
         plt$is_significant <- is.finite(plt$p_adj) & !is.na(plt$p_adj) & (plt$p_adj <= alpha)
 
-        # Build a stable ordered factor for y
-        plt$y_lab <- plt$label
+        # Order rows: most significant first (top of plot)
         plt <- plt[order(plt$p_adj, -plt$enrichment, plt$GO_ID), , drop = FALSE]
-        plt$y_lab <- factor(plt$y_lab, levels = rev(plt$y_lab))
 
-        # Boundary line between significant and non-significant (only if both exist in top_n)
-        sig_idx <- which(plt$is_significant)
+        # Make a discrete y with TOP = first row in plt
+        # (ggplot discrete scale puts the LAST factor level at the TOP)
+        plt$y_lab <- factor(plt$label, levels = rev(plt$label))
+
+        # Compute cut line: below the last significant term in THIS ordered plt
         cut_y <- NULL
-        if (length(sig_idx) > 0L && length(sig_idx) < nrow(plt)) {
-          cut_y <- max(sig_idx) + 0.5
+        sig_idx <- which(plt$is_significant)
+        if (length(sig_idx) > 0L && max(sig_idx) < nrow(plt)) {
+          i_last_sig <- max(sig_idx)
+
+          # With levels=rev(label), ggplot's numeric y positions are:
+          # position(i) = nrow(plt) - i + 1  (bottom=1, top=n)
+          n <- nrow(plt)
+          pos_last_sig <- n - i_last_sig + 1
+          # boundary between last_sig and next row is halfway down:
+          cut_y <- pos_last_sig - 0.5
         }
+
+        upper <- .upper_padj(plt, alpha)
 
         base_family <- .pick_sans_family()
 
@@ -646,7 +660,7 @@ go_enrichment <- function(
           )
         ) +
           ggplot2::geom_point() +
-          .padj_scale(alpha) +
+          .padj_scale(upper = upper, legend_name = legend_name) +
           ggplot2::labs(
             x = "Enrichment (pos/bg)",
             y = sprintf("GO %s (%s)", ont, side),
@@ -661,7 +675,7 @@ go_enrichment <- function(
               "text",
               x = -Inf,
               y = cut_y,
-              label = sprintf("adj p \u2264 %.3g", alpha),
+              label = sprintf("%s \u2264 %.3g", sig_label, alpha),
               hjust = -0.05,
               vjust = -0.4,
               size = 3.5
