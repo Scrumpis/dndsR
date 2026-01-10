@@ -165,6 +165,7 @@ calculate_dnds <- function(comparison_file = NULL,
       # resolve in shim_env (where we shadow pairwiseAlignment)
       if (!grepl(paste0(from_pkg, "::"), txt, fixed = TRUE) &&
           !grepl("orthologr:::{3}", txt) &&
+          !grepl("getFromNamespace\\s*\\(", txt) &&
           !grepl("pairwiseAlignment\\s*\\(", txt) &&
           !grepl("writePairwiseAlignments\\s*\\(", txt) &&
           !grepl("\\bpattern\\s*\\(", txt) &&
@@ -179,6 +180,19 @@ calculate_dnds <- function(comparison_file = NULL,
       }
 
       txt <- gsub("orthologr:::{3}", "", txt, perl = TRUE)
+
+      # Rewrite namespace-bypass patterns that ignore shim_env
+      txt <- gsub(
+        "getFromNamespace\\(\\s*['\"]pairwiseAlignment['\"]\\s*,\\s*['\"]Biostrings['\"]\\s*\\)",
+        "pwalign::pairwiseAlignment",
+        txt,
+        perl = TRUE
+      )
+      
+      # Also handle Biostrings:::pairwiseAlignment (triple-colon)
+      txt <- gsub("Biostrings:::{3}pairwiseAlignment", "pwalign::pairwiseAlignment", txt, perl = TRUE)
+      txt <- gsub("Biostrings::pairwiseAlignment", "pwalign::pairwiseAlignment", txt, fixed = TRUE)
+
 
       # Replace unqualified calls (if they exist) to force pwalign
       txt <- gsub("(?<![[:alnum:]_:.])pairwiseAlignment\\s*\\(", "pwalign::pairwiseAlignment(", txt, perl = TRUE)
