@@ -688,46 +688,21 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     NULL
   }
                                                          
-  .padj_scale <- function(alpha, legend_name) {
+  .upper_padj <- function(d, alpha) {
+    max_p <- suppressWarnings(max(d$p_adj, na.rm = TRUE))
+    if (!is.finite(max_p)) max_p <- alpha
+    eps <- max(1e-12, alpha * 1e-6)
+    max(max_p, alpha + eps)
+  }
+
+  .padj_scale <- function(upper, legend_name) {
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
-
-    # Clamp alpha to [0,1] to avoid weird edge cases
-    alpha <- max(0, min(1, alpha))
-
-    # Clamp to [0,1] always; alpha just defines the yellow cutoff.
-    if (!requireNamespace("viridisLite", quietly = TRUE)) {
-      return(
-        ggplot2::scale_color_viridis_c(
-          option = "viridis",
-          direction = -1,
-          limits = c(0, 1),
-          oob = oob_fun,
-          breaks = sort(unique(c(0, 0.25, 0.5, 0.75, alpha))),
-          name = legend_name
-        )
-      )
-    }
-
-    pal <- viridisLite::viridis(256, option = "viridis", direction = -1)
-
-    # direction=-1 gives yellow -> ... -> purple; drop early yellowish section for the gradient
-    start_idx <- 25L
-    grad_cols <- pal[start_idx:256]
-    yellow    <- pal[1]
-
-    # IMPORTANT: values must be strictly increasing (no duplicate alpha)
-    grad_vals <- seq(alpha, 1, length.out = length(grad_cols) + 1L)[-1L]
-
-    cols   <- c(yellow, yellow, grad_cols)
-    values <- c(0, alpha, grad_vals)
-
-    ggplot2::scale_color_gradientn(
-      colours = cols,
-      values  = values,
-      limits  = c(0, 1),
-      oob     = oob_fun,
-      breaks  = sort(unique(c(0, 0.25, 0.5, 0.75, alpha))),
-      name    = legend_name
+    ggplot2::scale_color_viridis_c(
+      option = "viridis",
+      direction = -1,
+      limits = c(0, upper),
+      oob = oob_fun,
+      name = legend_name
     )
   }
 
@@ -801,7 +776,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       )
     ) +
       ggplot2::geom_point(stroke = 1.2) +
-      .padj_scale(alpha_val, legend_name = legend_name) +
+      .padj_scale(upper = .upper_padj(top_plot, alpha_val), legend_name = legend_name) +
       ggplot2::scale_shape_manual(
         values = c(`FALSE` = 16, `TRUE` = 1),
         labels = c(`FALSE` = "finite", `TRUE` = "inf"),
