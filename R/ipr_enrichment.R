@@ -786,7 +786,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab) +
       ggplot2::theme_minimal(base_size = 13, base_family = base_family) +
       ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.05, add = 0)) +
-      ggplot2::coord_cartesian(clip = "off") +
       ggplot2::theme(plot.margin = ggplot2::margin(5.5, 50, 5.5, 5.5))
 
     # Keep your optional fixed x-axis limits logic
