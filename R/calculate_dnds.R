@@ -146,18 +146,30 @@ calculate_dnds <- function(comparison_file = NULL,
     # Helpers that moved out of Biostrings (names used by the patcher)
     moved <- c("pairwiseAlignment", "pattern", "subject", "writePairwiseAlignments")
 
+    # Shadow the defunct Biostrings import binding inside orthologr.
+    # Any bare pairwiseAlignment() used by orthologr helpers will resolve here first.
+    shim_env$pairwiseAlignment <- get("pairwiseAlignment", envir = asNamespace("pwalign"), inherits = FALSE)
+    
+    # Some pwalign builds may or may not expose this; only set if present.
+    if (exists("writePairwiseAlignments", envir = asNamespace("pwalign"), inherits = FALSE)) {
+      shim_env$writePairwiseAlignments <- get("writePairwiseAlignments", envir = asNamespace("pwalign"), inherits = FALSE)
+    }
+
     # Rewrite any explicit Biostrings:: calls to pwalign:: (and also catch bare calls)
     .patch_fun_text <- function(fun, from_pkg = "Biostrings", to_pkg = "pwalign") {
       if (!is.function(fun)) return(fun)
 
       txt <- paste(deparse(fun), collapse = "\n")
 
-      # quick exit if nothing relevant
+      # quick exit if nothing relevant — BUT still rebind the environment so bare calls
+      # resolve in shim_env (where we shadow pairwiseAlignment)
       if (!grepl(paste0(from_pkg, "::"), txt, fixed = TRUE) &&
+          !grepl("orthologr:::{3}", txt) &&
           !grepl("pairwiseAlignment\\s*\\(", txt) &&
           !grepl("writePairwiseAlignments\\s*\\(", txt) &&
           !grepl("\\bpattern\\s*\\(", txt) &&
           !grepl("\\bsubject\\s*\\(", txt)) {
+        environment(fun) <- shim_env
         return(fun)
       }
 
@@ -165,6 +177,8 @@ calculate_dnds <- function(comparison_file = NULL,
       for (nm in moved) {
         txt <- gsub(paste0(from_pkg, "::", nm), paste0(to_pkg, "::", nm), txt, fixed = TRUE)
       }
+
+      txt <- gsub("orthologr:::{3}", "", txt, perl = TRUE)
 
       # Replace unqualified calls (if they exist) to force pwalign
       txt <- gsub("(?<![[:alnum:]_:.])pairwiseAlignment\\s*\\(", "pwalign::pairwiseAlignment(", txt, perl = TRUE)
