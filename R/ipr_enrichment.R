@@ -691,6 +691,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .padj_scale <- function(alpha, legend_name) {
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
 
+    # Clamp alpha to [0,1] to avoid weird edge cases
+    alpha <- max(0, min(1, alpha))
+
     # Clamp to [0,1] always; alpha just defines the yellow cutoff.
     if (!requireNamespace("viridisLite", quietly = TRUE)) {
       return(
@@ -712,8 +715,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     grad_cols <- pal[start_idx:256]
     yellow    <- pal[1]
 
+    # IMPORTANT: values must be strictly increasing (no duplicate alpha)
+    grad_vals <- seq(alpha, 1, length.out = length(grad_cols) + 1L)[-1L]
+
     cols   <- c(yellow, yellow, grad_cols)
-    values <- c(0, alpha, seq(alpha, 1, length.out = length(grad_cols)))
+    values <- c(0, alpha, grad_vals)
 
     ggplot2::scale_color_gradientn(
       colours = cols,
