@@ -795,7 +795,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       )
     ) +
       ggplot2::geom_point(stroke = 1.2) +
-      .padj_scale(alpha_val legend_name = legend_name) +
+      .padj_scale(alpha_val, legend_name = legend_name) +
       ggplot2::scale_shape_manual(
         values = c(`FALSE` = 16, `TRUE` = 1),
         labels = c(`FALSE` = "finite", `TRUE` = "inf"),
