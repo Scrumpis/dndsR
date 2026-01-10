@@ -51,7 +51,6 @@ ENV MAKEFLAGS="-j$(nproc)"
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); install.packages(c('remotes','BiocManager'))"
 
 # ---- CRAN ----
-# Note: devtools/pkgdown are not needed for a production/runtime deps image.
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
   install.packages(c( \
     'cli','data.table','optparse','xml2','ggplot2','dplyr','testthat','knitr','rmarkdown', \
@@ -76,12 +75,22 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
 # ---- GitHub runtime deps ----
 # Install metablastr + rdiamond normally, then build orthologr from source with our patch applied.
 COPY inst/patches/orthologr-pwalign.patch /tmp/orthologr-pwalign.patch
+ARG ORTHOLOGR_REF=HEAD
 
 RUN set -eux; \
   R -q -e "options(warn=2); remotes::install_github(c('drostlab/metablastr','drostlab/rdiamond'), upgrade='never')"; \
   \
   rm -rf /tmp/orthologr; \
-  git clone --depth 1 https://github.com/drostlab/orthologr /tmp/orthologr; \
+  git clone https://github.com/drostlab/orthologr /tmp/orthologr; \
+  \
+  # allow future pinning a known-good orthologr commit/tag if build breaks
+  # build with: docker build --build-arg ORTHOLOGR_REF=<sha-or-tag> ...
+  if [ -n "${ORTHOLOGR_REF:-}" ] && [ "${ORTHOLOGR_REF}" != "HEAD" ]; then \
+    git -C /tmp/orthologr checkout -q "${ORTHOLOGR_REF}"; \
+  fi; \
+  \
+  # fail early if the patch no longer applies cleanly
+  patch --dry-run --forward -p1 -d /tmp/orthologr < /tmp/orthologr-pwalign.patch; \
   patch --forward -p1 -d /tmp/orthologr < /tmp/orthologr-pwalign.patch; \
   R CMD INSTALL /tmp/orthologr; \
   \
@@ -92,7 +101,8 @@ RUN set -eux; \
 # Ensure patch was applied
 RUN R -q -e " \
   stopifnot(requireNamespace('orthologr', quietly=TRUE)); \
-  txt <- paste(deparse(body(orthologr:::pairwise_aln)), collapse='\n'); \
+  fn <- get('pairwise_aln', asNamespace('orthologr')); \
+  txt <- paste(deparse(body(fn)), collapse='\n'); \
   stopifnot(grepl('pwalign::pairwiseAlignment', txt)); \
   stopifnot(grepl('pwalign::pattern', txt)); \
   stopifnot(grepl('pwalign::subject', txt)); \
