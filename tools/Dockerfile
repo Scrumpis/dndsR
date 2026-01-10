@@ -12,7 +12,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN set -eux; \
   apt-get update -qq; \
   apt-get install -y --no-install-recommends \
-    ca-certificates gnupg2 curl wget git make g++ \
+    ca-certificates gnupg2 curl wget git make g++ patch \
     pkg-config \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     zlib1g-dev libbz2-dev liblzma-dev \
@@ -47,10 +47,10 @@ ENV MAKEFLAGS="-j$(nproc)"
 # R dependencies
 # ============================================================
 
-# remotes + BiocManager (cheap)
+# remotes + BiocManager
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); install.packages(c('remotes','BiocManager'))"
 
-# ---- CRAN first (runtime deps only; remove dev-only packages) ----
+# ---- CRAN ----
 # Note: devtools/pkgdown are not needed for a production/runtime deps image.
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
   install.packages(c( \
@@ -62,7 +62,7 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
     !vapply(c('RIdeogram','svglite','sysfonts','showtext'), requireNamespace, logical(1), quietly=TRUE) ]; \
   if (length(missing)) stop('Missing CRAN packages after install: ', paste(missing, collapse=', '))"
 
-# ---- Bioconductor (slow, after CRAN succeeds) ----
+# ---- Bioconductor ----
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
   BiocManager::install(c( \
     'AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures', \
@@ -73,15 +73,34 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
     !vapply(c('AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures','GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO','IHW','qvalue','rtracklayer','pwalign','txdbmaker'), requireNamespace, logical(1), quietly=TRUE) ]; \
   if (length(missing)) stop('Missing Bioc packages after install: ', paste(missing, collapse=', '))"
 
-# ---- GitHub runtime deps (fail fast) ----
-RUN R -q -e "options(warn=2); remotes::install_github(c( \
-    'drostlab/metablastr','drostlab/rdiamond','drostlab/orthologr' \
-  ), upgrade='never'); \
-  missing <- c('metablastr','rdiamond','orthologr')[ \
-    !vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE) ]; \
-  if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
+# ---- GitHub runtime deps ----
+# Install metablastr + rdiamond normally, then build orthologr from source with our patch applied.
+COPY inst/patches/orthologr-pwalign.patch /tmp/orthologr-pwalign.patch
 
-# Final sanity check (cheap)
+RUN set -eux; \
+  R -q -e "options(warn=2); remotes::install_github(c('drostlab/metablastr','drostlab/rdiamond'), upgrade='never')"; \
+  \
+  rm -rf /tmp/orthologr; \
+  git clone --depth 1 https://github.com/drostlab/orthologr /tmp/orthologr; \
+  patch --forward -p1 -d /tmp/orthologr < /tmp/orthologr-pwalign.patch; \
+  R CMD INSTALL /tmp/orthologr; \
+  \
+  R -q -e "options(warn=2); \
+    missing <- c('metablastr','rdiamond','orthologr')[!vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE)]; \
+    if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
+
+# Ensure patch was applied
+RUN R -q -e " \
+  stopifnot(requireNamespace('orthologr', quietly=TRUE)); \
+  txt <- paste(deparse(body(orthologr:::pairwise_aln)), collapse='\n'); \
+  stopifnot(grepl('pwalign::pairwiseAlignment', txt)); \
+  stopifnot(grepl('pwalign::pattern', txt)); \
+  stopifnot(grepl('pwalign::subject', txt)); \
+  stopifnot(grepl('pwalign::writePairwiseAlignments', txt)); \
+  cat('orthologr patch OK\n'); \
+"
+
+# Final sanity check
 RUN Rscript -e "stopifnot( \
   requireNamespace('RIdeogram', quietly=TRUE), \
   requireNamespace('topGO', quietly=TRUE), \
