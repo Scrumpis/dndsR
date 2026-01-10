@@ -694,7 +694,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     eps <- max(1e-12, alpha * 1e-6)
     max(max_p, alpha + eps)
   }
-  .padj_scale <- function(upper, legend_name) {
+  .padj_scale <- function(alpha, upper, legend_name) {
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
     ggplot2::scale_color_viridis_c(
       option = "viridis",
