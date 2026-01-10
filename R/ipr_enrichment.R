@@ -688,7 +688,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     NULL
   }
                                                          
-  .padj_scale <- function(alpha, upper, legend_name) {
+  .padj_scale <- function(alpha, legend_name) {
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
 
     # Clamp to [0,1] always; alpha just defines the yellow cutoff.
@@ -756,7 +756,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!nrow(top_plot)) return(invisible(NULL))
 
     base_family <- .pick_sans_family()
-    upper <- .upper_padj(top_plot, alpha_val)
 
     # What are we actually showing on the color scale?
     legend_name <- if (identical(fdr_method, "none")) "p" else "adj p"
