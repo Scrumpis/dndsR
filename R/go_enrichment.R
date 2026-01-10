@@ -253,15 +253,12 @@ go_enrichment <- function(
   }
 
   .padj_scale <- function(alpha, upper) {
-    ggplot2::scale_color_gradientn(
-      colours = c("red", "grey80", "steelblue"),
-      values = scales::rescale(
-        c(0, alpha, upper),
-        to = c(0, 1),
-        from = c(0, upper)
-      ),
+    oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
+    ggplot2::scale_color_viridis_c(
+      option = "viridis",
+      direction = -1,
       limits = c(0, upper),
-      oob = scales::squish,
+      oob = oob_fun,
       name = "adj p"
     )
   }
@@ -612,13 +609,12 @@ go_enrichment <- function(
     )
 
     if (isTRUE(make_plots)) {
-      if (!requireNamespace("ggplot2", quietly = TRUE) ||
-          !requireNamespace("scales", quietly = TRUE)) {
-        warning(
-          "Skipping plots: packages 'ggplot2' and 'scales' are required for plotting.",
-          call. = FALSE
-        )
-      } else {
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+      warning(
+        "Skipping plots: package 'ggplot2' is required for plotting.",
+        call. = FALSE
+      )
+    } else {
         plt <- out[order(out$p_adj, -out$enrichment), ]
         plt <- utils::head(plt, top_n)
         upper <- .upper_padj(plt, alpha)
