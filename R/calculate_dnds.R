@@ -74,7 +74,8 @@
 #' where \code{<suffix>} is \code{cds_suffix} or \code{protein_suffix} depending on \code{seq_type}.
 #'
 #' This function requires the \pkg{orthologr} package. For Biostrings >= 2.77.1, alignment helpers
-#' were moved into \pkg{pwalign}; this function applies a small shim to keep older orthologr code working.
+#' were moved into \pkg{pwalign}; ensure \pkg{pwalign} is installed if your \pkg{orthologr} version uses it.
+#' We provide a patched orthologr version in the Docker image.
 #'
 #' @return (Invisibly) a character vector of output TSV paths (batch mode), or a single output TSV path
 #'   (single mode). Comparisons skipped due to missing inputs are omitted from batch outputs.
@@ -122,112 +123,18 @@ calculate_dnds <- function(comparison_file = NULL,
       "or run inside the dndsR container (recommended)."
     )
   )
-  .need_pkg(
-    "pwalign",
-    paste0(
-      "Biostrings >= 2.77.1 moved pairwiseAlignment()/pattern()/subject()/writePairwiseAlignments() ",
-      "into the 'pwalign' package."
-    )
-  )
-  # ---- Biostrings >= 2.77.1 compatibility shim (CRAN-safe; no namespace edits) ----
-  .orthologr_dNdS <- orthologr::dNdS
-
+  
   if (requireNamespace("Biostrings", quietly = TRUE) &&
       utils::packageVersion("Biostrings") >= "2.77.1") {
-
     .need_pkg(
       "pwalign",
-      "Biostrings >= 2.77.1 moved pairwiseAlignment helpers into the 'pwalign' package."
-    )
-
-    ortho_ns <- asNamespace("orthologr")
-    shim_env <- new.env(parent = ortho_ns)
-
-    # Helpers that moved out of Biostrings (names used by the patcher)
-    moved <- c("pairwiseAlignment", "pattern", "subject", "writePairwiseAlignments")
-
-    # Shadow the defunct Biostrings import binding inside orthologr.
-    # Any bare pairwiseAlignment() used by orthologr helpers will resolve here first.
-    shim_env$pairwiseAlignment <- get("pairwiseAlignment", envir = asNamespace("pwalign"), inherits = FALSE)
-    
-    # Some pwalign builds may or may not expose this; only set if present.
-    if (exists("writePairwiseAlignments", envir = asNamespace("pwalign"), inherits = FALSE)) {
-      shim_env$writePairwiseAlignments <- get("writePairwiseAlignments", envir = asNamespace("pwalign"), inherits = FALSE)
-    }
-
-    # Rewrite any explicit Biostrings:: calls to pwalign:: (and also catch bare calls)
-    .patch_fun_text <- function(fun, from_pkg = "Biostrings", to_pkg = "pwalign") {
-      if (!is.function(fun)) return(fun)
-
-      txt <- paste(deparse(fun), collapse = "\n")
-
-      # quick exit if nothing relevant — BUT still rebind the environment so bare calls
-      # resolve in shim_env (where we shadow pairwiseAlignment)
-      if (!grepl(paste0(from_pkg, "::"), txt, fixed = TRUE) &&
-          !grepl("orthologr:::{3}", txt) &&
-          !grepl("getFromNamespace\\s*\\(", txt) &&
-          !grepl("pairwiseAlignment\\s*\\(", txt) &&
-          !grepl("writePairwiseAlignments\\s*\\(", txt) &&
-          !grepl("\\bpattern\\s*\\(", txt) &&
-          !grepl("\\bsubject\\s*\\(", txt)) {
-        environment(fun) <- shim_env
-        return(fun)
-      }
-
-      # Replace explicit namespace-qualified calls first
-      for (nm in moved) {
-        txt <- gsub(paste0(from_pkg, "::", nm), paste0(to_pkg, "::", nm), txt, fixed = TRUE)
-      }
-
-      txt <- gsub("orthologr:::{3}", "", txt, perl = TRUE)
-
-      # Rewrite namespace-bypass patterns that ignore shim_env
-      txt <- gsub(
-        "getFromNamespace\\(\\s*['\"]pairwiseAlignment['\"]\\s*,\\s*['\"]Biostrings['\"]\\s*\\)",
-        "pwalign::pairwiseAlignment",
-        txt,
-        perl = TRUE
+      paste0(
+        "Biostrings >= 2.77.1 moved pairwiseAlignment()/pattern()/subject()/writePairwiseAlignments() ",
+        "into the 'pwalign' package."
       )
-      
-      # Also handle Biostrings:::pairwiseAlignment (triple-colon)
-      txt <- gsub("Biostrings:::{3}pairwiseAlignment", "pwalign::pairwiseAlignment", txt, perl = TRUE)
-      txt <- gsub("Biostrings::pairwiseAlignment", "pwalign::pairwiseAlignment", txt, fixed = TRUE)
-
-
-      # Replace unqualified calls (if they exist) to force pwalign
-      txt <- gsub("(?<![[:alnum:]_:.])pairwiseAlignment\\s*\\(", "pwalign::pairwiseAlignment(", txt, perl = TRUE)
-      txt <- gsub("(?<![[:alnum:]_:.])writePairwiseAlignments\\s*\\(", "pwalign::writePairwiseAlignments(", txt, perl = TRUE)
-      txt <- gsub("(?<![[:alnum:]_:.])pattern\\s*\\(", "pwalign::pattern(", txt, perl = TRUE)
-      txt <- gsub("(?<![[:alnum:]_:.])subject\\s*\\(", "pwalign::subject(", txt, perl = TRUE)
-
-      # Re-eval as a function and keep formals identical
-      patched <- eval(parse(text = txt))
-      environment(patched) <- shim_env
-      patched
-    }
-
-    # Patch EVERY orthologr function that references Biostrings::pairwiseAlignment (or bare calls)
-    ortho_objs <- ls(envir = ortho_ns, all.names = TRUE)
-    for (nm in ortho_objs) {
-      obj <- get(nm, envir = ortho_ns, inherits = FALSE)
-      if (is.function(obj)) {
-        patched <- .patch_fun_text(obj)
-        # only install if actually changed / relevant (cheap heuristic)
-        # install into shim_env so calls from patched dNdS resolve here
-        assign(nm, patched, envir = shim_env)
-      }
-    }
-
-    # Patch dNdS itself and run that
-    f <- .patch_fun_text(orthologr::dNdS)
-    environment(f) <- shim_env
-    .orthologr_dNdS <- f
-
-    if (isTRUE(getOption("dndsR.verbose_shims", FALSE))) {
-      message("Using pwalign shim for orthologr under Biostrings >= 2.77.1 (auto-patched orthologr functions).")
-    }
+    )
   }
-
+  
   # ---- Optional: if using DIAMOND, confirm the binary is on PATH ----
   if (identical(tolower(aligner), "diamond")) {
     if (Sys.which("diamond") == "") {
@@ -525,7 +432,7 @@ calculate_dnds <- function(comparison_file = NULL,
       " (seq_type=", seq_type, ", mode=", inp$mode, ")"
     )
 
-    res <- do.call(.orthologr_dNdS, args)
+    res <- do.call(orthologr::dNdS, args)
 
     utils::write.table(
       res,
