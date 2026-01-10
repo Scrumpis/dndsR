@@ -24,21 +24,6 @@ RUN set -eux; \
   && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
-# Disable bspm auto-enable (breaks under Singularity / no apt access)
-# ============================================================
-RUN set -eux; \
-  for f in /etc/R/Rprofile.site /usr/lib/R/etc/Rprofile.site; do \
-    if [ -f "$f" ]; then \
-      sed -i \
-        -e '/bspm::enable/d' \
-        -e '/options(bspm\./d' \
-        "$f"; \
-      echo 'options(bspm.enabled = FALSE)' >> "$f"; \
-    fi; \
-  done
-ENV BSPM_DISABLE=1
-
-# ============================================================
 # Fail-fast + faster compilation (when it must compile)
 # ============================================================
 ENV MAKEFLAGS="-j$(nproc)"
@@ -53,7 +38,7 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); install.packages(c(
 # ---- CRAN ----
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
   install.packages(c( \
-    'cli','data.table','optparse','xml2','ggplot2','dplyr','testthat','knitr','rmarkdown', \
+    'cli','data.table','optparse','xml2','ggplot2','dplyr','dtplyr','R.utils','testthat','knitr','rmarkdown', \
     'RIdeogram','doParallel','foreach','ape','Rdpack','benchmarkme','svglite', \
     'sysfonts','showtext','showtextdb' \
   )); \
@@ -117,6 +102,21 @@ RUN Rscript -e "stopifnot( \
   requireNamespace('GO.db', quietly=TRUE), \
   requireNamespace('GenomicFeatures', quietly=TRUE) \
 )"
+
+# ============================================================
+# Disable bspm auto-enable (breaks under Singularity / no apt access)
+# ============================================================
+RUN set -eux; \
+  for f in /etc/R/Rprofile.site /usr/lib/R/etc/Rprofile.site; do \
+    if [ -f "$f" ]; then \
+      sed -i \
+        -e '/bspm::enable/d' \
+        -e '/options(bspm\./d' \
+        "$f"; \
+      echo 'options(bspm.enabled = FALSE)' >> "$f"; \
+    fi; \
+  done
+ENV BSPM_DISABLE=1
 
 # ============================================================
 # Micromamba environment (python + OrthoFinder toolchain)
