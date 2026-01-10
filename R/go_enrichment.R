@@ -252,12 +252,13 @@ go_enrichment <- function(
     max(max_p, alpha + eps)
   }
 
-  .padj_scale <- function(alpha, upper) {
+  .padj_scale <- function(alpha) {
+    # Clamp colors above alpha to alpha (so everything non-significant shares the same top color)
     oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
     ggplot2::scale_color_viridis_c(
       option = "viridis",
       direction = -1,
-      limits = c(0, upper),
+      limits = c(0, alpha),
       oob = oob_fun,
       name = "adj p"
     )
@@ -615,9 +616,23 @@ go_enrichment <- function(
         call. = FALSE
       )
     } else {
-        plt <- out[order(out$p_adj, -out$enrichment), ]
+                plt <- out[order(out$p_adj, -out$enrichment, out$GO_ID), , drop = FALSE]
         plt <- utils::head(plt, top_n)
-        upper <- .upper_padj(plt, alpha)
+
+        # Explicit ordering for the y-axis: top = most significant (smallest p_adj)
+        plt$is_significant <- is.finite(plt$p_adj) & !is.na(plt$p_adj) & (plt$p_adj <= alpha)
+
+        # Build a stable ordered factor for y
+        plt$y_lab <- plt$label
+        plt <- plt[order(plt$p_adj, -plt$enrichment, plt$GO_ID), , drop = FALSE]
+        plt$y_lab <- factor(plt$y_lab, levels = rev(plt$y_lab))
+
+        # Boundary line between significant and non-significant (only if both exist in top_n)
+        sig_idx <- which(plt$is_significant)
+        cut_y <- NULL
+        if (length(sig_idx) > 0L && length(sig_idx) < nrow(plt)) {
+          cut_y <- max(sig_idx) + 0.5
+        }
 
         base_family <- .pick_sans_family()
 
@@ -625,19 +640,34 @@ go_enrichment <- function(
           plt,
           ggplot2::aes(
             x = enrichment,
-            y = stats::reorder(label, -p_adj),
+            y = y_lab,
             size = significant,
             color = p_adj
           )
         ) +
           ggplot2::geom_point() +
-          .padj_scale(alpha, upper) +
+          .padj_scale(alpha) +
           ggplot2::labs(
             x = "Enrichment (pos/bg)",
             y = sprintf("GO %s (%s)", ont, side),
             size = "# pos"
           ) +
           ggplot2::theme_minimal(base_size = 12, base_family = base_family)
+
+        if (!is.null(cut_y)) {
+          gg <- gg +
+            ggplot2::geom_hline(yintercept = cut_y, linetype = "dashed", linewidth = 0.6) +
+            ggplot2::annotate(
+              "text",
+              x = -Inf,
+              y = cut_y,
+              label = sprintf("adj p \u2264 %.3g", alpha),
+              hjust = -0.05,
+              vjust = -0.4,
+              size = 3.5
+            ) +
+            ggplot2::coord_cartesian(clip = "off")
+        }
 
         out_svg <- sub("\\.tsv$", "_topN.svg", out_file)
         dev_fun <- .svg_device()
