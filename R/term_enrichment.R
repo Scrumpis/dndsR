@@ -424,8 +424,8 @@ term_enrichment <- function(dnds_annot_file = NULL,
     )
   }
 
-  # ---------- font & SVG device (simpler; bold by default; no bundled fonts) ----------
-  .pick_sans_family <- function() "DejaVu Sans"
+  # ---------- font & SVG device ----------
+  .pick_sans_family <- function() "Arial"
 
   .svg_device <- function() {
     if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
