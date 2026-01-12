@@ -481,9 +481,9 @@ term_enrichment <- function(dnds_annot_file = NULL,
         y = ylab,
         size = "# pos"
       ) +
-      ggplot2::theme_minimal(base_size = 12, base_family = base_family) +
-      ggplot2::theme(
-        text = ggplot2::element_text(face = "bold")
+      ggplot2::theme_minimal(base_size = 12, base_family = base_family) #+
+      #ggplot2::theme(
+       # text = ggplot2::element_text(face = "bold")
       )
 
     if (!is.null(cut_y)) {
