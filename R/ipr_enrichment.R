@@ -910,7 +910,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       c <- as.integer(all_tab[[tt]] - a)
       b <- n_pos - a
       d <- n_bg  - c
-      ft <- try(stats::fisher.test(matrix(c(a,b,c,d), nrow = 2), alternative = "greater"), silent = TRUE)
+      ft <- try(stats::fisher.test(matrix(c(a,c,b,d), nrow = 2), alternative = "greater"), silent = TRUE)
       ci <- c(NA_real_, NA_real_); or <- NA_real_; p <- NA_real_
       if (!inherits(ft, "try-error")) {
         p  <- ft$p.value
@@ -1064,7 +1064,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         b <- n_pos - a; d <- n_bg - c
         if (a < min_pos) next
 
-        ft <- try(stats::fisher.test(matrix(c(a,b,c,d), nrow = 2), alternative = "greater"), silent = TRUE)
+        ft <- try(stats::fisher.test(matrix(c(a,c,b,d), nrow = 2), alternative = "greater"), silent = TRUE)
         ci <- c(NA_real_, NA_real_); or <- NA_real_; p <- NA_real_
         if (!inherits(ft, "try-error")) {
           p  <- ft$p.value; or <- as.numeric(ft$estimate)
