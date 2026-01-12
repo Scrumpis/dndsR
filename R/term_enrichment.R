@@ -484,7 +484,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       ggplot2::theme_minimal(base_size = 12, base_family = base_family) #+
       #ggplot2::theme(
        # text = ggplot2::element_text(face = "bold")
-      )
+      #)
 
     if (!is.null(cut_y)) {
       gg <- gg +
