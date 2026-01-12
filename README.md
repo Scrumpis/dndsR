@@ -164,10 +164,9 @@ dndsr regional_dnds_contrasts \
 - Add --help-more/-hm flag for CLI to expand dependency args (dndsr calculate_dnds -hm gives ?orthologr::dNdS()). 
 - Update Rvignette with test dataset
 - Ensure docker image contains all dependencies of all optional functions
-- Add parallelization to term_enrichment and dnds_ideogram
 - Cleanup documentation
 - Extract recycled helpers into their own scripts
-- dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing
+- dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization
 - go_enrichment - topN.svg -> top$N.svg output file naming
 
 ## Contributing
