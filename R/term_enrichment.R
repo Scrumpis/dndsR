@@ -60,6 +60,9 @@
 #' @param keep_unmatched_ids Logical; if TRUE (default), keep terms lacking metadata.
 #'   If FALSE, rows without a metadata NAME are dropped.
 #' @param verbose Logical; if TRUE, prints detection and audit messages. Default TRUE.
+#' @param threads Integer; maximum number of parallel workers (forked processes; default 4).
+#'   In batch mode, workers are applied across (comparison, side) jobs.
+#'   On Windows, runs sequentially (no forking).
 #'
 #' @return (Invisibly) a character vector of output TSV paths.
 #'   In batch mode, this includes all comparisons. In single mode, paths for that file.
@@ -99,10 +102,22 @@ term_enrichment <- function(dnds_annot_file = NULL,
                             exclude_descendants_limit = 5000,
                             term_metadata = NULL,
                             keep_unmatched_ids = TRUE,
-                            verbose = TRUE) {
+                            verbose = TRUE,
+                            threads = 4) {
 
   sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
   fdr_method <- match.arg(fdr_method)
+
+  threads <- suppressWarnings(as.integer(threads))
+  if (is.na(threads) || threads < 1L) threads <- 1L
+  message(sprintf("[term_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))
+  if (isTRUE(make_plots) && threads > 8L && !is.null(comparison_file)) {
+    warning(
+      "[term_enrichment] make_plots=TRUE with threads>8 may be I/O-heavy (many SVG writes). ",
+      "Consider lowering threads.",
+      call. = FALSE
+    )
+  }
 
   .msg <- function(...) if (isTRUE(verbose)) message(...)
 
@@ -371,32 +386,145 @@ term_enrichment <- function(dnds_annot_file = NULL,
     gsub("_+", "_", gsub("^_|_$", "", x))
   }
 
+  # ---- plotting helpers (MATCH go_enrichment style) ----
+  .upper_padj <- function(d, alpha) {
+    max_p <- suppressWarnings(max(d$p_adj, na.rm = TRUE))
+    if (!is.finite(max_p)) max_p <- alpha
+    eps <- max(1e-12, alpha * 1e-6)
+    max(max_p, alpha + eps)
+  }
+
+  .padj_scale <- function(upper, legend_name) {
+    oob_fun <- if (requireNamespace("scales", quietly = TRUE)) scales::squish else NULL
+    ggplot2::scale_color_viridis_c(
+      option = "viridis",
+      direction = -1,
+      limits = c(0, upper),
+      oob = oob_fun,
+      name = legend_name
+    )
+  }
+
+  .bundled_arial_path <- function() {
+    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
+    if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
+    ttf
+  }
+
+  .setup_showtext <- function() {
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+
+    if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
+    if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
+
+    ok <- try({
+      sysfonts::font_add(family = "Arial Bold", regular = ttf)
+      showtext::showtext_auto(TRUE)
+      TRUE
+    }, silent = TRUE)
+
+    if (isTRUE(ok)) "Arial Bold" else NULL
+  }
+
+  .register_svglite_mapping <- function() {
+    if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
+    ttf <- .bundled_arial_path()
+    if (is.null(ttf)) return(NULL)
+
+    function(file, ...) svglite::svglite(
+      file,
+      user_fonts = list(`Arial Bold` = ttf),
+      ...
+    )
+  }
+
+  .pick_sans_family <- function() {
+    fam <- .setup_showtext()
+    if (!is.null(fam)) return(fam)
+    "sans"
+  }
+
+  .svg_device <- function() {
+    dev_map <- .register_svglite_mapping()
+    if (!is.null(dev_map)) return(dev_map)
+    if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
+    NULL
+  }
+
   .write_plot <- function(df, ylab, out_svg) {
     if (!isTRUE(make_plots) || !requireNamespace("ggplot2", quietly = TRUE) || !nrow(df)) {
       return(invisible(NULL))
     }
 
-    top <- df[order(df$p_adj, -df$enrichment, df$term), , drop = FALSE]
-    top <- utils::head(top, top_n)
+    plt <- df[order(df$p_adj, -df$enrichment, df$term), , drop = FALSE]
+    plt <- utils::head(plt, top_n)
 
-    yvar <- if ("label" %in% names(top)) "label" else "term"
-    top$y_lab <- top[[yvar]]
+    yvar <- if ("label" %in% names(plt)) "label" else "term"
+    plt$label_plot <- plt[[yvar]]
+
+    # define significance using p_adj (BH/IHW/qvalue/none paths all land here)
+    plt$is_significant <- is.finite(plt$p_adj) & !is.na(plt$p_adj) & (plt$p_adj <= alpha)
+
+    # order: most significant first
+    plt <- plt[order(plt$p_adj, -plt$enrichment, plt$term), , drop = FALSE]
+
+    # top row at top of plot
+    plt$y_lab <- factor(plt$label_plot, levels = rev(plt$label_plot))
+
+    # cut line below last significant term
+    cut_y <- NULL
+    sig_idx <- which(plt$is_significant)
+    if (length(sig_idx) > 0L && max(sig_idx) < nrow(plt)) {
+      i_last_sig <- max(sig_idx)
+      n <- nrow(plt)
+      pos_last_sig <- n - i_last_sig + 1
+      cut_y <- pos_last_sig - 0.5
+    }
+
+    upper <- .upper_padj(plt, alpha)
+    base_family <- .pick_sans_family()
 
     gg <- ggplot2::ggplot(
-      top,
+      plt,
       ggplot2::aes(
         x = enrichment,
-        y = stats::reorder(y_lab, -p_adj),
+        y = y_lab,
         size = pos_count,
         color = p_adj
       )
     ) +
       ggplot2::geom_point() +
-      ggplot2::scale_color_gradient(low = "red", high = "blue") +
-      ggplot2::labs(x = "Enrichment (pos/bg)", y = ylab, size = "# pos", color = "adj p") +
-      ggplot2::theme_minimal(base_size = 13)
+      .padj_scale(upper = upper, legend_name = "adj p") +
+      ggplot2::labs(
+        x = "Enrichment (pos/bg)",
+        y = ylab,
+        size = "# pos"
+      ) +
+      ggplot2::theme_minimal(base_size = 12, base_family = base_family)
 
-    ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+    if (!is.null(cut_y)) {
+      gg <- gg +
+        ggplot2::geom_hline(yintercept = cut_y, linetype = "dashed", linewidth = 0.6) +
+        ggplot2::annotate(
+          "text",
+          x = -Inf,
+          y = cut_y,
+          label = sprintf("adj p \u2264 %.3g", alpha),
+          hjust = -0.05,
+          vjust = -0.4,
+          size = 3.5
+        ) +
+        ggplot2::coord_cartesian(clip = "off")
+    }
+
+    dev_fun <- .svg_device()
+    if (!is.null(dev_fun)) {
+      ggplot2::ggsave(out_svg, gg, device = dev_fun, width = 11, height = 9)
+    } else {
+      ggplot2::ggsave(out_svg, gg, width = 11, height = 9)
+    }
+
     invisible(NULL)
   }
 
@@ -498,7 +626,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
     out_tsv
   }
 
-  .run_one_comparison <- function(comp_name, comp_dir) {
+  .run_one_comparison <- function(comp_name, comp_dir, sides_run = sides) {
     in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) stop("Annotated dN/dS file not found: ", in_file)
 
@@ -518,7 +646,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
 
     out_paths <- character(0)
     for (tm in det$term_set) {
-      for (sd in sides) {
+      for (sd in sides_run) {
         p <- .enrich_side_term(d, side = sd, term_type = tm, comp_name = comp_name, comp_dir = comp_dir)
         if (!is.null(p)) out_paths <- c(out_paths, p)
       }
@@ -532,14 +660,52 @@ term_enrichment <- function(dnds_annot_file = NULL,
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
 
-    outs <- character(0)
-    for (i in seq_len(nrow(df))) {
+    jobs <- expand.grid(
+      i = seq_len(nrow(df)),
+      side = sides,
+      KEEP.OUT.ATTRS = FALSE,
+      stringsAsFactors = FALSE
+    )
+
+    run_one_job <- function(k) {
+      i <- jobs$i[k]
+      side <- jobs$side[k]
       comp <- df$comparison_name[i]
       comp_dir <- file.path(output_dir, comp)
       dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
-      outs <- c(outs, .run_one_comparison(comp, comp_dir))
+
+      message(sprintf("[term_enrichment] %s %s (logging to %s/%s_%s_term_enrichment.log)",
+                      comp, side, comp_dir, comp, side))
+      log_file <- file.path(comp_dir, sprintf("%s_%s_term_enrichment.log", comp, side))
+
+      .dndsr_with_log(
+        log_file = log_file,
+        tag = "term_enrichment",
+        header = c(
+          sprintf("[term_enrichment] comp=%s side=%s", comp, side),
+          sprintf("[term_enrichment] pid=%d threads=%d", Sys.getpid(), threads)
+        ),
+        expr = {
+          .run_one_comparison(comp, comp_dir, sides_run = side)
+        }
+      )
     }
 
+    if (threads > 1L && .Platform$OS.type != "windows") {
+      outs_list <- parallel::mclapply(
+        seq_len(nrow(jobs)),
+        run_one_job,
+        mc.cores = threads,
+        mc.preschedule = FALSE
+      )
+    } else {
+      if (threads > 1L && .Platform$OS.type == "windows") {
+        warning("[term_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+      }
+      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
+    }
+
+    outs <- unlist(outs_list, use.names = FALSE)
     .msg("All term enrichments complete.")
     return(invisible(outs))
   }
@@ -552,24 +718,55 @@ term_enrichment <- function(dnds_annot_file = NULL,
 
   # Single-mode: allow running in-place without requiring the directory be named exactly comp_name
   # (but still write outputs beside the input file).
-  d <- .read_dnds_annot(dnds_annot_file)
-  d <- .coerce_qs_cols_to_char(d)
 
-  det <- .resolve_term_set(d)
-  .msg(sprintf("[term_enrichment] %s: detected term types = {%s}; testing = {%s}",
-               comp_name,
-               paste(sort(det$base_detect), collapse = ", "),
-               paste(sort(det$term_set), collapse = ", ")))
-  if (!length(det$term_set)) stop("No eligible term columns present in: ", dnds_annot_file)
+  run_one_side <- function(sd) {
+    message(sprintf("[term_enrichment] %s %s (logging to %s/%s_%s_term_enrichment.log)",
+                    comp_name, sd, comp_dir, comp_name, sd))
+    log_file <- file.path(comp_dir, sprintf("%s_%s_term_enrichment.log", comp_name, sd))
 
-  outs <- character(0)
-  for (tm in det$term_set) {
-    for (sd in sides) {
-      p <- .enrich_side_term(d, side = sd, term_type = tm, comp_name = comp_name, comp_dir = comp_dir)
-      if (!is.null(p)) outs <- c(outs, p)
-    }
+    .dndsr_with_log(
+      log_file = log_file,
+      tag = "term_enrichment",
+      header = c(
+        sprintf("[term_enrichment] comp=%s side=%s", comp_name, sd),
+        sprintf("[term_enrichment] pid=%d threads=%d", Sys.getpid(), threads)
+      ),
+      expr = {
+        d <- .read_dnds_annot(dnds_annot_file)
+        d <- .coerce_qs_cols_to_char(d)
+
+        det <- .resolve_term_set(d)
+        .msg(sprintf("[term_enrichment] %s: detected term types = {%s}; testing = {%s}",
+                     comp_name,
+                     paste(sort(det$base_detect), collapse = ", "),
+                     paste(sort(det$term_set), collapse = ", ")))
+        if (!length(det$term_set)) stop("No eligible term columns present in: ", dnds_annot_file)
+
+        outs <- character(0)
+        for (tm in det$term_set) {
+          p <- .enrich_side_term(d, side = sd, term_type = tm, comp_name = comp_name, comp_dir = comp_dir)
+          if (!is.null(p)) outs <- c(outs, p)
+        }
+        outs
+      }
+    )
   }
 
+  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
+    outs_list <- parallel::mclapply(
+      sides,
+      run_one_side,
+      mc.cores = min(threads, length(sides)),
+      mc.preschedule = FALSE
+    )
+  } else {
+    if (threads > 1L && .Platform$OS.type == "windows") {
+      warning("[term_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
+    }
+    outs_list <- lapply(sides, run_one_side)
+  }
+
+  outs <- unlist(outs_list, use.names = FALSE)
   .msg("Term enrichment complete for: ", dnds_annot_file)
   invisible(outs)
 }
