@@ -166,8 +166,9 @@ dndsr regional_dnds_contrasts \
 - Ensure docker image contains all dependencies of all optional functions
 - Cleanup documentation
 - Extract recycled helpers into their own scripts
-- dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization
+- dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization, add multi-pattern removal for chr labels
 - go_enrichment - topN.svg -> top$N.svg output file naming
+- term_enrichment - fix font
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
