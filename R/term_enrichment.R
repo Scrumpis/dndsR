@@ -425,7 +425,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
   }
 
   # ---------- font & SVG device ----------
-  .pick_sans_family <- function() "Arial"
+  .pick_sans_family <- function() "sans"
 
   .svg_device <- function() {
     if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
@@ -481,10 +481,10 @@ term_enrichment <- function(dnds_annot_file = NULL,
         y = ylab,
         size = "# pos"
       ) +
-      ggplot2::theme_minimal(base_size = 12, base_family = base_family) #+
-      #ggplot2::theme(
-       # text = ggplot2::element_text(face = "bold")
-      #)
+      ggplot2::theme_minimal(base_size = 12, base_family = base_family) +
+      ggplot2::theme(
+        text = ggplot2::element_text(face = "bold")
+      )
 
     if (!is.null(cut_y)) {
       gg <- gg +
