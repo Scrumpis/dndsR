@@ -553,14 +553,18 @@ go_enrichment <- function(
       }
     }
 
-    valid_idx <- which(is.finite(raw_p) & raw_p < 1 & sig_counts > 0)
+    # Adjust across all tested nodes with valid p-values
     p_adj <- rep(1, length(raw_p))
-    if (length(valid_idx)) {
-      p_adj[valid_idx] <- if (p_adjust == "BH") {
-        stats::p.adjust(raw_p[valid_idx], method = "BH")
+    ok <- is.finite(raw_p) & !is.na(raw_p) & raw_p >= 0 & raw_p <= 1
+    
+    if (any(ok)) {
+      if (p_adjust == "BH") {
+        p_adj[ok] <- stats::p.adjust(raw_p[ok], method = "BH")
       } else {
-        raw_p[valid_idx]
+        p_adj[ok] <- raw_p[ok]
       }
+    } else {
+      warning("[go_enrichment] No valid p-values from topGO; setting all p_adj=1.", call. = FALSE)
     }
 
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
@@ -630,7 +634,10 @@ go_enrichment <- function(
 
         # Make a discrete y with TOP = first row in plt
         # (ggplot discrete scale puts the LAST factor level at the TOP)
-        plt$y_lab <- factor(plt$label, levels = rev(plt$label))
+        #plt$y_lab <- factor(plt$label, levels = rev(plt$label))
+        # Use unique GO_ID for y to avoid duplicate label issues
+        plt$y_id <- factor(plt$GO_ID, levels = rev(plt$GO_ID))
+        lab_map <- stats::setNames(plt$label, plt$GO_ID)
 
         # Compute cut line: below the last significant term in THIS ordered plt
         cut_y <- NULL
@@ -654,7 +661,7 @@ go_enrichment <- function(
           plt,
           ggplot2::aes(
             x = enrichment,
-            y = y_lab,
+            y = y_id,
             size = significant,
             color = p_adj
           )
