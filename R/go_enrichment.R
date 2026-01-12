@@ -635,9 +635,6 @@ go_enrichment <- function(
         # Make a discrete y with TOP = first row in plt
         # (ggplot discrete scale puts the LAST factor level at the TOP)
         plt$y_lab <- factor(plt$label, levels = rev(plt$label))
-        # Use unique GO_ID for y to avoid duplicate label issues
-        #plt$y_id <- factor(plt$GO_ID, levels = rev(plt$GO_ID))
-        #lab_map <- stats::setNames(plt$label, plt$GO_ID)
 
         # Compute cut line: below the last significant term in THIS ordered plt
         cut_y <- NULL
