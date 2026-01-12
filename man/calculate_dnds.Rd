@@ -6,6 +6,7 @@
 \usage{
 calculate_dnds(
   comparison_file = NULL,
+  seq_list_file = NULL,
   comparison_name = NULL,
   query_seq = NULL,
   subject_seq = NULL,
@@ -26,28 +27,34 @@ calculate_dnds(
 \arguments{
 \item{comparison_file}{Path to a whitespace-delimited (tabs/spaces) file OR a data.frame
 describing comparisons (batch mode).
-Must include \code{comparison_name} and either:
+Must include columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
+Additional columns are allowed and ignored.
+
+Notes:
 \itemize{
-\item \code{query_seq} and \code{subject_seq} (direct mode), OR
-\item \code{query_fasta} and \code{subject_fasta} (pipeline mode).
-}
-Additional columns are allowed and ignored. For backward compatibility, files with
-\code{query_gff}/\code{subject_gff} columns are accepted but those columns are not used.}
+\item query_gff/subject_gff are accepted for consistency with other dndsR steps but are not used here.
+\item For a simpler FASTA-only batch wrapper (no GFF columns), use seq_list_file (see below).
+}}
+
+\item{seq_list_file}{Path to a whitespace-delimited (tabs/spaces) file OR a data.frame
+describing FASTA pairs to run with orthologr in batch.
+Must include columns: comparison_name, query_seq, subject_seq.
+These files are used directly as inputs to orthologr::dNdS() (CDS by default; set seq_type="protein" for proteins).}
 
 \item{comparison_name}{Name for the comparison (single mode). Used as the per-comparison
 folder name under \code{output_dir} and as the output TSV basename.}
 
-\item{query_seq}{Path to the query sequence FASTA used directly by \code{orthologr::dNdS()}
-(single mode). Required for direct mode.}
+\item{query_seq}{Path to the query sequence FASTA for \code{orthologr::dNdS()}
+(single mode). Required for single mode.}
 
-\item{subject_seq}{Path to the subject sequence FASTA used directly by \code{orthologr::dNdS()}
-(single mode). Required for direct mode.}
+\item{subject_seq}{Path to the subject sequence FASTA for \code{orthologr::dNdS()}
+(single mode). Required for single mode.}
 
 \item{query_fasta}{Path to the original query FASTA used only to derive the expected
-per-comparison sequence FASTA in pipeline mode (single mode).}
+per-comparison sequence FASTA in batch mode.}
 
 \item{subject_fasta}{Path to the original subject FASTA used only to derive the expected
-per-comparison sequence FASTA in pipeline mode (single mode).}
+per-comparison sequence FASTA in batch mode.}
 
 \item{output_dir}{Root directory containing per-comparison folders. Each run uses
 \code{file.path(output_dir, comparison_name)}.}
@@ -59,10 +66,10 @@ Default \code{FALSE}.}
 Must be \code{"cds"} or \code{"protein"}. When \code{"cds"}, input files must be CDS nucleotide
 FASTAs. When \code{"protein"}, input files must be protein FASTAs.}
 
-\item{cds_suffix}{Filename suffix used in pipeline mode when \code{seq_type="cds"}.
+\item{cds_suffix}{Filename suffix used in batch mode when \code{seq_type="cds"}.
 Default \code{"_CDS.fasta"}.}
 
-\item{protein_suffix}{Filename suffix used in pipeline mode when \code{seq_type="protein"}.
+\item{protein_suffix}{Filename suffix used in batch mode when \code{seq_type="protein"}.
 Default \code{"_AA.fasta"}.}
 
 \item{comp_cores}{Integer number of CPU cores to pass to \code{orthologr::dNdS()} as
@@ -91,24 +98,23 @@ reproducible container-friendly behavior, and standardized output locations.
 \details{
 This function supports two input styles:
 \itemize{
-\item \strong{Direct mode}: provide \code{query_seq} and \code{subject_seq} paths
+\item \strong{Single mode}: provide \code{query_seq} and \code{subject_seq} paths
 (CDS or protein FASTAs depending on \code{seq_type}).
-\item \strong{Pipeline mode}: provide \code{query_fasta} and \code{subject_fasta} only
-to derive expected per-comparison sequence FASTAs within \code{output_dir} using
-standardized suffixes (e.g. \code{_CDS.fasta} or \code{_AA.fasta}).
+\item \strong{Batch mode}: provide comparison_file.
 }
 
 \strong{Output path:} for each comparison, results are written to
 \code{file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds.tsv"))}.
 
-\strong{Pipeline mode file resolution:} when \code{query_fasta}/\code{subject_fasta} are used,
+\strong{Batch mode file resolution:} when \code{query_fasta}/\code{subject_fasta} are used,
 the input FASTAs are resolved as:
 \itemize{
-\item \code{file.path(output_dir, comparison_name, paste0(basename(query_fasta_noext), <suffix>))}
-\item \code{file.path(output_dir, comparison_name, paste0(basename(subject_fasta_noext), <suffix>))}
+\item \code{file.path(output_dir, comparison_name, paste0(basename(query_fasta), <suffix>))}
+\item \code{file.path(output_dir, comparison_name, paste0(basename(subject_fasta), <suffix>))}
 }
 where \code{<suffix>} is \code{cds_suffix} or \code{protein_suffix} depending on \code{seq_type}.
 
 This function requires the \pkg{orthologr} package. For Biostrings >= 2.77.1, alignment helpers
-were moved into \pkg{pwalign}; this function applies a small shim to keep older orthologr code working.
+were moved into \pkg{pwalign}; ensure \pkg{pwalign} is installed if your \pkg{orthologr} version uses it.
+We provide a patched orthologr version in the Docker image.
 }

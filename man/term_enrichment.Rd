@@ -17,8 +17,8 @@ term_enrichment(
   make_plots = TRUE,
   top_n = 20,
   drop_rows_without_term = TRUE,
-  min_total = 0,
-  min_pos = 0,
+  min_total = 2,
+  min_pos = 2,
   fdr_method = c("BH", "IHW", "qvalue", "none"),
   alpha = 0.05,
   term_seps = c(";", "|", ","),
@@ -33,7 +33,8 @@ term_enrichment(
   exclude_descendants_limit = 5000,
   term_metadata = NULL,
   keep_unmatched_ids = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  threads = 4
 )
 }
 \arguments{
@@ -109,6 +110,10 @@ avoid accidental mass exclusion. Default 5000.}
 If FALSE, rows without a metadata NAME are dropped.}
 
 \item{verbose}{Logical; if TRUE, prints detection and audit messages. Default TRUE.}
+
+\item{threads}{Integer; maximum number of parallel workers (forked processes; default 4).
+In batch mode, workers are applied across (comparison, side) jobs.
+On Windows, runs sequentially (no forking).}
 }
 \value{
 (Invisibly) a character vector of output TSV paths.

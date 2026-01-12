@@ -2,7 +2,7 @@
 % Please edit documentation in R/ipr_enrichment.R
 \name{ipr_enrichment}
 \alias{ipr_enrichment}
-\title{InterPro (IPR) enrichment (Fisher) for query/subject terms in dNdS results}
+\title{InterPro (IPR) term enrichment (Fisher/hierarchy-aware) under positive selection and visualization}
 \usage{
 ipr_enrichment(
   dnds_annot_file = NULL,
@@ -24,10 +24,10 @@ ipr_enrichment(
   include_types = NULL,
   stratify_by_type = TRUE,
   types = NULL,
-  adjust_scope = c("global", "per_type"),
+  adjust_scope = c("per_type", "global"),
   entries_source = c("auto", "local", "remote", "none"),
   entries_path = NULL,
-  entries_url = "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list",
+  entries_url = NULL,
   entries_timeout_s = 20,
   keep_unmatched = TRUE,
   exclude_ids = NULL,
@@ -36,29 +36,26 @@ ipr_enrichment(
   exclude_descendants = FALSE,
   exclude_descendants_depth = Inf,
   exclude_descendants_limit = 5000,
-  method = c("fisher", "parent_child", "weight01"),
+  method = c("fisher", "parent_child"),
   ancestor_novel_frac = 0.2,
+  parent_child_alpha = alpha,
   x_axis_min = NULL,
   x_axis_max = NULL,
-  x_axis_pad_right = 3,
   interpro_release = NULL,
   auto_detect_release = TRUE,
-  release_candidates = c("92.0", "94.0", "96.0", "98.0", "100.0"),
   strict_coverage = 0.9,
   tree_source = c("auto", "local", "remote", "none"),
   tree_path = NULL,
-  tree_url =
-    "https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt",
-  tree_timeout_s = 20
+  tree_url = NULL,
+  tree_timeout_s = 120,
+  threads = 4
 )
 }
 \arguments{
 \item{dnds_annot_file}{Path to a single \if{html}{\out{<comp>}}_dnds_annot.tsv (single mode).}
 
 \item{comparison_file}{Path to whitespace-delimited file (tabs/spaces; header or not)
-with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
-If provided, batch mode reads:
-file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv")).}
+with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{output_dir}{Root directory containing per-comparison folders (batch mode).}
 
@@ -75,12 +72,14 @@ file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv"
 
 \item{top_n}{Integer; number of rows for plot (default 20).}
 
-\item{drop_rows_without_term}{Logical; if TRUE (default), rows with no IPR term are
-removed from BOTH positives and background (annotation-aware universe).}
+\item{drop_rows_without_term}{Logical; if TRUE (default), rows with no retained IPR term
+(after filtering by type/exclusions) are removed from the enrichment universe (both
+positives and background) for that side. When stratify_by_type=TRUE, this filtering
+is applied independently within each ENTRY_TYPE analysis.}
 
-\item{min_total}{Minimum total occurrences (pos+nonpos) required for a term (default 0).}
+\item{min_total}{Minimum total occurrences (pos+nonpos) required for a term (default 2).}
 
-\item{min_pos}{Minimum positive occurrences required for a term (default 0).}
+\item{min_pos}{Minimum positive occurrences required for a term (default 2).}
 
 \item{max_prop}{Maximum allowed proportion of the background annotated set
 that may be assigned to a term (default 0.20). Terms with
@@ -89,7 +88,7 @@ are filtered out to avoid overly broad terms dominating enrichment.}
 
 \item{fdr_method}{One of "BH","BY","IHW","qvalue","none". Defaults to "BH".}
 
-\item{alpha}{FDR level for IHW weighting (default 0.05).}
+\item{alpha}{FDR level for IHW weighting (default 0.05). Ignored unless fdr_method="IHW".}
 
 \item{term_sep}{Separator used in q_ipr/s_ipr strings (default ";").}
 
@@ -97,12 +96,16 @@ are filtered out to avoid overly broad terms dominating enrichment.}
 in pooled mode (e.g., c("Domain","Homologous_superfamily")). Ignored if stratified.}
 
 \item{stratify_by_type}{Logical. If TRUE, run separate analyses per ENTRY_TYPE with
-type-specific backgrounds (recommended). Default FALSE.}
+type-specific backgrounds (recommended). Default TRUE.
+Note: method="parent_child" is currently implemented only when stratify_by_type=TRUE.}
 
 \item{types}{Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 = infer from data present in q_ipr/s_ipr (after exclusions).}
 
-\item{adjust_scope}{When stratified, "global" (one BH across all tests) or "per_type".}
+\item{adjust_scope}{When stratified, "per_type" (adjust within each ENTRY_TYPE; default)
+or "global" (adjust once across all ENTRY_TYPE results for a given comparison+side).
+Note: method="parent_child" always uses per-type adjustment because the elim/claim
+procedure depends on within-type adjusted p-values.}
 
 \item{entries_source}{Where to load InterPro entries from:
 "auto" (bundled static; default), "local" (use entries_path),
@@ -111,11 +114,14 @@ type-specific backgrounds (recommended). Default FALSE.}
 \item{entries_path}{Optional path to a TSV copy of InterPro entry.list
 (columns: ENTRY_AC, ENTRY_TYPE, ENTRY_NAME). Used for "auto"/"local".}
 
-\item{entries_url}{Remote URL for current InterPro entry.list (default EBI).}
+\item{entries_url}{Remote URL for current InterPro entry.list.
+If NULL (default), uses the EMBL-EBI current release endpoint.}
 
 \item{entries_timeout_s}{Numeric timeout (seconds) for remote fetch (default 20).}
 
-\item{keep_unmatched}{Keep IPRs not found in entry.list when filtering (default TRUE).}
+\item{keep_unmatched}{Keep IPRs not found in entry.list when filtering (default TRUE).
+Note: if keep_unmatched=FALSE and drop_rows_without_term=TRUE, rows whose only terms
+are unmatched may be removed from the enrichment universe.}
 
 \item{exclude_ids}{Character vector of IPR accessions (e.g. "IPR000123") to exclude
 globally from both positives and background before enrichment. Preferred name.}
@@ -133,40 +139,111 @@ globally from both positives and background before enrichment. Preferred name.}
 \item{exclude_descendants_limit}{Hard cap on the number of excluded IPRs to avoid
 accidental mass exclusion (default 5000).}
 
-\item{method}{Enrichment mode: "fisher" (default), "parent_child" (elim-like), "weight01".}
+\item{method}{Enrichment mode: "fisher" (default) or "parent_child" (elim-like).}
 
-\item{ancestor_novel_frac}{Keep parent only if >= this fraction of unclaimed genes (default 0.20).}
+\item{ancestor_novel_frac}{Keep parent only if >= this fraction of unclaimed genes
+(default 0.20).}
+
+\item{parent_child_alpha}{Significance cutoff used by method="parent_child" for
+claiming/elim logic and novelty filtering (default = alpha).}
 
 \item{x_axis_min, x_axis_max}{Optional fixed x-axis limits for plots.}
-
-\item{x_axis_pad_right}{Numeric. Extra units to extend the x-axis beyond the
-maximum observed enrichment when x_axis_max is not set (default 3).}
 
 \item{interpro_release}{Optional string (e.g. "94.0") to pin archived InterPro release.}
 
 \item{auto_detect_release}{Logical; auto-pick best archived release by IPR coverage (default TRUE).}
 
-\item{release_candidates}{Character vector of releases to test (default c("92.0","94.0","96.0","98.0","100.0")).}
-
 \item{strict_coverage}{Numeric in \eqn{[0,1]}; fail if best coverage < this (default 0.90).}
 
-\item{tree_source}{Where to load ParentChildTree from: "auto","local","remote","none".}
+\item{tree_source}{Where to load ParentChildTree from: "auto","local","remote","none".
+If "none", hierarchy features are disabled and term_trees/tree_path/tree_url are ignored.}
 
 \item{tree_path}{Optional local ParentChildTreeFile.txt or 2-col TSV edgelist.}
 
-\item{tree_url}{Optional explicit URL to ParentChildTree (raw txt or TSV).}
+\item{tree_url}{Optional explicit URL to the InterPro ParentChildTree file.
+If NULL (default), uses the EMBL-EBI current release endpoint.}
 
-\item{tree_timeout_s}{Numeric timeout (seconds) for tree fetch (default 20).}
+\item{tree_timeout_s}{Numeric timeout (seconds) for tree fetch (default 120).}
+
+\item{threads}{Integer; maximum number of parallel workers (forked processes; default 4).
+In batch mode, workers are applied across (comparison, side) jobs.
+On Windows, runs sequentially (no forking).}
 }
 \value{
 In single mode: (invisibly) list of output TSV paths.
-In batch mode:  (invisibly) vector of output TSV paths across comparisons.
-Each TSV includes: IPR, ENTRY_TYPE, ENTRY_NAME, pos_count, nonpos_count,
-pos_total, nonpos_total, odds_ratio, p_value, p_adj, total_count, enrichment,
-label, side, comparison.
+In batch mode: (invisibly) vector of output TSV paths across comparisons.
+Each TSV includes enrichment statistics plus InterPro metadata columns:
+IPR, ENTRY_TYPE, ENTRY_NAME, label, side, comparison.
 }
 \description{
-Reads \if{html}{\out{<comp>}}/\if{html}{\out{<comp>}}_dnds_annot.tsv and tests enrichment of IPR terms (q_ipr / s_ipr)
-among positively selected pairs (dNdS > pos_threshold) vs the filtered background.
-Adds InterPro metadata (ENTRY_TYPE/ENTRY_NAME) and supports pooled vs per-type analyses.
+Reads either dnds_annot.tsv (single) or comparison_file (batch) and tests enrichment
+of IPR terms (q_ipr / s_ipr) among positively selected pairs (dNdS > pos_threshold)
+vs the filtered background and plots enrichment.
 }
+\details{
+Default InterPro resources (EMBL-EBI):
+\itemize{
+\item Entry list:
+\url{https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/entry.list}
+\item Parent–child tree:
+\url{https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt}
+}
+}
+\section{Input and execution modes}{
+
+\itemize{
+\item Single mode: provide \code{dnds_annot_file}.
+\item Batch mode: provide \code{comparison_file}; per-comparison inputs are read from
+\code{file.path(output_dir, comparison_name, "<comparison>_dnds_annot.tsv")}.
+}
+}
+
+\section{Defining positives and the enrichment universe}{
+
+\itemize{
+\item Positives are rows with dNdS > pos_threshold.
+\item Background is the filtered set after applying dNdS limits and optional expressions.
+}
+}
+
+\section{Term frequency and multiple-testing filters}{
+
+\itemize{
+\item Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
+}
+}
+
+\section{Multiple testing adjustment}{
+
+Controls how p-values are adjusted after testing, including optional weighting methods.
+}
+
+\section{InterPro term parsing and stratification}{
+
+Defines how IPR accessions are split from q_ipr/s_ipr and whether results are pooled
+or analyzed separately by InterPro ENTRY_TYPE.
+}
+
+\section{InterPro metadata and release handling}{
+
+Options for attaching InterPro names/types from entry.list and (optionally) selecting
+or pinning an InterPro release for better term coverage.
+}
+
+\section{Excluding terms and hierarchy expansion}{
+
+Configure global exclusions and (optionally) expand exclusions over descendants using
+an InterPro parent-child tree.
+}
+
+\section{Hierarchy-aware enrichment modes}{
+
+Select alternative enrichment strategies that attempt to account for term hierarchy
+(e.g., parent-child style filtering).
+}
+
+\section{Plotting}{
+
+Controls writing per-result plots (top-N bubble plots) and plot axis behavior.
+}
+

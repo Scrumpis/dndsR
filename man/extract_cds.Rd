@@ -12,7 +12,8 @@ extract_cds(
   subject_gff = NULL,
   output_dir = ".",
   overwrite = FALSE,
-  verbose = TRUE,
+  verbose = FALSE,
+  threads = 1,
   comparison_file = NULL,
   group_by = c("gene", "tx"),
   export_proteins = FALSE,
@@ -35,9 +36,13 @@ extract_cds(
 
 \item{output_dir}{Output directory; one subdir per comparison.}
 
-\item{overwrite}{Overwrite existing outputs if TRUE.}
+\item{overwrite}{Overwrite existing outputs if TRUE (default FALSE).}
 
-\item{verbose}{Print progress messages if TRUE.}
+\item{verbose}{Print progress messages if TRUE (default FALSE).}
+
+\item{threads}{Integer; maximum number of parallel workers (forked processes; default 1).
+In batch mode, workers are applied across unique genome extraction tasks.
+On Windows, runs sequentially (no forking).}
 
 \item{comparison_file}{Optional comparison table path or data.frame.}
 
@@ -67,4 +72,6 @@ In batch mode, reads a whitespace-delimited comparison file (tabs/spaces) with e
 \item or headerless with the above in the first 5 columns
 }
 Subject inputs may be left blank/NA to run query-only extraction.
+
+TxDb genome build metadata is not required for CDS extraction and is intentionally ignored.
 }
