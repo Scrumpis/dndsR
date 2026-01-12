@@ -167,6 +167,7 @@ dndsr regional_dnds_contrasts \
 - Add parallelization to term_enrichment and dnds_ideogram
 - Cleanup documentation
 - Extract recycled helpers into their own scripts
+- dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
