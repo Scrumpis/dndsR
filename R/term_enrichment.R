@@ -154,10 +154,28 @@ term_enrichment <- function(dnds_annot_file = NULL,
 
   .apply_filter <- function(d) {
     keep <- !is.na(d$dNdS) & (d$dNdS < max_dnds)
+  
     if (!is.null(filter_expr) && nzchar(filter_expr)) {
       ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-      if (!inherits(ok, "try-error")) keep <- keep & isTRUE(as.vector(ok))
+  
+      if (inherits(ok, "try-error")) {
+        warning("[term_enrichment] filter_expr failed to evaluate; ignoring it.", call. = FALSE)
+      } else {
+        ok <- as.logical(ok)
+  
+        # allow scalar TRUE/FALSE to apply to all rows
+        if (length(ok) == 1L) {
+          ok <- rep(ok, nrow(d))
+        }
+  
+        if (length(ok) != nrow(d)) {
+          warning("[term_enrichment] filter_expr did not return length 1 or nrow(d); ignoring it.", call. = FALSE)
+        } else {
+          keep <- keep & ok
+        }
+      }
     }
+  
     d[keep, , drop = FALSE]
   }
 
@@ -173,7 +191,8 @@ term_enrichment <- function(dnds_annot_file = NULL,
   .split_unique <- function(s, sep) {
     s <- as.character(s)[1]
     if (is.na(s) || !nzchar(s)) return(character(0))
-    unique(strsplit(s, sep, fixed = TRUE)[[1]])
+    parts <- trimws(strsplit(s, sep, fixed = TRUE)[[1]])
+    unique(parts[nzchar(parts)])
   }
 
   .count_terms <- function(v, sep) {
@@ -354,7 +373,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       b <- n_pos - a
       d <- n_bg  - c
 
-      ft <- try(stats::fisher.test(matrix(c(a,b,c,d), nrow = 2), alternative = "greater"), silent = TRUE)
+      ft <- try(stats::fisher.test(matrix(c(a,c,b,d), nrow = 2), alternative = "greater"), silent = TRUE)
 
       data.frame(
         term = tt,
