@@ -116,7 +116,7 @@ dndsr go_enrichment -c comparison_file.txt -t 8
 #### General term enrichment:
 Fisher's Exact Test and multiple testing correction. Tests non-IPR and non-GO terms like KEGG, PANTHER, etc. Optionally receives a custom pattern of interest to test for enrichment. 
 ```
-dndsr term_enrichment -c comparison_file.txt
+dndsr term_enrichment -c comparison_file.txt -t 8
 ```
 ### 6. Selection pressure ideogram
 Custom [RIdeogram](https://cran.r-project.org/web/packages/RIdeogram/) visualization of dN/dS binned values accross a genome in an ideogram.
