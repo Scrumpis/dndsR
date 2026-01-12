@@ -154,20 +154,20 @@ term_enrichment <- function(dnds_annot_file = NULL,
 
   .apply_filter <- function(d) {
     keep <- !is.na(d$dNdS) & (d$dNdS < max_dnds)
-  
+
     if (!is.null(filter_expr) && nzchar(filter_expr)) {
       ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-  
+
       if (inherits(ok, "try-error")) {
         warning("[term_enrichment] filter_expr failed to evaluate; ignoring it.", call. = FALSE)
       } else {
         ok <- as.logical(ok)
-  
+
         # allow scalar TRUE/FALSE to apply to all rows
         if (length(ok) == 1L) {
           ok <- rep(ok, nrow(d))
         }
-  
+
         if (length(ok) != nrow(d)) {
           warning("[term_enrichment] filter_expr did not return length 1 or nrow(d); ignoring it.", call. = FALSE)
         } else {
@@ -175,7 +175,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
         }
       }
     }
-  
+
     d[keep, , drop = FALSE]
   }
 
@@ -424,49 +424,10 @@ term_enrichment <- function(dnds_annot_file = NULL,
     )
   }
 
-  .bundled_arial_path <- function() {
-    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
-    if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
-    ttf
-  }
-
-  .setup_showtext <- function() {
-    ttf <- .bundled_arial_path()
-    if (is.null(ttf)) return(NULL)
-
-    if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
-    if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
-
-    ok <- try({
-      sysfonts::font_add(family = "Arial Bold", regular = ttf)
-      showtext::showtext_auto(TRUE)
-      TRUE
-    }, silent = TRUE)
-
-    if (isTRUE(ok)) "Arial Bold" else NULL
-  }
-
-  .register_svglite_mapping <- function() {
-    if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
-    ttf <- .bundled_arial_path()
-    if (is.null(ttf)) return(NULL)
-
-    function(file, ...) svglite::svglite(
-      file,
-      user_fonts = list(`Arial Bold` = ttf),
-      ...
-    )
-  }
-
-  .pick_sans_family <- function() {
-    fam <- .setup_showtext()
-    if (!is.null(fam)) return(fam)
-    "sans"
-  }
+  # ---------- font & SVG device (simpler; bold by default; no bundled fonts) ----------
+  .pick_sans_family <- function() "sans"
 
   .svg_device <- function() {
-    dev_map <- .register_svglite_mapping()
-    if (!is.null(dev_map)) return(dev_map)
     if (requireNamespace("svglite", quietly = TRUE)) return(function(file, ...) svglite::svglite(file, ...))
     NULL
   }
@@ -520,7 +481,10 @@ term_enrichment <- function(dnds_annot_file = NULL,
         y = ylab,
         size = "# pos"
       ) +
-      ggplot2::theme_minimal(base_size = 12, base_family = base_family)
+      ggplot2::theme_minimal(base_size = 12, base_family = base_family) +
+      ggplot2::theme(
+        text = ggplot2::element_text(face = "bold")
+      )
 
     if (!is.null(cut_y)) {
       gg <- gg +
