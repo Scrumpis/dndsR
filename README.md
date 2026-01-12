@@ -168,6 +168,7 @@ dndsr regional_dnds_contrasts \
 - Cleanup documentation
 - Extract recycled helpers into their own scripts
 - dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing
+- go_enrichment - topN.svg -> top$N.svg output file naming
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
