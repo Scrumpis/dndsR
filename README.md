@@ -2,6 +2,10 @@
 
 ***Pre-release. Still performing tests before publication. Use at your own risk.***  
   
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+  
 An R package for scalable calculation and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairs of genomes. For single or multiple pairwise comparisons of genomes, dndsR...
 - Extracts CDS or proteins using input genome FASTAs and gene annotation GFF3s
 - Calculates dN/dS
