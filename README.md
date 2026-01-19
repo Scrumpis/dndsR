@@ -17,7 +17,7 @@ dndsR is primarily built for containerized command line usage but is also a load
 
 ### Table of Contents
 * [Setup](#setup)
-* [Command-Line Interface (CLI) Usage](#command-/-line-interface-(cli)-usage)
+* [Command-Line Interface (CLI) Usage](#command-line-interface-(cli)-usage)
 * [Contributing](#contributing)
 
 ## Setup
@@ -65,7 +65,7 @@ git pull
 dndsr
 ```
 
-## Command-Line Interface (CLI) Usage
+## Command Line Interface (CLI) Usage
 _**Recommended for large-scale analysis**_  
   
 All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3".
