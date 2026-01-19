@@ -21,30 +21,32 @@ dndsR is primarily built for containerized command line usage but is also a load
 * [Contributing](#contributing)
 
 ## Setup
-Containerzied command-line interface (CLI) usage with Docker or Singularity is recommended, however, if Orthofinder 2.5.4, Diamond 2.1.14, and R dependencies are present on your system, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage. The Docker image includes a patched ```orthologr``` version which calls the updated ```pwalign::``` commands instead of the deprecated ```pairwiseAlignment::```, which is required by ```dndsR``` to calcualte dN/dS. 
+Containerized command-line interface (CLI) usage with Docker or Singularity is recommended (follow instructions starting at Clone Repo), however, if the below are present
 
-### Clone the Repo
+```Orthofinder 2.5.4```, ```Diamond 2.1.14```, and R dependencies are present on your system, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage. The Docker image includes a patched ```orthologr``` version which calls the updated ```pwalign::``` commands instead of the deprecated ```pairwiseAlignment::```, which is required by ```dndsR``` to calcualte dN/dS. 
+
+### Clone Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
 cd dndsR
 ```
-### Pull the Image
-Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr) using either Apptainer/Singularity or Docker.  
+### Pull Docker Image
+Pull the Docker image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr) using either Singularity/Apptainer or Docker. Replace ```singularity``` with ```apptainer``` if needed in the below commands.  
 
-Singularity
+Singularity/Apptainer:
 ```
 singularity pull dndsr.sif docker://scrumpis/dndsr:latest
 ```
-Docker
+Docker:
 ```
 docker pull scrumpis/dndsr:latest
 ```
 ### Install
-Singularity (can call Apptainer too):
+Singularity/Apptainer:
 ```
 tools/dndsr-install install --engine singularity --sif dndsr.sif
 ```
-Docker (on Mac):
+Docker (example using Mac):
 ```
 tools/dndsr-install install --engine docker --image scrumpis/dndsr:latest --docker-platform linux/amd64
 ```
@@ -58,7 +60,7 @@ zsh (macOS default):
 source ~/.zshrc
 ```
 ### Update (if needed)
-Used to update to current repo version if using older version.  
+Used to update to current repo version if using an older version.  
 While in the dndsR cloned repo:
 ```
 git pull
@@ -68,7 +70,7 @@ dndsr
 ## Usage
 _**Command-line interface (CLI) usage recommended for large-scale analysis. See dndsR_usage_vignette.Rmd for R usage.**_  
   
-The below documents a typical CLI workflow with dndsR. All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3".
+The below documents a typical CLI workflow with dndsR. All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a headerless space or tab separated text file (comparison_file) containing: ```comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3"```, with a row for each pairwise comparison being made.
 ### Sample comparison_file
 ```
 Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
@@ -181,6 +183,8 @@ dndsr regional_dnds_contrasts \
 - dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization, add multi-pattern removal for chr labels
 - go_enrichment - topN.svg -> top$N.svg output file naming
 - term_enrichment - fix font
+- All term enrichment - add note to documentation  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
+- Rvignette - add note  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
