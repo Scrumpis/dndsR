@@ -7,7 +7,7 @@
   
 **dndsR** is a containerized R package for scalable calculation and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairwise genome comparisons.  
   
-Using genome FASTA and gene annotation GFF3 files, **dndsR** provides end-to-end functionality to:
+Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-to-end functionality to:
 - Extract coding sequences (CDS) or proteins
 - Calculate dN/dS
 - Visualize selection pressures across the genomes through ideograms
