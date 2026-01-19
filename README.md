@@ -15,6 +15,12 @@ An R package for scalable calculation and analysis of the ratio of non-synonymou
   
 dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
+### Table of Contents
+* [Setup](#setup)
+* [Command-Line Interface (CLI)/Terminal Usage](#usage)
+* [Contributing](#contributing)
+* [License](#license)
+
 ## Setup
 CLI usage with Docker or Singularity is recommended, however, if Orthofinder 2.5.4, Diamond 2.1.14, and R dependencies are present on your system, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage. The Docker image includes a patched ```orthologr``` version which calls the updated ```pwalign::``` commands instead of the deprecated ```pairwiseAlignment::```, which is required by ```dndsR``` to calcualte dNdS. 
 
@@ -69,9 +75,8 @@ All functions will produce outputs for both the query and subject of a compariso
 Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
 ```
-_**Use** ```dndsr --help``` **or** ```dndsr <function> --help``` **for more information on any commands.**_
 
-## Notes
+### Usage notes
 - Can use special characters or spaces in path if double-quoted in the comparison_file
 - All flags are called with ```--```
 - ```-``` or ```_``` are recognized flag separators (```--min_pos``` and ```--min-pos``` both work)
@@ -83,6 +88,8 @@ _**Use** ```dndsr --help``` **or** ```dndsr <function> --help``` **for more info
   - ```-w``` = ```--warnings``` Prints R warnings: off|summary|all (default: off).
 - If warnings are not being logged while multi-threading, try single-threading to debug.
 - All functionality from called packages like orthologr can be called even if not specified in docs.
+- If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
+- Use ```dndsr --help``` or ```dndsr <function> --help``` for more information on usage.
 
 ### 1. split_comparisons.R (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
