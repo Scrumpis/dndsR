@@ -5,7 +5,7 @@
 [![R-CMD-check](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
   
-**dndsR** is a containerized R package for scalable calculation and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairwise genome comparisons.  
+**dndsR** is a containerized R package for scalable calculation and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairwise genome comparisons. The dN/dS ratio is commonly used to determine whether genes are conserved by selection (dN/dS < 1), diverging (dN/dS > 1), or evolving neutrally (dN/dS ~ 1).
   
 Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-to-end functionality to:
 - Extract coding sequences (CDS) or proteins
