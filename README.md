@@ -21,9 +21,10 @@ dndsR is primarily built for containerized command line usage but is also a load
 * [Contributing](#contributing)
 
 ## Setup
-Containerized command-line interface (CLI) usage with Docker or Singularity is recommended (follow instructions starting at Clone Repo), however, if the below are present
-
-```Orthofinder 2.5.4```, ```Diamond 2.1.14```, and R dependencies are present on your system, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage. The Docker image includes a patched ```orthologr``` version which calls the updated ```pwalign::``` commands instead of the deprecated ```pairwiseAlignment::```, which is required by ```dndsR``` to calcualte dN/dS. 
+**Containerized command-line interface (CLI) usage** with Docker or Singularity is recommended (**follow instructions starting at Clone Repo**), however, if the below are present locally, dndsR can be used directly in R (see dndsR_usage_vignette.Rmd).
+- ```Orthofinder 2.5.4```
+- ```Diamond 2.1.14```
+- Patched ```orthologr``` version which calls ```pwalign::``` commands, not deprecated ```pairwiseAlignment::``` (required to calcualte dN/dS; included in Docker image)
 
 ### Clone Repo
 ```
