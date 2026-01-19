@@ -95,12 +95,12 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 - Use ```dndsr --help``` or ```dndsr <function> --help``` for more information on usage.
 
 ### 1. Split by subgenome or haplotype (optional)
-Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
+Separates subgenomes, haplotypes, or other chromosome/scaffold naming patterns patterns into their own FASTA and GFF3 files and generates a new ```comparison_file``` corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
 dndsr split_comparisons -c comparison_file.txt
 ```
 ### 2. Extract CDS or proteins
-Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff files for each species of each comparison in comparison_file.
+Extracts CDS or proteins into new FASTA files using the input genome.fasta and genome.gff files for each species of each comparison in comparison_file.
 ```
 dndsr extract_cds -c comparison_file.txt -t 8
 ```
