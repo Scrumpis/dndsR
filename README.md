@@ -1,5 +1,4 @@
 # dndsR
-## About
 ***Pre-release. Still performing tests before publication. Use at your own risk.***  
   
 <!-- badges: start -->
@@ -15,8 +14,7 @@ An R package for scalable calculation and analysis of the ratio of non-synonymou
   
 dndsR is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
-### Table of Contents
-* [About](#about)
+## Table of Contents
 * [Setup](#setup)
 * [Usage](#usage)
 * [Contributing](#contributing)
