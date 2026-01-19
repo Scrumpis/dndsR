@@ -17,9 +17,8 @@ dndsR is primarily built for containerized command line usage but is also a load
 
 ### Table of Contents
 * [Setup](#setup)
-* [Command-Line Interface (CLI)/Terminal Usage](#usage)
+* [Command-Line Interface (CLI) Usage](#Command-Line Interface (CLI) Usage)
 * [Contributing](#contributing)
-* [License](#license)
 
 ## Setup
 CLI usage with Docker or Singularity is recommended, however, if Orthofinder 2.5.4, Diamond 2.1.14, and R dependencies are present on your system, you can use the library directly in RStudio or similar. See Dockerfile for dependencies and dndsR-test-vignette.Rmd (under development) for usage. The Docker image includes a patched ```orthologr``` version which calls the updated ```pwalign::``` commands instead of the deprecated ```pairwiseAlignment::```, which is required by ```dndsR``` to calcualte dNdS. 
@@ -66,7 +65,7 @@ git pull
 dndsr
 ```
 
-## Command-Line Interface (CLI)/Terminal Usage
+## Command-Line Interface (CLI) Usage
 _**Recommended for large-scale analysis**_  
   
 All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3".
