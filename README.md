@@ -17,7 +17,7 @@ dndsR is primarily built for containerized command line usage but is also a load
 
 ### Table of Contents
 * [Setup](#setup)
-* [Command-Line Interface Usage](#command-line interface usage)
+* [Command Line Interface (CLI) Usage](#command-line-interface-(cli)-usage)
 * [Contributing](#contributing)
 
 ## Setup
@@ -65,7 +65,7 @@ git pull
 dndsr
 ```
 
-## Command-Line Interface Usage
+## Command-Line Interface (CLI) Usage
 _**Recommended for large-scale analysis**_  
   
 All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3".
@@ -90,12 +90,12 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 - If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
 - Use ```dndsr --help``` or ```dndsr <function> --help``` for more information on usage.
 
-### 1. split_comparisons.R (optional)
+### 1. Split by subgenome or haplotype (optional)
 Separate subgenomes, haplotypes, or other patterns into their own fastas and gffs and generates a new comparison_file corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
 dndsr split_comparisons -c comparison_file.txt
 ```
-### 2. Extract CDS or Proteins
+### 2. Extract CDS or proteins
 Extracts CDS or proteins into a new fasta using the genome.fasta and genome.gff files for each species of each comparison in comparison_file.
 ```
 dndsr extract_cds -c comparison_file.txt -t 8
@@ -135,7 +135,7 @@ Custom [RIdeogram](https://cran.r-project.org/web/packages/RIdeogram/) visualiza
 ```
 dndsr dnds_ideogram -c comparison_file.txt
 ```
-### 7. Comparative Analysis (under development)
+### 7. Comparative analysis (under development)
 The below is for making comparisons between dN/dS outputs.
 Outputs dN/dS distributions and stats between comparisons. Requires regions.bed of interest for analysis (will update to default to regionless, whole genome analysis with regional option).
 regions.bed (seq_name, start, end, feature_name (optional)  
