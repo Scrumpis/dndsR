@@ -24,7 +24,7 @@ git clone https://github.com/Scrumpis/dndsR
 cd dndsR
 ```
 ### Pull the Image
-Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr)  
+Pull image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr) using either Apptainer/Singularity or Docker.  
 
 Singularity
 ```
