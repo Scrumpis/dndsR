@@ -69,7 +69,7 @@ All functions will produce outputs for both the query and subject of a compariso
 Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
 CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
 ```
-**Use** ```dndsr --help``` **or** ```dndsr <function> --help``` **for more information on any commands.**
+_**Use** ```dndsr --help``` **or** ```dndsr <function> --help``` **for more information on any commands.**_
 
 ## Notes
 - Can use special characters or spaces in path if double-quoted in the comparison_file
