@@ -17,7 +17,7 @@ dndsR is primarily built for containerized command line usage but is also a load
 
 ### Table of Contents
 * [Setup](#setup)
-* [Command-Line Interface Usage](#Command-Line Interface Usage)
+* [Command-Line Interface Usage](#command-line interface usage)
 * [Contributing](#contributing)
 
 ## Setup
