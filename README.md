@@ -44,11 +44,11 @@ Docker (on Mac):
 tools/dndsr-install install --engine docker --image scrumpis/dndsr:latest --docker-platform linux/amd64
 ```
 #### Make dndsR findable and allow tab completion  
-Unix:
+Bash:
 ```
-source ~/.bashrc
+bash source ~/.bashrc
 ```
-Mac:
+zsh (macOS default):
 ```
 source ~/.zshrc
 ```
