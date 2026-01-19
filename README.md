@@ -66,7 +66,7 @@ dndsr
 ```
 
 ## Usage
-_**Command-line interface (CLI) usage recommended for large-scale analysis. See dndsR_usage_vignette.Rmd for R usage**_  
+_**Command-line interface (CLI) usage recommended for large-scale analysis. See dndsR_usage_vignette.Rmd for R usage.**_  
   
 The below documents a typical CLI workflow with dndsR. All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a space or tab separated text file (comparison_file) containing: comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3".
 ### Sample comparison_file
