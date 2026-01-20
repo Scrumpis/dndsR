@@ -12,7 +12,7 @@ Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-
 - Calculate enrichment of gene functional annotation terms (InterPro (IPR), Gene Ontology (GO), etc.) under positive/diversifying selection
 - Analyze broad dN/dS patterns across whole genomes or genomic regions
   
-**dndsR** is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
+**dndsR** is primarily built for containerized command-line usage but is also a loadable R library for more advanced users.
 
 ## Table of Contents
 * [Setup](#setup)
