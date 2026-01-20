@@ -9,8 +9,8 @@ Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-
 - Extract coding sequences (CDS) or proteins
 - Calculate dN/dS
 - Visualize selection pressures across the genomes through ideograms
-- Calculate enrichment of gene functional annotation terms (InterPro (IPR), Gene Ontology (GO), etc.) under positive/diversifying selection
-- Analyze broad dN/dS patterns across whole genomes or genomic regions
+- Calculate and visualize enrichment of gene functional annotation terms (InterPro (IPR), Gene Ontology (GO), etc.) under positive/diversifying selection
+- Analyze and visualize broad dN/dS patterns across whole genomes or genomic regions
   
 **dndsR** is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
