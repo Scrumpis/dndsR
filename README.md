@@ -26,7 +26,7 @@ Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-
 - ```Orthofinder 2.5.4```
 - ```Diamond 2.1.14```
 - Patched ```orthologr``` version which calls ```pwalign::``` commands, not deprecated ```pairwiseAlignment::``` (required to calcualte dN/dS; included in Docker image)
-
+Advanced users may also execute R scripts or interactive R sessions directly within the container.
 ### Clone Repo
 ```
 git clone https://github.com/Scrumpis/dndsR
