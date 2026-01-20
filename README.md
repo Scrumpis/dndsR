@@ -3,14 +3,14 @@
 [![R-CMD-check](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
   
-**dndsR** is a containerized R package for scalable calculation and analysis of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairwise genome comparisons. The dN/dS ratio is commonly used to determine whether genes are conserved by selection (dN/dS < 1), diverging (dN/dS > 1), or evolving neutrally (dN/dS ~ 1).
+**dndsR** is a containerized R package for scalable calculation, analysis, and publication-ready visualization of the ratio of non-synonymous (dN) to synonymous (dS) substitutions (dN/dS) between orthologous genes in pairwise genome comparisons. The dN/dS ratio is commonly used to determine whether genes are conserved by selection (dN/dS < 1), diverging (dN/dS > 1), or evolving neutrally (dN/dS ~ 1).
   
 Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-to-end functionality to:
 - Extract coding sequences (CDS) or proteins
 - Calculate dN/dS
-- Visualize selection pressures across the genomes through ideograms
-- Calculate and visualize enrichment of gene functional annotation terms (InterPro (IPR), Gene Ontology (GO), etc.) under positive/diversifying selection
-- Analyze and visualize broad dN/dS patterns across whole genomes or genomic regions
+- Summarize selection pressures across genomes through ideograms
+- Calculate enrichment of gene functional annotation terms (InterPro (IPR), Gene Ontology (GO), etc.) under positive/diversifying selection
+- Analyze broad dN/dS patterns across whole genomes or genomic regions
   
 **dndsR** is primarily built for containerized command line usage but is also a loadable R library for more advanced users.
 
