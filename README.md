@@ -1,6 +1,4 @@
 # dndsR
-***Pre-release. Still performing tests before publication. Use at your own risk.***  
-  
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
