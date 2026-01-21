@@ -50,7 +50,7 @@ Docker (example using Mac):
 ```
 tools/dndsr-install install --engine docker --image scrumpis/dndsr:latest --docker-platform linux/amd64
 ```
-#### Make dndsR findable and allow tab completion  
+### Make dndsR findable and allow tab completion  
 Bash:
 ```
 bash source ~/.bashrc
