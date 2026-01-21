@@ -27,6 +27,7 @@ append_parallel_checklist <- function(e, threads, step_name = "this step") {
     "Notes:",
     "- 'connection lost' / 'error reading from connection' often means a parallel worker died (commonly out-of-memory (OOM)).",
     "- Reducing threads often solves this issue"
+    "If still getting connection lost, check input file paths (UPDATE)"
   )
 
   stop(paste(c(base, checklist), collapse = "\n"), call. = FALSE)
