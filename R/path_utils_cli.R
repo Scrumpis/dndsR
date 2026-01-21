@@ -1,5 +1,5 @@
 #' @keywords internal
-# Rlibrary/R/path_utils_cli.R
+# R/path_utils_cli.R
 # CLI helper to resolve R script paths
 
 # Try to get the path of the running Rscript file (when invoked as: Rscript /path/to/cli_main.R ...)
