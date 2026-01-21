@@ -180,6 +180,7 @@ dndsr regional_dnds_contrasts \
 - Ensure docker image contains all dependencies of all optional functions
 - Cleanup documentation
 - Extract recycled helpers into their own scripts
+- extract_cds - if fasta or gff input paths are not being parsed while multi-threading, logs do not indicate that. Logs print as if run was fine. But in single-thread mode it states files not found.
 - dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization, add multi-pattern removal for chr labels
 - go_enrichment - topN.svg -> top$N.svg output file naming
 - term_enrichment - fix font
