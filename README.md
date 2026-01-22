@@ -93,7 +93,7 @@ CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/Calb
 - Use ```dndsr --help``` or ```dndsr <function> --help``` for more information on usage.
 
 ### 1. Split by subgenome or haplotype (optional)
-Separates subgenomes, haplotypes, or other chromosome/scaffold naming patterns patterns into their own FASTA and GFF3 files and generates a new ```comparison_file``` corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
+Separates subgenomes, haplotypes, or other chromosome/scaffold naming patterns into their own FASTA and GFF3 files and generates a new ```comparison_file``` corresponding to the splits. Generally recommended for polyploid comparisons so best matches occur between the same subgenome. [SubPhaser](https://github.com/zhangrengang/SubPhaser?tab=readme-ov-file) can be used to phase allopolyploids lacking diploid progenitor genomes.
 ```
 dndsr split_comparisons -c comparison_file.txt
 ```
