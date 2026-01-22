@@ -186,6 +186,7 @@ dndsr regional_dnds_contrasts \
 - term_enrichment - fix font
 - All term enrichment - add note to documentation  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
 - Rvignette - add note  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
+- Remove warnings flag and just auto-expand warnings always.
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
