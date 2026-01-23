@@ -32,7 +32,7 @@ cd dndsR
 ```
 ### Pull Docker Image
 Pull the Docker image from [DockerHub](https://hub.docker.com/r/scrumpis/dndsr) using either Singularity/Apptainer or Docker. Replace ```singularity``` with ```apptainer``` if needed in the below commands.  
-Performance note: The dndsR Docker image is built for ```linux/amd64```. Apple-silicon (M-series) Macs will run the image under emulation, which may be significantly slower for large genomes. For production-scale analyses, Linux-based HPC usage is strongly recommended.  
+**Performance note:** The dndsR Docker image is built for ```linux/amd64```. Apple-silicon (M-series) Macs will run the image under emulation, which may be significantly slower for large genomes. For production-scale analyses, Linux-based HPC usage is strongly recommended.  
   
 Singularity/Apptainer:
 ```
