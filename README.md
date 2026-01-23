@@ -72,9 +72,10 @@ _**Command-line interface (CLI) usage recommended for large-scale analysis. See 
   
 The below documents a typical CLI workflow with dndsR. All functions will produce outputs for both the query and subject of a comparison by default. All commands allow single or batch comparisons. Batch mode takes as input a headerless space or tab separated text file (comparison_file) containing: ```comparison_basename, "query_fasta", "query_gff3", "subject_fasta", "subject_gff3"```, with a row for each pairwise comparison being made.
 ### Sample comparison_file
+_**Use relative paths from ```output_dir``` for Docker**_
 ```
-Cform_v_Calbum "/path_to/Cformosanum.fasta" "/path_to/Cformosanum.gff" "/path_to/Calbum.fasta" "/path_to/Calbum.gff"
-CalbumB_v_CalbumC "/path_to/CalbumB.fasta" "/path_to/CalbumB.gff" "/path_to/CalbumC.fasta" "/path_to/CalbumC.gff"
+Cform_v_Calbum ./path_to/Cformosanum.fasta ./path_to/Cformosanum.gff ./path_to/Calbum.fasta ./path_to/Calbum.gff
+CalbumB_v_CalbumC ./path_to/CalbumB.fasta ./path_to/CalbumB.gff ./path_to/CalbumC.fasta ./path_to/CalbumC.gff
 ```
 
 ### Usage notes
