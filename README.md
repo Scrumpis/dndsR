@@ -10,6 +10,9 @@ Using genome FASTA and gene annotation GFF3 input files, **dndsR** provides end-
 - Calculate dN/dS
 - Summarize selection pressures across genomes through ideograms
 - Calculate enrichment of gene functional annotation terms (InterPro (IPR), Gene Ontology (GO), etc.) under positive/diversifying selection
+- Summarize dN/dS distributions and stats across the whole genome or genomic regions
+- Test regional enrichment of dN/dS patterns
+- Contrast 
 - Analyze broad dN/dS patterns across whole genomes or genomic regions
   
 **dndsR** is primarily built for containerized command-line usage but is also a loadable R library for more advanced users.
@@ -143,7 +146,7 @@ dndsr dnds_ideogram -c comparison_file.txt
 ```
 ### 7. Comparative analysis (under development)
 The below is for making comparisons between dN/dS outputs.
-Outputs dN/dS distributions and stats between comparisons. Requires regions.bed of interest for analysis (will update to default to regionless, whole genome analysis with regional option).
+Outputs dN/dS distributions and stats between comparisons. Optionally takes as input regions.bed of interest for analysis.
 regions.bed (seq_name, start, end, feature_name (optional)  
 Example:
 ```
