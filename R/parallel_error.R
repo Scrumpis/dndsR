@@ -6,7 +6,7 @@
 #'
 #' @keywords internal
 #' @noRd
-
+# Not implemented currently
 append_parallel_checklist <- function(e, threads, step_name = "this step") {
   base <- conditionMessage(e)
 
