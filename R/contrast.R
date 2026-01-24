@@ -1,4 +1,4 @@
-# dnds_contrasts.R
+# contrast.R
 # (updated: global-by-default; optional regional restriction via regions_bed)
 
 # -----------------------------
@@ -319,7 +319,7 @@
 #'
 #' @return Invisibly, a character vector of summary TSV paths (one per contrast x side_tag).
 #' @export
-dnds_contrasts <- function(dnds_annot_file_a = NULL,
+contrast <- function(dnds_annot_file_a = NULL,
                            dnds_annot_file_b = NULL,
                            comparison_file   = NULL,
                            contrast_file     = NULL,
@@ -693,7 +693,7 @@ dnds_contrasts <- function(dnds_annot_file_a = NULL,
     comps      <- .read_comparisons(comparison_file)
     comp_names <- comps$comparison_name
 
-    contrast_dir <- file.path(output_dir, "dnds_contrasts")
+    contrast_dir <- file.path(output_dir, "contrast")
     dir.create(contrast_dir, showWarnings = FALSE, recursive = TRUE)
 
     if (!is.null(contrast_file)) {
