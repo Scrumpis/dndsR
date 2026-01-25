@@ -76,9 +76,18 @@
   keep <- !is.na(d[[dnds_col]]) & is.finite(d[[dnds_col]]) & d[[dnds_col]] < max_dnds
 
   if (!is.null(filter_expr) && nzchar(filter_expr)) {
-    ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-    if (!inherits(ok, "try-error")) keep <- keep & isTRUE(as.vector(ok))
+    env <- list2env(d, parent = parent.frame())
+    ok <- try(eval(parse(text = filter_expr), envir = env), silent = TRUE)
+    if (!inherits(ok, "try-error")) {
+      ok <- as.logical(ok)
+      if (length(ok) == 1L) ok <- rep(ok, nrow(d))
+      if (length(ok) != nrow(d)) {
+        stop("filter_expr must return a logical vector of length 1 or nrow(d).")
+      }
+      keep <- keep & ok
+    }
   }
+
   d[keep, , drop = FALSE]
 }
 
@@ -240,10 +249,15 @@
 
 #' Make state labels from numeric dN/dS
 #'
+#' Uses both neutral bounds:
+#' - Purifying: x < neutral_lower
+#' - Neutral:   neutral_lower <= x <= neutral_upper
+#' - Positive:  x > neutral_upper
+#'
 #' @keywords internal
 .make_states <- function(d, dnds_col, pos_threshold, neutral_lower, neutral_upper) {
   x <- d[[dnds_col]]
-  d$state <- ifelse(x > pos_threshold, "Positive",
+  d$state <- ifelse(x > neutral_upper, "Positive",
                     ifelse(x < neutral_lower, "Purifying", "Neutral"))
   d$state <- factor(d$state, levels = c("Positive","Neutral","Purifying"))
   d
@@ -264,10 +278,25 @@
 #'
 #' Expects d$y already present (0/1)
 #'
+#' Adds a guard against (quasi-)complete separation:
+#' - returns NULL if y has no variation
+#' - returns NULL if either group has only 0s or only 1s for y
+#'
 #' @keywords internal
 .fit_pair <- function(d, group_col, groupA, groupB, random_effect_col = NULL) {
   d2 <- d[d[[group_col]] %in% c(groupA, groupB), , drop = FALSE]
   if (!nrow(d2)) return(NULL)
+
+  if (!"y" %in% names(d2)) stop("Internal error: d$y is required for model fitting.")
+  d2$y <- as.integer(d2$y)
+
+  # Must have both outcomes present
+  if (length(unique(d2$y[is.finite(d2$y)])) < 2L) return(NULL)
+
+  # Separation guard: each group must have both outcomes
+  tt <- table(d2[[group_col]], d2$y)
+  if (ncol(tt) < 2L) return(NULL)
+  if (any(tt[, "0"] == 0L | tt[, "1"] == 0L)) return(NULL)
 
   d2[[group_col]] <- stats::relevel(factor(d2[[group_col]]), ref = groupB)
 
@@ -293,9 +322,9 @@
       if (inherits(coefs, "try-error") || inherits(vcovm, "try-error")) return(NULL)
 
       # pick the single non-intercept term (since only A vs B present)
-      tt <- setdiff(names(coefs), "(Intercept)")
-      if (length(tt) != 1) return(NULL)
-      term <- tt[1]
+      tt2 <- setdiff(names(coefs), "(Intercept)")
+      if (length(tt2) != 1) return(NULL)
+      term <- tt2[1]
 
       est <- unname(coefs[term])
       se  <- sqrt(diag(vcovm))[term]
@@ -316,7 +345,7 @@
 
   # GLM fallback
   form <- stats::as.formula(sprintf("y ~ %s", group_col))
-  fit  <- stats::glm(form, data = d2, family = stats::binomial(link = "logit"))
+  fit  <- suppressWarnings(stats::glm(form, data = d2, family = stats::binomial(link = "logit")))
   sm   <- summary(fit)$coefficients
 
   rn <- rownames(sm)
@@ -414,15 +443,21 @@
 #' Adds:
 #'   gene_id, side, seqname, start, end, dNdS_pair, comparison, gene_key
 #'
+#' If random_effect_col is provided and exists in the pairwise table, it is propagated
+#' onto gene rows so gene-mode mixed models can be fit.
+#'
 #' @keywords internal
-.pairwise_to_gene_rows <- function(d, comp_name, dnds_col, focal_sides = c("query","subject")) {
+.pairwise_to_gene_rows <- function(d, comp_name, dnds_col, focal_sides = c("query","subject"), random_effect_col = NULL) {
   focal_sides <- match.arg(focal_sides, choices = c("query","subject"), several.ok = TRUE)
   out <- list()
+
+  re_ok <- !is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(d)
 
   if ("query" %in% focal_sides) {
     need <- c("query_id","q_gff_seqname","q_gff_start","q_gff_end", dnds_col)
     miss <- setdiff(need, names(d))
     if (length(miss)) stop("Missing in pairwise table (query side): ", paste(miss, collapse = ", "))
+
     tmp <- data.frame(
       gene_id    = as.character(d$query_id),
       side       = "query",
@@ -433,6 +468,8 @@
       comparison = as.character(comp_name),
       stringsAsFactors = FALSE
     )
+    if (re_ok) tmp[[random_effect_col]] <- d[[random_effect_col]]
+
     tmp$gene_key <- paste(tmp$comparison, tmp$side, tmp$gene_id, sep = "|")
     out[[length(out) + 1]] <- tmp
   }
@@ -441,6 +478,7 @@
     need <- c("subject_id","s_gff_seqname","s_gff_start","s_gff_end", dnds_col)
     miss <- setdiff(need, names(d))
     if (length(miss)) stop("Missing in pairwise table (subject side): ", paste(miss, collapse = ", "))
+
     tmp <- data.frame(
       gene_id    = as.character(d$subject_id),
       side       = "subject",
@@ -451,6 +489,8 @@
       comparison = as.character(comp_name),
       stringsAsFactors = FALSE
     )
+    if (re_ok) tmp[[random_effect_col]] <- d[[random_effect_col]]
+
     tmp$gene_key <- paste(tmp$comparison, tmp$side, tmp$gene_id, sep = "|")
     out[[length(out) + 1]] <- tmp
   }
@@ -506,7 +546,7 @@
   agg <- merge(agg, n_pairs, by = c("gene_key","gene_id","group"), all.x = TRUE)
 
   # attach a random-effect column if requested and present in gene rows
-  if (!is.null(random_effect_col) && random_effect_col %in% names(g)) {
+  if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(g)) {
     re_map <- g[, c("gene_key", random_effect_col), drop = FALSE]
     re_map <- re_map[!is.na(re_map[[random_effect_col]]), , drop = FALSE]
     re_map <- re_map[!duplicated(re_map$gene_key), , drop = FALSE]
@@ -633,6 +673,11 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   group_mode <- match.arg(group_mode)
   agg_fun    <- match.arg(agg_fun)
   focal_sides <- match.arg(focal_sides, choices = c("query","subject"), several.ok = TRUE)
+
+  # sanity checks for thresholds
+  if (!is.finite(neutral_lower) || !is.finite(neutral_upper) || neutral_lower > neutral_upper) {
+    stop("Require neutral_lower <= neutral_upper (both finite).")
+  }
 
   regions <- .read_regions_bed(regions_bed,
                                region_seq_col   = region_seq_col,
@@ -795,7 +840,13 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       d <- .filter_dnds(d, dnds_col = dnds_col, filter_expr = filter_expr, max_dnds = max_dnds)
       if (!nrow(d)) next
 
-      g <- .pairwise_to_gene_rows(d, comp_name = comp_name, dnds_col = dnds_col, focal_sides = focal_sides)
+      g <- .pairwise_to_gene_rows(
+        d,
+        comp_name = comp_name,
+        dnds_col = dnds_col,
+        focal_sides = focal_sides,
+        random_effect_col = random_effect_col
+      )
       if (!nrow(g)) next
 
       # label region_status per gene row (uses the gene coords directly)
