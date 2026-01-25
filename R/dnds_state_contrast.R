@@ -86,6 +86,10 @@
 #'
 #' Returns a data.frame with columns: seqname, start, end, region_name
 #'
+#' Notes:
+#' - Tries to infer whether the file has a header. For best results, provide a header row.
+#' - Column selectors can be column names (character) or 1-based column indices (numeric).
+#'
 #' @keywords internal
 .read_regions_bed <- function(regions_bed,
                               region_seq_col   = NULL,
@@ -95,22 +99,68 @@
   if (is.null(regions_bed)) return(NULL)
   if (!file.exists(regions_bed)) stop("regions_bed not found: ", regions_bed)
 
-  reg_raw <- .read_ws(regions_bed, header_try = TRUE)
+  # Try header=TRUE first; if start/end look non-numeric, fall back to header=FALSE
+  reg1 <- try(.read_ws(regions_bed, header_try = TRUE), silent = TRUE)
+  if (inherits(reg1, "try-error")) {
+    reg_raw <- .read_ws(regions_bed, header_try = FALSE)
+    names(reg_raw) <- paste0("V", seq_len(ncol(reg_raw)))
+  } else {
+    reg_raw <- reg1
+    if (ncol(reg_raw) >= 3) {
+      s2 <- suppressWarnings(as.numeric(reg_raw[[2]]))
+      s3 <- suppressWarnings(as.numeric(reg_raw[[3]]))
+      frac_bad <- mean(is.na(s2) | is.na(s3))
+      if (!is.finite(frac_bad)) frac_bad <- 1
+      if (frac_bad > 0.5) {
+        reg_raw <- .read_ws(regions_bed, header_try = FALSE)
+        names(reg_raw) <- paste0("V", seq_len(ncol(reg_raw)))
+      }
+    }
+  }
+
   if (ncol(reg_raw) < 3) stop("regions_bed must have at least 3 columns: seqname, start, end.")
 
-  if (is.null(region_seq_col))   region_seq_col   <- names(reg_raw)[1]
-  if (is.null(region_start_col)) region_start_col <- names(reg_raw)[2]
-  if (is.null(region_end_col))   region_end_col   <- names(reg_raw)[3]
-  if (is.null(region_name_col) || !region_name_col %in% names(reg_raw)) {
-    reg_raw$region_name <- "region"
-    region_name_col <- "region_name"
+  # Resolve column selectors (character name or numeric index)
+  .col_get <- function(df, sel, default_idx) {
+    if (is.null(sel)) return(df[[default_idx]])
+    if (is.numeric(sel)) {
+      sel <- as.integer(sel[1])
+      if (sel < 1L || sel > ncol(df)) stop("regions_bed column index out of range: ", sel)
+      return(df[[sel]])
+    }
+    sel <- as.character(sel[1])
+    if (!sel %in% names(df)) stop("regions_bed column not found: ", sel)
+    df[[sel]]
+  }
+
+  seqv   <- .col_get(reg_raw, region_seq_col,   1)
+  startv <- .col_get(reg_raw, region_start_col, 2)
+  endv   <- .col_get(reg_raw, region_end_col,   3)
+
+  # region_name optional
+  if (is.null(region_name_col)) {
+    namev <- rep("region", nrow(reg_raw))
+  } else if (is.numeric(region_name_col)) {
+    idx <- as.integer(region_name_col[1])
+    if (idx < 1L || idx > ncol(reg_raw)) {
+      namev <- rep("region", nrow(reg_raw))
+    } else {
+      namev <- reg_raw[[idx]]
+    }
+  } else {
+    nm <- as.character(region_name_col[1])
+    if (!nm %in% names(reg_raw)) {
+      namev <- rep("region", nrow(reg_raw))
+    } else {
+      namev <- reg_raw[[nm]]
+    }
   }
 
   data.frame(
-    seqname     = as.character(reg_raw[[region_seq_col]]),
-    start       = as.numeric(reg_raw[[region_start_col]]),
-    end         = as.numeric(reg_raw[[region_end_col]]),
-    region_name = as.character(reg_raw[[region_name_col]]),
+    seqname     = as.character(seqv),
+    start       = as.numeric(startv),
+    end         = as.numeric(endv),
+    region_name = as.character(namev),
     stringsAsFactors = FALSE
   )
 }
@@ -485,9 +535,13 @@
 #'   - aggregate across partners per gene (median/mean),
 #'   - classify each gene into state, and fit pairwise A vs B models on gene-level observations.
 #'
+#' Region coordinates are treated as inclusive numeric intervals; ensure your `regions_bed`
+#' coordinates are consistent with the coordinate system used in your dN/dS tables.
+#'
 #' @param level One of c("pairwise","gene").
 #'
-#' @param dnds_table_file Pairwise mode single input TSV.
+#' @param dnds_table_file Pairwise mode single input TSV. In gene mode, this can also be
+#'   used as a convenience alias for a single *_dnds_annot.tsv file.
 #' @param comparison_file Batch mode comparisons file (both levels).
 #' @param output_dir Root directory for batch mode.
 #' @param in_suffix Filename within each comparison folder:
@@ -507,7 +561,14 @@
 #' @param fdr_method One of "BH","BY","none". Applied within each (state, scope).
 #'
 #' @param regions_bed Optional BED-like file. If provided, enables region scope.
-#' @param side Pairwise mode region overlap side ("query" or "subject"). (Gene mode uses coords on each gene row.)
+#' @param region_seq_col,region_start_col,region_end_col Column selectors in `regions_bed`
+#'   giving the chromosome/seqname, start, and end columns. Each selector may be a column
+#'   name (character) or 1-based column index (numeric). If NULL (default), the first three
+#'   columns of the file are used.
+#' @param region_name_col Optional column selector in `regions_bed` for labeling regions
+#'   (name or 1-based index). If NULL or not present, a constant label ("region") is used.
+#' @param side Pairwise mode region overlap side ("query" or "subject"). Ignored in gene mode
+#'   (gene mode uses the gene-row coordinates directly).
 #' @param scopes Which scopes to run: subset of c("global","region").
 #'
 #' @param make_plots If TRUE, write forest plot PDF and PNG.
@@ -519,7 +580,8 @@
 #' @param focal_sides Which genes to treat as focal observations: c("query","subject") (gene mode; default both).
 #' @param group_mode "subgenome" infers group from seqname suffix (B/C/D) or "custom".
 #' @param gene_group_col If group_mode="custom", name of column in gene rows to use as group
-#'   (rare; usually you'd keep group_mode="subgenome").
+#'   (rare; usually you'd keep group_mode="subgenome"). The column must exist in the gene-row
+#'   table prior to aggregation.
 #' @param agg_fun "median" or "mean" aggregation across partners.
 #' @param min_pairs Minimum pairwise observations per gene required before modeling.
 #' @param gene_out_dir Subdirectory (within output_dir) for gene-mode outputs in batch runs.
