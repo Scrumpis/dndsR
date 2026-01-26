@@ -1,14 +1,5 @@
 # dnds_contrast.R
-# (updated: global-by-default; optional regional restriction via regions_bed)
 #
-# Key fixes vs prior version:
-#  - Paired "positive selection enrichment" now uses McNemar (paired binary), not Fisher (independent).
-#  - Merge-key duplicates now HARD-FAIL by default (prevents silent "keep first" bias).
-#  - Regional coordinate conventions handled explicitly (BED 0-based half-open vs 1-based closed).
-#  - Regions BED parsing validates numeric coords, start/end sanity.
-#  - Bootstrap CIs optionally reproducible via seed.
-#  - Wilcoxon can optionally keep zeros (default) or drop them (configurable).
-
 # -----------------------------
 # Internal helpers
 # -----------------------------
