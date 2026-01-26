@@ -77,15 +77,23 @@
 
   if (!is.null(filter_expr) && nzchar(filter_expr)) {
     env <- list2env(d, parent = parent.frame())
-    ok <- try(eval(parse(text = filter_expr), envir = env), silent = TRUE)
-    if (!inherits(ok, "try-error")) {
-      ok <- as.logical(ok)
-      if (length(ok) == 1L) ok <- rep(ok, nrow(d))
-      if (length(ok) != nrow(d)) {
-        stop("filter_expr must return a logical vector of length 1 or nrow(d).")
-      }
-      keep <- keep & ok
+
+    expr <- tryCatch(parse(text = filter_expr), error = function(e) e)
+    if (inherits(expr, "error")) {
+      stop("filter_expr failed to parse: ", conditionMessage(expr))
     }
+
+    ok <- tryCatch(eval(expr, envir = env), error = function(e) e)
+    if (inherits(ok, "error")) {
+      stop("filter_expr failed to evaluate: ", conditionMessage(ok))
+    }
+
+    ok <- as.logical(ok)
+    if (length(ok) == 1L) ok <- rep(ok, nrow(d))
+    if (length(ok) != nrow(d)) {
+      stop("filter_expr must return a logical vector of length 1 or nrow(d).")
+    }
+    keep <- keep & ok
   }
 
   d[keep, , drop = FALSE]
@@ -165,10 +173,16 @@
     }
   }
 
+  # normalize coords
+  st <- suppressWarnings(as.numeric(startv))
+  en <- suppressWarnings(as.numeric(endv))
+  lo <- pmin(st, en)
+  hi <- pmax(st, en)
+
   data.frame(
     seqname     = as.character(seqv),
-    start       = as.numeric(startv),
-    end         = as.numeric(endv),
+    start       = lo,
+    end         = hi,
     region_name = as.character(namev),
     stringsAsFactors = FALSE
   )
@@ -178,6 +192,10 @@
 #'
 #' Adds region_status ("region"/"background") based on overlap.
 #' Uses data.table::foverlaps if available; otherwise falls back to a loop.
+#'
+#' Behavior:
+#' - Rows with missing/non-finite coords are labeled "background".
+#' - start/end are normalized so start <= end.
 #'
 #' @keywords internal
 .label_region_status_coords <- function(d, regions, seq_col, start_col, end_col) {
@@ -190,32 +208,55 @@
          paste(c(seq_col, start_col, end_col), collapse = ", "))
   }
 
-  has_dt <- requireNamespace("data.table", quietly = TRUE)
+  seqv <- as.character(d[[seq_col]])
+  st0  <- suppressWarnings(as.numeric(d[[start_col]]))
+  en0  <- suppressWarnings(as.numeric(d[[end_col]]))
+
+  # normalize and mark valid rows
+  st <- pmin(st0, en0)
+  en <- pmax(st0, en0)
+  ok <- !is.na(seqv) & nzchar(seqv) & is.finite(st) & is.finite(en)
+
   lab <- rep("background", nrow(d))
+  if (!any(ok) || !nrow(regions)) {
+    d$region_status <- lab
+    return(d)
+  }
+
+  has_dt <- requireNamespace("data.table", quietly = TRUE)
 
   if (has_dt) {
     dt_g <- data.table::data.table(
-      idx     = seq_len(nrow(d)),
-      seqname = as.character(d[[seq_col]]),
-      start   = as.numeric(d[[start_col]]),
-      end     = as.numeric(d[[end_col]])
+      idx     = which(ok),
+      seqname = seqv[ok],
+      start   = st[ok],
+      end     = en[ok]
     )
     dt_r <- data.table::data.table(
-      seqname = regions$seqname,
-      start   = regions$start,
-      end     = regions$end
+      seqname = as.character(regions$seqname),
+      start   = suppressWarnings(as.numeric(regions$start)),
+      end     = suppressWarnings(as.numeric(regions$end))
     )
-    data.table::setkey(dt_g, seqname, start, end)
-    data.table::setkey(dt_r, seqname, start, end)
-    ov <- data.table::foverlaps(dt_g, dt_r, nomatch = 0L)
-    in_idx <- unique(ov$idx)
-    lab[in_idx] <- "region"
+    # drop bad regions
+    dt_r <- dt_r[is.finite(start) & is.finite(end) & !is.na(seqname)]
+    if (nrow(dt_r)) {
+      data.table::setkey(dt_g, seqname, start, end)
+      data.table::setkey(dt_r, seqname, start, end)
+      ov <- data.table::foverlaps(dt_g, dt_r, nomatch = 0L)
+      in_idx <- unique(ov$idx)
+      lab[in_idx] <- "region"
+    }
   } else {
+    # loop fallback on valid rows only
+    ok_idx <- which(ok)
     for (i in seq_len(nrow(regions))) {
       r <- regions[i, ]
-      hits <- which(d[[seq_col]] == r$seqname &
-                      d[[start_col]] <= r$end &
-                      d[[end_col]]   >= r$start)
+      if (!is.finite(r$start) || !is.finite(r$end) || is.na(r$seqname)) next
+      hits <- ok_idx[
+        seqv[ok_idx] == r$seqname &
+          st[ok_idx] <= r$end &
+          en[ok_idx] >= r$start
+      ]
       if (length(hits)) lab[hits] <- "region"
     }
   }
@@ -249,15 +290,17 @@
 
 #' Make state labels from numeric dN/dS
 #'
-#' Uses both neutral bounds:
+#' Uses both neutral bounds and an (optional) explicit positive threshold:
+#' - Positive:  x > pos_threshold (if finite), otherwise x > neutral_upper
 #' - Purifying: x < neutral_lower
-#' - Neutral:   neutral_lower <= x <= neutral_upper
-#' - Positive:  x > neutral_upper
+#' - Neutral:   otherwise (neutral band in-between)
 #'
 #' @keywords internal
 .make_states <- function(d, dnds_col, pos_threshold, neutral_lower, neutral_upper) {
-  x <- d[[dnds_col]]
-  d$state <- ifelse(x > neutral_upper, "Positive",
+  x <- suppressWarnings(as.numeric(d[[dnds_col]]))
+  pos_cut <- if (is.finite(pos_threshold)) pos_threshold else neutral_upper
+
+  d$state <- ifelse(x > pos_cut, "Positive",
                     ifelse(x < neutral_lower, "Purifying", "Neutral"))
   d$state <- factor(d$state, levels = c("Positive","Neutral","Purifying"))
   d
@@ -296,11 +339,13 @@
   # Separation guard: each group must have both outcomes
   tt <- table(d2[[group_col]], d2$y)
   if (ncol(tt) < 2L) return(NULL)
+  if (!all(c("0","1") %in% colnames(tt))) return(NULL)
   if (any(tt[, "0"] == 0L | tt[, "1"] == 0L)) return(NULL)
 
   d2[[group_col]] <- stats::relevel(factor(d2[[group_col]]), ref = groupB)
 
   use_re <- !is.null(random_effect_col) &&
+    nzchar(random_effect_col) &&
     random_effect_col %in% names(d2) &&
     any(!is.na(d2[[random_effect_col]]))
 
@@ -391,8 +436,8 @@
   res$or_ci_lower <- exp(res$log_or_ci_lower)
   res$or_ci_upper <- exp(res$log_or_ci_upper)
 
-  # ordering for readability within facets
-  res$contrast_label <- factor(res$contrast_label, levels = rev(unique(res$contrast_label)))
+  # ordering for readability within facets (stable ordering by appearance)
+  res$contrast_label <- factor(res$contrast_label, levels = rev(unique(as.character(res$contrast_label))))
 
   gg <- ggplot2::ggplot(res, ggplot2::aes(x = odds_ratio, y = contrast_label)) +
     ggplot2::geom_vline(xintercept = 1, linetype = "dashed", linewidth = 0.8) +
@@ -444,7 +489,8 @@
 #'   gene_id, side, seqname, start, end, dNdS_pair, comparison, gene_key
 #'
 #' If random_effect_col is provided and exists in the pairwise table, it is propagated
-#' onto gene rows so gene-mode mixed models can be fit.
+#' onto gene rows. NOTE: In gene mode, random effects are only used if the random-effect
+#' column is constant within each gene_key after aggregation; otherwise it is disabled.
 #'
 #' @keywords internal
 .pairwise_to_gene_rows <- function(d, comp_name, dnds_col, focal_sides = c("query","subject"), random_effect_col = NULL) {
@@ -500,6 +546,10 @@
 
 #' Aggregate gene rows to gene-level table (per gene_key + group)
 #'
+#' Random effects:
+#' - Only retained if random_effect_col is constant within each gene_key.
+#' - If it varies within gene_key (common for orthogroup-per-pair), it is disabled with a warning.
+#'
 #' @keywords internal
 .aggregate_gene_table <- function(g,
                                   group_mode = c("subgenome","custom"),
@@ -513,6 +563,15 @@
   g <- g[!is.na(g$gene_key) & nzchar(g$gene_key) &
            !is.na(g$dNdS_pair) & is.finite(g$dNdS_pair), , drop = FALSE]
   if (!nrow(g)) return(g)
+
+  # normalize gene coords for any later overlap/debugging (FIXED: avoid start/end collapse)
+  g$start <- suppressWarnings(as.numeric(g$start))
+  g$end   <- suppressWarnings(as.numeric(g$end))
+  st0 <- g$start
+  en0 <- g$end
+  ok_xy <- is.finite(st0) & is.finite(en0)
+  g$start[ok_xy] <- pmin(st0[ok_xy], en0[ok_xy])
+  g$end[ok_xy]   <- pmax(st0[ok_xy], en0[ok_xy])
 
   if (group_mode == "subgenome") {
     g$group <- .infer_group_from_seqname(g$seqname)
@@ -545,12 +604,21 @@
 
   agg <- merge(agg, n_pairs, by = c("gene_key","gene_id","group"), all.x = TRUE)
 
-  # attach a random-effect column if requested and present in gene rows
+  # attach a random-effect column if requested and valid for gene-level
   if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(g)) {
-    re_map <- g[, c("gene_key", random_effect_col), drop = FALSE]
-    re_map <- re_map[!is.na(re_map[[random_effect_col]]), , drop = FALSE]
-    re_map <- re_map[!duplicated(re_map$gene_key), , drop = FALSE]
-    agg <- merge(agg, re_map, by = "gene_key", all.x = TRUE)
+    # require that RE does not vary within gene_key
+    re_counts <- tapply(g[[random_effect_col]], g$gene_key, function(x) length(unique(na.omit(x))))
+    re_counts[is.na(re_counts)] <- 0L
+    bad <- names(re_counts)[re_counts > 1L]
+
+    if (length(bad)) {
+      warning("random_effect_col varies within gene_key in gene mode; disabling random effects for gene models.")
+    } else {
+      re_map <- g[, c("gene_key", random_effect_col), drop = FALSE]
+      re_map <- re_map[!is.na(re_map[[random_effect_col]]), , drop = FALSE]
+      re_map <- re_map[!duplicated(re_map$gene_key), , drop = FALSE]
+      agg <- merge(agg, re_map, by = "gene_key", all.x = TRUE)
+    }
   }
 
   agg <- agg[is.finite(agg$dNdS_agg) & agg$n_pairs >= min_pairs, , drop = FALSE]
@@ -678,6 +746,9 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   if (!is.finite(neutral_lower) || !is.finite(neutral_upper) || neutral_lower > neutral_upper) {
     stop("Require neutral_lower <= neutral_upper (both finite).")
   }
+  if (is.finite(pos_threshold) && pos_threshold < neutral_upper) {
+    warning("pos_threshold < neutral_upper; Positive will be called for x > pos_threshold, which may overlap the neutral band.")
+  }
 
   regions <- .read_regions_bed(regions_bed,
                                region_seq_col   = region_seq_col,
@@ -716,8 +787,27 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       return(list(results = NULL, paths = character(0)))
     }
 
-    # region status (pairwise uses side switch)
-    d <- .label_region_status_pairwise(d, regions = regions, side = side)
+    # If regions requested, ensure required coord columns exist; otherwise auto-disable region scope
+    scopes_pw <- scopes
+    if (!is.null(regions) && "region" %in% scopes_pw) {
+      req_cols <- if (side == "query") {
+        c("q_gff_seqname", "q_gff_start", "q_gff_end")
+      } else {
+        c("s_gff_seqname", "s_gff_start", "s_gff_end")
+      }
+      if (!all(req_cols %in% names(d))) {
+        warning("[dnds_state_contrast/pairwise] regions_bed provided but missing required columns for side='",
+                side, "': ", paste(req_cols, collapse = ", "),
+                ". Disabling region scope for: ", label)
+        d$region_status <- "global"
+        scopes_pw <- setdiff(scopes_pw, "region")
+      } else {
+        # region status (pairwise uses side switch)
+        d <- .label_region_status_pairwise(d, regions = regions, side = side)
+      }
+    } else {
+      d$region_status <- "global"
+    }
 
     # states
     d <- .make_states(d, dnds_col = dnds_col,
@@ -727,7 +817,7 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
 
     all_res <- list()
 
-    for (scp in scopes) {
+    for (scp in scopes_pw) {
       d_sc <- if (scp == "global") d else d[d$region_status == "region", , drop = FALSE]
 
       # power filter per group
@@ -827,11 +917,25 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   .run_one_gene_from_files <- function(files, label, out_dir) {
     # stack gene rows from all files
     gene_rows <- list()
+    used_names <- character(0)
 
     for (i in seq_along(files)) {
       f <- files[i]
-      if (!file.exists(f)) next
+      if (!file.exists(f)) {
+        warning("[dnds_state_contrast/gene] Missing file (skipping): ", f)
+        next
+      }
+
+      # comp name: strip known suffix, then strip .tsv if still present
       comp_name <- sub("_dnds_annot\\.tsv$", "", basename(f))
+      comp_name <- sub("\\.tsv$", "", comp_name)
+
+      # prevent collisions if multiple files share basename
+      if (comp_name %in% used_names) {
+        comp_name <- make.unique(c(used_names, comp_name))[length(used_names) + 1L]
+        warning("[dnds_state_contrast/gene] Duplicate basename detected; using unique comparison id: ", comp_name)
+      }
+      used_names <- c(used_names, comp_name)
 
       d <- .read_tsv(f)
       if (!nrow(d)) next
@@ -902,12 +1006,18 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       pairs <- utils::combn(sort(groups), 2, simplify = FALSE)
       states <- levels(gene_tbl$state)
 
+      # use random effects only if the column survived aggregation
+      re_for_gene <- NULL
+      if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(gene_tbl)) {
+        re_for_gene <- random_effect_col
+      }
+
       for (st in states) {
         gene_tbl$y <- as.integer(gene_tbl$state == st)
         for (p in pairs) {
           A <- p[1]; B <- p[2]
           fit <- .fit_pair(gene_tbl, group_col = "group", groupA = A, groupB = B,
-                           random_effect_col = random_effect_col)
+                           random_effect_col = re_for_gene)
           if (is.null(fit)) next
 
           all_res[[length(all_res) + 1]] <- data.frame(
