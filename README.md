@@ -195,6 +195,7 @@ dndsr regional_dnds_contrasts \
 - Rvignette - add note  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
 - Remove warnings flag and just auto-expand warnings always.
 - CLI - add error message for unknown dndsr subcommand to prevent launching container first
+- decide if input beds should be 0 or 1 based. Make match GFF and if not true bed 0 based then maybe call .txt instead.
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
