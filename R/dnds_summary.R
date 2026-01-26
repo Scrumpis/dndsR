@@ -112,22 +112,48 @@
 #'
 #' @keywords internal
 .filter_dnds <- function(d, filter_expr = NULL, max_dnds = 10) {
-  keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
+  if (!"dNdS" %in% names(d)) {
+    stop("Missing required column 'dNdS' for filtering.")
+  }
+
+  keep <- !is.na(d$dNdS) & is.finite(d$dNdS) & (d$dNdS < max_dnds)
+
   if (!is.null(filter_expr) && nzchar(filter_expr)) {
     ok <- try(eval(parse(text = filter_expr),
                    envir = d,
                    enclos = parent.frame()),
               silent = TRUE)
     if (!inherits(ok, "try-error")) {
-      keep <- keep & isTRUE(as.vector(ok))
+      if (!is.logical(ok)) {
+        warning("filter_expr did not evaluate to logical; ignoring filter_expr.")
+      } else if (length(ok) == 1L) {
+        keep <- keep & rep_len(isTRUE(ok), nrow(d))
+      } else if (length(ok) == nrow(d)) {
+        keep <- keep & ok
+      } else {
+        warning("filter_expr returned logical of length ", length(ok),
+                " but expected 1 or nrow(d)=", nrow(d), "; ignoring filter_expr.")
+      }
+    } else {
+      warning("filter_expr failed to evaluate; ignoring filter_expr.")
     }
   }
+
   d[keep, , drop = FALSE]
 }
 
-#' Read and normalize a regions BED-like file
+#' Read and normalize a regions BED-like file (EXPECTED HEADERLESS)
+#'
+#' Expected format (headerless):
+#'   col1 = seqname, col2 = start, col3 = end, optional col4 = region_name/label
 #'
 #' Returns a data.frame with columns: seqname, start, end, region_name
+#'
+#' Notes:
+#' - This function treats provided coordinates as closed intervals for overlap:
+#'   gene_start <= region_end AND gene_end >= region_start.
+#' - If you are providing canonical BED (often 0-based, half-open),
+#'   convert upstream to match your intended convention.
 #'
 #' @keywords internal
 .read_regions_bed <- function(regions_bed,
@@ -141,25 +167,56 @@
   if (!file.exists(regions_bed)) {
     stop("regions_bed not found: ", regions_bed)
   }
-  reg_raw <- .read_ws(regions_bed, header_try = TRUE)
+
+  # IMPORTANT: expected headerless
+  reg_raw <- .read_ws(regions_bed, header_try = FALSE)
   if (ncol(reg_raw) < 3) {
-    stop("regions_bed must have at least 3 columns: seqname, start, end.")
-  }
-  if (is.null(region_seq_col))   region_seq_col   <- names(reg_raw)[1]
-  if (is.null(region_start_col)) region_start_col <- names(reg_raw)[2]
-  if (is.null(region_end_col))   region_end_col   <- names(reg_raw)[3]
-  if (is.null(region_name_col) || !region_name_col %in% names(reg_raw)) {
-    reg_raw$region_name <- "region"
-    region_name_col <- "region_name"
+    stop("regions_bed must have at least 3 columns (headerless): seqname, start, end.")
   }
 
-  data.frame(
-    seqname     = as.character(reg_raw[[region_seq_col]]),
-    start       = as.numeric(reg_raw[[region_start_col]]),
-    end         = as.numeric(reg_raw[[region_end_col]]),
-    region_name = as.character(reg_raw[[region_name_col]]),
+  # Helper: allow numeric index or column name (e.g., "V1")
+  .resolve_col <- function(x, default_idx) {
+    if (is.null(x)) return(default_idx)
+    if (is.numeric(x) && length(x) == 1L && x >= 1 && x <= ncol(reg_raw)) return(as.integer(x))
+    if (is.character(x) && length(x) == 1L && x %in% names(reg_raw)) return(match(x, names(reg_raw)))
+    stop("Invalid regions_bed column selector: ", x,
+         " (use integer index, or a column name like 'V1').")
+  }
+
+  seq_idx   <- .resolve_col(region_seq_col,   1L)
+  start_idx <- .resolve_col(region_start_col, 2L)
+  end_idx   <- .resolve_col(region_end_col,   3L)
+
+  # Region name: optional
+  name_idx <- NULL
+  if (!is.null(region_name_col)) {
+    name_idx <- .resolve_col(region_name_col, 4L)
+  } else if (ncol(reg_raw) >= 4) {
+    name_idx <- 4L
+  }
+
+  out <- data.frame(
+    seqname     = as.character(reg_raw[[seq_idx]]),
+    start       = suppressWarnings(as.numeric(reg_raw[[start_idx]])),
+    end         = suppressWarnings(as.numeric(reg_raw[[end_idx]])),
+    region_name = if (!is.null(name_idx)) as.character(reg_raw[[name_idx]]) else "region",
     stringsAsFactors = FALSE
   )
+
+  if (anyNA(out$seqname) || any(!nzchar(out$seqname))) {
+    stop("regions_bed contains missing/blank seqname values.")
+  }
+  if (anyNA(out$start) || anyNA(out$end)) {
+    stop("regions_bed contains non-numeric start/end values (NA after coercion).")
+  }
+  if (any(out$start > out$end)) {
+    stop("regions_bed contains rows with start > end.")
+  }
+  if (anyNA(out$region_name) || any(!nzchar(out$region_name))) {
+    out$region_name[is.na(out$region_name) | !nzchar(out$region_name)] <- "region"
+  }
+
+  out
 }
 
 #' Label dNdS rows as inside/outside regions for a given side
@@ -189,12 +246,29 @@
          paste(c(seq_col, start_col, end_col), collapse = ", "))
   }
 
+  # Validate seqnames
+  seqv <- as.character(d[[seq_col]])
+  if (anyNA(seqv) || any(!nzchar(seqv))) {
+    stop("Found NA/blank in ", side, " seqname column used for overlap labeling.")
+  }
+
+  # Coerce coordinates and validate coercion (prevents silent wrong labeling)
+  st_num <- suppressWarnings(as.numeric(d[[start_col]]))
+  en_num <- suppressWarnings(as.numeric(d[[end_col]]))
+  if (anyNA(st_num) || anyNA(en_num)) {
+    stop("Non-numeric ", side, " start/end values detected after coercion. Check columns ",
+         start_col, " and ", end_col, ".")
+  }
+  if (any(st_num > en_num)) {
+    stop("Found start > end in gene intervals for ", side, " side.")
+  }
+
   if (has_dt) {
     dt_g <- data.table::data.table(
       idx     = seq_len(nrow(d)),
-      seqname = as.character(d[[seq_col]]),
-      start   = as.numeric(d[[start_col]]),
-      end     = as.numeric(d[[end_col]])
+      seqname = seqv,
+      start   = st_num,
+      end     = en_num
     )
     dt_r <- data.table::data.table(
       seqname     = regions$seqname,
@@ -202,24 +276,29 @@
       end         = regions$end,
       region_name = regions$region_name
     )
+
+    if (any(dt_r$start > dt_r$end)) stop("Found start > end in region intervals.")
+
     data.table::setkey(dt_g, seqname, start, end)
     data.table::setkey(dt_r, seqname, start, end)
-    ov    <- data.table::foverlaps(dt_g, dt_r, nomatch = 0L)
+    ov     <- data.table::foverlaps(dt_g, dt_r, nomatch = 0L)
     in_idx <- unique(ov$idx)
-    lab   <- rep("background", nrow(d))
+
+    lab <- rep("background", nrow(d))
     lab[in_idx] <- "region"
     d[[status_col]] <- lab
   } else {
     lab <- rep("background", nrow(d))
     for (i in seq_len(nrow(regions))) {
-      r    <- regions[i, ]
-      hits <- which(d[[seq_col]] == r$seqname &
-                    d[[start_col]] <= r$end   &
-                    d[[end_col]]   >= r$start)
+      r <- regions[i, ]
+      hits <- which(seqv == r$seqname &
+                      st_num <= r$end &
+                      en_num >= r$start)
       if (length(hits)) lab[hits] <- "region"
     }
     d[[status_col]] <- lab
   }
+
   d
 }
 
@@ -237,12 +316,14 @@
   med <- stats::median(x)
   sd  <- stats::sd(x)
   se  <- sd / sqrt(max(1L, n))
+
   if (ci_method == "normal") {
     ci <- m + c(-1.96, 1.96) * se
   } else {
     means <- replicate(n_boot, mean(sample(x, size = n, replace = TRUE)))
-    ci <- stats::quantile(means, probs = c(0.025, 0.975), names = FALSE)
+    ci <- stats::quantile(means, probs = c(0.025, 0.975), names = FALSE, na.rm = TRUE)
   }
+
   c(m, med, sd, se, ci[1], ci[2])
 }
 
@@ -251,7 +332,7 @@
 #' Strips CRLF artifacts and trims leading/trailing whitespace from column names.
 #'
 #' @param d A data.frame-like object.
-#' @return `d` with cleaned column names.
+#' @return d with cleaned column names.
 #' @keywords internal
 .clean_colnames <- function(d) {
   nn <- names(d)
@@ -269,13 +350,13 @@
 #'
 #' Summarize dN/dS distributions for each dNdS annotation file.
 #'
-#' - Always computes a **global** summary across all retained rows.
-#' - If `regions_bed` is provided, also labels rows as inside/outside regions
-#'   (per side) and computes region/background summaries + a Wilcoxon rank-sum
+#' - Always computes a global summary across all retained rows.
+#' - If regions_bed is provided, also labels rows as inside/outside regions
+#'   (per side) and computes region/background summaries plus a Wilcoxon rank-sum
 #'   test (region vs background) for each side.
 #'
-#' Works in single mode (`dnds_annot_file`) or batch mode (`comparison_file` +
-#' `output_dir`), mirroring other dndsR commands.
+#' Works in single mode (dnds_annot_file) or batch mode (comparison_file +
+#' output_dir), mirroring other dndsR commands.
 #'
 #' @param dnds_annot_file Path to a single <comp>_dnds_annot.tsv (single mode).
 #' @param comparison_file Path to whitespace-delimited file (tabs/spaces; header or not)
@@ -284,32 +365,28 @@
 #'   file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv")).
 #' @param output_dir Root directory containing per-comparison folders (batch mode).
 #'
-#' @param regions_bed Optional. Path to BED-like file of regions with at least 3 columns:
-#'   seqname, start, end, and optionally a name/label column. If NULL, only global
+#' @param regions_bed Optional. Path to a HEADERLESS BED-like file of regions with at least 3 columns:
+#'   seqname, start, end, and optionally a 4th name/label column. If NULL, only global
 #'   summaries (and global plots) are produced.
 #' @param region_seq_col,region_start_col,region_end_col,region_name_col
-#'   Column names in regions_bed for seqname/start/end/label (default: first three +
-#'   optional "region_name").
+#'   Optional selectors for regions_bed columns (integer indices, or names like "V1").
+#'   Defaults are 1,2,3, and (if present) 4 for region_name.
 #'
 #' @param sides Character vector among c("query","subject") indicating which genome
-#'   side to use for overlap when `regions_bed` is provided (default both).
+#'   side to use for overlap when regions_bed is provided (default both).
 #'   Coordinates are taken from q_gff_* or s_gff_* columns.
 #'
 #' @param filter_expr Optional character with a logical expression evaluated in the data
 #'   (e.g., "q_gff_seqname == s_gff_seqname & dNdS < 5").
-#' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds or NA dNdS (default 10).
+#' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds or NA/non-finite dNdS (default 10).
 #' @param make_plots Logical; if TRUE, write global plots always and regional plots
-#'   when `regions_bed` is provided (default TRUE).
+#'   when regions_bed is provided (default TRUE).
 #'
 #' @param ci_method One of "normal" (mean +/- 1.96*SE) or "bootstrap" for 95% CI.
 #' @param n_boot Number of bootstrap resamples if ci_method = "bootstrap" (default 1000).
 #'
 #' @return Invisibly, in single mode: path to summary TSV.
 #'         In batch mode: vector of summary TSV paths.
-#'         The TSV contains:
-#'           - one row with scope="global" (side=NA, region_status="all")
-#'           - plus (if regions_bed) two rows per side with scope="regional"
-#'             (region/background) and a Wilcoxon rank-sum p_value for region vs background.
 #' @export
 dnds_summary <- function(dnds_annot_file = NULL,
                          comparison_file = NULL,
@@ -353,13 +430,12 @@ dnds_summary <- function(dnds_annot_file = NULL,
     dfp <- d[is.finite(d$dNdS), , drop = FALSE]
     if (!nrow(dfp)) return(invisible(NULL))
 
-    # Global histogram (log1p x)
     gg_hist <- ggplot2::ggplot(dfp, ggplot2::aes(x = dNdS)) +
       ggplot2::geom_histogram(bins = 60, alpha = 0.7) +
       ggplot2::scale_x_continuous(trans = "log1p") +
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::labs(
-        title = paste0(comp_name, " — global dN/dS distribution"),
+        title = paste0(comp_name, " - global dN/dS distribution"),
         x     = "dN/dS (log1p scale)",
         y     = "Count"
       )
@@ -371,13 +447,12 @@ dnds_summary <- function(dnds_annot_file = NULL,
       height   = 4
     )
 
-    # Global ECDF (log1p x)
     gg_ecdf <- ggplot2::ggplot(dfp, ggplot2::aes(x = dNdS)) +
       ggplot2::stat_ecdf() +
       ggplot2::scale_x_continuous(trans = "log1p") +
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::labs(
-        title = paste0(comp_name, " — global dN/dS ECDF"),
+        title = paste0(comp_name, " - global dN/dS ECDF"),
         x     = "dN/dS (log1p scale)",
         y     = "ECDF"
       )
@@ -400,10 +475,9 @@ dnds_summary <- function(dnds_annot_file = NULL,
       status_col <- if (sd == "query") "q_region_status" else "s_region_status"
       if (!status_col %in% names(d)) next
 
-      df_plot <- d[is.finite(d$dNdS) & !is.na(d[[status_col]]), ]
+      df_plot <- d[is.finite(d$dNdS) & !is.na(d[[status_col]]), , drop = FALSE]
       if (!nrow(df_plot)) next
 
-      # Violin + box (quick region vs background comparison)
       gg <- ggplot2::ggplot(df_plot,
                             ggplot2::aes_string(x = status_col, y = "dNdS")) +
         ggplot2::geom_violin(trim = TRUE, alpha = 0.7) +
@@ -413,7 +487,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
         ggplot2::labs(
           x     = paste0(sd, " region status"),
           y     = "dN/dS (log1p scale)",
-          title = paste0(comp_name, " — region vs background (", sd, " side)")
+          title = paste0(comp_name, " - region vs background (", sd, " side)")
         )
 
       ggplot2::ggsave(
@@ -423,13 +497,12 @@ dnds_summary <- function(dnds_annot_file = NULL,
         height   = 4
       )
 
-      # Overlaid histograms (often easier to interpret than violins)
       gg2 <- ggplot2::ggplot(df_plot, ggplot2::aes_string(x = "dNdS", fill = status_col)) +
         ggplot2::geom_histogram(position = "identity", bins = 60, alpha = 0.45) +
         ggplot2::scale_x_continuous(trans = "log1p") +
         ggplot2::theme_minimal(base_size = 12) +
         ggplot2::labs(
-          title = paste0(comp_name, " — region/background overlay (", sd, " side)"),
+          title = paste0(comp_name, " - region/background overlay (", sd, " side)"),
           x     = "dN/dS (log1p scale)",
           y     = "Count"
         )
@@ -445,8 +518,10 @@ dnds_summary <- function(dnds_annot_file = NULL,
     invisible(NULL)
   }
 
-  .summarize_one <- function(comp_name, comp_dir) {
-    in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
+  .summarize_one <- function(comp_name, comp_dir, in_file = NULL) {
+    if (is.null(in_file)) {
+      in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
+    }
     if (!file.exists(in_file)) stop("Annotated dN/dS file not found: ", in_file)
 
     d_raw <- utils::read.table(in_file,
@@ -471,7 +546,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
     n_removed_na     <- sum(is.na(d_raw$dNdS))
     n_removed_ge_max <- sum(is.finite(d_raw$dNdS) & d_raw$dNdS >= max_dnds)
 
-    # Apply filtering (was previously missing in the original function)
+    # Apply filtering
     d <- .filter_dnds(d_raw, filter_expr = filter_expr, max_dnds = max_dnds)
 
     if (!nrow(d)) {
@@ -484,7 +559,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
 
     res_list <- list()
 
-    # ---------- global summary ----------
+    # Global summary
     vals_all  <- d$dNdS
     stats_all <- .calc_mean_ci(vals_all, ci_method = ci_method, n_boot = n_boot)
 
@@ -509,32 +584,26 @@ dnds_summary <- function(dnds_annot_file = NULL,
       stringsAsFactors  = FALSE
     )
 
-    # ---------- regional summaries (optional) ----------
+    # Regional summaries (optional)
     if (has_regions) {
-      # Label region status for each requested side
       for (sd in sides) {
         d <- tryCatch(
           .label_region_side(d, regions = regions, side = sd),
           error = function(e) {
-            stop(
-              sprintf(
-                "dnds_summary failed for comparison '%s' (file: %s) while labeling side='%s':\n%s",
-                comp_name, in_file, sd, conditionMessage(e)
-              ),
-              call. = FALSE
-            )
+            stop(sprintf(
+              "dnds_summary failed for comparison '%s' (file: %s) while labeling side='%s':\n%s",
+              comp_name, in_file, sd, conditionMessage(e)
+            ), call. = FALSE)
           }
         )
       }
 
-      # Regional plots (if requested)
       if (make_plots) .plot_regional(d, comp_name, comp_dir, sides)
 
       for (sd in sides) {
         status_col <- if (sd == "query") "q_region_status" else "s_region_status"
         if (!status_col %in% names(d)) next
 
-        # Stats for region/background
         for (st in c("region", "background")) {
           vals  <- d$dNdS[d[[status_col]] == st]
           stats <- .calc_mean_ci(vals, ci_method = ci_method, n_boot = n_boot)
@@ -555,12 +624,11 @@ dnds_summary <- function(dnds_annot_file = NULL,
             se_dnds           = stats[4],
             ci_lower          = stats[5],
             ci_upper          = stats[6],
-            p_value           = NA_real_,  # filled below for both rows
+            p_value           = NA_real_,
             stringsAsFactors  = FALSE
           )
         }
 
-        # Wilcoxon rank-sum: region vs background (within comparison/side)
         x_reg <- d$dNdS[d[[status_col]] == "region"]
         x_bg  <- d$dNdS[d[[status_col]] == "background"]
         p     <- .wilcox_region(x_reg, x_bg)
@@ -582,7 +650,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
     out_tsv
   }
 
-  # ---- batch vs single ----
+  # Batch vs single
   if (!is.null(comparison_file)) {
     df   <- .read_comparisons(comparison_file)
     outs <- character(0)
@@ -595,13 +663,9 @@ dnds_summary <- function(dnds_annot_file = NULL,
       one <- tryCatch(
         .summarize_one(comp, comp_dir),
         error = function(e) {
-          warning(
-            sprintf(
-              "Skipping comparison '%s' (dir: %s): %s",
-              comp, comp_dir, conditionMessage(e)
-            ),
-            call. = FALSE
-          )
+          warning(sprintf("Skipping comparison '%s' (dir: %s): %s",
+                          comp, comp_dir, conditionMessage(e)),
+                  call. = FALSE)
           character(0)
         }
       )
@@ -622,7 +686,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
 
   comp_dir  <- dirname(dnds_annot_file)
   comp_name <- sub("_dnds_annot\\.tsv$", "", basename(dnds_annot_file))
-  out       <- .summarize_one(comp_name, comp_dir)
+  out       <- .summarize_one(comp_name, comp_dir, in_file = dnds_annot_file)
   message("dN/dS summary complete for: ", dnds_annot_file)
   invisible(out)
 }
