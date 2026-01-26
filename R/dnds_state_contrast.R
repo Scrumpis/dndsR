@@ -2,7 +2,7 @@
 # dN/dS state contrasts via logistic regression (optional mixed model) + forest plot
 #
 # Merged "pairwise" + "gene" modes:
-#   - level = "pairwise": model states on per-ortholog-pair rows (your modernized version)
+#   - level = "pairwise": model states on per-ortholog-pair rows
 #   - level = "gene":     stack *_dnds_annot.tsv, convert to gene rows (query/subject),
 #                         optionally filter by regions, aggregate across partners per gene,
 #                         then model states on gene-level observations
@@ -99,93 +99,84 @@
   d[keep, , drop = FALSE]
 }
 
-#' Read and normalize a regions BED-like file
+#' Read and normalize a regions BED-like file (EXPECTED HEADERLESS)
 #'
-#' Returns a data.frame with columns: seqname, start, end, region_name
+#' Expected (headerless):
+#'   col1 = seqname, col2 = start, col3 = end, optional col4 = region_name/label
+#'
+#' Column selectors may be:
+#'   - integer indices (1-based), OR
+#'   - column names like "V1", "V2" (if you read elsewhere and name them)
+#'
+#' Returns data.frame: seqname, start, end, region_name
 #'
 #' Notes:
-#' - Tries to infer whether the file has a header. For best results, provide a header row.
-#' - Column selectors can be column names (character) or 1-based column indices (numeric).
+#' - Coordinates are treated as inclusive numeric intervals for overlap:
+#'     gene_start <= region_end AND gene_end >= region_start
+#' - If you provide canonical BED (often 0-based, half-open), convert upstream to match
+#'   the coordinate convention in your dN/dS tables.
 #'
 #' @keywords internal
-.read_regions_bed <- function(regions_bed,
-                              region_seq_col   = NULL,
-                              region_start_col = NULL,
-                              region_end_col   = NULL,
-                              region_name_col  = NULL) {
-  if (is.null(regions_bed)) return(NULL)
-  if (!file.exists(regions_bed)) stop("regions_bed not found: ", regions_bed)
+.read_regions_file <- function(regions_file,
+                               region_seq_col   = NULL,
+                               region_start_col = NULL,
+                               region_end_col   = NULL,
+                               region_name_col  = NULL) {
+  if (is.null(regions_file)) return(NULL)
+  if (!file.exists(regions_file)) stop("regions_file not found: ", regions_file)
 
-  # Try header=TRUE first; if start/end look non-numeric, fall back to header=FALSE
-  reg1 <- try(.read_ws(regions_bed, header_try = TRUE), silent = TRUE)
-  if (inherits(reg1, "try-error")) {
-    reg_raw <- .read_ws(regions_bed, header_try = FALSE)
-    names(reg_raw) <- paste0("V", seq_len(ncol(reg_raw)))
-  } else {
-    reg_raw <- reg1
-    if (ncol(reg_raw) >= 3) {
-      s2 <- suppressWarnings(as.numeric(reg_raw[[2]]))
-      s3 <- suppressWarnings(as.numeric(reg_raw[[3]]))
-      frac_bad <- mean(is.na(s2) | is.na(s3))
-      if (!is.finite(frac_bad)) frac_bad <- 1
-      if (frac_bad > 0.5) {
-        reg_raw <- .read_ws(regions_bed, header_try = FALSE)
-        names(reg_raw) <- paste0("V", seq_len(ncol(reg_raw)))
-      }
+  reg_raw <- .read_ws(regions_file, header_try = FALSE)
+  if (ncol(reg_raw) < 3) stop("regions_file must have at least 3 columns (headerless): seqname, start, end.")
+  names(reg_raw) <- paste0("V", seq_len(ncol(reg_raw)))
+
+  .resolve_idx <- function(sel, default_idx) {
+    if (is.null(sel)) return(as.integer(default_idx))
+    if (is.numeric(sel) && length(sel) == 1L) {
+      idx <- as.integer(sel)
+      if (idx < 1L || idx > ncol(reg_raw)) stop("regions_file column index out of range: ", idx)
+      return(idx)
     }
+    if (is.character(sel) && length(sel) == 1L) {
+      nm <- as.character(sel)
+      if (!nm %in% names(reg_raw)) stop("regions_file column not found: ", nm, " (expected e.g. 'V1').")
+      return(match(nm, names(reg_raw)))
+    }
+    stop("Invalid regions_file column selector: ", sel)
   }
 
-  if (ncol(reg_raw) < 3) stop("regions_bed must have at least 3 columns: seqname, start, end.")
+  seq_idx   <- .resolve_idx(region_seq_col,   1L)
+  start_idx <- .resolve_idx(region_start_col, 2L)
+  end_idx   <- .resolve_idx(region_end_col,   3L)
 
-  # Resolve column selectors (character name or numeric index)
-  .col_get <- function(df, sel, default_idx) {
-    if (is.null(sel)) return(df[[default_idx]])
-    if (is.numeric(sel)) {
-      sel <- as.integer(sel[1])
-      if (sel < 1L || sel > ncol(df)) stop("regions_bed column index out of range: ", sel)
-      return(df[[sel]])
-    }
-    sel <- as.character(sel[1])
-    if (!sel %in% names(df)) stop("regions_bed column not found: ", sel)
-    df[[sel]]
+  name_idx <- NULL
+  if (!is.null(region_name_col)) {
+    name_idx <- .resolve_idx(region_name_col, 4L)
+  } else if (ncol(reg_raw) >= 4) {
+    name_idx <- 4L
   }
 
-  seqv   <- .col_get(reg_raw, region_seq_col,   1)
-  startv <- .col_get(reg_raw, region_start_col, 2)
-  endv   <- .col_get(reg_raw, region_end_col,   3)
+  seqv <- as.character(reg_raw[[seq_idx]])
+  st0  <- suppressWarnings(as.numeric(reg_raw[[start_idx]]))
+  en0  <- suppressWarnings(as.numeric(reg_raw[[end_idx]]))
 
-  # region_name optional
-  if (is.null(region_name_col)) {
-    namev <- rep("region", nrow(reg_raw))
-  } else if (is.numeric(region_name_col)) {
-    idx <- as.integer(region_name_col[1])
-    if (idx < 1L || idx > ncol(reg_raw)) {
-      namev <- rep("region", nrow(reg_raw))
-    } else {
-      namev <- reg_raw[[idx]]
-    }
-  } else {
-    nm <- as.character(region_name_col[1])
-    if (!nm %in% names(reg_raw)) {
-      namev <- rep("region", nrow(reg_raw))
-    } else {
-      namev <- reg_raw[[nm]]
-    }
-  }
+  if (anyNA(seqv) || any(!nzchar(seqv))) stop("regions_file contains missing/blank seqname values.")
+  if (anyNA(st0) || anyNA(en0)) stop("regions_file contains non-numeric start/end values (NA after coercion).")
 
-  # normalize coords
-  st <- suppressWarnings(as.numeric(startv))
-  en <- suppressWarnings(as.numeric(endv))
-  lo <- pmin(st, en)
-  hi <- pmax(st, en)
+  lo <- pmin(st0, en0)
+  hi <- pmax(st0, en0)
+  if (any(lo > hi)) stop("regions_file contains rows with start > end (after normalization).")
 
-  data.frame(
-    seqname     = as.character(seqv),
+  namev <- if (!is.null(name_idx)) as.character(reg_raw[[name_idx]]) else rep("region", nrow(reg_raw))
+  namev[is.na(namev) | !nzchar(namev)] <- "region"
+
+  out <- data.frame(
+    seqname     = seqv,
     start       = lo,
     end         = hi,
-    region_name = as.character(namev),
+    region_name = namev,
     stringsAsFactors = FALSE
   )
+  out
 }
 
 #' Label rows as inside/outside regions given explicit coord columns
@@ -212,7 +203,6 @@
   st0  <- suppressWarnings(as.numeric(d[[start_col]]))
   en0  <- suppressWarnings(as.numeric(d[[end_col]]))
 
-  # normalize and mark valid rows
   st <- pmin(st0, en0)
   en <- pmax(st0, en0)
   ok <- !is.na(seqv) & nzchar(seqv) & is.finite(st) & is.finite(en)
@@ -237,7 +227,6 @@
       start   = suppressWarnings(as.numeric(regions$start)),
       end     = suppressWarnings(as.numeric(regions$end))
     )
-    # drop bad regions
     dt_r <- dt_r[is.finite(start) & is.finite(end) & !is.na(seqname)]
     if (nrow(dt_r)) {
       data.table::setkey(dt_g, seqname, start, end)
@@ -247,7 +236,6 @@
       lab[in_idx] <- "region"
     }
   } else {
-    # loop fallback on valid rows only
     ok_idx <- which(ok)
     for (i in seq_len(nrow(regions))) {
       r <- regions[i, ]
@@ -364,14 +352,13 @@
       vcovm <- try(stats::vcov(fit), silent = TRUE)
       if (inherits(coefs, "try-error") || inherits(vcovm, "try-error")) return(NULL)
 
-      # pick the single non-intercept term (since only A vs B present)
       tt2 <- setdiff(names(coefs), "(Intercept)")
       if (length(tt2) != 1) return(NULL)
       term <- tt2[1]
 
       est <- unname(coefs[term])
 
-      # FIX: index variance first, then sqrt; and guard against NA/0
+      # variance index first, then sqrt (and guard)
       se  <- sqrt(diag(vcovm)[term])
       if (!is.finite(se) || se <= 0) return(NULL)
 
@@ -399,7 +386,6 @@
   rn <- rn[rn != "(Intercept)"]
   if (!length(rn)) return(NULL)
 
-  # with only A/B present, there should be one coefficient
   if (length(rn) != 1) return(NULL)
   rr <- rn[1]
 
@@ -423,6 +409,8 @@
 
 #' Forest plot for state contrasts
 #'
+#' Orders contrasts *within each facet* for readability (avoids global factor ordering).
+#'
 #' @keywords internal
 .plot_state_forest <- function(res,
                                out_path,
@@ -440,10 +428,28 @@
   res$or_ci_lower <- exp(res$log_or_ci_lower)
   res$or_ci_upper <- exp(res$log_or_ci_upper)
 
-  # ordering for readability within facets (stable ordering by appearance)
-  res$contrast_label <- factor(res$contrast_label, levels = rev(unique(as.character(res$contrast_label))))
+  # Build a facet-specific y variable so ordering is per-facet, not global.
+  # We keep displayed labels as the original contrast_label.
+  facet_id <- if (facet_by == "scope") paste(res$state, res$scope, sep = "||") else as.character(res$state)
+  y_key <- paste(res$contrast_label, facet_id, sep = " @ ")
 
-  gg <- ggplot2::ggplot(res, ggplot2::aes(x = odds_ratio, y = contrast_label)) +
+  # Order within each facet by odds_ratio (then name as tiebreak)
+  ord_df <- data.frame(y_key = y_key,
+                       facet_id = facet_id,
+                       odds_ratio = res$odds_ratio,
+                       contrast_label = as.character(res$contrast_label),
+                       stringsAsFactors = FALSE)
+  ord_df <- ord_df[order(ord_df$facet_id, ord_df$odds_ratio, ord_df$contrast_label), , drop = FALSE]
+
+  levs <- character(0)
+  for (fid in unique(ord_df$facet_id)) {
+    kk <- ord_df[ord_df$facet_id == fid, , drop = FALSE]
+    levs <- c(levs, unique(kk$y_key))
+  }
+
+  res$y_key <- factor(y_key, levels = rev(levs)) # rev to place largest OR near top visually
+
+  gg <- ggplot2::ggplot(res, ggplot2::aes(x = odds_ratio, y = y_key)) +
     ggplot2::geom_vline(xintercept = 1, linetype = "dashed", linewidth = 0.8) +
     ggplot2::geom_errorbarh(
       ggplot2::aes(xmin = or_ci_lower, xmax = or_ci_upper),
@@ -452,6 +458,7 @@
     ) +
     ggplot2::geom_point(size = point_size) +
     ggplot2::scale_x_log10() +
+    ggplot2::scale_y_discrete(labels = function(x) sub(" @ .*$", "", x)) +
     ggplot2::labs(x = "Odds ratio", y = NULL) +
     ggplot2::theme_classic(base_size = 14, base_family = base_family) +
     ggplot2::theme(
@@ -495,10 +502,6 @@
 #'
 #' Adds:
 #'   gene_id, side, seqname, start, end, dNdS_pair, comparison, gene_key
-#'
-#' If random_effect_col is provided and exists in the pairwise table, it is propagated
-#' onto gene rows. NOTE: In gene mode, random effects are only used if the random-effect
-#' column is constant within each gene_key after aggregation; otherwise it is disabled.
 #'
 #' @keywords internal
 .pairwise_to_gene_rows <- function(d, comp_name, dnds_col, focal_sides = c("query","subject"), random_effect_col = NULL) {
@@ -556,11 +559,13 @@
 #'
 #' Random effects:
 #' - Only retained if random_effect_col is constant within each gene_key.
-#' - If it varies within gene_key (common for orthogroup-per-pair), it is disabled with a warning.
+#' - If it varies within gene_key, it is disabled with a warning.
 #'
 #' Safety:
 #' - In group_mode="subgenome", if any groups cannot be inferred, this function STOPs
 #'   with example seqnames to prevent silent gene loss.
+#'
+#' Adds back `comparison` and `side` parsed from gene_key for debugging/sanity checks.
 #'
 #' @keywords internal
 .aggregate_gene_table <- function(g,
@@ -576,7 +581,7 @@
            !is.na(g$dNdS_pair) & is.finite(g$dNdS_pair), , drop = FALSE]
   if (!nrow(g)) return(g)
 
-  # normalize gene coords for any later overlap/debugging (FIXED: avoid start/end collapse)
+  # normalize gene coords
   g$start <- suppressWarnings(as.numeric(g$start))
   g$end   <- suppressWarnings(as.numeric(g$end))
   st0 <- g$start
@@ -588,7 +593,6 @@
   if (group_mode == "subgenome") {
     g$group <- .infer_group_from_seqname(g$seqname)
 
-    # SAFETY: do not silently drop genes if inference fails
     if (any(is.na(g$group) | !nzchar(g$group))) {
       bad_seq <- unique(as.character(g$seqname[is.na(g$group) | !nzchar(g$group)]))
       bad_seq <- bad_seq[!is.na(bad_seq) & nzchar(bad_seq)]
@@ -630,9 +634,13 @@
 
   agg <- merge(agg, n_pairs, by = c("gene_key","gene_id","group"), all.x = TRUE)
 
+  # add comparison + side parsed from gene_key: "<comparison>|<side>|<gene_id>"
+  parts <- strsplit(as.character(agg$gene_key), "\\|", fixed = FALSE)
+  agg$comparison <- vapply(parts, function(p) if (length(p) >= 1) p[1] else NA_character_, character(1))
+  agg$side       <- vapply(parts, function(p) if (length(p) >= 2) p[2] else NA_character_, character(1))
+
   # attach a random-effect column if requested and valid for gene-level
   if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(g)) {
-    # require that RE does not vary within gene_key
     re_counts <- tapply(g[[random_effect_col]], g$gene_key, function(x) length(unique(na.omit(x))))
     re_counts[is.na(re_counts)] <- 0L
     bad <- names(re_counts)[re_counts > 1L]
@@ -657,72 +665,8 @@
 
 #' dN/dS state contrasts (pairwise or gene-level) via logistic regression + forest plot
 #'
-#' Pairwise mode:
-#'   - input is a table containing dNdS + group column (or batch reads <comp>_dnds_annot.tsv),
-#'   - optionally restrict to regions (regions_bed + side),
-#'   - fit pairwise A vs B logistic models for each state within each scope (global/region).
-#'
-#' Gene mode:
-#'   - input is one or more *_dnds_annot.tsv tables (single or batch),
-#'   - convert to gene rows on query/subject side(s),
-#'   - optionally restrict to regions (regions_bed) before aggregation,
-#'   - aggregate across partners per gene (median/mean),
-#'   - classify each gene into state, and fit pairwise A vs B models on gene-level observations.
-#'
-#' Region coordinates are treated as inclusive numeric intervals; ensure your `regions_bed`
+#' Region coordinates are treated as inclusive numeric intervals; ensure your `regions_file`
 #' coordinates are consistent with the coordinate system used in your dN/dS tables.
-#'
-#' @param level One of c("pairwise","gene").
-#'
-#' @param dnds_table_file Pairwise mode single input TSV. In gene mode, this can also be
-#'   used as a convenience alias for a single *_dnds_annot.tsv file.
-#' @param comparison_file Batch mode comparisons file (both levels).
-#' @param output_dir Root directory for batch mode.
-#' @param in_suffix Filename within each comparison folder:
-#'   - pairwise: defaults to "<comp>_dnds_annot.tsv"
-#'   - gene:     defaults to "<comp>_dnds_annot.tsv"
-#'
-#' @param dnds_col Name of dN/dS column (default "dNdS").
-#' @param group_col Pairwise mode grouping column name in the table (default "group").
-#' @param random_effect_col Optional column for random intercept (e.g., orthogroup) (default NULL).
-#'
-#' @param pos_threshold,neutral_lower,neutral_upper State thresholds.
-#' @param max_dnds Drop rows with dN/dS >= max_dnds or NA.
-#' @param filter_expr Optional expression evaluated in raw tables before modeling.
-#'
-#' @param min_n_per_group Minimum observations per group within a scope.
-#'
-#' @param fdr_method One of "BH","BY","none". Applied within each (state, scope).
-#'
-#' @param regions_bed Optional BED-like file. If provided, enables region scope.
-#' @param region_seq_col,region_start_col,region_end_col Column selectors in `regions_bed`
-#'   giving the chromosome/seqname, start, and end columns. Each selector may be a column
-#'   name (character) or 1-based column index (numeric). If NULL (default), the first three
-#'   columns of the file are used.
-#' @param region_name_col Optional column selector in `regions_bed` for labeling regions
-#'   (name or 1-based index). If NULL or not present, a constant label ("region") is used.
-#' @param side Pairwise mode region overlap side ("query" or "subject"). Ignored in gene mode
-#'   (gene mode uses the gene-row coordinates directly).
-#' @param scopes Which scopes to run: subset of c("global","region").
-#'
-#' @param make_plots If TRUE, write forest plot PDF and PNG.
-#' @param base_family Font family for plots.
-#' @param out_prefix Output prefix (default derived from file/comp name).
-#'
-#' ---- gene-mode only ----
-#' @param dnds_annot_files Optional vector of explicit *_dnds_annot.tsv paths (gene mode single).
-#' @param focal_sides Which genes to treat as focal observations: c("query","subject") (gene mode; default both).
-#' @param group_mode "subgenome" infers group from seqname suffix (current default is conservative) or "custom".
-#' @param gene_group_col If group_mode="custom", name of column in gene rows to use as group.
-#'   This is recommended for general haplotypes/subgenomes (not just B/C/D).
-#' @param agg_fun "median" or "mean" aggregation across partners.
-#' @param min_pairs Minimum pairwise observations per gene required before modeling.
-#' @param gene_out_dir Subdirectory (within output_dir) for gene-mode outputs in batch runs.
-#'
-#' @return Invisibly returns list with:
-#'   - results: data.frame (or list of per-comp dfs in batch)
-#'   - paths: written TSV + plot paths
-#'   - gene_table: (gene mode only) the aggregated gene table (or list in batch)
 #'
 #' @export
 dnds_state_contrast <- function(level            = c("pairwise","gene"),
@@ -741,7 +685,7 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
                                 filter_expr       = NULL,
                                 min_n_per_group   = 50,
                                 fdr_method        = c("BH","BY","none"),
-                                regions_bed       = NULL,
+                                regions_file       = NULL,
                                 region_seq_col    = NULL,
                                 region_start_col  = NULL,
                                 region_end_col    = NULL,
@@ -772,17 +716,18 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     stop("Require neutral_lower <= neutral_upper (both finite).")
   }
 
-  # SAFETY: forbid overlapping thresholds by default (prevents silent state redefinition)
+  # Was previously a hard stop; now warn (overlap is allowed, Positive overrides Neutral).
   if (is.finite(pos_threshold) && pos_threshold < neutral_upper) {
-    stop("pos_threshold must be >= neutral_upper to avoid overlapping state definitions. ",
-         "pos_threshold=", pos_threshold, ", neutral_upper=", neutral_upper, ".")
+    warning("pos_threshold (", pos_threshold, ") is < neutral_upper (", neutral_upper, "). ",
+            "Positive classification will override Neutral for x > pos_threshold. ",
+            "If you intended non-overlapping states, set pos_threshold >= neutral_upper.")
   }
 
-  regions <- .read_regions_bed(regions_bed,
-                               region_seq_col   = region_seq_col,
-                               region_start_col = region_start_col,
-                               region_end_col   = region_end_col,
-                               region_name_col  = region_name_col)
+  regions <- .read_regions_file(regions_file,
+                                region_seq_col   = region_seq_col,
+                                region_start_col = region_start_col,
+                                region_end_col   = region_end_col,
+                                region_name_col  = region_name_col)
 
   # determine scopes
   if (is.null(scopes)) {
@@ -791,7 +736,7 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   } else {
     scopes <- match.arg(scopes, choices = c("global","region"), several.ok = TRUE)
     if ("region" %in% scopes && is.null(regions)) {
-      stop("scopes includes 'region' but regions_bed is NULL.")
+      stop("scopes includes 'region' but regions_file is NULL.")
     }
   }
 
@@ -808,14 +753,12 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     if (!group_col %in% names(d)) stop("Missing group_col: ", group_col)
     if (!dnds_col %in% names(d)) stop("Missing dnds_col: ", dnds_col)
 
-    # filter
     d <- .filter_dnds(d, dnds_col = dnds_col, filter_expr = filter_expr, max_dnds = max_dnds)
     if (!nrow(d)) {
       warning("[dnds_state_contrast/pairwise] No rows after filtering for: ", label)
       return(list(results = NULL, paths = character(0)))
     }
 
-    # If regions requested, ensure required coord columns exist; otherwise auto-disable region scope
     scopes_pw <- scopes
     if (!is.null(regions) && "region" %in% scopes_pw) {
       req_cols <- if (side == "query") {
@@ -824,20 +767,18 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
         c("s_gff_seqname", "s_gff_start", "s_gff_end")
       }
       if (!all(req_cols %in% names(d))) {
-        warning("[dnds_state_contrast/pairwise] regions_bed provided but missing required columns for side='",
+        warning("[dnds_state_contrast/pairwise] regions_file provided but missing required columns for side='",
                 side, "': ", paste(req_cols, collapse = ", "),
                 ". Disabling region scope for: ", label)
         d$region_status <- "global"
         scopes_pw <- setdiff(scopes_pw, "region")
       } else {
-        # region status (pairwise uses side switch)
         d <- .label_region_status_pairwise(d, regions = regions, side = side)
       }
     } else {
       d$region_status <- "global"
     }
 
-    # states
     d <- .make_states(d, dnds_col = dnds_col,
                       pos_threshold = pos_threshold,
                       neutral_lower = neutral_lower,
@@ -848,7 +789,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     for (scp in scopes_pw) {
       d_sc <- if (scp == "global") d else d[d$region_status == "region", , drop = FALSE]
 
-      # power filter per group
       tab <- table(d_sc[[group_col]])
       keep_groups <- names(tab)[tab >= min_n_per_group]
       d_sc <- d_sc[d_sc[[group_col]] %in% keep_groups, , drop = FALSE]
@@ -899,7 +839,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
 
     res <- do.call(rbind, all_res)
 
-    # FDR within each (state, scope)
     res$p_adj <- NA_real_
     key <- paste(res$state, res$scope, sep = "||")
     for (k in unique(key)) {
@@ -907,12 +846,10 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       res$p_adj[idx] <- .adjust_p(res$p_value[idx], method = fdr_method)
     }
 
-    # OR columns
     res$odds_ratio  <- exp(res$log_or)
     res$or_ci_lower <- exp(res$log_or_ci_lower)
     res$or_ci_upper <- exp(res$log_or_ci_upper)
 
-    # context columns
     res$pos_threshold <- pos_threshold
     res$neutral_lower <- neutral_lower
     res$neutral_upper <- neutral_upper
@@ -920,7 +857,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     res$min_n_per_group <- min_n_per_group
     res$fdr_method    <- fdr_method
 
-    # write outputs
     dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
     prefix <- if (!is.null(out_prefix) && nzchar(out_prefix)) out_prefix else label
 
@@ -943,7 +879,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   # Gene-mode runner
   # -----------------------------
   .run_one_gene_from_files <- function(files, label, out_dir) {
-    # stack gene rows from all files
     gene_rows <- list()
     used_names <- character(0)
 
@@ -954,11 +889,9 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
         next
       }
 
-      # comp name: strip known suffix, then strip .tsv if still present
       comp_name <- sub("_dnds_annot\\.tsv$", "", basename(f))
       comp_name <- sub("\\.tsv$", "", comp_name)
 
-      # prevent collisions if multiple files share basename
       if (comp_name %in% used_names) {
         comp_name <- make.unique(c(used_names, comp_name))[length(used_names) + 1L]
         warning("[dnds_state_contrast/gene] Duplicate basename detected; using unique comparison id: ", comp_name)
@@ -981,9 +914,7 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       )
       if (!nrow(g)) next
 
-      # label region_status per gene row (uses the gene coords directly)
       g <- .label_region_status_coords(g, regions = regions, seq_col = "seqname", start_col = "start", end_col = "end")
-
       gene_rows[[length(gene_rows) + 1]] <- g
     }
 
@@ -994,7 +925,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
 
     g_all <- do.call(rbind, gene_rows)
 
-    # compute results per scope
     all_res <- list()
     gene_tbl_by_scope <- list()
 
@@ -1012,7 +942,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       )
       if (!nrow(gene_tbl)) next
 
-      # enforce power at gene level
       tab <- table(gene_tbl$group)
       keep_groups <- names(tab)[tab >= min_n_per_group]
       gene_tbl <- gene_tbl[gene_tbl$group %in% keep_groups, , drop = FALSE]
@@ -1022,7 +951,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
         next
       }
 
-      # add state on aggregated dNdS
       gene_tbl <- .make_states(gene_tbl, dnds_col = "dNdS_agg",
                                pos_threshold = pos_threshold,
                                neutral_lower = neutral_lower,
@@ -1034,7 +962,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       pairs <- utils::combn(sort(groups), 2, simplify = FALSE)
       states <- levels(gene_tbl$state)
 
-      # use random effects only if the column survived aggregation
       re_for_gene <- NULL
       if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(gene_tbl)) {
         re_for_gene <- random_effect_col
@@ -1077,7 +1004,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
 
     res <- do.call(rbind, all_res)
 
-    # FDR within each (state, scope)
     res$p_adj <- NA_real_
     key <- paste(res$state, res$scope, sep = "||")
     for (k in unique(key)) {
@@ -1085,7 +1011,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
       res$p_adj[idx] <- .adjust_p(res$p_value[idx], method = fdr_method)
     }
 
-    # OR columns + context
     res$odds_ratio  <- exp(res$log_or)
     res$or_ci_lower <- exp(res$log_or_ci_lower)
     res$or_ci_upper <- exp(res$log_or_ci_upper)
@@ -1101,7 +1026,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     res$group_mode    <- group_mode
     res$focal_sides   <- paste(focal_sides, collapse = ",")
 
-    # write outputs
     dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
     prefix <- if (!is.null(out_prefix) && nzchar(out_prefix)) out_prefix else label
 
@@ -1109,7 +1033,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     utils::write.table(res, out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
     out_paths <- c(out_tsv)
 
-    # also write gene tables (per scope) so you can sanity check
     for (scp in names(gene_tbl_by_scope)) {
       gt <- gene_tbl_by_scope[[scp]]
       out_gt <- file.path(out_dir, sprintf("%s_gene_table_%s.tsv", prefix, scp))
@@ -1160,7 +1083,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
         outs_all[[comp]] <- run$results
         paths_all <- c(paths_all, run$paths)
       } else {
-        # gene mode: in batch we run per-comp by default (single file), but write into a shared subdir
         out_dir_gene <- file.path(output_dir, gene_out_dir, comp)
         run <- .run_one_gene_from_files(files = c(in_file), label = comp, out_dir = out_dir_gene)
         outs_all[[comp]] <- run$results
@@ -1193,7 +1115,6 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     files <- as.character(dnds_annot_files)
     if (any(!file.exists(files))) stop("Some dnds_annot_files do not exist.")
   } else if (!is.null(dnds_table_file)) {
-    # allow dnds_table_file as a convenience alias in gene mode too
     files <- c(dnds_table_file)
     if (!file.exists(files[1])) stop("dnds_table_file not found: ", files[1])
   } else {
