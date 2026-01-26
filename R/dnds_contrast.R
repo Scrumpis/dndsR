@@ -134,9 +134,9 @@
 #' Returns a data.frame with columns: seqname, start, end, region_name
 #'
 #' Coordinate conventions:
-#'   - If regions_coord = "bed0", interpret as BED 0-based, half-open [start, end)
-#'     and convert to 1-based, closed [start+1, end] for overlap with GFF-like coordinates.
-#'   - If regions_coord = "gff1", interpret as 1-based, closed [start, end].
+#'   - If regions_coord = "bed0", interpret as BED 0-based, half-open \code{\[start, end\)}
+#'     and convert to 1-based, closed \code{\[start+1, end\]} for overlap with GFF-like coordinates.
+#'   - If regions_coord = "gff1", interpret as 1-based, closed \code{\[start, end\]}.
 #'
 #' Robust to headerless BED files: tries header=TRUE, then falls back to header=FALSE.
 #'
