@@ -1,5 +1,13 @@
 # dnds_contrast.R
 # (updated: global-by-default; optional regional restriction via regions_bed)
+#
+# Key fixes vs prior version:
+#  - Paired "positive selection enrichment" now uses McNemar (paired binary), not Fisher (independent).
+#  - Merge-key duplicates now HARD-FAIL by default (prevents silent "keep first" bias).
+#  - Regional coordinate conventions handled explicitly (BED 0-based half-open vs 1-based closed).
+#  - Regions BED parsing validates numeric coords, start/end sanity.
+#  - Bootstrap CIs optionally reproducible via seed.
+#  - Wilcoxon can optionally keep zeros (default) or drop them (configurable).
 
 # -----------------------------
 # Internal helpers
@@ -69,11 +77,11 @@
     if (all(req5 %in% names(df))) return(df[, req5, drop = FALSE])
     if (all(req4 %in% names(df))) {
       return(data.frame(
-        contrast_name = df$contrast_name,
-        compA         = df$compA,
-        compA_side    = df$side,
-        compB         = df$compB,
-        compB_side    = df$side,
+        contrast_name    = df$contrast_name,
+        compA            = df$compA,
+        compA_side       = df$side,
+        compB            = df$compB,
+        compB_side       = df$side,
         stringsAsFactors = FALSE
       ))
     }
@@ -104,40 +112,68 @@
   normalize_df(df2)
 }
 
-#' Filter dNdS annotation table by NA / max_dnds / optional logical expression
+#' Filter dNdS annotation table by NA / max_dnds
+#'
+#' Keeps rows with finite dNdS and dNdS < max_dnds. This is the only filtering
+#' performed (by design).
 #'
 #' @keywords internal
-.filter_dnds <- function(d, filter_expr = NULL, max_dnds = 10) {
-  keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
-  if (!is.null(filter_expr) && nzchar(filter_expr)) {
-    ok <- try(eval(parse(text = filter_expr),
-                   envir  = d,
-                   enclos = parent.frame()),
-              silent = TRUE)
-    if (!inherits(ok, "try-error")) {
-      keep <- keep & isTRUE(as.vector(ok))
-    }
-  }
+.filter_dnds <- function(d, max_dnds = 10) {
+  keep <- is.finite(d$dNdS) & d$dNdS < max_dnds
   d[keep, , drop = FALSE]
+}
+
+#' Clean column names
+#'
+#' Strips CRLF artifacts and trims leading/trailing whitespace from column names.
+#'
+#' @param d A data.frame-like object.
+#' @return `d` with cleaned column names.
+#' @keywords internal
+.clean_colnames <- function(d) {
+  nn <- names(d)
+  nn <- sub("\r$", "", nn)
+  nn <- trimws(nn)
+  names(d) <- nn
+  d
 }
 
 #' Read and normalize a regions BED-like file
 #'
 #' Returns a data.frame with columns: seqname, start, end, region_name
 #'
+#' Coordinate conventions:
+#'   - If regions_coord = "bed0", interpret as BED 0-based, half-open [start, end)
+#'     and convert to 1-based, closed [start+1, end] for overlap with GFF-like coordinates.
+#'   - If regions_coord = "gff1", interpret as 1-based, closed [start, end].
+#'
+#' Robust to headerless BED files: tries header=TRUE, then falls back to header=FALSE.
+#'
 #' @keywords internal
 .read_regions_bed <- function(regions_bed,
                               region_seq_col   = NULL,
                               region_start_col = NULL,
                               region_end_col   = NULL,
-                              region_name_col  = NULL) {
+                              region_name_col  = NULL,
+                              regions_coord    = c("bed0", "gff1"),
+                              stop_on_invalid  = TRUE) {
+  regions_coord <- match.arg(regions_coord)
+
   if (missing(regions_bed) || is.null(regions_bed) || !nzchar(regions_bed)) {
     stop("regions_bed is required.")
   }
   if (!file.exists(regions_bed)) stop("regions_bed not found: ", regions_bed)
 
-  reg_raw <- .read_ws(regions_bed, header_try = TRUE)
+  reg_raw <- try(.read_ws(regions_bed, header_try = TRUE), silent = TRUE)
+  if (inherits(reg_raw, "try-error") || ncol(reg_raw) < 3) {
+    reg_raw <- .read_ws(regions_bed, header_try = FALSE)
+  }
   if (ncol(reg_raw) < 3) stop("regions_bed must have at least 3 columns: seqname, start, end.")
+
+  # If headerless, assign standard names for first 3 columns.
+  if (is.null(names(reg_raw)) || any(!nzchar(names(reg_raw)[1:3]))) {
+    names(reg_raw)[1:3] <- c("seqname", "start", "end")
+  }
 
   if (is.null(region_seq_col))   region_seq_col   <- names(reg_raw)[1]
   if (is.null(region_start_col)) region_start_col <- names(reg_raw)[2]
@@ -147,11 +183,47 @@
     region_name_col <- "region_name"
   }
 
+  seqname <- as.character(reg_raw[[region_seq_col]])
+  start0  <- suppressWarnings(as.numeric(reg_raw[[region_start_col]]))
+  end0    <- suppressWarnings(as.numeric(reg_raw[[region_end_col]]))
+  rname   <- as.character(reg_raw[[region_name_col]])
+
+  bad <- is.na(seqname) | !nzchar(seqname) | is.na(start0) | is.na(end0)
+  if (any(bad)) {
+    msg <- paste0(
+      "regions_bed has invalid rows (missing/NA seqname or non-numeric start/end). ",
+      "First few bad row indices: ",
+      paste(head(which(bad), 10), collapse = ", ")
+    )
+    if (stop_on_invalid) stop(msg) else warning(msg)
+  }
+
+  # Convert coordinate convention to 1-based closed intervals for downstream overlap
+  if (regions_coord == "bed0") {
+    # BED: 0-based, half-open [start, end) => 1-based closed [start+1, end]
+    start <- start0 + 1
+    end   <- end0
+  } else {
+    start <- start0
+    end   <- end0
+  }
+
+  # Basic sanity
+  bad2 <- !is.finite(start) | !is.finite(end) | start > end
+  if (any(bad2)) {
+    msg <- paste0(
+      "regions_bed has invalid intervals (start > end or non-finite). ",
+      "First few bad row indices: ",
+      paste(head(which(bad2), 10), collapse = ", ")
+    )
+    if (stop_on_invalid) stop(msg) else warning(msg)
+  }
+
   data.frame(
-    seqname     = as.character(reg_raw[[region_seq_col]]),
-    start       = as.numeric(reg_raw[[region_start_col]]),
-    end         = as.numeric(reg_raw[[region_end_col]]),
-    region_name = as.character(reg_raw[[region_name_col]]),
+    seqname     = seqname,
+    start       = start,
+    end         = end,
+    region_name = rname,
     stringsAsFactors = FALSE
   )
 }
@@ -160,6 +232,8 @@
 #'
 #' Adds a column q_region_status or s_region_status with values "region"/"background".
 #' Uses data.table::foverlaps if available; otherwise falls back to a simple loop.
+#'
+#' NOTE: Assumes regions and gene coords are in the same convention (1-based closed).
 #'
 #' @keywords internal
 .label_region_side <- function(d, regions, side = c("query", "subject")) {
@@ -183,19 +257,39 @@
          paste(c(seq_col, start_col, end_col), collapse = ", "))
   }
 
+  # coerce coords numeric & validate
+  d_seq   <- as.character(d[[seq_col]])
+  d_start <- suppressWarnings(as.numeric(d[[start_col]]))
+  d_end   <- suppressWarnings(as.numeric(d[[end_col]]))
+
+  bad <- is.na(d_seq) | !nzchar(d_seq) | is.na(d_start) | is.na(d_end) | d_start > d_end
+  if (any(bad)) {
+    stop("Gene coordinate columns contain invalid rows for side='", side, "'. ",
+         "First few bad row indices: ", paste(head(which(bad), 10), collapse = ", "))
+  }
+
   if (has_dt) {
     dt_g <- data.table::data.table(
       idx     = seq_len(nrow(d)),
-      seqname = as.character(d[[seq_col]]),
-      start   = as.numeric(d[[start_col]]),
-      end     = as.numeric(d[[end_col]])
+      seqname = d_seq,
+      start   = d_start,
+      end     = d_end
     )
     dt_r <- data.table::data.table(
-      seqname     = regions$seqname,
-      start       = regions$start,
-      end         = regions$end,
-      region_name = regions$region_name
+      seqname     = as.character(regions$seqname),
+      start       = as.numeric(regions$start),
+      end         = as.numeric(regions$end),
+      region_name = as.character(regions$region_name)
     )
+
+    # Validate regions too
+    badr <- is.na(dt_r$seqname) | !nzchar(dt_r$seqname) |
+      is.na(dt_r$start) | is.na(dt_r$end) | dt_r$start > dt_r$end
+    if (any(badr)) {
+      stop("Regions contain invalid rows. First few bad region indices: ",
+           paste(head(which(badr), 10), collapse = ", "))
+    }
+
     data.table::setkey(dt_g, seqname, start, end)
     data.table::setkey(dt_r, seqname, start, end)
     ov     <- data.table::foverlaps(dt_g, dt_r, nomatch = 0L)
@@ -207,9 +301,9 @@
     lab <- rep("background", nrow(d))
     for (i in seq_len(nrow(regions))) {
       r <- regions[i, ]
-      hits <- which(d[[seq_col]] == r$seqname &
-                      d[[start_col]] <= r$end &
-                      d[[end_col]]   >= r$start)
+      hits <- which(d_seq == r$seqname &
+                      d_start <= r$end &
+                      d_end   >= r$start)
       if (length(hits)) lab[hits] <- "region"
     }
     d[[status_col]] <- lab
@@ -220,7 +314,10 @@
 #' Compute mean/median/SD/SE/CI for a numeric vector
 #'
 #' @keywords internal
-.calc_mean_ci <- function(x, ci_method = c("normal", "bootstrap"), n_boot = 1000) {
+.calc_mean_ci <- function(x,
+                          ci_method = c("normal", "bootstrap"),
+                          n_boot = 1000,
+                          seed = NULL) {
   ci_method <- match.arg(ci_method)
   x <- x[is.finite(x)]
   n <- length(x)
@@ -232,25 +329,11 @@
   if (ci_method == "normal") {
     ci <- m + c(-1.96, 1.96) * se
   } else {
+    if (!is.null(seed)) set.seed(seed)
     means <- replicate(n_boot, mean(sample(x, size = n, replace = TRUE)))
     ci <- stats::quantile(means, probs = c(0.025, 0.975), names = FALSE)
   }
   c(m, med, sd, se, ci[1], ci[2])
-}
-
-#' Clean column names
-#'
-#' Strips CRLF artifacts and trims leading/trailing whitespace from column names.
-#'
-#' @param d A data.frame-like object.
-#' @return `d` with cleaned column names.
-#' @keywords internal
-.clean_colnames <- function(d) {
-  nn <- names(d)
-  nn <- sub("\r$", "", nn)
-  nn <- trimws(nn)
-  names(d) <- nn
-  d
 }
 
 # -----------------------------
@@ -261,12 +344,12 @@
 #'
 #' Compare dN/dS between pairs of dNdS annotation files using paired nonparametric
 #' tests. For each contrast (compA vs compB), the function:
-#'   - filters each table by max_dnds and optional filter_expr,
+#'   - filters each table by max_dnds,
 #'   - (optional) restricts to genes in regions_bed (side-aware),
 #'   - matches rows across comparisons,
 #'   - computes delta = dNdS_A - dNdS_B per matched gene,
 #'   - runs a Wilcoxon signed-rank test on delta,
-#'   - runs Fisher's exact test for enrichment of dN/dS > pos_threshold in A vs B,
+#'   - runs McNemar's test (paired) for enrichment of dN/dS > pos_threshold in A vs B,
 #'   - writes a TSV summary + optional plots.
 #'
 #' Default behavior is genome-wide contrasts (regions_bed = NULL).
@@ -294,6 +377,8 @@
 #'
 #' @param regions_bed Optional BED-like file of regions. If provided, restrict to
 #'   genes overlapping regions (regional mode). If NULL, run genome-wide (default).
+#' @param regions_coord Coordinate convention for regions_bed: "bed0" (BED 0-based half-open)
+#'   or "gff1" (1-based closed). Default "bed0".
 #' @param region_seq_col,region_start_col,region_end_col,region_name_col
 #'   Column names in regions_bed for seqname/start/end/label.
 #'
@@ -304,18 +389,23 @@
 #'   to evaluate in auto-all-pairs mode and single-contrast mode. Ignored in global
 #'   mode (regions_bed = NULL).
 #'
-#' @param filter_expr Optional character with a logical expression evaluated in
-#'   each dNdS table prior to region labeling and merging.
-#' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds or NA dNdS (default 10).
+#' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds or non-finite dNdS (default 10).
 #'
 #' @param ci_method One of "normal" (mean +/- 1.96*SE) or "bootstrap" (percentile).
 #' @param n_boot Integer; number of bootstrap resamples if ci_method = "bootstrap".
+#' @param ci_seed Optional integer seed for bootstrap reproducibility (default NULL).
 #'
 #' @param make_plots Logical; if TRUE, write paired scatter, delta histogram,
 #'   and delta ECDF per contrast.
 #'
 #' @param pos_threshold Numeric threshold for calling "positive selection"
-#'   (genes with dN/dS > pos_threshold are counted in the enrichment test; default 1).
+#'   (genes with dN/dS > pos_threshold are counted in the paired enrichment test; default 1).
+#'
+#' @param drop_zero_deltas Logical; if TRUE, drop delta==0 before Wilcoxon (legacy behavior).
+#'   Default FALSE (keep zeros; ties handled by wilcox.test).
+#'
+#' @param dedup_keys What to do if merge keys are duplicated within A or B:
+#'   "error" (default) stops with a message; "first" keeps first occurrence.
 #'
 #' @return Invisibly, a character vector of summary TSV paths (one per contrast x side_tag).
 #' @export
@@ -325,21 +415,26 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
                           contrast_file     = NULL,
                           output_dir        = getwd(),
                           regions_bed       = NULL,
+                          regions_coord     = c("bed0", "gff1"),
                           region_seq_col    = NULL,
                           region_start_col  = NULL,
                           region_end_col    = NULL,
                           region_name_col   = NULL,
                           merge_cols        = NULL,
                           sides             = c("query", "subject"),
-                          filter_expr       = NULL,
                           max_dnds          = 10,
                           ci_method         = c("normal", "bootstrap"),
                           n_boot            = 1000,
+                          ci_seed           = NULL,
                           make_plots        = TRUE,
-                          pos_threshold     = 1) {
+                          pos_threshold     = 1,
+                          drop_zero_deltas  = FALSE,
+                          dedup_keys        = c("error", "first")) {
 
-  ci_method <- match.arg(ci_method)
-  sides     <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
+  ci_method     <- match.arg(ci_method)
+  sides         <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
+  regions_coord <- match.arg(regions_coord)
+  dedup_keys    <- match.arg(dedup_keys)
 
   do_regions <- !is.null(regions_bed) && nzchar(regions_bed)
 
@@ -349,11 +444,14 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
                                  region_seq_col   = region_seq_col,
                                  region_start_col = region_start_col,
                                  region_end_col   = region_end_col,
-                                 region_name_col  = region_name_col)
+                                 region_name_col  = region_name_col,
+                                 regions_coord    = regions_coord,
+                                 stop_on_invalid  = TRUE)
   }
 
-  .wilcox_signed <- function(delta) {
-    delta <- delta[is.finite(delta) & delta != 0]
+  .wilcox_signed <- function(delta, drop_zero = FALSE) {
+    delta <- delta[is.finite(delta)]
+    if (drop_zero) delta <- delta[delta != 0]
     if (length(delta) < 2L) return(NA_real_)
     stats::wilcox.test(delta, mu = 0, alternative = "two.sided")$p.value
   }
@@ -389,7 +487,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       ggplot2::labs(
         x     = "delta dN/dS (A - B)",
         y     = "Count",
-        title = paste0(contrast_name, " — delta histogram (", side_tag, ")")
+        title = paste0(contrast_name, " - delta histogram (", side_tag, ")")
       )
 
     ggplot2::ggsave(
@@ -406,7 +504,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       ggplot2::labs(
         x     = "delta dN/dS (A - B)",
         y     = "ECDF",
-        title = paste0(contrast_name, " — delta ECDF (", side_tag, ")")
+        title = paste0(contrast_name, " - delta ECDF (", side_tag, ")")
       )
 
     ggplot2::ggsave(
@@ -425,20 +523,91 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     invisible(TRUE)
   }
 
-  .merge_dnds <- function(dA, dB, by_cols, suffixes = c("_A","_B")) {
+  .check_dups_or_handle <- function(d, by_cols, label, action = c("error", "first")) {
+    action <- match.arg(action)
+    key <- do.call(paste, c(d[by_cols], sep = "\x1F"))
+    dup <- duplicated(key)
+    if (any(dup)) {
+      # include a few example keys for debugging
+      ex_keys <- unique(key[dup])
+      msg <- paste0(
+        "Duplicate merge keys detected in ", label, " (", sum(dup), " duplicated rows; ",
+        length(ex_keys), " duplicated key(s)). ",
+        "Example duplicated key(s): ",
+        paste(head(ex_keys, 5), collapse = " | "),
+        ".\nThis can bias results if handled silently. Resolve upstream (recommended) ",
+        "or set dedup_keys='first' to keep the first occurrence."
+      )
+      if (action == "error") stop(msg)
+      # else keep first
+      d <- d[!dup, , drop = FALSE]
+    }
+    d
+  }
+
+  .merge_dnds <- function(dA, dB, by_cols, suffixes = c("_A", "_B")) {
+    by_cols <- as.character(by_cols)
+
     # drop empty/NA keys
     for (cc in by_cols) {
       dA <- dA[!is.na(dA[[cc]]) & nzchar(as.character(dA[[cc]])), , drop = FALSE]
       dB <- dB[!is.na(dB[[cc]]) & nzchar(as.character(dB[[cc]])), , drop = FALSE]
     }
 
-    # deduplicate by key (keep first)
-    keyA <- do.call(paste, c(dA[by_cols], sep = "\r"))
-    keyB <- do.call(paste, c(dB[by_cols], sep = "\r"))
-    dA <- dA[!duplicated(keyA), , drop = FALSE]
-    dB <- dB[!duplicated(keyB), , drop = FALSE]
+    # check duplicates (hard-fail by default)
+    dA <- .check_dups_or_handle(dA, by_cols, label = "table A", action = dedup_keys)
+    dB <- .check_dups_or_handle(dB, by_cols, label = "table B", action = dedup_keys)
 
     merge(dA, dB, by = by_cols, suffixes = suffixes)
+  }
+
+  .paired_pos_tests <- function(dNdS_A, dNdS_B, pos_threshold = 1) {
+    # Paired binary outcomes; only keep pairs where BOTH values are finite
+    ok <- is.finite(dNdS_A) & is.finite(dNdS_B)
+    if (!any(ok)) {
+      return(list(
+        n_pairs_both_finite = 0L,
+        n_pos_A = NA_integer_, n_pos_B = NA_integer_,
+        b_Apos_Bnon = NA_integer_, c_Anon_Bpos = NA_integer_,
+        mcnemar_p_two_sided = NA_real_,
+        binom_p_A_gt_B = NA_real_
+      ))
+    }
+
+    Apos <- dNdS_A[ok] > pos_threshold
+    Bpos <- dNdS_B[ok] > pos_threshold
+
+    # 2x2 for McNemar:
+    #           Bpos   !Bpos
+    # Apos        a      b
+    # !Apos       c      d
+    a <- sum(Apos & Bpos)
+    b <- sum(Apos & !Bpos)  # discordant in A direction
+    c <- sum(!Apos & Bpos)  # discordant in B direction
+    d <- sum(!Apos & !Bpos)
+
+    # McNemar (paired), 2-sided
+    mcn_p <- tryCatch(
+      stats::mcnemar.test(matrix(c(a, b, c, d), nrow = 2, byrow = TRUE))$p.value,
+      error = function(e) NA_real_
+    )
+
+    # One-sided exact sign/binomial test on discordant pairs only:
+    # H0: b and c equally likely; H1: b > c (more Apos when Bnonpos)
+    bin_p <- NA_real_
+    if ((b + c) > 0) {
+      bin_p <- stats::binom.test(x = b, n = b + c, p = 0.5, alternative = "greater")$p.value
+    }
+
+    list(
+      n_pairs_both_finite = sum(ok),
+      n_pos_A = sum(Apos),
+      n_pos_B = sum(Bpos),
+      b_Apos_Bnon = b,
+      c_Anon_Bpos = c,
+      mcnemar_p_two_sided = mcn_p,
+      binom_p_A_gt_B = bin_p
+    )
   }
 
   .run_one_contrast <- function(contrast_name,
@@ -469,23 +638,23 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     .require_cols(dA_raw, c("dNdS"), context = fileA)
     .require_cols(dB_raw, c("dNdS"), context = fileB)
 
-    # Apply filtering
-    dA <- .filter_dnds(dA_raw, filter_expr = filter_expr, max_dnds = max_dnds)
-    dB <- .filter_dnds(dB_raw, filter_expr = filter_expr, max_dnds = max_dnds)
+    # Apply filtering (finite dNdS and below threshold)
+    dA <- .filter_dnds(dA_raw, max_dnds = max_dnds)
+    dB <- .filter_dnds(dB_raw, max_dnds = max_dnds)
 
     if (!nrow(dA) || !nrow(dB)) {
       warning("No rows after filtering for contrast ", contrast_name)
       return(NA_character_)
     }
 
-    mode_label <- if (do_regions) "regional (region-only)" else "genome-wide"
+    mode_label <- if (do_regions) paste0("regional (region-only; regions_coord=", regions_coord, ")") else "genome-wide"
 
     # ----------------------------
     # Regional restriction (optional)
     # ----------------------------
     if (do_regions) {
-      if (!sideA %in% c("query","subject")) stop("sideA must be 'query' or 'subject' in regional mode.")
-      if (!sideB %in% c("query","subject")) stop("sideB must be 'query' or 'subject' in regional mode.")
+      if (!sideA %in% c("query", "subject")) stop("sideA must be 'query' or 'subject' in regional mode.")
+      if (!sideB %in% c("query", "subject")) stop("sideB must be 'query' or 'subject' in regional mode.")
 
       dA <- .label_region_side(dA, regions = regions, side = sideA)
       dB <- .label_region_side(dB, regions = regions, side = sideB)
@@ -508,7 +677,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     if (is.null(merge_cols)) {
       if (!do_regions) {
         # Global default: ortholog-pair key
-        merge_cols_use <- c("query_id","subject_id")
+        merge_cols_use <- c("query_id", "subject_id")
         .require_cols(dA, merge_cols_use, context = paste0("table A (", compA_name, ")"))
         .require_cols(dB, merge_cols_use, context = paste0("table B (", compB_name, ")"))
 
@@ -530,8 +699,8 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
 
       } else {
         # Regional default: side-aware focal matching
-        .require_cols(dA, c("query_id","subject_id"), context = paste0("table A (", compA_name, ")"))
-        .require_cols(dB, c("query_id","subject_id"), context = paste0("table B (", compB_name, ")"))
+        .require_cols(dA, c("query_id", "subject_id"), context = paste0("table A (", compA_name, ")"))
+        .require_cols(dB, c("query_id", "subject_id"), context = paste0("table B (", compB_name, ")"))
 
         focal_id_A <- if (sideA == "query") dA$query_id else dA$subject_id
         focal_id_B <- if (sideB == "query") dB$query_id else dB$subject_id
@@ -581,8 +750,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     # standardize names for downstream code
     if (!("dNdS_A" %in% names(merged))) {
       # merge() uses suffixes; ensure exactly dNdS_A / dNdS_B exist
-      # If user supplied merge_cols, dNdS columns should have been suffixed.
-      # Defensive fallback:
       dcols <- grep("^dNdS", names(merged), value = TRUE)
       if (length(dcols) == 2) {
         names(merged)[match(dcols[1], names(merged))] <- "dNdS_A"
@@ -590,7 +757,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       }
     }
 
-    if (!all(c("dNdS_A","dNdS_B") %in% names(merged))) {
+    if (!all(c("dNdS_A", "dNdS_B") %in% names(merged))) {
       stop("Internal error: merged table is missing dNdS_A and/or dNdS_B after merging.")
     }
 
@@ -599,7 +766,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     # ----------------------------
     # Stats / tests
     # ----------------------------
-    stats_delta  <- .calc_mean_ci(merged$delta, ci_method = ci_method, n_boot = n_boot)
+    stats_delta  <- .calc_mean_ci(merged$delta, ci_method = ci_method, n_boot = n_boot, seed = ci_seed)
     mean_delta   <- stats_delta[1]
     median_delta <- stats_delta[2]
     delta_sd     <- stats_delta[3]
@@ -613,39 +780,17 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     med_B  <- stats::median(merged$dNdS_B, na.rm = TRUE)
     n      <- sum(is.finite(merged$delta))
 
-    p_wilcox <- .wilcox_signed(merged$delta)
+    p_wilcox <- .wilcox_signed(merged$delta, drop_zero = drop_zero_deltas)
 
-    # Positive selection enrichment: dN/dS > pos_threshold
-    is_finite_A <- is.finite(merged$dNdS_A)
-    is_finite_B <- is.finite(merged$dNdS_B)
-    is_pos_A    <- is_finite_A & merged$dNdS_A > pos_threshold
-    is_pos_B    <- is_finite_B & merged$dNdS_B > pos_threshold
-
-    nA         <- sum(is_finite_A)
-    nB         <- sum(is_finite_B)
-    n_pos_A    <- sum(is_pos_A)
-    n_pos_B    <- sum(is_pos_B)
-    n_non_A    <- nA - n_pos_A
-    n_non_B    <- nB - n_pos_B
-    frac_pos_A <- if (nA > 0) n_pos_A / nA else NA_real_
-    frac_pos_B <- if (nB > 0) n_pos_B / nB else NA_real_
-
-    fisher_p <- NA_real_
-    if (nA > 0 && nB > 0) {
-      tab <- matrix(c(n_pos_A, n_non_A,
-                      n_pos_B, n_non_B),
-                    nrow = 2, byrow = TRUE)
-      fisher_p <- tryCatch(
-        stats::fisher.test(tab, alternative = "greater")$p.value,
-        error = function(e) NA_real_
-      )
-    }
+    # Paired positive-selection enrichment (McNemar + one-sided exact binomial on discordant pairs)
+    pos_tests <- .paired_pos_tests(merged$dNdS_A, merged$dNdS_B, pos_threshold = pos_threshold)
 
     summary_df <- data.frame(
       contrast_name   = contrast_name,
       compA           = compA_name,
       compB           = compB_name,
       mode            = if (do_regions) "regional" else "global",
+      regions_coord   = if (do_regions) regions_coord else NA_character_,
       sideA           = if (do_regions) sideA else "global",
       sideB           = if (do_regions) sideB else "global",
       side_tag        = side_tag,
@@ -662,14 +807,15 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       delta_ci_lower  = delta_ci_lo,
       delta_ci_upper  = delta_ci_hi,
       wilcox_p_value  = p_wilcox,
-      n_pos_A         = n_pos_A,
-      n_nonpos_A      = n_non_A,
-      frac_pos_A      = frac_pos_A,
-      n_pos_B         = n_pos_B,
-      n_nonpos_B      = n_non_B,
-      frac_pos_B      = frac_pos_B,
+      wilcox_drop_zero_deltas = drop_zero_deltas,
       pos_threshold   = pos_threshold,
-      fisher_p_A_gt_B_dnds_gt_pos_threshold = fisher_p,
+      n_pairs_both_finite_for_pos = pos_tests$n_pairs_both_finite,
+      n_pos_A         = pos_tests$n_pos_A,
+      n_pos_B         = pos_tests$n_pos_B,
+      discordant_Apos_Bnon = pos_tests$b_Apos_Bnon,
+      discordant_Anon_Bpos = pos_tests$c_Anon_Bpos,
+      mcnemar_p_two_sided = pos_tests$mcnemar_p_two_sided,
+      binom_p_A_gt_B_on_discordant = pos_tests$binom_p_A_gt_B,
       stringsAsFactors = FALSE
     )
 
