@@ -336,10 +336,8 @@
   # Must have both outcomes present
   if (length(unique(d2$y[is.finite(d2$y)])) < 2L) return(NULL)
 
-  # Separation guard: each group must have both outcomes
-  tt <- table(d2[[group_col]], d2$y)
-  if (ncol(tt) < 2L) return(NULL)
-  if (!all(c("0","1") %in% colnames(tt))) return(NULL)
+  # Separation guard: each group must have both outcomes (force levels 0/1)
+  tt <- table(d2[[group_col]], factor(d2$y, levels = c(0, 1)))
   if (any(tt[, "0"] == 0L | tt[, "1"] == 0L)) return(NULL)
 
   d2[[group_col]] <- stats::relevel(factor(d2[[group_col]]), ref = groupB)
@@ -372,7 +370,11 @@
       term <- tt2[1]
 
       est <- unname(coefs[term])
-      se  <- sqrt(diag(vcovm))[term]
+
+      # FIX: index variance first, then sqrt; and guard against NA/0
+      se  <- sqrt(diag(vcovm)[term])
+      if (!is.finite(se) || se <= 0) return(NULL)
+
       z   <- stats::qnorm(0.975)
       lo  <- est - z * se
       hi  <- est + z * se
@@ -404,6 +406,8 @@
   est <- sm[rr, "Estimate"]
   se  <- sm[rr, "Std. Error"]
   pval <- sm[rr, "Pr(>|z|)"]
+
+  if (!is.finite(se) || se <= 0) return(NULL)
 
   z <- stats::qnorm(0.975)
   lo <- est - z * se
@@ -473,7 +477,11 @@
 
 # ---- gene-mode helpers ----
 
-#' Infer subgenome/group from seqname (default: capture terminal B/C/D)
+#' Infer group from seqname (current default: capture terminal B/C/D)
+#'
+#' NOTE: This helper is intentionally conservative. In gene mode, inference failures
+#' will STOP with examples rather than silently dropping genes. If you want general
+#' haplotype/subgenome handling, prefer group_mode="custom" + gene_group_col.
 #'
 #' @keywords internal
 .infer_group_from_seqname <- function(x) {
@@ -550,6 +558,10 @@
 #' - Only retained if random_effect_col is constant within each gene_key.
 #' - If it varies within gene_key (common for orthogroup-per-pair), it is disabled with a warning.
 #'
+#' Safety:
+#' - In group_mode="subgenome", if any groups cannot be inferred, this function STOPs
+#'   with example seqnames to prevent silent gene loss.
+#'
 #' @keywords internal
 .aggregate_gene_table <- function(g,
                                   group_mode = c("subgenome","custom"),
@@ -575,6 +587,20 @@
 
   if (group_mode == "subgenome") {
     g$group <- .infer_group_from_seqname(g$seqname)
+
+    # SAFETY: do not silently drop genes if inference fails
+    if (any(is.na(g$group) | !nzchar(g$group))) {
+      bad_seq <- unique(as.character(g$seqname[is.na(g$group) | !nzchar(g$group)]))
+      bad_seq <- bad_seq[!is.na(bad_seq) & nzchar(bad_seq)]
+      msg <- paste0(
+        "Failed to infer 'group' from seqname for ", length(bad_seq), " seqnames in gene mode.\n",
+        "This would silently drop genes; stopping for safety.\n\n",
+        "Provide group_mode='custom' and gene_group_col (recommended for general haplotypes/subgenomes),\n",
+        "or adjust your seqnames to match the inference rule.\n\n",
+        "Examples:\n  ", paste(utils::head(bad_seq, 5), collapse = "\n  ")
+      )
+      stop(msg)
+    }
   } else {
     if (is.null(group_col) || !nzchar(group_col)) stop("group_col is required when group_mode='custom'.")
     if (!group_col %in% names(g)) stop("group_col '", group_col, "' not found in gene rows.")
@@ -686,10 +712,9 @@
 #' ---- gene-mode only ----
 #' @param dnds_annot_files Optional vector of explicit *_dnds_annot.tsv paths (gene mode single).
 #' @param focal_sides Which genes to treat as focal observations: c("query","subject") (gene mode; default both).
-#' @param group_mode "subgenome" infers group from seqname suffix (B/C/D) or "custom".
-#' @param gene_group_col If group_mode="custom", name of column in gene rows to use as group
-#'   (rare; usually you'd keep group_mode="subgenome"). The column must exist in the gene-row
-#'   table prior to aggregation.
+#' @param group_mode "subgenome" infers group from seqname suffix (current default is conservative) or "custom".
+#' @param gene_group_col If group_mode="custom", name of column in gene rows to use as group.
+#'   This is recommended for general haplotypes/subgenomes (not just B/C/D).
 #' @param agg_fun "median" or "mean" aggregation across partners.
 #' @param min_pairs Minimum pairwise observations per gene required before modeling.
 #' @param gene_out_dir Subdirectory (within output_dir) for gene-mode outputs in batch runs.
@@ -746,8 +771,11 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   if (!is.finite(neutral_lower) || !is.finite(neutral_upper) || neutral_lower > neutral_upper) {
     stop("Require neutral_lower <= neutral_upper (both finite).")
   }
+
+  # SAFETY: forbid overlapping thresholds by default (prevents silent state redefinition)
   if (is.finite(pos_threshold) && pos_threshold < neutral_upper) {
-    warning("pos_threshold < neutral_upper; Positive will be called for x > pos_threshold, which may overlap the neutral band.")
+    stop("pos_threshold must be >= neutral_upper to avoid overlapping state definitions. ",
+         "pos_threshold=", pos_threshold, ", neutral_upper=", neutral_upper, ".")
   }
 
   regions <- .read_regions_bed(regions_bed,
