@@ -2,9 +2,10 @@
 % Please edit documentation in R/dnds_state_contrast.R
 \name{dnds_state_contrast}
 \alias{dnds_state_contrast}
-\title{dN/dS state contrasts via (mixed) logistic regression}
+\title{dN/dS state contrasts (pairwise or gene-level) via logistic regression + forest plot}
 \usage{
 dnds_state_contrast(
+  level = c("pairwise", "gene"),
   dnds_table_file = NULL,
   comparison_file = NULL,
   output_dir = getwd(),
@@ -19,64 +20,121 @@ dnds_state_contrast(
   filter_expr = NULL,
   min_n_per_group = 50,
   fdr_method = c("BH", "BY", "none"),
+  regions_bed = NULL,
+  region_seq_col = NULL,
+  region_start_col = NULL,
+  region_end_col = NULL,
+  region_name_col = NULL,
+  side = c("query", "subject"),
+  scopes = NULL,
   make_plots = TRUE,
-  out_prefix = NULL
+  base_family = "Liberation Sans",
+  out_prefix = NULL,
+  dnds_annot_files = NULL,
+  focal_sides = c("query", "subject"),
+  group_mode = c("subgenome", "custom"),
+  gene_group_col = NULL,
+  agg_fun = c("median", "mean"),
+  min_pairs = 2,
+  gene_out_dir = "gene_level_state_contrast"
 )
 }
 \arguments{
-\item{dnds_table_file}{Path to a TSV with dN/dS + group column (single mode).}
+\item{level}{One of c("pairwise","gene").}
 
-\item{comparison_file}{Optional batch file; if provided, reads per-comparison
-tables from file.path(output_dir, comparison_name, in_suffix).
-Must have a column 'comparison_name' (header or first column).}
+\item{dnds_table_file}{Pairwise mode single input TSV. In gene mode, this can also be
+used as a convenience alias for a single *_dnds_annot.tsv file.}
 
-\item{output_dir}{Root dir for batch outputs (default getwd()).}
+\item{comparison_file}{Batch mode comparisons file (both levels).}
 
-\item{in_suffix}{Filename within each comparison folder (default "\if{html}{\out{<comp>}}_dnds.tsv").}
+\item{output_dir}{Root directory for batch mode.}
+
+\item{in_suffix}{Filename within each comparison folder:
+\itemize{
+\item pairwise: defaults to "\if{html}{\out{<comp>}}_dnds_annot.tsv"
+\item gene:     defaults to "\if{html}{\out{<comp>}}_dnds_annot.tsv"
+}}
 
 \item{dnds_col}{Name of dN/dS column (default "dNdS").}
 
-\item{group_col}{Name of grouping column (e.g., "subgenome", "species", "region") (default "group").}
+\item{group_col}{Pairwise mode grouping column name in the table (default "group").}
 
-\item{random_effect_col}{Optional column for random intercept (e.g., "orthogroup") (default NULL).}
+\item{random_effect_col}{Optional column for random intercept (e.g., orthogroup) (default NULL).}
 
-\item{pos_threshold}{Numeric; dN/dS > this is "Positive" (default 1).}
+\item{pos_threshold, neutral_lower, neutral_upper}{State thresholds.}
 
-\item{neutral_lower}{Numeric; lower bound for "Neutral" (default 0.9).}
+\item{max_dnds}{Drop rows with dN/dS >= max_dnds or NA.}
 
-\item{neutral_upper}{Numeric; upper bound for "Neutral" (default 1.1).}
+\item{filter_expr}{Optional expression evaluated in raw tables before modeling.}
 
-\item{max_dnds}{Numeric; drop rows with dN/dS >= max_dnds or NA (default 10).}
+\item{min_n_per_group}{Minimum observations per group within a scope.}
 
-\item{filter_expr}{Optional expression evaluated in the table to filter rows.}
+\item{fdr_method}{One of "BH","BY","none". Applied within each (state, scope).}
 
-\item{min_n_per_group}{Minimum rows required per group to run comparisons (default 50).}
+\item{regions_bed}{Optional BED-like file. If provided, enables region scope.}
 
-\item{fdr_method}{One of "BH","BY","none" (default "BH").}
+\item{region_seq_col, region_start_col, region_end_col}{Column selectors in \code{regions_bed}
+giving the chromosome/seqname, start, and end columns. Each selector may be a column
+name (character) or 1-based column index (numeric). If NULL (default), the first three
+columns of the file are used.}
 
-\item{make_plots}{Logical; if TRUE, writes forest plot (default TRUE).}
+\item{region_name_col}{Optional column selector in \code{regions_bed} for labeling regions
+(name or 1-based index). If NULL or not present, a constant label ("region") is used.}
 
-\item{out_prefix}{Output prefix (default derived from file basename).}
+\item{side}{Pairwise mode region overlap side ("query" or "subject"). Ignored in gene mode
+(gene mode uses the gene-row coordinates directly).}
+
+\item{scopes}{Which scopes to run: subset of c("global","region").}
+
+\item{make_plots}{If TRUE, write forest plot PDF and PNG.}
+
+\item{base_family}{Font family for plots.}
+
+\item{out_prefix}{Output prefix (default derived from file/comp name).
+
+---- gene-mode only ----}
+
+\item{dnds_annot_files}{Optional vector of explicit *_dnds_annot.tsv paths (gene mode single).}
+
+\item{focal_sides}{Which genes to treat as focal observations: c("query","subject") (gene mode; default both).}
+
+\item{group_mode}{"subgenome" infers group from seqname suffix (current default is conservative) or "custom".}
+
+\item{gene_group_col}{If group_mode="custom", name of column in gene rows to use as group.
+This is recommended for general haplotypes/subgenomes (not just B/C/D).}
+
+\item{agg_fun}{"median" or "mean" aggregation across partners.}
+
+\item{min_pairs}{Minimum pairwise observations per gene required before modeling.}
+
+\item{gene_out_dir}{Subdirectory (within output_dir) for gene-mode outputs in batch runs.}
 }
 \value{
 Invisibly returns list with:
 \itemize{
-\item results: data.frame of contrasts
+\item results: data.frame (or list of per-comp dfs in batch)
 \item paths: written TSV + plot paths
+\item gene_table: (gene mode only) the aggregated gene table (or list in batch)
 }
 }
 \description{
-Compares the frequency of dN/dS "states" across groups using one-vs-rest
-logistic regression, optionally with a random intercept (mixed model).
+Pairwise mode:
+\itemize{
+\item input is a table containing dNdS + group column (or batch reads \if{html}{\out{<comp>}}_dnds_annot.tsv),
+\item optionally restrict to regions (regions_bed + side),
+\item fit pairwise A vs B logistic models for each state within each scope (global/region).
+}
 }
 \details{
-States are:
+Gene mode:
 \itemize{
-\item Positive:  dN/dS > pos_threshold
-\item Neutral:   neutral_lower <= dN/dS <= neutral_upper
-\item Purifying: dN/dS < neutral_lower
+\item input is one or more *_dnds_annot.tsv tables (single or batch),
+\item convert to gene rows on query/subject side(s),
+\item optionally restrict to regions (regions_bed) before aggregation,
+\item aggregate across partners per gene (median/mean),
+\item classify each gene into state, and fit pairwise A vs B models on gene-level observations.
 }
 
-Runs all pairwise contrasts (A vs B) and returns odds ratios with CIs and FDR.
-Produces a forest plot faceted by state and reference group.
+Region coordinates are treated as inclusive numeric intervals; ensure your \code{regions_bed}
+coordinates are consistent with the coordinate system used in your dN/dS tables.
 }
