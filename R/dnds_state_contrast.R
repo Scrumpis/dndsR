@@ -70,7 +70,9 @@
 #' Filter dNdS table by NA / max_dnds / optional expression
 #'
 #' @keywords internal
-.filter_dnds <- function(d, dnds_col = "dNdS", filter_expr = NULL, max_dnds = 10) {
+.filter_dnds <- function(d, dnds_col = "dNdS", filter_expr = NULL, max_dnds = 10, ...) {
+  # NOTE: the trailing "..." is intentional.
+  # It prevents hard failures if callers pass legacy arguments that are not used here.
   if (!dnds_col %in% names(d)) stop("Missing dnds_col: ", dnds_col)
   d[[dnds_col]] <- suppressWarnings(as.numeric(d[[dnds_col]]))
   keep <- !is.na(d[[dnds_col]]) & is.finite(d[[dnds_col]]) & d[[dnds_col]] < max_dnds
@@ -164,19 +166,17 @@
 
   lo <- pmin(st0, en0)
   hi <- pmax(st0, en0)
-  if (any(lo > hi)) stop("regions_file contains rows with start > end (after normalization).")
 
   namev <- if (!is.null(name_idx)) as.character(reg_raw[[name_idx]]) else rep("region", nrow(reg_raw))
   namev[is.na(namev) | !nzchar(namev)] <- "region"
 
-  out <- data.frame(
+  data.frame(
     seqname     = seqv,
     start       = lo,
     end         = hi,
     region_name = namev,
     stringsAsFactors = FALSE
   )
-  out
 }
 
 #' Label rows as inside/outside regions given explicit coord columns
@@ -258,7 +258,7 @@
 #' Requires columns like q_gff_seqname/q_gff_start/q_gff_end or s_* depending on side.
 #'
 #' @keywords internal
-.label_region_status_pairwise <- function(d, regions, side = c("query","subject")) {
+.label_region_status_pairwise <- function(d, regions, side = c("query", "subject")) {
   side <- match.arg(side)
   if (is.null(regions)) {
     d$region_status <- "global"
@@ -290,14 +290,14 @@
 
   d$state <- ifelse(x > pos_cut, "Positive",
                     ifelse(x < neutral_lower, "Purifying", "Neutral"))
-  d$state <- factor(d$state, levels = c("Positive","Neutral","Purifying"))
+  d$state <- factor(d$state, levels = c("Positive", "Neutral", "Purifying"))
   d
 }
 
 #' Adjust p-values
 #'
 #' @keywords internal
-.adjust_p <- function(p, method = c("BH","BY","none")) {
+.adjust_p <- function(p, method = c("BH", "BY", "none")) {
   method <- match.arg(method)
   if (method == "none") return(p)
   stats::p.adjust(p, method = method)
@@ -321,10 +321,8 @@
   if (!"y" %in% names(d2)) stop("Internal error: d$y is required for model fitting.")
   d2$y <- as.integer(d2$y)
 
-  # Must have both outcomes present
   if (length(unique(d2$y[is.finite(d2$y)])) < 2L) return(NULL)
 
-  # Separation guard: each group must have both outcomes (force levels 0/1)
   tt <- table(d2[[group_col]], factor(d2$y, levels = c(0, 1)))
   if (any(tt[, "0"] == 0L | tt[, "1"] == 0L)) return(NULL)
 
@@ -342,7 +340,6 @@
     d3 <- d2[!is.na(d2[[random_effect_col]]), , drop = FALSE]
     if (!nrow(d3)) return(NULL)
 
-    # need >=2 random-effect levels to be meaningful/stable
     if (length(unique(as.character(d3[[random_effect_col]]))) < 2L) {
       use_re <- FALSE
     } else {
@@ -358,7 +355,6 @@
 
       est <- unname(coefs[term])
 
-      # variance index first, then sqrt (and guard)
       se  <- sqrt(diag(vcovm)[term])
       if (!is.finite(se) || se <= 0) return(NULL)
 
@@ -377,7 +373,6 @@
     }
   }
 
-  # GLM fallback
   form <- stats::as.formula(sprintf("y ~ %s", group_col))
   fit  <- suppressWarnings(stats::glm(form, data = d2, family = stats::binomial(link = "logit")))
   sm   <- summary(fit)$coefficients
@@ -385,10 +380,9 @@
   rn <- rownames(sm)
   rn <- rn[rn != "(Intercept)"]
   if (!length(rn)) return(NULL)
-
   if (length(rn) != 1) return(NULL)
-  rr <- rn[1]
 
+  rr <- rn[1]
   est <- sm[rr, "Estimate"]
   se  <- sm[rr, "Std. Error"]
   pval <- sm[rr, "Pr(>|z|)"]
@@ -409,13 +403,13 @@
 
 #' Forest plot for state contrasts
 #'
-#' Orders contrasts *within each facet* for readability (avoids global factor ordering).
+#' Orders contrasts within each facet for readability (avoids global factor ordering).
 #'
 #' @keywords internal
 .plot_state_forest <- function(res,
                                out_path,
                                base_family = "Liberation Sans",
-                               facet_by = c("scope","state"),
+                               facet_by = c("scope", "state"),
                                point_size = 2.8,
                                line_width = 0.9,
                                dpi = 600) {
@@ -423,17 +417,13 @@
 
   facet_by <- match.arg(facet_by)
 
-  # OR scale
   res$odds_ratio  <- exp(res$log_or)
   res$or_ci_lower <- exp(res$log_or_ci_lower)
   res$or_ci_upper <- exp(res$log_or_ci_upper)
 
-  # Build a facet-specific y variable so ordering is per-facet, not global.
-  # We keep displayed labels as the original contrast_label.
   facet_id <- if (facet_by == "scope") paste(res$state, res$scope, sep = "||") else as.character(res$state)
   y_key <- paste(res$contrast_label, facet_id, sep = " @ ")
 
-  # Order within each facet by odds_ratio (then name as tiebreak)
   ord_df <- data.frame(y_key = y_key,
                        facet_id = facet_id,
                        odds_ratio = res$odds_ratio,
@@ -447,7 +437,7 @@
     levs <- c(levs, unique(kk$y_key))
   }
 
-  res$y_key <- factor(y_key, levels = rev(levs)) # rev to place largest OR near top visually
+  res$y_key <- factor(y_key, levels = rev(levs))
 
   gg <- ggplot2::ggplot(res, ggplot2::aes(x = odds_ratio, y = y_key)) +
     ggplot2::geom_vline(xintercept = 1, linetype = "dashed", linewidth = 0.8) +
@@ -474,7 +464,7 @@
   }
 
   ext <- tolower(tools::file_ext(out_path))
-  if (ext %in% c("png","tiff","jpeg","jpg")) {
+  if (ext %in% c("png", "tiff", "jpeg", "jpg")) {
     ggplot2::ggsave(out_path, gg, width = 11, height = 8, dpi = dpi)
   } else {
     ggplot2::ggsave(out_path, gg, width = 11, height = 8)
@@ -504,14 +494,14 @@
 #'   gene_id, side, seqname, start, end, dNdS_pair, comparison, gene_key
 #'
 #' @keywords internal
-.pairwise_to_gene_rows <- function(d, comp_name, dnds_col, focal_sides = c("query","subject"), random_effect_col = NULL) {
-  focal_sides <- match.arg(focal_sides, choices = c("query","subject"), several.ok = TRUE)
+.pairwise_to_gene_rows <- function(d, comp_name, dnds_col, focal_sides = c("query", "subject"), random_effect_col = NULL) {
+  focal_sides <- match.arg(focal_sides, choices = c("query", "subject"), several.ok = TRUE)
   out <- list()
 
   re_ok <- !is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(d)
 
   if ("query" %in% focal_sides) {
-    need <- c("query_id","q_gff_seqname","q_gff_start","q_gff_end", dnds_col)
+    need <- c("query_id", "q_gff_seqname", "q_gff_start", "q_gff_end", dnds_col)
     miss <- setdiff(need, names(d))
     if (length(miss)) stop("Missing in pairwise table (query side): ", paste(miss, collapse = ", "))
 
@@ -532,7 +522,7 @@
   }
 
   if ("subject" %in% focal_sides) {
-    need <- c("subject_id","s_gff_seqname","s_gff_start","s_gff_end", dnds_col)
+    need <- c("subject_id", "s_gff_seqname", "s_gff_start", "s_gff_end", dnds_col)
     miss <- setdiff(need, names(d))
     if (length(miss)) stop("Missing in pairwise table (subject side): ", paste(miss, collapse = ", "))
 
@@ -569,9 +559,9 @@
 #'
 #' @keywords internal
 .aggregate_gene_table <- function(g,
-                                  group_mode = c("subgenome","custom"),
+                                  group_mode = c("subgenome", "custom"),
                                   group_col = NULL,
-                                  agg_fun = c("median","mean"),
+                                  agg_fun = c("median", "mean"),
                                   min_pairs = 2,
                                   random_effect_col = NULL) {
   group_mode <- match.arg(group_mode)
@@ -581,7 +571,6 @@
            !is.na(g$dNdS_pair) & is.finite(g$dNdS_pair), , drop = FALSE]
   if (!nrow(g)) return(g)
 
-  # normalize gene coords
   g$start <- suppressWarnings(as.numeric(g$start))
   g$end   <- suppressWarnings(as.numeric(g$end))
   st0 <- g$start
@@ -616,7 +605,6 @@
 
   fun <- if (agg_fun == "median") stats::median else mean
 
-  # aggregate dNdS
   agg <- stats::aggregate(
     dNdS_pair ~ gene_key + gene_id + group,
     data = g,
@@ -624,7 +612,6 @@
   )
   names(agg)[names(agg) == "dNdS_pair"] <- "dNdS_agg"
 
-  # n_pairs
   n_pairs <- stats::aggregate(
     dNdS_pair ~ gene_key + gene_id + group,
     data = g,
@@ -632,14 +619,12 @@
   )
   names(n_pairs)[names(n_pairs) == "dNdS_pair"] <- "n_pairs"
 
-  agg <- merge(agg, n_pairs, by = c("gene_key","gene_id","group"), all.x = TRUE)
+  agg <- merge(agg, n_pairs, by = c("gene_key", "gene_id", "group"), all.x = TRUE)
 
-  # add comparison + side parsed from gene_key: "<comparison>|<side>|<gene_id>"
   parts <- strsplit(as.character(agg$gene_key), "\\|", fixed = FALSE)
   agg$comparison <- vapply(parts, function(p) if (length(p) >= 1) p[1] else NA_character_, character(1))
   agg$side       <- vapply(parts, function(p) if (length(p) >= 2) p[2] else NA_character_, character(1))
 
-  # attach a random-effect column if requested and valid for gene-level
   if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(g)) {
     re_counts <- tapply(g[[random_effect_col]], g$gene_key, function(x) length(unique(na.omit(x))))
     re_counts[is.na(re_counts)] <- 0L
@@ -680,9 +665,13 @@
 #' Ensure your \code{regions_file} coordinate system matches your dN/dS tables.
 #'
 #' @section Core mode:
+#' Choose whether observations are ortholog pairs ("pairwise") or aggregated gene-side observations ("gene").
+#'
 #' @param level Character. Analysis level: \code{"pairwise"} or \code{"gene"}.
 #'
 #' @section Input selection (single vs batch):
+#' Single mode analyzes one table (or one list of tables in gene mode). Batch mode iterates over comparisons.
+#'
 #' @param dnds_table_file Character. Path to a single input TSV.
 #' In pairwise mode, this is a pairwise dN/dS table containing \code{dnds_col} and \code{group_col}.
 #' In gene mode, this can be used as a single-file alias for \code{dnds_annot_files}.
@@ -696,11 +685,14 @@
 #' \code{"<comparison_name>_dnds_annot.tsv"}.
 #'
 #' @section Core columns:
+#' Controls which columns are interpreted as dN/dS values and group labels.
+#'
 #' @param dnds_col Character. Column name containing dN/dS values (default \code{"dNdS"}).
-#' @param group_col Character. Pairwise mode only: column name defining groups
-#' (default \code{"group"}).
+#' @param group_col Character. Pairwise mode only: column name defining groups (default \code{"group"}).
 #'
 #' @section State definitions and filtering:
+#' Defines how dN/dS values are converted to states and how rows are removed prior to modeling.
+#'
 #' @param pos_threshold Numeric. Positive selection threshold:
 #' \code{x > pos_threshold} is Positive. If not finite, Positive is \code{x > neutral_upper}.
 #' Default: 1.
@@ -709,10 +701,12 @@
 #' (unless overridden by \code{pos_threshold}).
 #' @param max_dnds Numeric. Maximum allowed dN/dS to retain (rows with \code{dnds_col >= max_dnds}
 #' or non-finite values are dropped). Default: 10.
-#' @param filter_expr Character or NULL. Optional R expression (as text) evaluated in the table’s
+#' @param filter_expr Character or NULL. Optional R expression (as text) evaluated in the table's
 #' column environment; must return a logical vector of length 1 or \code{nrow(d)}.
 #'
 #' @section Modeling options:
+#' Options controlling GLM vs mixed models and multiple-testing correction.
+#'
 #' @param random_effect_col Character or NULL. Optional column name to use as a random intercept
 #' (mixed model via \code{lme4::glmer}). If NULL/unavailable, falls back to \code{glm}.
 #' @param min_n_per_group Integer. Minimum number of observations per group to keep that group
@@ -721,23 +715,29 @@
 #' \code{state x scope} block. One of \code{"BH"}, \code{"BY"}, or \code{"none"}.
 #'
 #' @section Regions and scopes:
+#' Optional region restriction can be applied; results can be reported for global and/or region-only scopes.
+#'
 #' @param regions_file Character or NULL. Optional BED-like file (expected headerless) specifying regions.
 #' Must contain at least 3 columns: seqname, start, end; optional 4th column is region name/label.
 #' @param region_seq_col,region_start_col,region_end_col,region_name_col Integer/Character/NULL.
 #' Optional selectors for columns in \code{regions_file}. May be 1-based indices (e.g., 1,2,3,4)
 #' or names like \code{"V1"}. If NULL, defaults to 1/2/3 and uses column 4 as name if present.
-#' @param side Character. Pairwise mode only: which side’s coordinates to use when labeling rows
+#' @param side Character. Pairwise mode only: which side's coordinates to use when labeling rows
 #' as inside/outside regions. One of \code{"query"} or \code{"subject"}.
 #' @param scopes Character vector or NULL. Which scopes to analyze: \code{"global"} and optionally \code{"region"}.
 #' If NULL, uses \code{"global"} and adds \code{"region"} when \code{regions_file} is provided.
 #'
 #' @section Output and plotting:
+#' Controls TSV output and optional forest plots.
+#'
 #' @param make_plots Logical. If TRUE, writes forest plots (PDF + PNG) alongside TSV results.
 #' @param base_family Character. Base font family used by ggplot theme (default: \code{"Liberation Sans"}).
 #' @param out_prefix Character or NULL. Output filename prefix. If NULL, uses the inferred label
 #' (comparison name in batch mode; input basename in single mode).
 #'
 #' @section Gene-mode only:
+#' Options used only when \code{level="gene"} to build and aggregate gene-level observations.
+#'
 #' @param dnds_annot_files Character vector or NULL. Gene mode only: one or more paths to
 #' \code{*_dnds_annot.tsv} tables to stack before converting to gene rows.
 #' @param focal_sides Character vector. Gene mode only: which sides to include when converting pairwise
@@ -777,10 +777,10 @@
 #'   level = "gene",
 #'   dnds_table_file = "BvC_dnds_annot.tsv",
 #'   group_mode = "subgenome",
-#'   focal_sides = c("query","subject")
+#'   focal_sides = c("query", "subject")
 #' )
 #' }
-dnds_state_contrast <- function(level            = c("pairwise","gene"),
+dnds_state_contrast <- function(level            = c("pairwise", "gene"),
                                 # shared / pairwise inputs
                                 dnds_table_file   = NULL,
                                 comparison_file   = NULL,
@@ -795,23 +795,23 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
                                 max_dnds          = 10,
                                 filter_expr       = NULL,
                                 min_n_per_group   = 50,
-                                fdr_method        = c("BH","BY","none"),
+                                fdr_method        = c("BH", "BY", "none"),
                                 regions_file       = NULL,
                                 region_seq_col    = NULL,
                                 region_start_col  = NULL,
                                 region_end_col    = NULL,
                                 region_name_col   = NULL,
-                                side              = c("query","subject"),
+                                side              = c("query", "subject"),
                                 scopes            = NULL,
                                 make_plots        = TRUE,
                                 base_family       = "Liberation Sans",
                                 out_prefix        = NULL,
                                 # gene-mode only
                                 dnds_annot_files  = NULL,
-                                focal_sides       = c("query","subject"),
-                                group_mode        = c("subgenome","custom"),
+                                focal_sides       = c("query", "subject"),
+                                group_mode        = c("subgenome", "custom"),
                                 gene_group_col    = NULL,
-                                agg_fun           = c("median","mean"),
+                                agg_fun           = c("median", "mean"),
                                 min_pairs         = 2,
                                 gene_out_dir      = "gene_level_state_contrast") {
 
@@ -820,14 +820,12 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
   side       <- match.arg(side)
   group_mode <- match.arg(group_mode)
   agg_fun    <- match.arg(agg_fun)
-  focal_sides <- match.arg(focal_sides, choices = c("query","subject"), several.ok = TRUE)
+  focal_sides <- match.arg(focal_sides, choices = c("query", "subject"), several.ok = TRUE)
 
-  # sanity checks for thresholds
   if (!is.finite(neutral_lower) || !is.finite(neutral_upper) || neutral_lower > neutral_upper) {
     stop("Require neutral_lower <= neutral_upper (both finite).")
   }
 
-  # Was previously a hard stop; now warn (overlap is allowed, Positive overrides Neutral).
   if (is.finite(pos_threshold) && pos_threshold < neutral_upper) {
     warning("pos_threshold (", pos_threshold, ") is < neutral_upper (", neutral_upper, "). ",
             "Positive classification will override Neutral for x > pos_threshold. ",
@@ -840,12 +838,11 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
                                 region_end_col   = region_end_col,
                                 region_name_col  = region_name_col)
 
-  # determine scopes
   if (is.null(scopes)) {
     scopes <- "global"
     if (!is.null(regions)) scopes <- c(scopes, "region")
   } else {
-    scopes <- match.arg(scopes, choices = c("global","region"), several.ok = TRUE)
+    scopes <- match.arg(scopes, choices = c("global", "region"), several.ok = TRUE)
     if ("region" %in% scopes && is.null(regions)) {
       stop("scopes includes 'region' but regions_file is NULL.")
     }
@@ -961,12 +958,12 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     res$or_ci_lower <- exp(res$log_or_ci_lower)
     res$or_ci_upper <- exp(res$log_or_ci_upper)
 
-    res$pos_threshold <- pos_threshold
-    res$neutral_lower <- neutral_lower
-    res$neutral_upper <- neutral_upper
-    res$max_dnds      <- max_dnds
+    res$pos_threshold   <- pos_threshold
+    res$neutral_lower   <- neutral_lower
+    res$neutral_upper   <- neutral_upper
+    res$max_dnds        <- max_dnds
     res$min_n_per_group <- min_n_per_group
-    res$fdr_method    <- fdr_method
+    res$fdr_method      <- fdr_method
 
     dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
     prefix <- if (!is.null(out_prefix) && nzchar(out_prefix)) out_prefix else label
@@ -1126,16 +1123,16 @@ dnds_state_contrast <- function(level            = c("pairwise","gene"),
     res$or_ci_lower <- exp(res$log_or_ci_lower)
     res$or_ci_upper <- exp(res$log_or_ci_upper)
 
-    res$pos_threshold <- pos_threshold
-    res$neutral_lower <- neutral_lower
-    res$neutral_upper <- neutral_upper
-    res$max_dnds      <- max_dnds
+    res$pos_threshold   <- pos_threshold
+    res$neutral_lower   <- neutral_lower
+    res$neutral_upper   <- neutral_upper
+    res$max_dnds        <- max_dnds
     res$min_n_per_group <- min_n_per_group
-    res$fdr_method    <- fdr_method
-    res$agg_fun       <- agg_fun
-    res$min_pairs     <- min_pairs
-    res$group_mode    <- group_mode
-    res$focal_sides   <- paste(focal_sides, collapse = ",")
+    res$fdr_method      <- fdr_method
+    res$agg_fun         <- agg_fun
+    res$min_pairs       <- min_pairs
+    res$group_mode      <- group_mode
+    res$focal_sides     <- paste(focal_sides, collapse = ",")
 
     dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
     prefix <- if (!is.null(out_prefix) && nzchar(out_prefix)) out_prefix else label
