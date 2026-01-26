@@ -1,4 +1,4 @@
-# contrast.R
+# dnds_contrast.R
 # (updated: global-by-default; optional regional restriction via regions_bed)
 
 # -----------------------------
@@ -319,24 +319,24 @@
 #'
 #' @return Invisibly, a character vector of summary TSV paths (one per contrast x side_tag).
 #' @export
-contrast <- function(dnds_annot_file_a = NULL,
-                           dnds_annot_file_b = NULL,
-                           comparison_file   = NULL,
-                           contrast_file     = NULL,
-                           output_dir        = getwd(),
-                           regions_bed       = NULL,
-                           region_seq_col    = NULL,
-                           region_start_col  = NULL,
-                           region_end_col    = NULL,
-                           region_name_col   = NULL,
-                           merge_cols        = NULL,
-                           sides             = c("query", "subject"),
-                           filter_expr       = NULL,
-                           max_dnds          = 10,
-                           ci_method         = c("normal", "bootstrap"),
-                           n_boot            = 1000,
-                           make_plots        = TRUE,
-                           pos_threshold     = 1) {
+dnds_contrast <- function(dnds_annot_file_a = NULL,
+                          dnds_annot_file_b = NULL,
+                          comparison_file   = NULL,
+                          contrast_file     = NULL,
+                          output_dir        = getwd(),
+                          regions_bed       = NULL,
+                          region_seq_col    = NULL,
+                          region_start_col  = NULL,
+                          region_end_col    = NULL,
+                          region_name_col   = NULL,
+                          merge_cols        = NULL,
+                          sides             = c("query", "subject"),
+                          filter_expr       = NULL,
+                          max_dnds          = 10,
+                          ci_method         = c("normal", "bootstrap"),
+                          n_boot            = 1000,
+                          make_plots        = TRUE,
+                          pos_threshold     = 1) {
 
   ci_method <- match.arg(ci_method)
   sides     <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
@@ -693,6 +693,7 @@ contrast <- function(dnds_annot_file_a = NULL,
     comps      <- .read_comparisons(comparison_file)
     comp_names <- comps$comparison_name
 
+    # NOTE: Keep output subdir name as "contrast" to avoid breaking existing paths/workflows.
     contrast_dir <- file.path(output_dir, "contrast")
     dir.create(contrast_dir, showWarnings = FALSE, recursive = TRUE)
 
