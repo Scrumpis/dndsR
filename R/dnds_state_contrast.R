@@ -663,12 +663,123 @@
 # Exported function
 # -----------------------------
 
-#' dN/dS state contrasts (pairwise or gene-level) via logistic regression + forest plot
+#' dN/dS state contrasts via logistic regression (pairwise or gene-level) + optional forest plot
 #'
-#' Region coordinates are treated as inclusive numeric intervals; ensure your `regions_file`
-#' coordinates are consistent with the coordinate system used in your dN/dS tables.
+#' Fits logistic regression models comparing the odds of each dN/dS "state"
+#' (Positive / Neutral / Purifying) between groups (e.g., subgenomes B/C/D).
+#'
+#' Two analysis levels are supported:
+#' \itemize{
+#'   \item \code{level = "pairwise"}: each ortholog-pair row is an observation.
+#'   \item \code{level = "gene"}: converts pairwise rows to gene-side observations
+#'     (query/subject), aggregates across partners per gene, then models gene-level states.
+#' }
+#'
+#' Region filtering (optional) treats coordinates as inclusive numeric intervals:
+#' a row overlaps a region if \code{start <= region_end AND end >= region_start}.
+#' Ensure your \code{regions_file} coordinate system matches your dN/dS tables.
+#'
+#' @section Core mode:
+#' @param level Character. Analysis level: \code{"pairwise"} or \code{"gene"}.
+#'
+#' @section Input selection (single vs batch):
+#' @param dnds_table_file Character. Path to a single input TSV.
+#' In pairwise mode, this is a pairwise dN/dS table containing \code{dnds_col} and \code{group_col}.
+#' In gene mode, this can be used as a single-file alias for \code{dnds_annot_files}.
+#' @param comparison_file Character or data.frame. Batch-mode comparisons table.
+#' If a file path, it must contain columns:
+#' \code{comparison_name, query_fasta, query_gff, subject_fasta, subject_gff}.
+#' If provided, runs once per comparison subdirectory under \code{output_dir}.
+#' @param output_dir Character. Base output directory for batch mode (default: \code{getwd()}).
+#' @param in_suffix Character or NULL. Batch mode only: relative filename inside each
+#' \code{file.path(output_dir, comparison_name)} directory. If NULL, defaults to
+#' \code{"<comparison_name>_dnds_annot.tsv"}.
+#'
+#' @section Core columns:
+#' @param dnds_col Character. Column name containing dN/dS values (default \code{"dNdS"}).
+#' @param group_col Character. Pairwise mode only: column name defining groups
+#' (default \code{"group"}).
+#'
+#' @section State definitions and filtering:
+#' @param pos_threshold Numeric. Positive selection threshold:
+#' \code{x > pos_threshold} is Positive. If not finite, Positive is \code{x > neutral_upper}.
+#' Default: 1.
+#' @param neutral_lower Numeric. Lower bound for Neutral band (default 0.9). Values below are Purifying.
+#' @param neutral_upper Numeric. Upper bound for Neutral band (default 1.1). Values above are Positive
+#' (unless overridden by \code{pos_threshold}).
+#' @param max_dnds Numeric. Maximum allowed dN/dS to retain (rows with \code{dnds_col >= max_dnds}
+#' or non-finite values are dropped). Default: 10.
+#' @param filter_expr Character or NULL. Optional R expression (as text) evaluated in the table’s
+#' column environment; must return a logical vector of length 1 or \code{nrow(d)}.
+#'
+#' @section Modeling options:
+#' @param random_effect_col Character or NULL. Optional column name to use as a random intercept
+#' (mixed model via \code{lme4::glmer}). If NULL/unavailable, falls back to \code{glm}.
+#' @param min_n_per_group Integer. Minimum number of observations per group to keep that group
+#' for modeling within each scope (default: 50).
+#' @param fdr_method Character. Multiple-testing correction method applied within each
+#' \code{state x scope} block. One of \code{"BH"}, \code{"BY"}, or \code{"none"}.
+#'
+#' @section Regions and scopes:
+#' @param regions_file Character or NULL. Optional BED-like file (expected headerless) specifying regions.
+#' Must contain at least 3 columns: seqname, start, end; optional 4th column is region name/label.
+#' @param region_seq_col,region_start_col,region_end_col,region_name_col Integer/Character/NULL.
+#' Optional selectors for columns in \code{regions_file}. May be 1-based indices (e.g., 1,2,3,4)
+#' or names like \code{"V1"}. If NULL, defaults to 1/2/3 and uses column 4 as name if present.
+#' @param side Character. Pairwise mode only: which side’s coordinates to use when labeling rows
+#' as inside/outside regions. One of \code{"query"} or \code{"subject"}.
+#' @param scopes Character vector or NULL. Which scopes to analyze: \code{"global"} and optionally \code{"region"}.
+#' If NULL, uses \code{"global"} and adds \code{"region"} when \code{regions_file} is provided.
+#'
+#' @section Output and plotting:
+#' @param make_plots Logical. If TRUE, writes forest plots (PDF + PNG) alongside TSV results.
+#' @param base_family Character. Base font family used by ggplot theme (default: \code{"Liberation Sans"}).
+#' @param out_prefix Character or NULL. Output filename prefix. If NULL, uses the inferred label
+#' (comparison name in batch mode; input basename in single mode).
+#'
+#' @section Gene-mode only:
+#' @param dnds_annot_files Character vector or NULL. Gene mode only: one or more paths to
+#' \code{*_dnds_annot.tsv} tables to stack before converting to gene rows.
+#' @param focal_sides Character vector. Gene mode only: which sides to include when converting pairwise
+#' rows to gene observations. Any of \code{"query"} and/or \code{"subject"}.
+#' @param group_mode Character. Gene mode only: how to define groups for gene observations.
+#' \code{"subgenome"} infers group from \code{seqname} using a conservative terminal B/C/D rule;
+#' \code{"custom"} uses \code{gene_group_col}.
+#' @param gene_group_col Character or NULL. Gene mode only: when \code{group_mode="custom"},
+#' this is the column in gene rows used as group label.
+#' @param agg_fun Character. Gene mode only: how to aggregate per-gene partner dN/dS values.
+#' One of \code{"median"} or \code{"mean"}.
+#' @param min_pairs Integer. Gene mode only: minimum number of finite partner pairs contributing to a gene
+#' before retaining that gene-level observation (default: 2).
+#' @param gene_out_dir Character. Batch + gene mode only: directory name under \code{output_dir}
+#' where gene-level results are written (default: \code{"gene_level_state_contrast"}).
+#'
+#' @return Invisibly returns a list. In single mode:
+#' \code{list(results = <data.frame>, paths = <character>)}.
+#' In batch mode:
+#' \code{list(results = <named list>, paths = <character>)}.
+#' In gene mode, also includes \code{gene_table} (per-scope gene-level tables) when available.
 #'
 #' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Pairwise (single)
+#' dnds_state_contrast(
+#'   level = "pairwise",
+#'   dnds_table_file = "BvC_dnds_annot.tsv",
+#'   group_col = "subgenome",
+#'   dnds_col = "dNdS"
+#' )
+#'
+#' # Gene (single file alias)
+#' dnds_state_contrast(
+#'   level = "gene",
+#'   dnds_table_file = "BvC_dnds_annot.tsv",
+#'   group_mode = "subgenome",
+#'   focal_sides = c("query","subject")
+#' )
+#' }
 dnds_state_contrast <- function(level            = c("pairwise","gene"),
                                 # shared / pairwise inputs
                                 dnds_table_file   = NULL,
