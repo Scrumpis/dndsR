@@ -134,9 +134,9 @@
 #' Returns a data.frame with columns: seqname, start, end, region_name
 #'
 #' Coordinate conventions:
-#'   - If regions_coord = "bed0", interpret as BED 0-based, half-open \code{\[start, end\)}
-#'     and convert to 1-based, closed \code{\[start+1, end\]} for overlap with GFF-like coordinates.
-#'   - If regions_coord = "gff1", interpret as 1-based, closed \code{\[start, end\]}.
+#'   - If regions_coord = "bed0", interpret as BED 0-based, half-open [start, end)
+#'     and convert to 1-based, closed [start+1, end] for overlap with GFF-like coordinates.
+#'   - If regions_coord = "gff1", interpret as 1-based, closed [start, end].
 #'
 #' Robust to headerless BED files: tries header=TRUE, then falls back to header=FALSE.
 #'
@@ -147,7 +147,8 @@
                               region_end_col   = NULL,
                               region_name_col  = NULL,
                               regions_coord    = c("bed0", "gff1"),
-                              stop_on_invalid  = TRUE) {
+                              stop_on_invalid  = TRUE,
+                              ...) {
   regions_coord <- match.arg(regions_coord)
 
   if (missing(regions_bed) || is.null(regions_bed) || !nzchar(regions_bed)) {
@@ -184,7 +185,7 @@
     msg <- paste0(
       "regions_bed has invalid rows (missing/NA seqname or non-numeric start/end). ",
       "First few bad row indices: ",
-      paste(head(which(bad), 10), collapse = ", ")
+      paste(utils::head(which(bad), 10), collapse = ", ")
     )
     if (stop_on_invalid) stop(msg) else warning(msg)
   }
@@ -205,7 +206,7 @@
     msg <- paste0(
       "regions_bed has invalid intervals (start > end or non-finite). ",
       "First few bad row indices: ",
-      paste(head(which(bad2), 10), collapse = ", ")
+      paste(utils::head(which(bad2), 10), collapse = ", ")
     )
     if (stop_on_invalid) stop(msg) else warning(msg)
   }
@@ -256,7 +257,7 @@
   bad <- is.na(d_seq) | !nzchar(d_seq) | is.na(d_start) | is.na(d_end) | d_start > d_end
   if (any(bad)) {
     stop("Gene coordinate columns contain invalid rows for side='", side, "'. ",
-         "First few bad row indices: ", paste(head(which(bad), 10), collapse = ", "))
+         "First few bad row indices: ", paste(utils::head(which(bad), 10), collapse = ", "))
   }
 
   if (has_dt) {
@@ -278,7 +279,7 @@
       is.na(dt_r$start) | is.na(dt_r$end) | dt_r$start > dt_r$end
     if (any(badr)) {
       stop("Regions contain invalid rows. First few bad region indices: ",
-           paste(head(which(badr), 10), collapse = ", "))
+           paste(utils::head(which(badr), 10), collapse = ", "))
     }
 
     data.table::setkey(dt_g, seqname, start, end)
@@ -308,7 +309,8 @@
 .calc_mean_ci <- function(x,
                           ci_method = c("normal", "bootstrap"),
                           n_boot = 1000,
-                          seed = NULL) {
+                          seed = NULL,
+                          ...) {
   ci_method <- match.arg(ci_method)
   x <- x[is.finite(x)]
   n <- length(x)
@@ -516,7 +518,9 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
 
   .check_dups_or_handle <- function(d, by_cols, label, action = c("error", "first")) {
     action <- match.arg(action)
-    key <- do.call(paste, c(d[by_cols], sep = "\x1F"))
+
+    # Use an ASCII separator to avoid non-ASCII/non-printable characters
+    key <- do.call(paste, c(d[by_cols], sep = "||"))
     dup <- duplicated(key)
     if (any(dup)) {
       # include a few example keys for debugging
@@ -525,7 +529,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
         "Duplicate merge keys detected in ", label, " (", sum(dup), " duplicated rows; ",
         length(ex_keys), " duplicated key(s)). ",
         "Example duplicated key(s): ",
-        paste(head(ex_keys, 5), collapse = " | "),
+        paste(utils::head(ex_keys, 5), collapse = " | "),
         ".\nThis can bias results if handled silently. Resolve upstream (recommended) ",
         "or set dedup_keys='first' to keep the first occurrence."
       )
