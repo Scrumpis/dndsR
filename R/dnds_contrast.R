@@ -373,7 +373,7 @@
 #' @param regions_coord Coordinate convention for regions_bed: "bed0" (BED 0-based half-open)
 #'   or "gff1" (1-based closed). Default "bed0".
 #' @param region_seq_col,region_start_col,region_end_col,region_name_col
-#'   Column names in regions_bed for seqname/start/end/label.
+#'   Column names in regions_bed for seqname, start, end, label.
 #'
 #' @param merge_cols Optional character vector of column names used to match rows
 #'   across comparisons. If NULL, defaults are used (see Matching behavior above).
