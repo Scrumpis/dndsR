@@ -56,8 +56,7 @@
 #' Returns a data.frame with normalized columns:
 #'   contrast_name, compA, compA_side, compB, compB_side
 #'
-#' Note: when regions_bed is NULL (global mode), these side columns are accepted
-#' but ignored.
+#' Note: side columns are used in BOTH global (regions_bed = NULL) and regional mode.
 #'
 #' @keywords internal
 .read_contrasts <- function(x) {
@@ -205,25 +204,29 @@
 # dN/dS contrasts function
 # -----------------------------
 
-#' Pairwise dN/dS contrasts (genome-wide by default; optional region restriction)
+#' Pairwise dN/dS contrasts (global by default; optional region restriction via regions_bed)
 #'
 #' Compare dN/dS between pairs of dNdS annotation files using paired nonparametric
 #' tests. For each contrast (compA vs compB), the function:
 #'   - filters each table by max_dnds,
-#'   - (optional) restricts to genes in regions_bed (side-aware),
-#'   - matches rows across comparisons,
-#'   - computes delta = dNdS_A - dNdS_B per matched gene,
+#'   - (optional) restricts to genes overlapping regions_bed (side-aware),
+#'   - matches rows across comparisons using a focal gene ID (side-aware),
+#'   - computes delta = dNdS_A - dNdS_B per matched focal gene,
 #'   - runs a Wilcoxon signed-rank test on delta,
 #'   - runs McNemar's test (paired) for enrichment of dN/dS > pos_threshold in A vs B,
 #'   - writes a TSV summary + optional plots.
 #'
-#' Default behavior is genome-wide contrasts (regions_bed = NULL).
+#' Mode is implicit:
+#'   - Global mode (default): regions_bed is NULL/empty, no region restriction is applied.
+#'   - Regional mode: provide regions_bed; only genes overlapping regions are used.
 #'
-#' Matching behavior:
-#'   - Global (regions_bed = NULL): merge on c("query_id","subject_id") by default
-#'     (recommended). You may override with merge_cols.
-#'   - Regional (regions_bed provided): merge on side-aware focal IDs by default
-#'     (query_id if side == "query", else subject_id). You may override with merge_cols.
+#' Matching behavior (both modes):
+#'   - Rows are matched across A and B using a single focal ID derived from the requested
+#'     side for each table:
+#'       * side == "query"   => focal_id = query_id
+#'       * side == "subject" => focal_id = subject_id
+#'   - In batch explicit-contrast mode, sides come from the contrast_file.
+#'   - In single-contrast and auto-all-pairs mode, sides default to "query" for both A and B.
 #'
 #' Modes:
 #'   1) Single-contrast: supply dnds_annot_file_a and dnds_annot_file_b.
@@ -236,23 +239,16 @@
 #' @param comparison_file Path to whitespace-delimited file with columns:
 #'   comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
 #' @param contrast_file Optional file defining contrasts (4-col or 5-col layout).
-#'   Note: side columns are ignored in global mode (regions_bed = NULL).
+#'   Side columns are always used when provided.
 #'
 #' @param output_dir Root directory containing per-comparison folders (batch mode).
 #'
 #' @param regions_bed Optional BED-like file of regions. If provided, restrict to
-#'   genes overlapping regions (regional mode). If NULL, run genome-wide (default).
+#'   genes overlapping regions (regional mode). If NULL/empty, run global (default).
 #' @param regions_coord Coordinate convention for regions_bed: "bed0" (BED 0-based half-open)
 #'   or "gff1" (1-based closed). Default "bed0".
 #' @param region_seq_col,region_start_col,region_end_col,region_name_col
 #'   Column names in regions_bed for seqname, start, end, label.
-#'
-#' @param merge_cols Optional character vector of column names used to match rows
-#'   across comparisons. If NULL, defaults are used (see Matching behavior above).
-#'
-#' @param sides Character vector among c("query","subject") indicating which side(s)
-#'   to evaluate in auto-all-pairs mode and single-contrast mode. Ignored in global
-#'   mode (regions_bed = NULL).
 #'
 #' @param max_dnds Numeric. Drop rows with dNdS >= max_dnds or non-finite dNdS (default 10).
 #'
@@ -269,10 +265,10 @@
 #' @param drop_zero_deltas Logical; if TRUE, drop delta==0 before Wilcoxon (legacy behavior).
 #'   Default FALSE (keep zeros; ties handled by wilcox.test).
 #'
-#' @param dedup_keys What to do if merge keys are duplicated within A or B:
+#' @param dedup_keys What to do if focal merge keys are duplicated within A or B:
 #'   "error" (default) stops with a message; "first" keeps first occurrence.
 #'
-#' @return Invisibly, a character vector of summary TSV paths (one per contrast x side_tag).
+#' @return Invisibly, a character vector of summary TSV paths (one per contrast).
 #' @export
 dnds_contrast <- function(dnds_annot_file_a = NULL,
                           dnds_annot_file_b = NULL,
@@ -285,8 +281,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
                           region_start_col  = NULL,
                           region_end_col    = NULL,
                           region_name_col   = NULL,
-                          merge_cols        = NULL,
-                          sides             = c("query", "subject"),
                           max_dnds          = 10,
                           ci_method         = c("normal", "bootstrap"),
                           n_boot            = 1000,
@@ -297,7 +291,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
                           dedup_keys        = c("error", "first")) {
 
   ci_method     <- match.arg(ci_method)
-  sides         <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
   regions_coord <- match.arg(regions_coord)
   dedup_keys    <- match.arg(dedup_keys)
 
@@ -395,7 +388,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     key <- do.call(paste, c(d[by_cols], sep = "||"))
     dup <- duplicated(key)
     if (any(dup)) {
-      # include a few example keys for debugging
       ex_keys <- unique(key[dup])
       msg <- paste0(
         "Duplicate merge keys detected in ", label, " (", sum(dup), " duplicated rows; ",
@@ -406,7 +398,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
         "or set dedup_keys='first' to keep the first occurrence."
       )
       if (action == "error") stop(msg)
-      # else keep first
       d <- d[!dup, , drop = FALSE]
     }
     d
@@ -429,7 +420,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
   }
 
   .paired_pos_tests <- function(dNdS_A, dNdS_B, pos_threshold = 1) {
-    # Paired binary outcomes; only keep pairs where BOTH values are finite
     ok <- is.finite(dNdS_A) & is.finite(dNdS_B)
     if (!any(ok)) {
       return(list(
@@ -444,23 +434,16 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     Apos <- dNdS_A[ok] > pos_threshold
     Bpos <- dNdS_B[ok] > pos_threshold
 
-    # 2x2 for McNemar:
-    #           Bpos   !Bpos
-    # Apos        a      b
-    # !Apos       c      d
     a <- sum(Apos & Bpos)
-    b <- sum(Apos & !Bpos)  # discordant in A direction
-    c <- sum(!Apos & Bpos)  # discordant in B direction
+    b <- sum(Apos & !Bpos)
+    c <- sum(!Apos & Bpos)
     d <- sum(!Apos & !Bpos)
 
-    # McNemar (paired), 2-sided
     mcn_p <- tryCatch(
       stats::mcnemar.test(matrix(c(a, b, c, d), nrow = 2, byrow = TRUE))$p.value,
       error = function(e) NA_real_
     )
 
-    # One-sided exact sign/binomial test on discordant pairs only:
-    # H0: b and c equally likely; H1: b > c (more Apos when Bnonpos)
     bin_p <- NA_real_
     if ((b + c) > 0) {
       bin_p <- stats::binom.test(x = b, n = b + c, p = 0.5, alternative = "greater")$p.value
@@ -505,7 +488,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     .require_cols(dA_raw, c("dNdS"), context = fileA)
     .require_cols(dB_raw, c("dNdS"), context = fileB)
 
-    # Apply filtering (finite dNdS and below threshold)
     dA <- .filter_dnds(dA_raw, max_dnds = max_dnds)
     dB <- .filter_dnds(dB_raw, max_dnds = max_dnds)
 
@@ -514,15 +496,19 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       return(NA_character_)
     }
 
-    mode_label <- if (do_regions) paste0("regional (region-only; regions_coord=", regions_coord, ")") else "genome-wide"
+    mode_label <- if (do_regions) {
+      paste0("regional (region-only; regions_coord=", regions_coord, ")")
+    } else {
+      "genome-wide"
+    }
 
     # ----------------------------
     # Regional restriction (optional)
     # ----------------------------
-    if (do_regions) {
-      if (!sideA %in% c("query", "subject")) stop("sideA must be 'query' or 'subject' in regional mode.")
-      if (!sideB %in% c("query", "subject")) stop("sideB must be 'query' or 'subject' in regional mode.")
+    if (!sideA %in% c("query", "subject")) stop("sideA must be 'query' or 'subject'.")
+    if (!sideB %in% c("query", "subject")) stop("sideB must be 'query' or 'subject'.")
 
+    if (do_regions) {
       dA <- .label_region_side(dA, regions = regions, side = sideA)
       dB <- .label_region_side(dB, regions = regions, side = sideB)
 
@@ -539,74 +525,31 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     }
 
     # ----------------------------
-    # Matching / merge
+    # Matching / merge (ALWAYS focal_id)
     # ----------------------------
-    if (is.null(merge_cols)) {
-      if (!do_regions) {
-        # Global default: ortholog-pair key
-        merge_cols_use <- c("query_id", "subject_id")
-        .require_cols(dA, merge_cols_use, context = paste0("table A (", compA_name, ")"))
-        .require_cols(dB, merge_cols_use, context = paste0("table B (", compB_name, ")"))
+    .require_cols(dA, c("query_id", "subject_id"), context = paste0("table A (", compA_name, ")"))
+    .require_cols(dB, c("query_id", "subject_id"), context = paste0("table B (", compB_name, ")"))
 
-        dA_key <- data.frame(
-          query_id   = as.character(dA$query_id),
-          subject_id = as.character(dA$subject_id),
-          dNdS       = as.numeric(dA$dNdS),
-          stringsAsFactors = FALSE
-        )
-        dB_key <- data.frame(
-          query_id   = as.character(dB$query_id),
-          subject_id = as.character(dB$subject_id),
-          dNdS       = as.numeric(dB$dNdS),
-          stringsAsFactors = FALSE
-        )
+    focal_id_A <- if (sideA == "query") dA$query_id else dA$subject_id
+    focal_id_B <- if (sideB == "query") dB$query_id else dB$subject_id
 
-        merged <- .merge_dnds(dA_key, dB_key, by_cols = merge_cols_use)
-        side_tag <- "global"
+    dA_key <- data.frame(
+      focal_id = as.character(focal_id_A),
+      dNdS     = as.numeric(dA$dNdS),
+      stringsAsFactors = FALSE
+    )
+    dB_key <- data.frame(
+      focal_id = as.character(focal_id_B),
+      dNdS     = as.numeric(dB$dNdS),
+      stringsAsFactors = FALSE
+    )
 
-      } else {
-        # Regional default: side-aware focal matching
-        .require_cols(dA, c("query_id", "subject_id"), context = paste0("table A (", compA_name, ")"))
-        .require_cols(dB, c("query_id", "subject_id"), context = paste0("table B (", compB_name, ")"))
+    merged <- .merge_dnds(dA_key, dB_key, by_cols = "focal_id")
 
-        focal_id_A <- if (sideA == "query") dA$query_id else dA$subject_id
-        focal_id_B <- if (sideB == "query") dB$query_id else dB$subject_id
-
-        dA_key <- data.frame(
-          focal_id = as.character(focal_id_A),
-          dNdS     = as.numeric(dA$dNdS),
-          stringsAsFactors = FALSE
-        )
-        dB_key <- data.frame(
-          focal_id = as.character(focal_id_B),
-          dNdS     = as.numeric(dB$dNdS),
-          stringsAsFactors = FALSE
-        )
-
-        merged <- .merge_dnds(dA_key, dB_key, by_cols = "focal_id")
-        side_tag <- paste0("A_", sideA, "__B_", sideB)
-      }
-
+    side_tag <- if (do_regions) {
+      paste0("regional__A_", sideA, "__B_", sideB)
     } else {
-      # User-specified merge columns (applies in either mode)
-      merge_cols_use <- as.character(merge_cols)
-      .require_cols(dA, merge_cols_use, context = paste0("table A (", compA_name, ")"))
-      .require_cols(dB, merge_cols_use, context = paste0("table B (", compB_name, ")"))
-
-      # keep only merge cols + dNdS
-      dA_key <- dA[, unique(c(merge_cols_use, "dNdS")), drop = FALSE]
-      dB_key <- dB[, unique(c(merge_cols_use, "dNdS")), drop = FALSE]
-
-      # coerce merge cols to character for consistency
-      for (cc in merge_cols_use) {
-        dA_key[[cc]] <- as.character(dA_key[[cc]])
-        dB_key[[cc]] <- as.character(dB_key[[cc]])
-      }
-      dA_key$dNdS <- as.numeric(dA_key$dNdS)
-      dB_key$dNdS <- as.numeric(dB_key$dNdS)
-
-      merged <- .merge_dnds(dA_key, dB_key, by_cols = merge_cols_use)
-      side_tag <- if (do_regions) paste0("custommerge__A_", sideA, "__B_", sideB) else "custommerge__global"
+      paste0("global__A_", sideA, "__B_", sideB)
     }
 
     if (!nrow(merged)) {
@@ -616,7 +559,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
 
     # standardize names for downstream code
     if (!("dNdS_A" %in% names(merged))) {
-      # merge() uses suffixes; ensure exactly dNdS_A / dNdS_B exist
       dcols <- grep("^dNdS", names(merged), value = TRUE)
       if (length(dcols) == 2) {
         names(merged)[match(dcols[1], names(merged))] <- "dNdS_A"
@@ -649,7 +591,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
 
     p_wilcox <- .wilcox_signed(merged$delta, drop_zero = drop_zero_deltas)
 
-    # Paired positive-selection enrichment (McNemar + one-sided exact binomial on discordant pairs)
     pos_tests <- .paired_pos_tests(merged$dNdS_A, merged$dNdS_B, pos_threshold = pos_threshold)
 
     summary_df <- data.frame(
@@ -658,8 +599,8 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       compB           = compB_name,
       mode            = if (do_regions) "regional" else "global",
       regions_coord   = if (do_regions) regions_coord else NA_character_,
-      sideA           = if (do_regions) sideA else "global",
-      sideB           = if (do_regions) sideB else "global",
+      sideA           = sideA,
+      sideB           = sideB,
       side_tag        = side_tag,
       n               = n,
       max_dnds        = max_dnds,
@@ -711,7 +652,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     dir.create(contrast_dir, showWarnings = FALSE, recursive = TRUE)
 
     if (!is.null(contrast_file)) {
-      # Explicit contrasts (side fields ignored if global mode)
+      # Explicit contrasts
       contr <- .read_contrasts(contrast_file)
 
       for (i in seq_len(nrow(contr))) {
@@ -724,15 +665,11 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
         if (!cA %in% comp_names) stop("compA '", cA, "' not found in comparison_file.")
         if (!cB %in% comp_names) stop("compB '", cB, "' not found in comparison_file.")
 
-        # Only validate sides if doing regional mode
-        if (do_regions) {
-          if (!sideA %in% c("query", "subject")) stop("compA_side must be 'query' or 'subject' in contrast_file.")
-          if (!sideB %in% c("query", "subject")) stop("compB_side must be 'query' or 'subject' in contrast_file.")
-        } else {
-          # keep values but they won't be used
-          if (is.na(sideA) || !nzchar(sideA)) sideA <- "query"
-          if (is.na(sideB) || !nzchar(sideB)) sideB <- "query"
-        }
+        # Default missing/blank sides to query; always validate
+        if (is.na(sideA) || !nzchar(sideA)) sideA <- "query"
+        if (is.na(sideB) || !nzchar(sideB)) sideB <- "query"
+        if (!sideA %in% c("query", "subject")) stop("compA_side must be 'query' or 'subject' in contrast_file.")
+        if (!sideB %in% c("query", "subject")) stop("compB_side must be 'query' or 'subject' in contrast_file.")
 
         fileA <- file.path(output_dir, cA, paste0(cA, "_dnds_annot.tsv"))
         fileB <- file.path(output_dir, cB, paste0(cB, "_dnds_annot.tsv"))
@@ -741,11 +678,17 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
                        .run_one_contrast(cn, cA, cB, sideA, sideB, fileA, fileB, contrast_dir))
       }
 
+      out_paths <- out_paths[!is.na(out_paths) & nzchar(out_paths)]
+      if (!length(out_paths)) {
+        stop("No contrast outputs were written. This usually means no overlapping focal_id values after filtering ",
+             "(or after region restriction if regions_bed was provided).")
+      }
+
       message("dN/dS contrasts complete (explicit contrast_file).")
       return(invisible(out_paths))
     }
 
-    # Auto all-pairs
+    # Auto all-pairs (defaults: query/query focal matching)
     pairs <- utils::combn(comp_names, 2, simplify = FALSE)
     for (p in pairs) {
       cA    <- p[1]
@@ -753,26 +696,22 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       fileA <- file.path(output_dir, cA, paste0(cA, "_dnds_annot.tsv"))
       fileB <- file.path(output_dir, cB, paste0(cB, "_dnds_annot.tsv"))
 
-      if (!do_regions) {
-        # Global: run once per pair
-        cn <- paste0(cA, "_vs_", cB)
-        out_paths <- c(out_paths,
-                       .run_one_contrast(cn, cA, cB, "query", "query", fileA, fileB, contrast_dir))
-      } else {
-        # Regional: run for each side (same side for A and B)
-        for (sd in sides) {
-          cn <- paste0(cA, "_vs_", cB)
-          out_paths <- c(out_paths,
-                         .run_one_contrast(cn, cA, cB, sd, sd, fileA, fileB, contrast_dir))
-        }
-      }
+      cn <- paste0(cA, "_vs_", cB)
+      out_paths <- c(out_paths,
+                     .run_one_contrast(cn, cA, cB, "query", "query", fileA, fileB, contrast_dir))
+    }
+
+    out_paths <- out_paths[!is.na(out_paths) & nzchar(out_paths)]
+    if (!length(out_paths)) {
+      stop("No contrast outputs were written. This usually means no overlapping focal_id values after filtering ",
+           "(or after region restriction if regions_bed was provided).")
     }
 
     message("dN/dS contrasts complete (auto all-pairs).")
     return(invisible(out_paths))
   }
 
-  # Single-contrast mode
+  # Single-contrast mode (defaults: query/query focal matching)
   if (!is.null(dnds_annot_file_a) && !is.null(dnds_annot_file_b)) {
     compA_name <- sub("_dnds_annot\\.tsv$", "", basename(dnds_annot_file_a))
     compB_name <- sub("_dnds_annot\\.tsv$", "", basename(dnds_annot_file_b))
@@ -782,23 +721,17 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
 
     out_dir <- dirname(dnds_annot_file_a)
 
-    if (!do_regions) {
-      # Global: run once
-      cn <- paste0(compA_name, "_vs_", compB_name)
-      out_paths <- c(out_paths,
-                     .run_one_contrast(cn, compA_name, compB_name,
-                                       "query", "query",
-                                       dnds_annot_file_a, dnds_annot_file_b,
-                                       out_dir))
-    } else {
-      # Regional: run per side (same for A and B)
-      for (sd in sides) {
-        cn <- paste0(compA_name, "_vs_", compB_name)
-        out_paths <- c(out_paths,
-                       .run_one_contrast(cn, compA_name, compB_name, sd, sd,
-                                         dnds_annot_file_a, dnds_annot_file_b,
-                                         out_dir))
-      }
+    cn <- paste0(compA_name, "_vs_", compB_name)
+    out_paths <- c(out_paths,
+                   .run_one_contrast(cn, compA_name, compB_name,
+                                     "query", "query",
+                                     dnds_annot_file_a, dnds_annot_file_b,
+                                     out_dir))
+
+    out_paths <- out_paths[!is.na(out_paths) & nzchar(out_paths)]
+    if (!length(out_paths)) {
+      stop("No contrast outputs were written. This usually means no overlapping focal_id values after filtering ",
+           "(or after region restriction if regions_bed was provided).")
     }
 
     message("dN/dS contrast(s) complete for: ", compA_name, " vs ", compB_name)
