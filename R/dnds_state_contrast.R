@@ -592,7 +592,7 @@
   agg$side       <- vapply(parts, function(p) if (length(p) >= 2) p[2] else NA_character_, character(1))
 
   if (!is.null(random_effect_col) && nzchar(random_effect_col) && random_effect_col %in% names(g)) {
-    re_counts <- tapply(g[[random_effect_col]], g$gene_key, function(x) length(unique(na.omit(x))))
+    re_counts <- tapply(g[[random_effect_col]], g$gene_key, function(x) length(unique(stats::na.omit(x))))
     re_counts[is.na(re_counts)] <- 0L
     bad <- names(re_counts)[re_counts > 1L]
 
