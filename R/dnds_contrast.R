@@ -294,7 +294,8 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
   regions_coord <- match.arg(regions_coord)
   dedup_keys    <- match.arg(dedup_keys)
 
-  do_regions <- !is.null(regions_bed) && nzchar(regions_bed)
+  if (!is.null(regions_bed) && !is.na(regions_bed)) regions_bed <- trimws(regions_bed)
+  do_regions <- !is.null(regions_bed) && !is.na(regions_bed) && nzchar(regions_bed)
 
   regions <- NULL
   if (do_regions) {
