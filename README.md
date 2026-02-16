@@ -72,6 +72,7 @@ While in the dndsR cloned repo:
 git pull
 dndsr
 ```
+Re-run dndsr-install if tab completion not working.
 
 ## Usage
 _**Command-line interface (CLI) usage recommended for large-scale analysis. See dndsR_usage_vignette.Rmd for R usage.**_  
