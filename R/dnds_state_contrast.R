@@ -67,40 +67,6 @@
   d
 }
 
-#' Filter dNdS table by NA / max_dnds / optional expression
-#'
-#' @keywords internal
-.filter_dnds <- function(d, dnds_col = "dNdS", filter_expr = NULL, max_dnds = 10, ...) {
-  # NOTE: the trailing "..." is intentional.
-  # It prevents hard failures if callers pass legacy arguments that are not used here.
-  if (!dnds_col %in% names(d)) stop("Missing dnds_col: ", dnds_col)
-  d[[dnds_col]] <- suppressWarnings(as.numeric(d[[dnds_col]]))
-  keep <- !is.na(d[[dnds_col]]) & is.finite(d[[dnds_col]]) & d[[dnds_col]] < max_dnds
-
-  if (!is.null(filter_expr) && nzchar(filter_expr)) {
-    env <- list2env(d, parent = parent.frame())
-
-    expr <- tryCatch(parse(text = filter_expr), error = function(e) e)
-    if (inherits(expr, "error")) {
-      stop("filter_expr failed to parse: ", conditionMessage(expr))
-    }
-
-    ok <- tryCatch(eval(expr, envir = env), error = function(e) e)
-    if (inherits(ok, "error")) {
-      stop("filter_expr failed to evaluate: ", conditionMessage(ok))
-    }
-
-    ok <- as.logical(ok)
-    if (length(ok) == 1L) ok <- rep(ok, nrow(d))
-    if (length(ok) != nrow(d)) {
-      stop("filter_expr must return a logical vector of length 1 or nrow(d).")
-    }
-    keep <- keep & ok
-  }
-
-  d[keep, , drop = FALSE]
-}
-
 #' Read and normalize a regions BED-like file (EXPECTED HEADERLESS)
 #'
 #' Expected (headerless):
