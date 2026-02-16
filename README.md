@@ -197,6 +197,7 @@ dndsr regional_dnds_contrasts \
 - Remove warnings flag and just auto-expand warnings always.
 - CLI - add error message for unknown dndsr subcommand to prevent launching container first
 - change any mention of regions_bed to regions_file, as it is 1-inclusive coords. Make this explicit in docs.
+- dnds_contrast,summary,state_contrast - region column of contrast file currently unusued and assumed contrast file is preprocessed ahead of time to only contain regions of interest
 
 ## Contributing
 dndsR is under active development. Contributions, bug reports, and feature requests are welcome. 
