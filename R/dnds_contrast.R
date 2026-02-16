@@ -103,17 +103,6 @@
   normalize_df(df2)
 }
 
-#' Filter dNdS annotation table by NA / max_dnds
-#'
-#' Keeps rows with finite dNdS and dNdS < max_dnds. This is the only filtering
-#' performed (by design).
-#'
-#' @keywords internal
-.filter_dnds <- function(d, max_dnds = 10) {
-  keep <- is.finite(d$dNdS) & d$dNdS < max_dnds
-  d[keep, , drop = FALSE]
-}
-
 #' Clean column names
 #'
 #' Strips CRLF artifacts and trims leading/trailing whitespace from column names.
