@@ -15,4 +15,7 @@ Uses data.table::foverlaps if available; otherwise falls back to a simple loop.
 Adds a column q_region_status or s_region_status with values "region"/"background".
 Uses data.table::foverlaps if available; otherwise falls back to a simple loop.
 }
+\details{
+NOTE: Assumes regions and gene coords are in the same convention (1-based closed).
+}
 \keyword{internal}

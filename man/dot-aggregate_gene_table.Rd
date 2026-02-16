@@ -17,7 +17,7 @@
 Random effects:
 \itemize{
 \item Only retained if random_effect_col is constant within each gene_key.
-\item If it varies within gene_key (common for orthogroup-per-pair), it is disabled with a warning.
+\item If it varies within gene_key, it is disabled with a warning.
 }
 }
 \details{
@@ -26,5 +26,7 @@ Safety:
 \item In group_mode="subgenome", if any groups cannot be inferred, this function STOPs
 with example seqnames to prevent silent gene loss.
 }
+
+Adds back \code{comparison} and \code{side} parsed from gene_key for debugging/sanity checks.
 }
 \keyword{internal}

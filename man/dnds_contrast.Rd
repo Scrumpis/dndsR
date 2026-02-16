@@ -2,7 +2,7 @@
 % Please edit documentation in R/dnds_contrast.R
 \name{dnds_contrast}
 \alias{dnds_contrast}
-\title{Pairwise dN/dS contrasts (genome-wide by default; optional region restriction)}
+\title{Pairwise dN/dS contrasts (global by default; optional region restriction via regions_bed)}
 \usage{
 dnds_contrast(
   dnds_annot_file_a = NULL,
@@ -11,18 +11,19 @@ dnds_contrast(
   contrast_file = NULL,
   output_dir = getwd(),
   regions_bed = NULL,
+  regions_coord = c("bed0", "gff1"),
   region_seq_col = NULL,
   region_start_col = NULL,
   region_end_col = NULL,
   region_name_col = NULL,
-  merge_cols = NULL,
-  sides = c("query", "subject"),
-  filter_expr = NULL,
   max_dnds = 10,
   ci_method = c("normal", "bootstrap"),
   n_boot = 1000,
+  ci_seed = NULL,
   make_plots = TRUE,
-  pos_threshold = 1
+  pos_threshold = 1,
+  drop_zero_deltas = FALSE,
+  dedup_keys = c("error", "first")
 )
 }
 \arguments{
@@ -34,62 +35,71 @@ dnds_contrast(
 comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{contrast_file}{Optional file defining contrasts (4-col or 5-col layout).
-Note: side columns are ignored in global mode (regions_bed = NULL).}
+Side columns are always used when provided.}
 
 \item{output_dir}{Root directory containing per-comparison folders (batch mode).}
 
 \item{regions_bed}{Optional BED-like file of regions. If provided, restrict to
-genes overlapping regions (regional mode). If NULL, run genome-wide (default).}
+genes overlapping regions (regional mode). If NULL/empty, run global (default).}
 
-\item{region_seq_col, region_start_col, region_end_col, region_name_col}{Column names in regions_bed for seqname/start/end/label.}
+\item{regions_coord}{Coordinate convention for regions_bed: "bed0" (BED 0-based half-open)
+or "gff1" (1-based closed). Default "bed0".}
 
-\item{merge_cols}{Optional character vector of column names used to match rows
-across comparisons. If NULL, defaults are used (see Matching behavior above).}
+\item{region_seq_col, region_start_col, region_end_col, region_name_col}{Column names in regions_bed for seqname, start, end, label.}
 
-\item{sides}{Character vector among c("query","subject") indicating which side(s)
-to evaluate in auto-all-pairs mode and single-contrast mode. Ignored in global
-mode (regions_bed = NULL).}
-
-\item{filter_expr}{Optional character with a logical expression evaluated in
-each dNdS table prior to region labeling and merging.}
-
-\item{max_dnds}{Numeric. Drop rows with dNdS >= max_dnds or NA dNdS (default 10).}
+\item{max_dnds}{Numeric. Drop rows with dNdS >= max_dnds or non-finite dNdS (default 10).}
 
 \item{ci_method}{One of "normal" (mean +/- 1.96*SE) or "bootstrap" (percentile).}
 
 \item{n_boot}{Integer; number of bootstrap resamples if ci_method = "bootstrap".}
 
+\item{ci_seed}{Optional integer seed for bootstrap reproducibility (default NULL).}
+
 \item{make_plots}{Logical; if TRUE, write paired scatter, delta histogram,
 and delta ECDF per contrast.}
 
 \item{pos_threshold}{Numeric threshold for calling "positive selection"
-(genes with dN/dS > pos_threshold are counted in the enrichment test; default 1).}
+(genes with dN/dS > pos_threshold are counted in the paired enrichment test; default 1).}
+
+\item{drop_zero_deltas}{Logical; if TRUE, drop delta==0 before Wilcoxon (legacy behavior).
+Default FALSE (keep zeros; ties handled by wilcox.test).}
+
+\item{dedup_keys}{What to do if focal merge keys are duplicated within A or B:
+"error" (default) stops with a message; "first" keeps first occurrence.}
 }
 \value{
-Invisibly, a character vector of summary TSV paths (one per contrast x side_tag).
+Invisibly, a character vector of summary TSV paths (one per contrast).
 }
 \description{
 Compare dN/dS between pairs of dNdS annotation files using paired nonparametric
 tests. For each contrast (compA vs compB), the function:
 \itemize{
-\item filters each table by max_dnds and optional filter_expr,
-\item (optional) restricts to genes in regions_bed (side-aware),
-\item matches rows across comparisons,
-\item computes delta = dNdS_A - dNdS_B per matched gene,
+\item filters each table by max_dnds,
+\item (optional) restricts to genes overlapping regions_bed (side-aware),
+\item matches rows across comparisons using a focal gene ID (side-aware),
+\item computes delta = dNdS_A - dNdS_B per matched focal gene,
 \item runs a Wilcoxon signed-rank test on delta,
-\item runs Fisher's exact test for enrichment of dN/dS > pos_threshold in A vs B,
+\item runs McNemar's test (paired) for enrichment of dN/dS > pos_threshold in A vs B,
 \item writes a TSV summary + optional plots.
 }
 }
 \details{
-Default behavior is genome-wide contrasts (regions_bed = NULL).
-
-Matching behavior:
+Mode is implicit:
 \itemize{
-\item Global (regions_bed = NULL): merge on c("query_id","subject_id") by default
-(recommended). You may override with merge_cols.
-\item Regional (regions_bed provided): merge on side-aware focal IDs by default
-(query_id if side == "query", else subject_id). You may override with merge_cols.
+\item Global mode (default): regions_bed is NULL/empty, no region restriction is applied.
+\item Regional mode: provide regions_bed; only genes overlapping regions are used.
+}
+
+Matching behavior (both modes):
+\itemize{
+\item Rows are matched across A and B using a single focal ID derived from the requested
+side for each table:
+\itemize{
+\item side == "query"   => focal_id = query_id
+\item side == "subject" => focal_id = subject_id
+}
+\item In batch explicit-contrast mode, sides come from the contrast_file.
+\item In single-contrast and auto-all-pairs mode, sides default to "query" for both A and B.
 }
 
 Modes:

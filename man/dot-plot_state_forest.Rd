@@ -15,6 +15,6 @@
 )
 }
 \description{
-Forest plot for state contrasts
+Orders contrasts within each facet for readability (avoids global factor ordering).
 }
 \keyword{internal}

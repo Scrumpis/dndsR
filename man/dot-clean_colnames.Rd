@@ -17,7 +17,7 @@
 \value{
 \code{d} with cleaned column names.
 
-\code{d} with cleaned column names.
+d with cleaned column names.
 }
 \description{
 Strips CRLF artifacts and trims leading/trailing whitespace from column names.

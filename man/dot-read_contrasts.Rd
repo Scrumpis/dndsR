@@ -25,8 +25,7 @@ or
 Returns a data.frame with normalized columns:
 contrast_name, compA, compA_side, compB, compB_side
 
-Note: when regions_bed is NULL (global mode), these side columns are accepted
-but ignored.
+Note: side columns are used in BOTH global (regions_bed = NULL) and regional mode.
 
 Returns a data.frame with normalized columns:
 contrast_name, compA, compA_side, compB, compB_side

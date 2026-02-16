@@ -31,24 +31,24 @@ file.path(output_dir, comparison_name, paste0(comparison_name, "_dnds_annot.tsv"
 
 \item{output_dir}{Root directory containing per-comparison folders (batch mode).}
 
-\item{regions_bed}{Optional. Path to BED-like file of regions with at least 3 columns:
-seqname, start, end, and optionally a name/label column. If NULL, only global
+\item{regions_bed}{Optional. Path to a HEADERLESS BED-like file of regions with at least 3 columns:
+seqname, start, end, and optionally a 4th name/label column. If NULL, only global
 summaries (and global plots) are produced.}
 
-\item{region_seq_col, region_start_col, region_end_col, region_name_col}{Column names in regions_bed for seqname/start/end/label (default: first three +
-optional "region_name").}
+\item{region_seq_col, region_start_col, region_end_col, region_name_col}{Optional selectors for regions_bed columns (integer indices, or names like "V1").
+Defaults are 1,2,3, and (if present) 4 for region_name.}
 
 \item{sides}{Character vector among c("query","subject") indicating which genome
-side to use for overlap when \code{regions_bed} is provided (default both).
+side to use for overlap when regions_bed is provided (default both).
 Coordinates are taken from q_gff_* or s_gff_* columns.}
 
 \item{filter_expr}{Optional character with a logical expression evaluated in the data
 (e.g., "q_gff_seqname == s_gff_seqname & dNdS < 5").}
 
-\item{max_dnds}{Numeric. Drop rows with dNdS >= max_dnds or NA dNdS (default 10).}
+\item{max_dnds}{Numeric. Drop rows with dNdS >= max_dnds or NA/non-finite dNdS (default 10).}
 
 \item{make_plots}{Logical; if TRUE, write global plots always and regional plots
-when \code{regions_bed} is provided (default TRUE).}
+when regions_bed is provided (default TRUE).}
 
 \item{ci_method}{One of "normal" (mean +/- 1.96*SE) or "bootstrap" for 95\% CI.}
 
@@ -57,22 +57,18 @@ when \code{regions_bed} is provided (default TRUE).}
 \value{
 Invisibly, in single mode: path to summary TSV.
 In batch mode: vector of summary TSV paths.
-The TSV contains:
-- one row with scope="global" (side=NA, region_status="all")
-- plus (if regions_bed) two rows per side with scope="regional"
-(region/background) and a Wilcoxon rank-sum p_value for region vs background.
 }
 \description{
 Summarize dN/dS distributions for each dNdS annotation file.
 }
 \details{
 \itemize{
-\item Always computes a \strong{global} summary across all retained rows.
-\item If \code{regions_bed} is provided, also labels rows as inside/outside regions
-(per side) and computes region/background summaries + a Wilcoxon rank-sum
+\item Always computes a global summary across all retained rows.
+\item If regions_bed is provided, also labels rows as inside/outside regions
+(per side) and computes region/background summaries plus a Wilcoxon rank-sum
 test (region vs background) for each side.
 }
 
-Works in single mode (\code{dnds_annot_file}) or batch mode (\code{comparison_file} +
-\code{output_dir}), mirroring other dndsR commands.
+Works in single mode (dnds_annot_file) or batch mode (comparison_file +
+output_dir), mirroring other dndsR commands.
 }

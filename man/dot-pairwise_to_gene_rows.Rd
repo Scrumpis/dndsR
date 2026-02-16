@@ -16,9 +16,4 @@
 Adds:
 gene_id, side, seqname, start, end, dNdS_pair, comparison, gene_key
 }
-\details{
-If random_effect_col is provided and exists in the pairwise table, it is propagated
-onto gene rows. NOTE: In gene mode, random effects are only used if the random-effect
-column is constant within each gene_key after aggregation; otherwise it is disabled.
-}
 \keyword{internal}
