@@ -111,7 +111,7 @@ Extracts CDS or proteins into new FASTA files using the input genome.fasta and g
 dndsr extract_cds -c comparison_file.txt -t 8
 ```
 ### 3. Calculate dN/dS
-Uses [orthologr](https://github.com/drostlab/orthologr) for 1:1 best-hit ortholog pairing and dN/dS calculations. Has access to all orthologr::dNdS functionality. Long runtime. If on cluster, consider submitting through SLURM, PBS, or similar.  
+Uses [orthologr](https://github.com/drostlab/orthologr) for 1:1 best-hit ortholog pairing and dN/dS calculations. Has access to all orthologr::dNdS functionality. Long runtime. If on cluster, consider submitting through job scheduler.  
 ```
 dndsr calculate_dnds -c comparison_file.txt -t 80
 ```
