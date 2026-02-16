@@ -108,39 +108,6 @@
   normalize_df(df2)
 }
 
-#' Filter dNdS annotation table by NA / max_dnds / optional logical expression
-#'
-#' @keywords internal
-.filter_dnds <- function(d, filter_expr = NULL, max_dnds = 10) {
-  if (!"dNdS" %in% names(d)) {
-    stop("Missing required column 'dNdS' for filtering.")
-  }
-
-  keep <- !is.na(d$dNdS) & is.finite(d$dNdS) & (d$dNdS < max_dnds)
-
-  if (!is.null(filter_expr) && nzchar(filter_expr)) {
-    ok <- try(eval(parse(text = filter_expr),
-                   envir = d,
-                   enclos = parent.frame()),
-              silent = TRUE)
-    if (!inherits(ok, "try-error")) {
-      if (!is.logical(ok)) {
-        warning("filter_expr did not evaluate to logical; ignoring filter_expr.")
-      } else if (length(ok) == 1L) {
-        keep <- keep & rep_len(isTRUE(ok), nrow(d))
-      } else if (length(ok) == nrow(d)) {
-        keep <- keep & ok
-      } else {
-        warning("filter_expr returned logical of length ", length(ok),
-                " but expected 1 or nrow(d)=", nrow(d), "; ignoring filter_expr.")
-      }
-    } else {
-      warning("filter_expr failed to evaluate; ignoring filter_expr.")
-    }
-  }
-
-  d[keep, , drop = FALSE]
-}
 
 #' Read and normalize a regions BED-like file (EXPECTED HEADERLESS)
 #'
