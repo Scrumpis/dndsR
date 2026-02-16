@@ -326,7 +326,6 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       ggplot2::scale_y_continuous(trans = "log1p") +
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::labs(
-        title = paste0(contrast_name, " (", mode_label, "; ", side_tag, ")"),
         x     = paste0("dN/dS (", compB_name, ")"),
         y     = paste0("dN/dS (", compA_name, ")")
       )
@@ -344,8 +343,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::labs(
         x     = "delta dN/dS (A - B)",
-        y     = "Count",
-        title = paste0(contrast_name, " - delta histogram (", side_tag, ")")
+        y     = "Count"
       )
 
     ggplot2::ggsave(
@@ -361,8 +359,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::labs(
         x     = "delta dN/dS (A - B)",
-        y     = "ECDF",
-        title = paste0(contrast_name, " - delta ECDF (", side_tag, ")")
+        y     = "ECDF"
       )
 
     ggplot2::ggsave(
@@ -403,6 +400,14 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     d
   }
 
+  # Shorten output file names
+  .side_abbrev <- function(x) {
+    x <- as.character(x)
+    if (x == "query")   return("q")
+    if (x == "subject") return("s")
+    stop("Invalid side: ", x)
+  }
+  
   .merge_dnds <- function(dA, dB, by_cols, suffixes = c("_A", "_B")) {
     by_cols <- as.character(by_cols)
 
@@ -546,10 +551,13 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
 
     merged <- .merge_dnds(dA_key, dB_key, by_cols = "focal_id")
 
+    a <- .side_abbrev(sideA)
+    b <- .side_abbrev(sideB)
+    
     side_tag <- if (do_regions) {
-      paste0("regional__A_", sideA, "__B_", sideB)
+      paste0("regional_", a, "_vs_", b)
     } else {
-      paste0("global__A_", sideA, "__B_", sideB)
+      paste0("global_", a, "_vs_", b)
     }
 
     if (!nrow(merged)) {
