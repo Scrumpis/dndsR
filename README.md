@@ -155,9 +155,9 @@ Chr01B 71000000 72000000 SG3
 Chr01B 72000000 73000000 SG3
 Chr01B 73000000 74000000 SG3
 ```
-#### Run regional_dnds_summary
+#### Run dnds_summary
 ```
-dndsr regional_dnds_summary \
+dndsr dnds_summary \
 -c comparison_file.txt \
 --regions-bed regions.bed \
 -O .
@@ -170,15 +170,23 @@ Example:
 BCvsBD CalbumBvC query CalbumUkBvD query
 BCvsCD CalbumBvC subject CalbumUkCvD query
 ```
-Run regional_dnds_contrasts
+Run dnds_contrasts
 ```
-dndsr regional_dnds_contrasts \
+dndsr dnds_contrasts \
 -c comparison_file.txt \
 --regions-bed regions.bed \
 --contrast-file contrast_file.txt \
 -O .
 ```
 
+Run dnds_state_contrasts (dnds_contrasts on the gene level)
+```
+dndsr dnds_state_contrasts \
+-c comparison_file.txt \
+--regions-bed regions.bed \
+--contrast-file contrast_file.txt \
+-O .
+```
 
 ## Future Improvements
 - Overhaul regional analyses and gene contrast functions
