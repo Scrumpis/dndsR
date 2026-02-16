@@ -5,9 +5,10 @@
 #' Robust to headerless BED files: tries header=TRUE, then falls back to header=FALSE.
 #'
 #' Coordinate conventions:
-#'   - regions_coord = "bed0": interpret as BED 0-based, half-open [`start`, `end`),
-#'     convert to 1-based, closed [`start + 1`, `end`] for overlap with GFF-like coordinates.
-#'   - regions_coord = "gff1": interpret as 1-based, closed [`start`, `end`].
+#'   - regions_coord = "bed0": interpret as BED 0-based, half-open interval
+#'     (`start`, `end`), and convert to 1-based, closed interval (`start + 1`, `end`)
+#'     for overlap with GFF-like coordinates.
+#'   - regions_coord = "gff1": interpret as 1-based, closed interval (`start`, `end`).
 #'
 #' Column selectors:
 #'   - region_*_col may be NULL (default), a column *name*, or a 1-based *integer index*.
