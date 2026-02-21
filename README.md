@@ -200,6 +200,7 @@ dndsr dnds_state_contrasts \
 - dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization, add multi-pattern removal for chr labels
 - go_enrichment - topN.svg -> top$N.svg output file naming
 - term_enrichment - fix font
+- ipr_enrichment - update so single file mode allows file name as input, currently appends _dnds_annot.tsv to the end of input pattern.
 - All term enrichment - add note to documentation  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
 - Rvignette - add note  If conducting annotation term enrichment, ensure GFF term versions are the same in each comparison (i.e., both annotated with IPR 83.0) to avoid erroneous results.
 - Remove warnings flag and just auto-expand warnings always.
