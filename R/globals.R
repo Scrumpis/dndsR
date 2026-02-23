@@ -7,5 +7,6 @@ utils::globalVariables(c(
   "odds_ratio","or_ci_lower","or_ci_upper",
   "label","significant",
   "enrichment","enrichment_plot","y_lab","p_adj","pos_count","is_inf_enrichment",
-  "dNdS_A","dNdS_B","delta","dNdS"
+  "dNdS_A","dNdS_B","delta","dNdS",
+  "delta_ci_lower","delta_ci_upper","mean_delta"
 ))
