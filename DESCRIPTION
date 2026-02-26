@@ -1,6 +1,6 @@
 Package: dndsR
 Type: Package
-Title: dN/dS Pipeline Utilities for Comparative Genomics
+Title: dN/dS Pipeline for Comparative Genomics
 Version: 0.3.0.000
 Authors@R: 
     person(given = "Nick", family = "Johnson", 
