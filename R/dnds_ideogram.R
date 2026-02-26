@@ -306,7 +306,9 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
     # Filtering
     if (isTRUE(dS_dN)) {
-      keep <- is.finite(d$dN) & is.finite(d$dS)
+      keep <- is.finite(d$dN) & is.finite(d$dS) &
+              d$dS >= min_dS & d$dS <= max_dS &
+              d$dN >= min_dN & d$dN <= max_dN
       d <- d[keep, , drop = FALSE]
     } else {
       keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
