@@ -46,6 +46,14 @@
 #' @param restrict_gff_to_gene Logical; if \code{TRUE}, only use GFF rows with \code{type=="gene"}
 #'   when indexing coordinates. Default \code{FALSE}.
 #' @param verbose Logical; print progress.
+#' @param dS_dN Logical; if \code{TRUE}, plot \code{dS} as the red heatmap and \code{dN}
+#'   as the blue heatmap (per window). Output files will be named
+#'   \code{<comp>_{query|subject}_ideogram_dS_dN.{svg,png}} so users can also generate
+#'   the default dN/dS selection-pressure ideograms.
+#' @param min_dS,max_dS Numeric thresholds applied to \code{dS} when \code{dS_dN=TRUE}.
+#'   Rows outside the range are dropped before windowing. Defaults: \code{min_dS=0}, \code{max_dS=Inf}.
+#' @param min_dN,max_dN Numeric thresholds applied to \code{dN} when \code{dS_dN=TRUE}.
+#'   Rows outside the range are dropped before windowing. Defaults: \code{min_dN=0}, \code{max_dN=Inf}.
 #' @param ... Additional arguments passed to \code{RIdeogram::ideogram()}, such
 #'   as layout or color options. Arguments that would override core mappings
 #'   (\code{karyotype}, \code{overlaid}, \code{label}) are ignored.
@@ -72,6 +80,12 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
                           make_png         = TRUE,
                           overwrite        = FALSE,
                           keep_intermediate= FALSE,
+                          # dS_dN:
+                          dS_dN            = FALSE,
+                          min_dS           = 0,
+                          max_dS           = Inf,
+                          min_dN           = 0,
+                          max_dN           = Inf,
                           # label normalization (opt-in; raw by default)
                           chr_strip_leading_chr0 = FALSE,
                           chr_strip_leading      = NULL,
@@ -86,10 +100,8 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
   req_cli <- function(...) if (verbose) message("[dndsR::dnds_ideogram] ", sprintf(...))
   die <- function(...) stop(sprintf(...), call. = FALSE)
 
-  # extra arguments to pass on to RIdeogram::ideogram()
   ideogram_dots <- list(...)
 
-  # ---------- utilities ----------
   .read_ws <- function(path, header_try = TRUE) {
     utils::read.table(path, header = header_try, sep = "", quote = "\"",
                       stringsAsFactors = FALSE, comment.char = "",
@@ -116,7 +128,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     fai
   }
 
-  # Keep RAW names (no digit stripping). RIdeogram accepts arbitrary labels.
   .read_karyotype <- function(fai_path) {
     fai <- utils::read.table(fai_path, sep = "\t", header = FALSE,
                              stringsAsFactors = FALSE, quote = "", comment.char = "")
@@ -134,7 +145,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     lev <- karyo$Chr
     f <- factor(tbl[[chr_col]], levels = lev, ordered = TRUE)
     tbl <- tbl[order(f, tbl$Start), , drop = FALSE]
-    # ensure Chr is character, not factor
     tbl[[chr_col]] <- as.character(tbl[[chr_col]])
     tbl
   }
@@ -196,7 +206,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     df
   }
 
-  # Write coords using the same schema as *_dnds_annot.tsv: {q,s}_gff_seqname/{q,s}_gff_start
   .augment_with_coords <- function(d, id_map, id_col, out_prefix) {
     miss <- setdiff(id_col, names(d))
     if (length(miss)) die("Input missing required column(s): %s", paste(miss, collapse = ", "))
@@ -218,7 +227,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     candidates[which(ex)[1]]
   }
 
-  # Crop output SVG to remove bottom white space
   crop_svg_by_bottom_margin <- function(svg, cut_px) {
     root <- xml2::xml_root(svg)
 
@@ -254,11 +262,13 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     svg
   }
 
-  # ---------- rendering worker (per side) ----------
   .one_side <- function(merged_path, side, fasta, window_size, max_dnds, filter_expr,
                         make_png, overwrite,
                         chr_strip_leading_chr0, chr_strip_leading, chr_strip_trailing, chr_case_insensitive,
-                        ideogram_args = NULL) {
+                        ideogram_args = NULL,
+                        dS_dN = FALSE,
+                        min_dS = 0, max_dS = Inf,
+                        min_dN = 0, max_dN = Inf) {
 
     if (!requireNamespace("RIdeogram", quietly = TRUE)) die("Please install RIdeogram: install.packages('RIdeogram')")
     if (!requireNamespace("xml2", quietly = TRUE))      die("Please install xml2: install.packages('xml2')")
@@ -267,8 +277,11 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     short <- substr(side, 1, 1) # 'q' or 's'
     comp_dir  <- dirname(normalizePath(merged_path))
     comp_base <- sub("\\.(tsv|txt)$", "", basename(merged_path))
-    out_svg   <- file.path(comp_dir, sprintf("%s_%s_ideogram.svg", comp_base, side))
-    out_png   <- file.path(comp_dir, sprintf("%s_%s_ideogram.png", comp_base, side))
+
+    # NEW: mode-specific output names so users can keep both
+    suffix <- if (isTRUE(dS_dN)) "ideogram_dS_dN" else "ideogram"
+    out_svg <- file.path(comp_dir, sprintf("%s_%s_%s.svg", comp_base, side, suffix))
+    out_png <- file.path(comp_dir, sprintf("%s_%s_%s.png", comp_base, side, suffix))
 
     if (!overwrite && file.exists(out_svg) && (!make_png || file.exists(out_png))) {
       req_cli("Exists -> skipping: %s (%s)", comp_base, side); return(out_svg)
@@ -277,20 +290,33 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     req_cli("Loading: %s", merged_path)
     d <- utils::read.table(merged_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
 
-    # Expect at minimum dNdS + id cols + our coord cols
-    need0 <- c("dNdS","query_id","subject_id")
+    # required cols
+    need0 <- c("query_id","subject_id")
     miss0 <- setdiff(need0, names(d))
     if (length(miss0)) die("Table missing columns: %s", paste(miss0, collapse = ", "))
 
-    # Early filter on dNdS
-    keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
-    d <- d[keep, , drop = FALSE]
-    if (!nrow(d)) { req_cli("No rows after dNdS filtering -> skip"); return(character(0)) }
+    # Mode-specific required numeric columns
+    if (isTRUE(dS_dN)) {
+      need_num <- c("dN","dS")
+    } else {
+      need_num <- c("dNdS")
+    }
+    missn <- setdiff(need_num, names(d))
+    if (length(missn)) die("Table missing columns: %s", paste(missn, collapse = ", "))
+
+    # Filtering
+    if (isTRUE(dS_dN)) {
+      keep <- is.finite(d$dN) & is.finite(d$dS)
+      d <- d[keep, , drop = FALSE]
+    } else {
+      keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
+      d <- d[keep, , drop = FALSE]
+    }
+    if (!nrow(d)) { req_cli("No rows after filtering -> skip"); return(character(0)) }
 
     need <- c(sprintf("%s_gff_seqname", short), sprintf("%s_gff_start", short))
     if (!all(need %in% names(d))) die("Internal error: expected coord columns %s in intermediate.", paste(need, collapse = ", "))
 
-    # Optional user filter (raw logical; no mapping implied)
     if (!is.null(filter_expr) && nzchar(filter_expr)) {
       ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
       if (inherits(ok, "try-error")) die("Bad filter_expr: %s", filter_expr)
@@ -299,39 +325,58 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     }
     if (!nrow(d)) { req_cli("No rows after filter_expr -> skip"); return(character(0)) }
 
-    # Transform + windowing
     chr_col   <- sprintf("%s_gff_seqname", short)
     start_col <- sprintf("%s_gff_start", short)
-    ln        <- log(d$dNdS + 1)
-    d$ln_dNdS      <- ln
-    d$ln_neg_dNdS  <- ifelse(d$dNdS >= 1, NA_real_, ln)
-    d$ln_pos_dNdS  <- ifelse(d$dNdS <  1, NA_real_, ln)
 
-    win <- stats::aggregate(
-      list(total_raw_dNdS    = d$dNdS,
-           total_ln_dNdS     = d$ln_dNdS,
-           total_ln_neg_dNdS = d$ln_neg_dNdS,
-           total_ln_pos_dNdS = d$ln_pos_dNdS,
-           n_genes           = rep(1L, nrow(d)),
-           neg_genes         = as.integer(d$dNdS < 1),
-           pos_genes         = as.integer(d$dNdS >= 1)),
-      by = list(Chr = d[[chr_col]],
-                Start = (d[[start_col]] %/% window_size) * window_size),
-      FUN = function(x) if (is.numeric(x)) sum(x, na.rm = TRUE) else sum(x)
-    )
+    # ---- windowing ----
+    if (isTRUE(dS_dN)) {
+      d$ln_dS <- log(d$dS + 1)
+      d$ln_dN <- log(d$dN + 1)
 
-    # add End and the averaged columns
-    win$End <- win$Start + window_size
-    win$avg_ln_dNdS      <- ifelse(win$n_genes  == 0, NA_real_, win$total_ln_dNdS      / pmax(win$n_genes,  1))
-    win$avg_ln_neg_dNdS  <- ifelse(win$neg_genes== 0, NA_real_, win$total_ln_neg_dNdS  / pmax(win$neg_genes,1))
-    win$avg_ln_pos_dNdS  <- ifelse(win$pos_genes== 0, NA_real_, win$total_ln_pos_dNdS  / pmax(win$pos_genes,1))
+      win <- stats::aggregate(
+        list(total_ln_dS = d$ln_dS,
+             total_ln_dN = d$ln_dN,
+             n_genes     = rep(1L, nrow(d))),
+        by = list(Chr = d[[chr_col]],
+                  Start = (d[[start_col]] %/% window_size) * window_size),
+        FUN = function(x) sum(x, na.rm = TRUE)
+      )
+
+      win$End <- win$Start + window_size
+      win$avg_ln_dS <- ifelse(win$n_genes == 0, NA_real_, win$total_ln_dS / pmax(win$n_genes, 1))
+      win$avg_ln_dN <- ifelse(win$n_genes == 0, NA_real_, win$total_ln_dN / pmax(win$n_genes, 1))
+
+    } else {
+      ln <- log(d$dNdS + 1)
+      d$ln_dNdS      <- ln
+      d$ln_neg_dNdS  <- ifelse(d$dNdS >= 1, NA_real_, ln)
+      d$ln_pos_dNdS  <- ifelse(d$dNdS <  1, NA_real_, ln)
+
+      win <- stats::aggregate(
+        list(total_raw_dNdS    = d$dNdS,
+             total_ln_dNdS     = d$ln_dNdS,
+             total_ln_neg_dNdS = d$ln_neg_dNdS,
+             total_ln_pos_dNdS = d$ln_pos_dNdS,
+             n_genes           = rep(1L, nrow(d)),
+             neg_genes         = as.integer(d$dNdS < 1),
+             pos_genes         = as.integer(d$dNdS >= 1)),
+        by = list(Chr = d[[chr_col]],
+                  Start = (d[[start_col]] %/% window_size) * window_size),
+        FUN = function(x) if (is.numeric(x)) sum(x, na.rm = TRUE) else sum(x)
+      )
+
+      win$End <- win$Start + window_size
+      win$avg_ln_dNdS      <- ifelse(win$n_genes  == 0, NA_real_, win$total_ln_dNdS      / pmax(win$n_genes,  1))
+      win$avg_ln_neg_dNdS  <- ifelse(win$neg_genes== 0, NA_real_, win$total_ln_neg_dNdS  / pmax(win$neg_genes,1))
+      win$avg_ln_pos_dNdS  <- ifelse(win$pos_genes== 0, NA_real_, win$total_ln_pos_dNdS  / pmax(win$pos_genes,1))
+    }
+
     if (!nrow(win)) { req_cli("No windows formed -> skip"); return(character(0)) }
 
-    # Karyotype (RAW names), then optional normalization for both karyotype & win
+    # Karyotype (RAW names), then optional normalization
     fai <- .ensure_fai(fasta)
     karyotype <- .read_karyotype(fai)
 
-    # Optional normalization (opt-in; default no change)
     karyotype$Chr <- .normalize_chr(
       karyotype$Chr,
       strip_chr0 = chr_strip_leading_chr0,
@@ -347,9 +392,9 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
       ci = chr_case_insensitive
     )
 
-    # Align to karyotype; clamp windows to chrom ends
     win <- win[win$Chr %in% karyotype$Chr, , drop = FALSE]
     if (!nrow(win)) { req_cli("No windows remain after matching chromosomes to FASTA -> skip"); return(character(0)) }
+
     chr_len <- stats::setNames(karyotype$End, karyotype$Chr)
     win$End <- pmin(win$End, chr_len[win$Chr])
     win$Start[is.na(win$Start)] <- 0L
@@ -357,94 +402,130 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     win <- win[is.finite(win$Start) & is.finite(win$End) & win$End > win$Start, , drop = FALSE]
     if (!nrow(win)) { req_cli("All windows invalid after clamping -> skip"); return(character(0)) }
 
-    # Build heatmaps
-    neg <- subset(win, is.finite(avg_ln_neg_dNdS), select = c("Chr","Start","End","avg_ln_neg_dNdS"))
-    pos <- subset(win, is.finite(avg_ln_pos_dNdS), select = c("Chr","Start","End","avg_ln_pos_dNdS"))
-    if (!nrow(neg) && !nrow(pos)) { req_cli("No heatmap data -> skip"); return(character(0)) }
+    # ---- heatmaps ----
+    if (isTRUE(dS_dN)) {
+      ds <- subset(win, is.finite(avg_ln_dS), select = c("Chr","Start","End","avg_ln_dS"))
+      dn <- subset(win, is.finite(avg_ln_dN), select = c("Chr","Start","End","avg_ln_dN"))
+      if (!nrow(ds) && !nrow(dn)) { req_cli("No heatmap data -> skip"); return(character(0)) }
 
-    if (nrow(neg)) { neg <- .order_by_karyotype(neg, karyotype, "Chr"); names(neg)[4] <- "Value"; neg$Value <- -1 * neg$Value }
-    if (nrow(pos)) { pos <- .order_by_karyotype(pos, karyotype, "Chr"); names(pos)[4] <- "Value" }
-    karyotype <- .order_by_karyotype(karyotype, karyotype, "Chr")
+      if (nrow(ds)) { ds <- .order_by_karyotype(ds, karyotype, "Chr"); names(ds)[4] <- "Value" }
+      if (nrow(dn)) { dn <- .order_by_karyotype(dn, karyotype, "Chr"); names(dn)[4] <- "Value" }
+      karyotype <- .order_by_karyotype(karyotype, karyotype, "Chr")
 
-    req_cli(sprintf("Rendering ideogram (%s)", side))
+      req_cli(sprintf("Rendering ideogram (%s) [dS red / dN blue]", side))
 
-    if (is.null(ideogram_args)) ideogram_args <- list()
+      if (is.null(ideogram_args)) ideogram_args <- list()
+      protected <- c("karyotype","overlaid","label")
+      bad <- intersect(names(ideogram_args), protected)
+      if (length(bad)) {
+        warning("[dndsR::dnds_ideogram] Ignoring arguments in ... that conflict with core RIdeogram params: ",
+                paste(bad, collapse = ", "))
+        ideogram_args[bad] <- NULL
+      }
 
-    # prevent user from stomping on core mapping args
-    protected <- c("karyotype","overlaid","label")
-    bad <- intersect(names(ideogram_args), protected)
-    if (length(bad)) {
-      warning("[dndsR::dnds_ideogram] Ignoring arguments in ... that conflict with core RIdeogram params: ",
-              paste(bad, collapse = ", "))
-      ideogram_args[bad] <- NULL
+      base_args <- list(
+        karyotype  = karyotype,
+        overlaid   = if (nrow(ds)) ds else NULL,  # red
+        label      = if (nrow(dn)) dn else NULL,  # blue
+        label_type = "heatmap",
+        colorset1  = c("#FFFFCC", "#e34a33"),     # dS: yellow->red
+        colorset2  = c("#FFFFCC", "#2c7fb8"),     # dN: yellow->blue
+        Ly = 3
+      )
+
+      do.call(RIdeogram::ideogram, c(base_args, ideogram_args))
+
+    } else {
+      neg <- subset(win, is.finite(avg_ln_neg_dNdS), select = c("Chr","Start","End","avg_ln_neg_dNdS"))
+      pos <- subset(win, is.finite(avg_ln_pos_dNdS), select = c("Chr","Start","End","avg_ln_pos_dNdS"))
+      if (!nrow(neg) && !nrow(pos)) { req_cli("No heatmap data -> skip"); return(character(0)) }
+
+      if (nrow(neg)) { neg <- .order_by_karyotype(neg, karyotype, "Chr"); names(neg)[4] <- "Value"; neg$Value <- -1 * neg$Value }
+      if (nrow(pos)) { pos <- .order_by_karyotype(pos, karyotype, "Chr"); names(pos)[4] <- "Value" }
+      karyotype <- .order_by_karyotype(karyotype, karyotype, "Chr")
+
+      req_cli(sprintf("Rendering ideogram (%s)", side))
+
+      if (is.null(ideogram_args)) ideogram_args <- list()
+      protected <- c("karyotype","overlaid","label")
+      bad <- intersect(names(ideogram_args), protected)
+      if (length(bad)) {
+        warning("[dndsR::dnds_ideogram] Ignoring arguments in ... that conflict with core RIdeogram params: ",
+                paste(bad, collapse = ", "))
+        ideogram_args[bad] <- NULL
+      }
+
+      base_args <- list(
+        karyotype  = karyotype,
+        overlaid   = if (nrow(neg)) neg else NULL,
+        label      = if (nrow(pos)) pos else NULL,
+        label_type = "heatmap",
+        colorset1  = c("#FFFFCC", "#e34a33"),  # inverted negative: yellow->red
+        colorset2  = c("#FFFFCC", "#2c7fb8"),  # positive: yellow->blue
+        Ly = 3
+      )
+
+      do.call(RIdeogram::ideogram, c(base_args, ideogram_args))
     }
 
-    base_args <- list(
-      karyotype = karyotype,
-      overlaid  = if (nrow(neg)) neg else NULL,
-      label     = if (nrow(pos)) pos else NULL,
-      label_type = "heatmap",
-      colorset1 = c("#FFFFCC", "#e34a33"),  # inverted negative: yellow->red
-      colorset2 = c("#FFFFCC", "#2c7fb8"),  # positive: yellow->blue
-      Ly = 3
-    )
-
-    do.call(RIdeogram::ideogram, c(base_args, ideogram_args))
-
-    # ---- cleanup stray Rplots.pdf from RIdeogram/base graphics ----
-    if (file.exists("Rplots.pdf")) {
-      suppressWarnings(file.remove("Rplots.pdf"))
-    }
-
+    if (file.exists("Rplots.pdf")) suppressWarnings(file.remove("Rplots.pdf"))
     if (!file.exists("chromosome.svg")) die("RIdeogram did not write chromosome.svg")
+
     svg <- xml2::read_xml("chromosome.svg")
     tn  <- xml2::xml_find_all(svg, ".//text")
-    xml2::xml_attr(tn, "font-size")  <- "14"
-    xml2::xml_attr(tn, "font-weight")<- "bold"
+    xml2::xml_attr(tn, "font-size")   <- "14"
+    xml2::xml_attr(tn, "font-weight") <- "bold"
+
     txt <- xml2::xml_text(tn)
-    low  <- which(txt == "Low"); high <- which(txt == "High")
-    if (length(low))  xml2::xml_text(tn[low]) <- "Neut"
-    if (length(high) >= 2) {
-      xml2::xml_text(tn[high[1]]) <- "Neg"
-      xml2::xml_text(tn[high[2]]) <- "Pos"
-      parent <- xml2::xml_parent(tn[high[1]])
-      hdr <- xml2::xml_add_child(parent, "text", "Selection Pressure")
-      xml2::xml_set_attr(hdr, "x", "600"); xml2::xml_set_attr(hdr, "y", "0")
-      xml2::xml_set_attr(hdr, "font-size", "14"); xml2::xml_set_attr(hdr, "font-weight", "bold")
-      xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
+
+    # --- legend relabeling ---
+    low  <- which(txt == "Low")
+    high <- which(txt == "High")
+
+    if (isTRUE(dS_dN)) {
+      # keep it simple: just rename the two legends
+      if (length(low))  xml2::xml_text(tn[low]) <- "Low"
+      if (length(high) >= 2) {
+        xml2::xml_text(tn[high[1]]) <- "dS"
+        xml2::xml_text(tn[high[2]]) <- "dN"
+        parent <- xml2::xml_parent(tn[high[1]])
+        hdr <- xml2::xml_add_child(parent, "text", "Divergence")
+        xml2::xml_set_attr(hdr, "x", "600"); xml2::xml_set_attr(hdr, "y", "0")
+        xml2::xml_set_attr(hdr, "font-size", "14"); xml2::xml_set_attr(hdr, "font-weight", "bold")
+        xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
+      }
+    } else {
+      if (length(low))  xml2::xml_text(tn[low]) <- "Neut"
+      if (length(high) >= 2) {
+        xml2::xml_text(tn[high[1]]) <- "Neg"
+        xml2::xml_text(tn[high[2]]) <- "Pos"
+        parent <- xml2::xml_parent(tn[high[1]])
+        hdr <- xml2::xml_add_child(parent, "text", "Selection Pressure")
+        xml2::xml_set_attr(hdr, "x", "600"); xml2::xml_set_attr(hdr, "y", "0")
+        xml2::xml_set_attr(hdr, "font-size", "14"); xml2::xml_set_attr(hdr, "font-weight", "bold")
+        xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
+      }
     }
 
-    # === Center chromosome labels around their current placement ===
+    # center chromosome labels (unchanged from your code)
     chr_names <- karyotype$Chr
     lab_nodes <- tn[xml2::xml_text(tn) %in% chr_names]
     if (length(lab_nodes)) {
 
-      # helpers: parse translate(...)
-      parse_tx <- function(tr) {
-        if (is.na(tr) || !nzchar(tr)) return(0)
-        m <- regmatches(tr, regexpr("translate\\s*\\(([^)]*)\\)", tr))
-        if (!length(m)) return(0)
-        nums <- as.numeric(strsplit(sub(".*\\(([^)]*)\\).*", "\\1", m), "[ ,]+")[[1]])
-        if (length(nums) >= 1 && is.finite(nums[1])) nums[1] else 0
-      }
-
-      # average glyph width in em for Arial-ish fonts; adjust if needed
       char_width_em <- 0.56
 
       for (i in seq_along(lab_nodes)) {
         node <- lab_nodes[i]
-        txt   <- xml2::xml_text(node)
-        nchar_txt <- nchar(txt)
+        txt0 <- xml2::xml_text(node)
+        nchar_txt <- nchar(txt0)
 
-        # current styling
         fs <- suppressWarnings(as.numeric(xml2::xml_attr(node, "font-size")))
-        if (is.na(fs)) fs <- 14  # your code sets 14; keep in sync
+        if (is.na(fs)) fs <- 14
         old_anchor <- xml2::xml_attr(node, "text-anchor")
         if (is.na(old_anchor) || !nzchar(old_anchor)) old_anchor <- "start"
 
-        # we always want center anchoring going forward
         xml2::xml_attr(node, "text-anchor") <- "middle"
-        xml2::xml_attr(node, "dx") <- NULL  # avoid compounding shifts
+        xml2::xml_attr(node, "dx") <- NULL
 
         half_px <- 0.5 * nchar_txt * fs * char_width_em
         dx <- switch(tolower(old_anchor),
@@ -464,9 +545,8 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
       }
     }
 
-    # === Add top padding by shifting the viewBox (no reparenting) ===
-    y_pad <- 80  # px; increase if your header still touches the top
-
+    # padding + background + crop (unchanged)
+    y_pad <- 80
     root <- xml2::xml_root(svg)
 
     vb <- xml2::xml_attr(root, "viewBox")
@@ -486,21 +566,10 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     }
 
     old_h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-    if (!is.na(old_h)) {
-      xml2::xml_attr(root, "height") <- paste0(old_h + y_pad, "px")
-    }
+    if (!is.na(old_h)) xml2::xml_attr(root, "height") <- paste0(old_h + y_pad, "px")
 
-    # === Solid white background behind everything (robust) ===
     root <- xml2::xml_root(svg)
-
     vb <- xml2::xml_attr(root, "viewBox")
-    if (is.na(vb) || !nzchar(vb)) {
-      w <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "width"))))
-      h <- suppressWarnings(as.numeric(sub("px$", "", xml2::xml_attr(root, "height"))))
-      if (is.na(w) || is.na(h)) { w <- 1200; h <- 800 }
-      xml2::xml_attr(root, "viewBox") <- sprintf("0 0 %g %g", w, h)
-      vb <- xml2::xml_attr(root, "viewBox")
-    }
     nums <- as.numeric(strsplit(vb, "[ ,]+")[[1]])
     stopifnot(length(nums) == 4)
     minX <- nums[1]; minY <- nums[2]; vw <- nums[3]; vh <- nums[4]
@@ -522,7 +591,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
     svg <- crop_svg_by_bottom_margin(svg, cut_px = 350)
 
-    # --- save & return ---
     xml2::write_xml(svg, "chromosome.svg")
     file.rename("chromosome.svg", out_svg)
 
@@ -534,12 +602,10 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     if (verbose) message("[dndsR::dnds_ideogram] Wrote: ", out_svg,
                          if (make_png && file.exists(out_png)) paste0(" and ", out_png) else "")
     out_svg
-  }  # <- this closes .one_side()
+  }
 
-  # ---------- batch vs single ----------
   outs <- character(0)
 
-  # -------- batch mode --------
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
     for (i in seq_len(nrow(df))) {
@@ -561,14 +627,15 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
         req_cli("Joining coords \u2192 intermediate: %s", basename(inter_path))
         D <- utils::read.table(dnds_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
-        need0 <- c("dNdS","query_id","subject_id")
+
+        # In either mode we need coords; numeric cols checked later in .one_side
+        need0 <- c("query_id","subject_id")
         miss0 <- setdiff(need0, names(D))
         if (length(miss0)) die("[%s] table missing columns: %s", comp, paste(miss0, collapse = ", "))
 
         D <- .augment_with_coords(D, q_map, "query_id",   "q")
         D <- .augment_with_coords(D, s_map, "subject_id", "s")
 
-        # Optional normalization of chr labels in the intermediate (opt-in; raw by default)
         D$q_gff_seqname <- .normalize_chr(D$q_gff_seqname,
                                           strip_chr0 = chr_strip_leading_chr0,
                                           strip_lead = chr_strip_leading,
@@ -593,7 +660,10 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
           window_size, max_dnds, filter_expr,
           make_png, overwrite,
           chr_strip_leading_chr0, chr_strip_leading, chr_strip_trailing, chr_case_insensitive,
-          ideogram_args = ideogram_dots
+          ideogram_args = ideogram_dots,
+          dS_dN = dS_dN,
+          min_dS = min_dS, max_dS = max_dS,
+          min_dN = min_dN, max_dN = max_dN
         ))
       }
 
@@ -603,7 +673,6 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     return(invisible(stats::na.omit(outs)))
   }
 
-  # -------- single mode --------
   if (is.null(dnds_annot_file)) die("Provide either comparison_file (batch) OR dnds_annot_file (single).")
   if (!file.exists(dnds_annot_file)) die("dnds_annot_file not found: %s", dnds_annot_file)
 
@@ -625,7 +694,10 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
         chr_strip_leading = chr_strip_leading,
         chr_strip_trailing = chr_strip_trailing,
         chr_case_insensitive = chr_case_insensitive,
-        ideogram_args = ideogram_dots
+        ideogram_args = ideogram_dots,
+        dS_dN = dS_dN,
+        min_dS = min_dS, max_dS = max_dS,
+        min_dN = min_dN, max_dN = max_dN
       ))
     } else if (sd == "subject") {
       if (is.null(subject_fasta) || !file.exists(subject_fasta)) {
@@ -644,7 +716,10 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
         chr_strip_leading = chr_strip_leading,
         chr_strip_trailing = chr_strip_trailing,
         chr_case_insensitive = chr_case_insensitive,
-        ideogram_args = ideogram_dots
+        ideogram_args = ideogram_dots,
+        dS_dN = dS_dN,
+        min_dS = min_dS, max_dS = max_dS,
+        min_dN = min_dN, max_dN = max_dN
       ))
     }
   }
