@@ -12,7 +12,9 @@
 #' @param ontologies c("BP","MF","CC") which GO branches.
 #' @param algorithm topGO algorithm: one of "weight01","elim","classic","weight".
 #' @param statistic topGO statistic: usually "fisher" (default) or "ks".
-#' @param pos_threshold Numeric; dNdS > pos_threshold defines "positive" (default 1).
+#' @param pos_threshold Numeric OR character quantile spec. If numeric, dNdS > pos_threshold defines "positive".
+#'   If character, use "q<prob>" or "quantile:<prob>" (e.g., "q0.95") to set the threshold to that quantile
+#'   of dNdS *after filtering* (and after drop_rows_without_go if enabled).
 #' @param max_dnds Drop rows with dNdS >= max_dnds or NA (default 10).
 #' @param filter_expr Optional character filter evaluated in the data
 #'   (e.g., "q_gff_seqname == s_gff_seqname").
@@ -175,6 +177,43 @@ go_enrichment <- function(
     d[keep, , drop = FALSE]
   }
 
+  .resolve_pos_threshold <- function(dnds_vals, pos_threshold, verbose = FALSE) {
+    # numeric threshold: keep existing behavior
+    if (is.numeric(pos_threshold) && length(pos_threshold) == 1L && is.finite(pos_threshold)) {
+      return(as.numeric(pos_threshold))
+    }
+
+    # character quantile spec: "q0.95" or "quantile:0.95"
+    if (is.character(pos_threshold) && length(pos_threshold) == 1L && nzchar(pos_threshold)) {
+      s <- trimws(pos_threshold)
+
+      q <- NA_real_
+      if (grepl("^q\\s*\\d*\\.?\\d+$", s, ignore.case = TRUE)) {
+        q <- suppressWarnings(as.numeric(sub("^q\\s*", "", s, ignore.case = TRUE)))
+      } else if (grepl("^quantile\\s*:\\s*\\d*\\.?\\d+$", s, ignore.case = TRUE)) {
+        q <- suppressWarnings(as.numeric(sub("^quantile\\s*:\\s*", "", s, ignore.case = TRUE)))
+      }
+
+      if (!is.na(q) && is.finite(q) && q > 0 && q < 1) {
+        thr <- as.numeric(stats::quantile(dnds_vals, probs = q, na.rm = TRUE, names = FALSE, type = 7))
+        if (isTRUE(verbose)) {
+          message(sprintf("  [go_enrichment] pos_threshold=%s -> quantile %.3f threshold=%.6g", s, q, thr))
+        }
+        return(thr)
+      }
+
+      stop(
+        "[go_enrichment] Invalid pos_threshold character spec: '", pos_threshold,
+        "'. Use e.g. 'q0.95' or 'quantile:0.95'.",
+        call. = FALSE
+      )
+    }
+
+    stop(
+      "[go_enrichment] pos_threshold must be a single numeric value or a character quantile spec (e.g., 'q0.95').",
+      call. = FALSE
+    )
+  }
   # Named logical vector (GOID = TRUE) for fast membership checks
   .build_exclude_set <- function(excl) {
     if (is.null(excl) || !length(excl)) return(NULL)
@@ -428,7 +467,8 @@ go_enrichment <- function(
     }
     if (!nrow(d)) return(NULL)
 
-    pos_ids <- d[[id_col]][d$dNdS > pos_threshold]
+    pos_thr <- .resolve_pos_threshold(d$dNdS, pos_threshold, verbose = verbose)
+    pos_ids <- d[[id_col]][d$dNdS > pos_thr]
 
     exclude_set_run <- base_exclude_set
     if (isTRUE(exclude_descendants) &&
