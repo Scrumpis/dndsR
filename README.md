@@ -197,7 +197,7 @@ dndsr dnds_state_contrasts \
 - Cleanup documentation
 - Extract recycled helpers into their own scripts
 - extract_cds - if fasta or gff input paths are not being parsed while multi-threading, logs do not indicate that. Logs print as if run was fine. But in single-thread mode it states files not found.
-- append_annotations - add triad filter option
+- append_annotations - add triad filter option (or strict homeolog filter between pairs), add message stating if files exist they were skipped
 - dnds_ideogram - Remove PNG convsersion and update SVG headers for in-browser viewing, parallelization, add multi-pattern removal for chr labels
 - go_enrichment - topN.svg -> top$N.svg output file naming
 - term_enrichment - fix font
