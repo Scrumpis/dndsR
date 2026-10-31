@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs every command block in the getting-started tutorial, in order, in a clean HOME.
 # The clone and image download are replaced with local copies of what they would fetch.
-#   DNDSR_SIF=/path/image.sif tools/dev/test-tutorial.sh
+#   DNDSR_SIF=/path/image.sif [DNDSR_ENGINE=apptainer] tools/dev/test-tutorial.sh
 # Exits nonzero if any block fails or the tutorial's expected final message is absent.
 set -eu
 root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
@@ -22,6 +22,7 @@ script=$work/tutorial.sh
 } |
   sed -e "s#^git clone .*#cp -r '$work/source' dndsR#" \
       -e "s#^singularity pull dndsr.sif .*#cp '$DNDSR_SIF' dndsr.sif#" \
+      -e "s#--engine singularity#--engine ${DNDSR_ENGINE:-singularity}#" \
       >"$script"
 
 cd "$work/run"

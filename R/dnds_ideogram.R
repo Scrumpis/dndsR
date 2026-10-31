@@ -350,28 +350,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
       win$avg_ln_dN <- ifelse(win$n_genes == 0, NA_real_, win$total_ln_dN / pmax(win$n_genes, 1))
 
     } else {
-      ln <- log(d$dNdS + 1)
-      d$ln_dNdS      <- ln
-      d$ln_neg_dNdS  <- ifelse(d$dNdS >= 1, NA_real_, ln)
-      d$ln_pos_dNdS  <- ifelse(d$dNdS <= 1, NA_real_, ln)
-
-      win <- stats::aggregate(
-        list(total_raw_dNdS    = d$dNdS,
-             total_ln_dNdS     = d$ln_dNdS,
-             total_ln_neg_dNdS = d$ln_neg_dNdS,
-             total_ln_pos_dNdS = d$ln_pos_dNdS,
-             n_genes           = rep(1L, nrow(d)),
-             neg_genes         = as.integer(d$dNdS < 1),
-             pos_genes         = as.integer(d$dNdS > 1)),
-        by = list(Chr = d[[chr_col]],
-                  Start = (d[[start_col]] %/% window_size) * window_size),
-        FUN = function(x) if (is.numeric(x)) sum(x, na.rm = TRUE) else sum(x)
-      )
-
-      win$End <- win$Start + window_size
-      win$avg_ln_dNdS      <- ifelse(win$n_genes  == 0, NA_real_, win$total_ln_dNdS      / pmax(win$n_genes,  1))
-      win$avg_ln_neg_dNdS  <- ifelse(win$neg_genes== 0, NA_real_, win$total_ln_neg_dNdS  / pmax(win$neg_genes,1))
-      win$avg_ln_pos_dNdS  <- ifelse(win$pos_genes== 0, NA_real_, win$total_ln_pos_dNdS  / pmax(win$pos_genes,1))
+      win <- .ideogram_windows(d$dNdS, d[[chr_col]], d[[start_col]], window_size)
     }
 
     if (!nrow(win)) { req_cli("No windows formed -> skip"); return(character(0)) }
@@ -495,7 +474,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
         hdr <- xml2::xml_add_child(parent, "text", "Divergence")
         xml2::xml_set_attr(hdr, "x", "600"); xml2::xml_set_attr(hdr, "y", "0")
         xml2::xml_set_attr(hdr, "font-size", "14"); xml2::xml_set_attr(hdr, "font-weight", "bold")
-        xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
+        xml2::xml_set_attr(hdr, "font-family", "Liberation Sans, Arial, sans-serif"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
       }
     } else {
       if (length(low))  xml2::xml_text(tn[low]) <- "Neut"
@@ -506,7 +485,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
         hdr <- xml2::xml_add_child(parent, "text", "Selection Pressure")
         xml2::xml_set_attr(hdr, "x", "600"); xml2::xml_set_attr(hdr, "y", "0")
         xml2::xml_set_attr(hdr, "font-size", "14"); xml2::xml_set_attr(hdr, "font-weight", "bold")
-        xml2::xml_set_attr(hdr, "font-family", "Arial"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
+        xml2::xml_set_attr(hdr, "font-family", "Liberation Sans, Arial, sans-serif"); xml2::xml_set_attr(hdr, "text-anchor", "middle")
       }
     }
 
@@ -729,4 +708,36 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
   if (verbose) message("Single-mode ideogram(s) complete.")
   return(invisible(stats::na.omit(outs)))
+}
+
+#' Summarize dN/dS in genome windows for an ideogram
+#'
+#' Each gene belongs to the window containing its start. Values are `log(dN/dS + 1)`
+#' averaged across genes: all genes, those below 1 (`neg`), and those above 1 (`pos`).
+#' A gene with dN/dS exactly 1 counts only in the overall average.
+#'
+#' @param dnds dN/dS for each gene.
+#' @param chr Sequence name for each gene.
+#' @param start Start coordinate for each gene.
+#' @param window_size Window size in bases.
+#' @return Data frame with one row per occupied window.
+#' @keywords internal
+.ideogram_windows <- function(dnds, chr, start, window_size) {
+  ln <- log(dnds + 1)
+  win <- stats::aggregate(
+    list(total_raw_dNdS    = dnds,
+         total_ln_dNdS     = ln,
+         total_ln_neg_dNdS = ifelse(dnds >= 1, NA_real_, ln),
+         total_ln_pos_dNdS = ifelse(dnds <= 1, NA_real_, ln),
+         n_genes           = rep(1L, length(dnds)),
+         neg_genes         = as.integer(dnds < 1),
+         pos_genes         = as.integer(dnds > 1)),
+    by = list(Chr = chr, Start = (start %/% window_size) * window_size),
+    FUN = function(x) sum(x, na.rm = TRUE)
+  )
+  win$End <- win$Start + window_size
+  win$avg_ln_dNdS     <- ifelse(win$n_genes   == 0, NA_real_, win$total_ln_dNdS     / pmax(win$n_genes, 1))
+  win$avg_ln_neg_dNdS <- ifelse(win$neg_genes == 0, NA_real_, win$total_ln_neg_dNdS / pmax(win$neg_genes, 1))
+  win$avg_ln_pos_dNdS <- ifelse(win$pos_genes == 0, NA_real_, win$total_ln_pos_dNdS / pmax(win$pos_genes, 1))
+  win
 }

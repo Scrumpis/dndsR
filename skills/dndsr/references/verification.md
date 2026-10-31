@@ -15,7 +15,8 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b
 | Package tests, run in the image | `tools/dev/run-tests.sh` | Pass, none skipped |
 | `R CMD check --no-manual` | Run in the image with `lme4` missing | No errors or warnings |
 | `extract_cds`, `calculate_dnds`, `append_annotations`, `term_enrichment`, `ipr_enrichment`, `dnds_summary`, `dnds_contrast`, `split_comparisons`, pairwise `dnds_state_contrast` | Results compared with independent values in tests | Pass |
-| `go_enrichment`, `dnds_ideogram` | Run on the example | Files written; values not independently checked |
+| `go_enrichment`, `ipr_enrichment` (including parent-child), `dnds_ideogram` windows | Constructed cases with hypergeometric or hand-calculated answers | Pass |
+| Rendered plots | Run on the example with the bundled Liberation Sans font | See `docs/validation/` |
 | Skill discovery | Claude Code 2.1.316 and Codex CLI 0.165.0 in a clone | Found |
 
 ## Not verified

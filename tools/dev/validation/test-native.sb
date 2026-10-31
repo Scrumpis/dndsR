@@ -1,0 +1,35 @@
+#!/bin/bash --login
+# Clean native install: runs the commands in INSTALL.md with a new R library and HOME.
+# The last step installs this checkout rather than GitHub, to test unpushed code.
+#   sbatch --export=ALL,REPO=<clone>,WORK=<empty dir>,RMODULE=<R module> test-native.sb
+#SBATCH --time=3:59:00
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=48G
+#SBATCH --job-name=dndsR-native
+set -euo pipefail
+module purge
+module load "$RMODULE"
+mkdir -p "$WORK/home" "$WORK/rlib" "$WORK/run"
+export HOME="$WORK/home" R_LIBS_USER="$WORK/rlib" MAKEFLAGS="-j$SLURM_CPUS_PER_TASK" Ncpus="$SLURM_CPUS_PER_TASK"
+R --version | head -1
+cd "$WORK/run"
+awk '/^## Native R/{on=1} on && /^```r$/ {exit} on && /^```$/ {i=!i; next} on && i' "$REPO/INSTALL.md" > diamond.sh
+bash -x diamond.sh
+export PATH="$HOME/.local/bin:$PATH"
+awk '/^## Native R/{on=1} on && /^```r$/ {i=1; next} on && i && /^```$/ {i=0} on && i' "$REPO/INSTALL.md" |
+  sed -e "s#^remotes::install_github(\"Scrumpis/dndsR\".*#remotes::install_local('$REPO', upgrade = 'never', force = TRUE, dependencies = FALSE)#" > install.R
+sed -i '1a options(Ncpus = as.integer(Sys.getenv("Ncpus")))' install.R
+Rscript --vanilla -e '.libPaths(Sys.getenv("R_LIBS_USER")); source("install.R", echo = TRUE)'
+date
+cat > run.R <<'RS'
+.libPaths(Sys.getenv("R_LIBS_USER"))
+library(dndsR)
+folder <- dndsr_example("native_example")
+setwd(folder)
+extract_cds(comparison_file = "comparison_file.txt")
+calculate_dnds(comparison_file = "comparison_file.txt", comp_cores = 2)
+verify_example()
+print(sessionInfo())
+RS
+Rscript --vanilla run.R
+echo NATIVE_OK

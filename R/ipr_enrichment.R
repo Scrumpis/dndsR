@@ -644,33 +644,33 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
 
   # ---------- font & plotting helpers (MATCH go_enrichment) ----------
-  .bundled_arial_path <- function() {
-    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
+  .bundled_font_path <- function() {
+    ttf <- system.file("fonts", "LiberationSans-Bold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
 
-  # use a single family name ("Arial") and explicitly map bold to the bundled TTF
+  # use a single family name and explicitly map bold to the bundled TTF
   .setup_showtext <- function() {
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
     if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
     ok <- try({
-      sysfonts::font_add(family = "Arial", regular = ttf, bold = ttf)
+      sysfonts::font_add(family = "Liberation Sans", regular = ttf, bold = ttf)
       showtext::showtext_auto(TRUE)
       TRUE
     }, silent = TRUE)
-    if (isTRUE(ok)) "Arial" else NULL
+    if (isTRUE(ok)) "Liberation Sans" else NULL
   }
 
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
     function(file, ...) svglite::svglite(
       file,
-      user_fonts = list(`Arial` = ttf),
+      user_fonts = list(`Liberation Sans` = ttf),
       ...
     )
   }

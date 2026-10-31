@@ -25,4 +25,3 @@ Interpretation limits and the estimator's bias are covered in [interpretation](.
 | Docker, Apptainer, macOS, and native installation are untested | Open |
 | A `git pull` in the clone reinstalls dndsR automatically on the next run, so the analysis version can change silently. Provenance records the version | Open; pin a tag for production analyses |
 | Windows runs sequentially and has not been tested | Open |
-| `inst/fonts/ArialBold.ttf`: Arial is proprietary and redistribution rights are unconfirmed | Needs maintainer decision before release or CRAN |

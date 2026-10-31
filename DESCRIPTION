@@ -9,6 +9,8 @@ Description: Utilities to extract CDS and proteins from FASTA/GFF,
     orchestrate ortholog discovery, and run dN/dS analyses at scale. 
     Includes helpers for batch comparisons, annotation joins, and QC.
 License: MIT + file LICENSE
+Copyright: inst/fonts/LiberationSans-Bold.ttf is under the SIL Open Font
+    License 1.1; see inst/fonts/LICENSE.LiberationSans.
 URL: https://github.com/Scrumpis/dndsR
 BugReports: https://github.com/Scrumpis/dndsR/issues
 Encoding: UTF-8

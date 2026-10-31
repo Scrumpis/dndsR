@@ -282,36 +282,36 @@ go_enrichment <- function(
   }
 
   # ---------- font & plotting helpers (match ipr_enrichment) ----------
-  .bundled_arial_path <- function() {
-    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
+  .bundled_font_path <- function() {
+    ttf <- system.file("fonts", "LiberationSans-Bold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
 
   .setup_showtext <- function() {
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
 
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
     if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
 
     ok <- try({
-      sysfonts::font_add(family = "Arial Bold", regular = ttf)
+      sysfonts::font_add(family = "Liberation Sans Bold", regular = ttf)
       showtext::showtext_auto(TRUE)
       TRUE
     }, silent = TRUE)
 
-    if (isTRUE(ok)) "Arial Bold" else NULL
+    if (isTRUE(ok)) "Liberation Sans Bold" else NULL
   }
 
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
 
     function(file, ...) svglite::svglite(
       file,
-      user_fonts = list(`Arial Bold` = ttf),
+      user_fonts = list(`Liberation Sans Bold` = ttf),
       ...
     )
   }
@@ -516,7 +516,8 @@ go_enrichment <- function(
     }
     if (!length(all_terms)) return(NULL)
 
-    term_genes <- topGO::genesInTerm(tgd, all_terms)
+    # Index by name: counts below are matched to all_terms by position.
+    term_genes <- topGO::genesInTerm(tgd, all_terms)[all_terms]
     annotated <- vapply(term_genes, length, integer(1))
     sig_counts <- vapply(
       term_genes,
