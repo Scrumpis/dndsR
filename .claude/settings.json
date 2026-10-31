@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(git status *)", "Bash(git diff *)", "Bash(git log *)", "Bash(git show *)",
+      "Bash(git branch *)", "Bash(git ls-files *)", "Bash(git rev-parse *)",
+      "Bash(git rev-list *)", "Bash(git merge-base *)", "Bash(git remote -v)",
+      "Bash(git tag -l *)", "Bash(git fetch *)", "Bash(git add *)", "Bash(git commit *)",
+      "Bash(git checkout dev)", "Bash(git pull --ff-only origin dev)",
+      "Bash(Rscript *)", "Bash(R CMD build *)", "Bash(R CMD check *)", "Bash(R CMD INSTALL *)",
+      "Bash(singularity exec *)", "Bash(apptainer exec *)", "Bash(docker run *)",
+      "Bash(tools/dev/*)", "Bash(bash tools/dev/*)", "Bash(sh tools/dev/*)",
+      "Bash(jq *)", "Bash(ls *)", "Bash(wc *)", "Bash(du *)", "Bash(grep *)", "Bash(find *)",
+      "Bash(sha256sum *)", "Bash(curl -s *)",
+      "WebFetch(domain:github.com)", "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:bioconductor.org)", "WebFetch(domain:cran.r-project.org)",
+      "WebFetch(domain:code.claude.com)", "WebFetch(domain:agentskills.io)",
+      "WebFetch(domain:hub.docker.com)"
+    ],
+    "ask": [
+      "Bash(git merge *)", "Bash(git rebase *)", "Bash(git cherry-pick *)", "Bash(git reset *)",
+      "Bash(git clean *)", "Bash(git stash *)", "Bash(git restore *)", "Bash(git tag *)",
+      "Bash(rm *)", "Bash(mv *)"
+    ],
+    "deny": [
+      "Bash(git push *)", "Bash(git push)", "Bash(git commit --no-verify *)",
+      "Bash(git filter-branch *)", "Bash(git filter-repo *)",
+      "Bash(gh release *)", "Bash(gh pr merge *)", "Bash(gh repo edit *)",
+      "Bash(docker push *)", "Bash(singularity push *)", "Bash(apptainer push *)",
+      "Read(./.env)", "Read(~/.git-credentials)", "Read(~/.ssh/**)", "Read(~/.claude/.credentials.json)",
+      "Edit(./.git/**)", "Edit(./.audit/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [
+        { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/git-guard.sh", "timeout": 10 },
+        { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/read-only-bash.sh", "timeout": 10 }
+      ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 10 } ] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 10 } ] }
+    ],
+    "SessionStart": [ { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 30 } ] } ],
+    "SubagentStart": [ { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 10 } ] } ],
+    "SubagentStop": [ { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 30 } ] } ],
+    "PreCompact": [ { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 30 } ] } ],
+    "Stop": [ { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 30 } ] } ],
+    "SessionEnd": [ { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit.sh", "timeout": 30 } ] } ]
+  }
+}

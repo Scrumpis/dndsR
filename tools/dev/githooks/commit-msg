@@ -1,0 +1,13 @@
+#!/bin/sh
+# dndsR hook. Skill gate: a commit changing software must also change skills/ or explain why not.
+SOFTWARE_PATHS='^(R/|man/|NAMESPACE$|DESCRIPTION$|inst/|tools/Dockerfile$|tools/dndsr-install$)'
+staged=$(git diff --cached --name-only)
+printf '%s\n' "$staged" | grep -Eq "$SOFTWARE_PATHS" || exit 0
+printf '%s\n' "$staged" | grep -q '^skills/' && exit 0
+grep -q '^Skill-Impact: ' "$1" && exit 0
+cat >&2 <<'MSG'
+dndsR policy: BLOCKED: this commit changes software but not skills/.
+Update skills/dndsr, or add a commit trailer explaining the review:
+  Skill-Impact: none - <reason>
+MSG
+exit 1

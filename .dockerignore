@@ -63,3 +63,7 @@ build/
 node_modules/
 venv/
 .env
+
+# Local agent audit record
+.audit
+.audit.moved.*

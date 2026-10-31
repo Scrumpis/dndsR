@@ -1,0 +1,5 @@
+#!/bin/sh
+# dndsR hook: blocks commits on main and unsafe staged content.
+. "$(dirname "$0")/_common.sh"
+[ "$(git symbolic-ref -q HEAD)" != "$PROTECTED_BRANCH" ] || block "committing on main"
+exec sh "$(dirname "$0")/check-public-safe.sh" --staged
