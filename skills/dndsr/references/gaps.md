@@ -11,6 +11,10 @@ Later development phases should resolve these. None is an audit result.
 - A released image matching the released package, and a compatibility table.
 - A citation and DOI.
 
+## Results from older versions
+
+dndsR before 0.3.0 could assemble CDS incorrectly (`docs/validation/cds-extraction.md`). Do not reuse its CDS or dN/dS results.
+
 ## Noticed while bootstrapping
 
 - The README uses `dnds_contrasts` and `dnds_state_contrasts`; the CLI has `dnds_contrast` and `dnds_state_contrast`.

@@ -1,0 +1,35 @@
+pair	class	syn_changes	nonsyn_changes	note
+g01	identical	0	0	
+g02	synonymous_only	30	0	
+g03	nonsynonymous_only	0	30	
+g04	conserved	40	8	
+g05	conserved	40	8	
+g06	conserved	40	8	
+g07	conserved	40	8	
+g08	conserved	40	8	
+g09	conserved	40	8	
+g10	conserved	40	8	
+g11	conserved	40	8	
+g12	conserved	40	8	
+g13	conserved	40	8	
+g14	conserved	40	8	
+g15	conserved	40	8	
+g16	neutral_like	12	36	
+g17	neutral_like	12	36	
+g18	neutral_like	12	36	
+g19	neutral_like	12	36	
+g20	excess_nonsynonymous	4	60	
+g21	excess_nonsynonymous	4	60	
+g22	excess_nonsynonymous	4	60	
+g23	excess_nonsynonymous	4	60	
+g24	excess_nonsynonymous	4	60	
+g25	excess_nonsynonymous	4	60	
+g26	structure	30	10	
+g27	structure	30	10	
+g28	structure	30	10	
+g29	multi_isoform	30	10	
+g30	multi_isoform	30	10	
+g35	multi_isoform	30	10	
+g36	multi_isoform	30	10	
+g31	internal_stop_subject	20	5	subject has an in-frame stop at codon 150
+g32	length_not_multiple_of_3	20	5	both CDS have one trailing extra base

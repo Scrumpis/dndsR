@@ -22,15 +22,24 @@
 #'   In batch mode, workers are applied across unique genome extraction tasks.
 #'   On Windows, runs sequentially (no forking).
 #' @param comparison_file Optional comparison table path or data.frame.
-#' @param group_by "gene" or "tx" for how CDS are grouped/named.
+#' @param group_by How CDS are grouped and named. `"gene"` (default) writes one CDS per
+#'   gene: the longest isoform with a valid CDS, named by gene ID. `"tx"`
+#'   writes every transcript, named by transcript ID.
 #' @param export_proteins If TRUE, also write translated proteins as AA FASTA.
-#' @param genetic_code Integer NCBI code for translation (1 = Standard).
-#' @param keep_internal_stops If FALSE, drop sequences with internal stops (post-translation).
+#' @param genetic_code Integer NCBI code used for translation and stop detection
+#'   (1 = Standard). dN/dS estimation itself assumes the standard code.
+#' @param keep_internal_stops If FALSE (default), CDS with an in-frame stop or a length
+#'   that is not a multiple of 3 are left out of the outputs and listed in the QC table.
 #' @param cds_suffix Filename suffix for CDS FASTA outputs. Default "_CDS.fasta".
 #' @param protein_suffix Filename suffix for AA FASTA outputs. Default "_AA.fasta".
 #'
 #' @details
 #' TxDb genome build metadata is not required for CDS extraction and is intentionally ignored.
+#'
+#' Each genome also gets a QC table, `<genome>_CDS_qc.tsv`, with one row per candidate CDS:
+#' `id`, `transcript`, `n_isoforms`, `length_nt`, `multiple_of_3`, `internal_stop`, `written`.
+#' Existing CDS outputs without a QC table were made by dndsR before 0.3.0 and are
+#' regenerated, because those versions could assemble exons incorrectly.
 #'
 #' @return A list (or list-of-lists in batch) with paths to CDS/protein files and metadata.
 #' @export
@@ -111,25 +120,44 @@ extract_cds <- function(comparison_name = NULL,
       }
     }
 
+    # Group by transcript in both modes. cdsBy(by = "gene") returns the CDS parts of all
+    # isoforms together in genomic order, which is not a valid coding sequence for
+    # multi-isoform genes or for multi-exon genes on the minus strand.
+    tx_cds <- GenomicFeatures::cdsBy(txdb, by = "tx", use.names = TRUE)
+    gene <- names(tx_cds)
     if (by == "gene") {
-      GenomicFeatures::cdsBy(txdb, by = "gene")
-    } else {
-      GenomicFeatures::cdsBy(txdb, by = "tx", use.names = TRUE)
+      tx_gene <- suppressMessages(AnnotationDbi::select(
+        txdb, keys = names(tx_cds), keytype = "TXNAME", columns = "GENEID"
+      ))
+      gene <- tx_gene$GENEID[match(names(tx_cds), tx_gene$TXNAME)]
+      if (anyNA(gene)) {
+        message("  - ", sum(is.na(gene)), " transcript(s) have no parent gene and were named by transcript ID")
+        gene[is.na(gene)] <- names(tx_cds)[is.na(gene)]
+      }
     }
+    list(cds = tx_cds, gene = gene)
   }
 
   # ---- helper: filter out groups whose seqlevels aren't in FASTA ----
-  .keep_valid_groups <- function(cds_groups, genome_chroms) {
-    keep <- vapply(cds_groups, function(gr) {
-      if (length(gr) == 0) return(FALSE)
-      all(as.character(GenomeInfoDb::seqnames(gr)) %in% as.character(genome_chroms))
-    }, logical(1))
-    cds_groups[keep]
+  .keep_valid_groups <- function(groups, genome_chroms) {
+    parts <- BiocGenerics::unlist(groups$cds, use.names = FALSE)
+    on_missing <- !(as.character(GenomeInfoDb::seqnames(parts)) %in% as.character(genome_chroms))
+    owner <- rep(seq_along(groups$cds), S4Vectors::elementNROWS(groups$cds))
+    keep <- !(seq_along(groups$cds) %in% owner[on_missing])
+    if (any(!keep)) {
+      message("  - ", sum(!keep), " transcript(s) skipped: on sequences missing from the FASTA")
+    }
+    list(cds = groups$cds[keep], gene = groups$gene[keep])
   }
 
   # ---- helper: translate CDS -> AA with options ----
   .translate_cds <- function(dna, genetic_code = 1L, keep_internal_stops = FALSE) {
-    aa <- Biostrings::translate(dna, if.fuzzy.codon = "X", genetic.code = genetic_code)
+    dna <- dna[Biostrings::width(dna) %% 3L == 0L]
+    aa <- Biostrings::translate(
+      dna,
+      if.fuzzy.codon = "X",
+      genetic.code = Biostrings::getGeneticCode(as.character(genetic_code))
+    )
 
     aa_chr <- as.character(aa)
     has_internal_stop <- vapply(aa_chr, function(s) {
@@ -198,12 +226,16 @@ extract_cds <- function(comparison_name = NULL,
     res <- list(
       cds_path = paste0(out_base, cds_suffix),
       prot_path = paste0(out_base, protein_suffix),
+      qc_path = paste0(out_base, "_CDS_qc.tsv"),
       cds_written = FALSE,
       prot_written = FALSE,
       dropped_with_internal_stops = 0L
     )
 
-    if (!overwrite && file.exists(res$cds_path) &&
+    if (!overwrite && file.exists(res$cds_path) && !file.exists(res$qc_path)) {
+      message("Regenerating ", res$cds_path, ": it has no QC table, so an older dndsR made it, ",
+              "and those versions could assemble exons incorrectly.")
+    } else if (!overwrite && file.exists(res$cds_path) &&
         (!export_proteins || file.exists(res$prot_path))) {
       vmsg("[OK] Existing outputs found for ", basename(out_base),
            " (use overwrite=TRUE to regenerate).")
@@ -218,20 +250,41 @@ extract_cds <- function(comparison_name = NULL,
     cds_groups <- .cds_groups(gff_path, by = group_by)
 
     cds_groups2 <- .keep_valid_groups(cds_groups, h$chroms)
-    if (length(cds_groups2) == 0L) {
-      warning("No CDS groups matched chromosomes in FASTA for: ", out_base, call. = FALSE)
+    if (length(cds_groups2$cds) == 0L) {
+      warning("No CDS matched chromosomes in FASTA for: ", out_base, call. = FALSE)
       return(res)
     }
 
-    vmsg("  - Extracting CDS sequences (", length(cds_groups2), " groups)")
-    cds <- GenomicFeatures::extractTranscriptSeqs(h$fafile, cds_groups2)
+    vmsg("  - Extracting CDS sequences (", length(cds_groups2$cds), " transcripts)")
+    all_cds <- GenomicFeatures::extractTranscriptSeqs(h$fafile, cds_groups2$cds)
+    names(all_cds) <- names(cds_groups2$cds)
 
-    if (is.null(names(cds)) || all(!nzchar(names(cds)))) {
-      nm <- names(cds_groups2)
-      if (!is.null(nm) && length(nm) == length(cds) && any(nzchar(nm))) {
-        names(cds) <- nm
-      }
-    }
+    quality <- .cds_quality(all_cds, genetic_code)
+    valid <- quality$multiple_of_3 & !is.na(quality$internal_stop) & !quality$internal_stop
+    chosen <- .select_longest_isoform(names(all_cds), cds_groups2$gene, Biostrings::width(all_cds), valid)
+    index <- match(chosen$tx, names(all_cds))
+
+    cds <- all_cds[index]
+    names(cds) <- chosen$gene
+    qc <- data.frame(
+      id = chosen$gene,
+      transcript = chosen$tx,
+      n_isoforms = chosen$n_isoforms,
+      length_nt = chosen$length_nt,
+      quality[index, , drop = FALSE],
+      written = keep_internal_stops | valid[index],
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    )
+    utils::write.table(qc, res$qc_path, sep = "\t", quote = FALSE, row.names = FALSE)
+    message(sprintf(
+      "[extract_cds] %s: %d CDS written; %d excluded (%d length not a multiple of 3, %d in-frame stop). See %s",
+      basename(out_base), sum(qc$written), sum(!qc$written),
+      sum(!qc$written & !qc$multiple_of_3),
+      sum(!qc$written & qc$multiple_of_3),
+      basename(res$qc_path)
+    ))
+    cds <- cds[qc$written]
 
     Biostrings::writeXStringSet(cds, filepath = res$cds_path, compress = FALSE)
     res$cds_written <- TRUE

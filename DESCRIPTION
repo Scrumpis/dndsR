@@ -16,6 +16,7 @@ Depends:
     R (>= 4.1)
 Imports:
     AnnotationDbi,
+    BiocGenerics,
     Biostrings,
     cli,
     data.table,
@@ -26,6 +27,7 @@ Imports:
     methods,
     orthologr,
     Rsamtools,
+    S4Vectors,
     scales,
     showtext,
     stats,
@@ -51,10 +53,10 @@ Suggests:
     rdiamond,
     readr,
     RIdeogram,
-    S4Vectors,
     systemfonts,
     rmarkdown,
     testthat,
+    withr,
     topGO,
     txdbmaker
 SystemRequirements:
