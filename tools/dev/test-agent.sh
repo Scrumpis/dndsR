@@ -29,7 +29,7 @@ case $agent in
     jq -r '.result // empty' "$out/claude.json" >"$out/answer.md"
     ;;
   codex)
-    CODEX_HOME=$real_home/.codex timeout 1500 codex exec --skip-git-repo-check -s danger-full-access "$prompt" >"$out/answer.md" 2>"$out/stderr.txt"
+    CODEX_HOME=$real_home/.codex timeout 1500 codex exec --skip-git-repo-check -s workspace-write "$prompt" >"$out/answer.md" 2>"$out/stderr.txt"
     rc=$?
     ;;
   *) echo "unknown agent: $agent" >&2; exit 2 ;;

@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-10-31: autonomous development toward v0.3.0
+
+- **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6` (same as the bootstrap)
+- **Done:** see `PROGRESS.md`. The major results are the CDS assembly bug in every release and the annotation leak, both fixed with tests.
+- **Delegated:** read-only scientific and software audits. Their reports are in the transcripts. Findings were checked before fixing; some remain code-review findings only (`docs/validation/known-issues.md`).
+- **Failed or not done:** see `RELEASE-READINESS.md`. Nothing was pushed, merged, tagged, or published.
+
 ## 2026-10-31: Phase 0 bootstrap
 
 - **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`

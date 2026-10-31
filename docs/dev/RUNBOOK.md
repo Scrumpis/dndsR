@@ -32,6 +32,10 @@ tools/dev/in-container.sh Rscript -e 'packageVersion("dndsR")'   # installs this
 tools/dev/run-tests.sh
 ```
 
+Runtime files can be recreated if purged: pull the image by the digest in `skills/dndsr/SKILL.md`. For the estimator comparison, create a micromamba environment with `paml` and `kakscalculator2` from bioconda, and for regenerating docs, install roxygen2 into `DNDSR_DEV_LIB`.
+
+Checks: `tools/dev/run-tests.sh`, `tools/dev/test-tutorial.sh`, `tools/dev/test-safeguards.sh`, `tools/dev/test-agent.sh claude`, and `tools/dev/validation/compare-estimators.R`.
+
 ## Inspect the audit trail
 
 Everything below is in `.audit/`, which is excluded from Git, Docker contexts, and R builds.
