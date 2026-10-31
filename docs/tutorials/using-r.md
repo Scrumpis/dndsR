@@ -11,12 +11,7 @@ library(dndsR)
 
 folder <- dndsr_example(file.path(tempdir(), "dndsr_example"))
 
-extract_cds(comparison_file = file.path(folder, "comparison_file.txt"), output_dir = folder)
-```
-
-The comparison file names its FASTA and GFF3 files relative to your working directory, so it is simplest to work inside the example folder:
-
-```r
+# The comparison file names its inputs relative to the working directory.
 setwd(folder)
 extract_cds(comparison_file = "comparison_file.txt")
 calculate_dnds(comparison_file = "comparison_file.txt", comp_cores = 2)

@@ -81,3 +81,38 @@ test_that("confidence intervals cope with one value", {
   expect_equal(normal[1], 3)
   expect_equal(normal[6] - normal[5], 2 * 1.96 * sd(x) / sqrt(5))
 })
+
+test_that("split_comparisons separates subgenomes and ignores FASTA descriptions", {
+  skip_if_not_installed("Biostrings")
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  writeLines(c(">Chr1A a description", "ACGTACGTACGT", ">Chr1B", "TTTTACGTACGT"), "q.fasta")
+  writeLines(c(">Chr1A", "ACGTACGTACGT", ">Chr1B", "TTTTACGTACGT"), "s.fasta")
+  gff <- paste(c("Chr1A", "Chr1B"), "x", "gene", 1, 12, ".", "+", ".", c("ID=g1", "ID=g2"), sep = "\t")
+  writeLines(c("##gff-version 3", gff), "q.gff3")
+  writeLines(c("##gff-version 3", gff), "s.gff3")
+  writeLines("c1 q.fasta q.gff3 s.fasta s.gff3", "c.txt")
+  suppressMessages(split_comparisons("c.txt"))
+  expect_true(all(file.exists(c("q_A.fasta", "q_B.fasta", "s_A.gff3", "s_B.gff3", "c_split.txt"))))
+  expect_equal(sub("^>(\\S+).*", "\\1", readLines("q_A.fasta")[1]), "Chr1A")
+  expect_false(any(grepl("Chr1B", readLines("q_A.gff3"))))
+  expect_equal(length(readLines("c_split.txt")), 2L)
+})
+
+test_that("pairwise state contrasts match a directly fitted logistic model", {
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  # Group A: 30 positive of 100. Group B: 10 positive of 100. Others are purifying.
+  table <- data.frame(
+    group = rep(c("A", "B"), each = 100),
+    dNdS = c(rep(2, 30), rep(0.1, 70), rep(2, 10), rep(0.1, 90))
+  )
+  utils::write.table(table, "t.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
+  suppressMessages(dnds_state_contrast(dnds_table_file = "t.tsv", output_dir = ".", make_plots = FALSE))
+  files <- list.files(".", "state.*\\.tsv$", recursive = TRUE, full.names = TRUE)
+  expect_gt(length(files), 0L)
+  got <- utils::read.delim(files[1])
+  row <- got[got$state == "Positive", ]
+  expect_equal(nrow(row), 1L)
+  expect_equal(row$odds_ratio, (30 / 70) / (10 / 90), tolerance = 1e-5)
+})

@@ -14,6 +14,7 @@ For every relevant software change:
 
 Rules for the skill:
 
+- Every command documented for users must run in `tools/dev/test-tutorial.sh`, a test, or `references/verification.md`.
 - `skills/dndsr/` is the only source. `.claude/skills/dndsr` and `.agents/skills/dndsr` are symlinks to it.
 - Document only what has been verified, and record it in `skills/dndsr/references/verification.md`. Mark anything else as unverified, or leave it out.
 - Use immutable image digests in commands. Do not assume Docker, internet access, specific paths, or elevated privileges.

@@ -14,10 +14,10 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b
 | `dndsr verify_example` | Tutorial and tests | 14 of 14 |
 | Package tests, run in the image | `tools/dev/run-tests.sh` | Pass, none skipped |
 | `R CMD check --no-manual` | Run in the image with `lme4` missing | No errors or warnings |
-| `extract_cds`, `calculate_dnds`, `append_annotations`, `term_enrichment`, `ipr_enrichment`, `dnds_summary`, `dnds_contrast` | Results compared with independent values in tests | Pass |
+| `extract_cds`, `calculate_dnds`, `append_annotations`, `term_enrichment`, `ipr_enrichment`, `dnds_summary`, `dnds_contrast`, `split_comparisons`, pairwise `dnds_state_contrast` | Results compared with independent values in tests | Pass |
 | `go_enrichment`, `dnds_ideogram` | Run on the example | Files written; values not independently checked |
 | Skill discovery | Claude Code 2.1.316 and Codex CLI 0.165.0 in a clone | Found |
 
 ## Not verified
 
-Real genomes; Docker; Apptainer; macOS; Windows; native installation from scratch; offline use; `split_comparisons` beyond code review; `dnds_state_contrast`; an agent completing the full workflow, unless recorded in `docs/dev/PROGRESS.md`.
+Real genomes; Docker; Apptainer; macOS; Windows; native installation from scratch; offline use; gene-level `dnds_state_contrast`; an agent completing the full workflow, unless recorded in `docs/dev/PROGRESS.md`.

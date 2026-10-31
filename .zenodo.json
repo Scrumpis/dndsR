@@ -1,0 +1,10 @@
+{
+  "title": "dndsR: dN/dS Pipeline for Comparative Genomics",
+  "description": "An R package and containerized command-line tool for pairwise dN/dS calculation, annotation, enrichment, and visualization from genome FASTA and GFF3 files.",
+  "upload_type": "software",
+  "creators": [
+    { "name": "Johnson, Nick" }
+  ],
+  "license": "MIT",
+  "keywords": ["dN/dS", "comparative genomics", "molecular evolution", "R"]
+}
