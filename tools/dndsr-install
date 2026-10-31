@@ -20,7 +20,7 @@ cat <<'EOF'
 dndsr-install — install host 'dndsr' shim that runs dndsR via container deps
 
 USAGE
-  tools/dndsr-install install --engine auto|apptainer|singularity|docker [--sif PATH | --image REF] [--rlib PATH] [--docker-platform PLATFORM]
+  tools/dndsr-install install --engine auto|apptainer|singularity|docker [--sif PATH | --image REF] [--rlib PATH] [--bind PATH[,PATH...]] [--docker-platform PLATFORM]
   tools/dndsr-install doctor
   tools/dndsr-install uninstall
 
@@ -28,17 +28,19 @@ NOTES
   - dndsR package is installed into a host library (default ~/.dndsr/rlib) by running R inside the container.
   - Container is used ONLY for dependencies/tools; dndsR itself remains on host.
   - Repo path is recorded in config; keep the repo if you want auto-install/updates.
+  - The current directory is available in the container. Use --bind for input files
+    elsewhere, for example --bind /mnt, then give their absolute paths.
 
 EXAMPLES
   # HPC (Apptainer)
   tools/dndsr-install install --engine apptainer --sif /path/to/dndsr.sif
 
   # Docker
-  tools/dndsr-install install --engine docker --image scrumpis/dndsr:0.2.0
+  tools/dndsr-install install --engine docker --image scrumpis/dndsr:v0.2.0
 
   # Then:
   dndsr --help
-  dndsr append-annotations -C comparisons.tsv ...
+  dndsr append_annotations -c comparisons.tsv
 
 EOF
 }
@@ -83,7 +85,8 @@ detect_shell(){
 ensure_zsh_completion(){
   local zshrc="${HOME}/.zshrc"
 
-  # Ensure zshrc exists
+  # Only people using zsh should have their zsh configuration changed.
+  [[ "$(detect_shell)" == "zsh" ]] || return 0
   [[ -f "$zshrc" ]] || : > "$zshrc"
 
   # Ensure fpath includes our completion dir + initialize completion
@@ -98,7 +101,7 @@ ZSH
 }
 
 write_config(){
-  local engine="$1" sif="$2" image="$3" rlib="$4" docker_platform="${5:-}"
+  local engine="$1" sif="$2" image="$3" rlib="$4" docker_platform="${5:-}" binds="${6:-}"
   mkdir -p "$CONF_DIR" "$BIN_DIR" "$rlib" || die "Failed to create install dirs"
 
   # Canonicalize paths so config works from ANY working directory
@@ -126,8 +129,8 @@ DNDSR_REPO=$repo_abs
 # Workdir inside container for runtime execution
 DNDSR_WORKDIR=/work
 
-# Optional: extra binds (comma-separated host:container pairs)
-# DNDSR_BINDS=/scratch:/scratch,/mnt:/mnt
+# Extra binds (comma-separated host paths or host:container pairs)
+DNDSR_BINDS=${binds}
 
 # Optional: extra engine args
 # DNDSR_EXTRA_ARGS=
@@ -274,7 +277,7 @@ install_if_needed(){
       cat <<CMD
 set -euo pipefail
 export R_PROFILE=/dev/null R_PROFILE_USER=/dev/null R_ENVIRON_USER=/dev/null BSPM_DISABLE=1
-Rscript --vanilla -e "install.packages(normalizePath('${REPO}'), repos=NULL, type='source', lib='${RLIB}', INSTALL_opts=c('--clean','--preclean'))"
+R CMD INSTALL --clean --preclean --library='${RLIB}' '${REPO}'
 printf '%s %s\n' '${ver:-unknown}' '${hash:-nohash}' > '${META}'
 CMD
     )
@@ -287,13 +290,13 @@ CMD
         -v "${RLIB}:${RLIB}" \
         -v "${REPO}:${REPO}" \
         "${IMAGE}" \
-        bash -lc "$cmd" >/dev/null
+        bash -c "$cmd" >/dev/null
     else
-      "$ENGINE" exec \
+      "$ENGINE" exec --cleanenv \
         --bind "${RLIB}:${RLIB}" \
         --bind "${REPO}:${REPO}" \
         "${SIF}" \
-        bash -lc "$cmd" >/dev/null
+        bash -c "$cmd" >/dev/null
     fi
   fi
 }
@@ -329,12 +332,25 @@ case "${1:-}" in
     fi
     echo
     echo "[test] dndsr --help (container invocation)"
-    # ensure install then try help
+    if "$0" --help >/dev/null; then
+      echo "[ok] dndsR runs in the container"
+      exit 0
+    fi
+    echo "[fail] dndsR did not run in the container" >&2
+    exit 1
     ;;
 esac
 
-# Ensure package installed (best-effort; uses repo if needed)
-install_if_needed
+# Ensure the package is installed. A lock stops parallel jobs racing to install it.
+if have flock && [[ -w "$RLIB" ]]; then
+  exec 9>"$RLIB/.install.lock"
+  flock 9
+  install_if_needed
+  flock -u 9
+  exec 9>&-
+else
+  install_if_needed
+fi
 
 # Now run the actual CLI inside container from the host-installed runner
 [[ -x "$RUNNER" ]] || die "Runner not found after install: $RUNNER"
@@ -347,13 +363,13 @@ pwd_real="$(pwd -P)"
 
 case "$ENGINE" in
   apptainer|singularity)
-    exec "$ENGINE" exec \
+    exec "$ENGINE" exec --cleanenv \
       "${extra_args[@]+"${extra_args[@]}"}" \
       --bind "${pwd_real}:${WORKDIR}" \
       --bind "${RLIB}:${RLIB}" \
       "${BIND_ARGS[@]+"${BIND_ARGS[@]}"}" \
       "${SIF}" \
-      bash -lc "export R_LIBS_USER='${RLIB}'; cd '${WORKDIR}'; '${RUNNER}' \"\$@\"" bash "$@"
+      bash -c "export R_LIBS_USER='${RLIB}'; cd '${WORKDIR}'; '${RUNNER}' \"\$@\"" bash "$@"
     ;;
   docker)
     exec docker run --rm \
@@ -365,7 +381,7 @@ case "$ENGINE" in
       "${BIND_ARGS[@]+"${BIND_ARGS[@]}"}" \
       "${extra_args[@]+"${extra_args[@]}"}" \
       "${IMAGE}" \
-      bash -lc "export R_LIBS_USER='${RLIB}'; '${RUNNER}' \"\$@\"" bash "$@"
+      bash -c "export R_LIBS_USER='${RLIB}'; '${RUNNER}' \"\$@\"" bash "$@"
     ;;
   *)
     die "Unknown engine: $ENGINE"
@@ -381,12 +397,8 @@ write_commands_cache(){
   mkdir -p "$CONF_DIR" || true
 
   # Try to run the just-installed shim (which will install dndsR if needed)
-  if "$SHIM" __commands >/dev/null 2>&1; then
-    "$SHIM" __commands > "$CMDS_FILE" || true
-  else
-    # If it fails (engine not available yet), create empty file; user can re-run install later
-    : > "$CMDS_FILE"
-  fi
+  # Fail here, loudly, if dndsR cannot be installed or run: that is what this step checks.
+  "$SHIM" __commands > "$CMDS_FILE" || die "dndsR could not be installed or run in the container. See the messages above."
 }
 
 install_completion(){
@@ -461,7 +473,7 @@ shift || true
 
 case "$cmd" in
   install)
-    engine="auto"; sif=""; image=""; rlib="${HOME}/.dndsr/rlib"; docker_platform=""
+    engine="auto"; sif=""; image=""; rlib="${HOME}/.dndsr/rlib"; docker_platform=""; binds=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --engine) engine="${2:-}"; shift 2 ;;
@@ -469,6 +481,7 @@ case "$cmd" in
         --image)  image="${2:-}"; shift 2 ;;
         --rlib)   rlib="${2:-}"; shift 2 ;;
         --docker-platform) docker_platform="${2:-}"; shift 2 ;;
+        --bind)   binds="${2:-}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "Unknown arg: $1" ;;
       esac
@@ -488,7 +501,7 @@ case "$cmd" in
       *) die "Invalid engine: $engine" ;;
     esac
 
-    write_config "$engine" "$sif" "$image" "$rlib" "$docker_platform"
+    write_config "$engine" "$sif" "$image" "$rlib" "$docker_platform" "$binds"
     write_shim
     write_commands_cache
     install_completion || true

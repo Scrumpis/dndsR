@@ -1,7 +1,7 @@
 Package: dndsR
 Type: Package
 Title: dN/dS Pipeline for Comparative Genomics
-Version: 0.3.0.000
+Version: 0.3.0
 Authors@R: 
     person(given = "Nick", family = "Johnson", 
            email = "john7932@msu.edu", role = c("aut","cre"))
@@ -55,7 +55,7 @@ Suggests:
     withr,
     topGO
 SystemRequirements:
-    DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)
+    DIAMOND (>= 2.1.8)
 Config/testthat/edition: 3
 ByteCompile: true
 Roxygen: list(markdown = TRUE)

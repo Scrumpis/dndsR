@@ -47,7 +47,7 @@ Details are in `.claude/rules/`.
 ## Files
 
 - Never commit transcripts, credentials, private paths, containers, temporary output, or bulky results. `tools/dev/check-public-safe.sh` checks staged files.
-- Put temporary files outside the repository. Inspect a target before deleting or overwriting it.
+- Put temporary files outside the repository. Agents may delete files they generated in the same session without asking. Anything else: inspect it first and do not delete it without approval.
 - Do not delete code, docs, tests, or results without a documented reason and explicit approval.
 
 ## Stop and ask a human before

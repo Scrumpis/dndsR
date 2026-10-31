@@ -2,24 +2,20 @@
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
       - ".github/ISSUE_TEMPLATE/**"
   pull_request:
     branches: [main, master]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - ".github/ISSUE_TEMPLATE/**"
 
 name: R-CMD-check.yaml
 
 permissions: read-all
 
 jobs:
-  R-CMD-check:
+  check:
     runs-on: ${{ matrix.config.os }}
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
@@ -59,3 +55,11 @@ jobs:
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+
+  # One stable result for the check that the protect_main ruleset requires.
+  R-CMD-check:
+    if: always()
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.check.result }}" = "success"

@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.6
-FROM rocker/r2u:jammy
+# Pinned by digest. To update, change the digest here and rerun the validation in CI.
+FROM rocker/r2u@sha256:b51f03901dd738476588240f0c37f359062c755b509213d4273b994e4923faea
 
 ENV DEBIAN_FRONTEND=noninteractive TZ=UTC \
     LC_ALL=C.UTF-8 LANG=C.UTF-8
@@ -24,11 +25,6 @@ RUN set -eux; \
   && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
-# Fail-fast + faster compilation (when it must compile)
-# ============================================================
-ENV MAKEFLAGS="-j$(nproc)"
-
-# ============================================================
 # R dependencies
 # ============================================================
 
@@ -38,7 +34,7 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); install.packages(c(
 # ---- CRAN ----
 RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
   install.packages(c( \
-    'cli','data.table','optparse','xml2','ggplot2','dplyr','dtplyr','R.utils','testthat','knitr','rmarkdown', \
+    'cli','data.table','lme4','xml2','ggplot2','dplyr','dtplyr','R.utils','testthat','withr', \
     'RIdeogram','doParallel','foreach','ape','Rdpack','benchmarkme','svglite', \
     'sysfonts','showtext','showtextdb' \
   )); \
@@ -57,43 +53,14 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
     !vapply(c('AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures','GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO','IHW','qvalue','rtracklayer','pwalign','txdbmaker'), requireNamespace, logical(1), quietly=TRUE) ]; \
   if (length(missing)) stop('Missing Bioc packages after install: ', paste(missing, collapse=', '))"
 
-# ---- GitHub runtime deps ----
-# Install metablastr + rdiamond normally, then build orthologr from source with our patch applied.
-COPY inst/patches/orthologr-pwalign.patch /tmp/orthologr-pwalign.patch
-ARG ORTHOLOGR_REF=HEAD
-
-RUN set -eux; \
-  R -q -e "options(warn=2); remotes::install_github(c('drostlab/metablastr','drostlab/rdiamond'), upgrade='never')"; \
-  \
-  rm -rf /tmp/orthologr; \
-  git clone https://github.com/drostlab/orthologr /tmp/orthologr; \
-  \
-  # allow future pinning a known-good orthologr commit/tag if build breaks
-  # build with: docker build --build-arg ORTHOLOGR_REF=<sha-or-tag> ...
-  if [ -n "${ORTHOLOGR_REF:-}" ] && [ "${ORTHOLOGR_REF}" != "HEAD" ]; then \
-    git -C /tmp/orthologr checkout -q "${ORTHOLOGR_REF}"; \
-  fi; \
-  \
-  # fail early if the patch no longer applies cleanly
-  patch --dry-run --forward -p1 -d /tmp/orthologr < /tmp/orthologr-pwalign.patch; \
-  patch --forward -p1 -d /tmp/orthologr < /tmp/orthologr-pwalign.patch; \
-  R CMD INSTALL /tmp/orthologr; \
-  \
-  R -q -e "options(warn=2); \
+# ---- GitHub runtime deps, pinned by commit ----
+# orthologr has included the pwalign fix upstream since 2026, so no patch is needed.
+ARG ORTHOLOGR_REF=06c3098adfba1e32135d904f72ea81a76902c664
+ARG METABLASTR_REF=02dad6daf9f4a0675317177ff434ae9bbcec535f
+ARG RDIAMOND_REF=d8b4006d5f2793ecf8b97a7560fa005b7a3420ee
+RUN R -q -e "options(warn=2); remotes::install_github(c('drostlab/metablastr@${METABLASTR_REF}','drostlab/rdiamond@${RDIAMOND_REF}','drostlab/orthologr@${ORTHOLOGR_REF}'), upgrade='never', dependencies=FALSE); \
     missing <- c('metablastr','rdiamond','orthologr')[!vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE)]; \
     if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
-
-# Ensure patch was applied
-RUN R -q -e " \
-  stopifnot(requireNamespace('orthologr', quietly=TRUE)); \
-  fn <- get('pairwise_aln', asNamespace('orthologr')); \
-  txt <- paste(deparse(body(fn)), collapse='\n'); \
-  stopifnot(grepl('pwalign::pairwiseAlignment', txt)); \
-  stopifnot(grepl('pwalign::pattern', txt)); \
-  stopifnot(grepl('pwalign::subject', txt)); \
-  stopifnot(grepl('pwalign::writePairwiseAlignments', txt)); \
-  cat('orthologr patch OK\n'); \
-"
 
 # Final sanity check
 RUN Rscript -e "stopifnot( \
@@ -122,16 +89,16 @@ ENV BSPM_DISABLE=1
 # Micromamba environment (python + OrthoFinder toolchain)
 # ============================================================
 ENV MAMBA_ROOT_PREFIX=/opt/conda
-ARG MAMBA_VER=latest
+ARG MAMBA_VER=2.5.0
 RUN set -eux; \
   curl -fsSL "https://micro.mamba.pm/api/micromamba/linux-64/${MAMBA_VER}" -o /tmp/micromamba.tar.bz2; \
   tar -xvjf /tmp/micromamba.tar.bz2 -C /usr/local/bin --strip-components=1 bin/micromamba; \
   rm -f /tmp/micromamba.tar.bz2
 
 RUN micromamba create -y -n tools -c conda-forge -c bioconda \
-      python=3.10 \
+      python=3.10.19 \
       orthofinder=2.5.4 \
-      mafft mcl fasttree \
+      mafft=7.526 mcl=22.282 fasttree=2.2.0 \
   && micromamba clean -a -y
 
 # ============================================================
@@ -148,9 +115,18 @@ RUN set -eux; \
 
 ENV PATH=/usr/local/bin:$MAMBA_ROOT_PREFIX/envs/tools/bin:$PATH
 
+# ============================================================
+# dndsR itself, so the image runs without any other installation
+# ============================================================
+COPY . /opt/dndsR
+RUN R CMD INSTALL --clean /opt/dndsR \
+  && install -m 0755 /opt/dndsR/inst/scripts/dndsr /usr/local/bin/dndsr \
+  && Rscript -e "stopifnot(requireNamespace('dndsR', quietly=TRUE))" \
+  && dndsr __commands
+
 WORKDIR /work
-CMD ["bash"]
+CMD ["dndsr", "--help"]
 
 LABEL \
   org.opencontainers.image.source="https://github.com/scrumpis/dndsr" \
-  org.opencontainers.image.description="dndsR runtime dependencies (R/Bioc + OrthoFinder toolchain)"
+  org.opencontainers.image.description="dndsR and its runtime dependencies"

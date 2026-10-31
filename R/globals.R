@@ -1,5 +1,6 @@
 # R/globals.R
 utils::globalVariables(c(
+  "avg_ln_dN", "avg_ln_dS",
   "seqname","start","end",
   "gene_state_contrasts",
   "avg_ln_neg_dNdS","avg_ln_pos_dNdS",

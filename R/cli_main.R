@@ -126,9 +126,8 @@ cli_print_command_help <- function(cmd) {
 #' dndsR command-line entrypoint
 #'
 #' Dispatches the `dndsr` command-line interface (CLI). This function is intended
-#' to be called by the `dndsr` executable installed with the package (e.g.,
-#' `inst/exec/dndsr`) or by the `dndsR-launcher`, rather than being used
-#' interactively.
+#' to be called by the `dndsr` executable (`inst/scripts/dndsr`), rather than being
+#' used interactively. Use the analysis functions, such as [calculate_dnds()], from R.
 #'
 #' The CLI discovers available commands by looking for functions named
 #' `cli_<command>` in the `dndsR` namespace.
@@ -165,10 +164,12 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     return(invisible(NULL))
   }
 
-  cmd  <- argv[1]
+  # Accept hyphens as well as underscores, as for options.
+  cmd  <- gsub("-", "_", argv[1], fixed = TRUE)
   args <- argv[-1]
 
-  if (length(args) == 0) {
+  # These commands are complete with no options. Others print their help.
+  if (length(args) == 0 && !(cmd %in% c("example", "verify_example"))) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
   }
@@ -180,6 +181,10 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
 
   fn <- cli_lookup_command(cmd)
   if (is.null(fn)) .cli_unknown_command(cmd)
+
+  if (cmd == "example" && !any(grepl("^(-o|-O|--output[-_]dir)", args))) {
+    args <- c(args, "-o", "dndsr_example")
+  }
 
   if (!exists("parse_dnds_opts", envir = ns, inherits = FALSE)) {
     stop("Internal error: parse_dnds_opts() not found in dndsR namespace.", call. = FALSE)

@@ -1,0 +1,32 @@
+# Builds the container and runs the example in it, without publishing anything.
+name: container
+
+on:
+  push:
+    branches: [dev]
+    paths: ["tools/Dockerfile", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker build -f tools/Dockerfile -t dndsr:test .
+
+      - name: Run the example and verify it
+        run: |
+          docker run --rm -v "$PWD/work:/work" -u "$(id -u):$(id -g)" dndsr:test dndsr example -o /work/example
+          cat > run.sh <<'EOF'
+          set -e
+          dndsr extract_cds -c comparison_file.txt
+          dndsr calculate_dnds -c comparison_file.txt -t 2
+          dndsr verify_example
+          EOF
+          docker run --rm -v "$PWD/work:/work" -v "$PWD/run.sh:/run.sh:ro" -w /work/example -u "$(id -u):$(id -g)" dndsr:test bash /run.sh

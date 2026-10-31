@@ -1,109 +1,98 @@
 ---
 name: dndsr
-description: Installs and runs dndsR, an R package and CLI for pairwise dN/dS analysis of orthologous genes from genome FASTA and GFF3 files, with annotation, term enrichment, ideograms, and regional or contrast summaries. Use when a user wants to calculate, summarize, or interpret dN/dS ratios with dndsR, or set it up with Singularity, Apptainer, or Docker.
+description: Installs and runs dndsR, an R package and CLI for pairwise dN/dS analysis of orthologous genes from genome FASTA and GFF3 files, with annotation, term enrichment, ideograms, and regional or contrast summaries. Use when a user wants to calculate, summarize, or interpret dN/dS ratios with dndsR, or set it up with Singularity, Apptainer, Docker, or R.
 license: MIT
-compatibility: Needs bash, git, and Singularity, Apptainer, or Docker. The Linux amd64 image is the only environment tested. Pulling the image and cloning the repository need network access unless both are already present.
+compatibility: Needs bash and git, plus Singularity, Apptainer, or Docker, or an R installation with dndsR's dependencies. Only Linux amd64 with Singularity has been tested. Cloning and pulling the image need network access unless both are already present.
 metadata:
-  software-version: "0.3.0.000"
-  skill-status: "initial; installation and CLI discovery verified, analyses not yet verified"
+  software-version: "0.3.0"
+  skill-status: "core workflow tested on a designed example; not validated on real genomes"
 ---
 
 # dndsR
 
-dndsR estimates and analyzes dN/dS between orthologous genes in pairwise genome comparisons. Its main output, the dN/dS ratio, compares nonsynonymous and synonymous substitution rates.
+dndsR estimates and analyzes dN/dS between orthologous genes in pairwise genome comparisons. It is both an R package and a command-line tool.
 
-Everything marked **unverified** below comes from the repository's documentation or code and has not been run to completion. Tell the user when you rely on it. Evidence for verified steps is in [references/verification.md](references/verification.md). Known gaps are in [references/gaps.md](references/gaps.md).
+What has been tested is recorded in [references/verification.md](references/verification.md). Tell the user when you rely on something that has not been tested. Open problems are in [references/gaps.md](references/gaps.md).
 
 ## 1. Check the environment
 
 ```
-command -v apptainer singularity docker
+command -v apptainer singularity docker Rscript
 command -v dndsr && dndsr --help
 ```
 
-If `dndsr --help` lists commands, skip to step 3. If no container engine exists, see "Native installation" in section 5.
+If `dndsr --help` lists commands, go to step 3. If R has dndsR (`Rscript -e 'packageVersion("dndsR")'`), every command below is also a function: see [Using dndsR from R](../../docs/tutorials/using-r.md).
 
 ## 2. Install
 
-The runtime image holds dependencies only. dndsR itself is installed from a git clone into an R library in the home directory, so the clone must stay in place.
+Tell the user first: this downloads 1.3 GB, and writes to `~/.config/dndsr`, `~/.dndsr/rlib`, and `~/.local/bin`. The image holds dependencies; dndsR is installed from the clone, which must stay in place. Replace `singularity` with `apptainer` if that is what is available (untested).
 
 ```
-git clone https://github.com/Scrumpis/dndsR
+git clone --branch dev https://github.com/Scrumpis/dndsR
 cd dndsR
-```
-
-The published image is on Docker Hub as `scrumpis/dndsr`, tag `v0.2.0`, digest `sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831`. List current tags with:
-
-```
-curl -s "https://hub.docker.com/v2/repositories/scrumpis/dndsr/tags?page_size=20"
-```
-
-Pin the digest for reproducibility, because tags can move. Apptainer works the same way when you replace `singularity` with `apptainer`, but only Singularity has been tested.
-
-```
 singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
 tools/dndsr-install install --engine singularity --sif dndsr.sif
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-The installer writes to `~/.config/dndsr`, `~/.dndsr/rlib`, and `~/.local/bin`, adds shell completions, and may edit `~/.zshrc`. Tell the user before running it. If `~/.local/bin` is not on `PATH`, it prints the line to add.
+Pin digests rather than tags, because tags can move. To see published tags: `curl -s "https://hub.docker.com/v2/repositories/scrumpis/dndsr/tags?page_size=20"`. The Docker route is in [INSTALL.md](../../INSTALL.md) and is untested.
 
-Docker is **unverified**:
+## 3. Verify with the example
 
-```
-docker pull scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
-tools/dndsr-install install --engine docker --image scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831 --docker-platform linux/amd64
-```
-
-Confirm the installation. Expect 11 commands:
+Always do this after installing. It takes about a minute.
 
 ```
-tools/dndsr-install doctor
-dndsr --help
+dndsr example
+cd dndsr_example
+dndsr extract_cds -c comparison_file.txt
+dndsr calculate_dnds -c comparison_file.txt -t 2
+dndsr verify_example
 ```
 
-## 3. Run commands
+Success ends with `All 14 example checks passed.` Any `[FAIL]` line, or a nonzero exit code, means the installation does not behave as expected: report it rather than continuing. This confirms the installation works. It does not validate results on other data.
 
-Use `dndsr <command> --help` for the arguments of any command. The commands, with their README-documented purpose, are in [references/commands.md](references/commands.md).
+## 4. Run a real analysis
 
-The documented order is below. **All of these are unverified.** Most accept a whitespace-delimited comparison file with `comparison_name query_fasta query_gff subject_fasta subject_gff` on each line. See the references for the exact format.
+Input is a comparison file, one line per comparison: `name query.fasta query.gff3 subject.fasta subject.gff3`. Paths are relative to the current folder, which is visible in the container. For data elsewhere, reinstall with `--bind <folder>` and use absolute paths.
 
 ```
-dndsr split_comparisons -c comparison_file.txt
 dndsr extract_cds -c comparison_file.txt -t 8
-dndsr calculate_dnds -c comparison_file.txt -t 80
+dndsr calculate_dnds -c comparison_file.txt -t 40
 dndsr append_annotations -c comparison_file.txt -t 8
+dndsr term_enrichment -c comparison_file.txt -t 8
 dndsr ipr_enrichment -c comparison_file.txt -t 8
 dndsr go_enrichment -c comparison_file.txt -t 8
-dndsr term_enrichment -c comparison_file.txt -t 8
 dndsr dnds_ideogram -c comparison_file.txt
+dndsr dnds_summary -c comparison_file.txt --regions-bed regions.bed
 ```
 
-`calculate_dnds` can be slow. On a cluster, submit it through the scheduler. Paths in the comparison file must be visible inside the container: with Docker the README asks for paths relative to the output directory, and with Singularity you may need `DNDSR_BINDS` in `~/.config/dndsr/config.env`.
+`calculate_dnds` can take many hours on whole genomes, so on a cluster use the scheduler. Commands and options: [references/commands.md](references/commands.md). Output columns: [docs/output-files.md](../../docs/output-files.md).
 
-## 4. Interpret results carefully
+Check `<comparison>/<genome>_CDS_qc.tsv` for exclusions, and the number of pairs in `<comparison>_dnds.tsv`, before interpreting results.
 
-No correctness audit has been completed, and no expected-result example exists yet. Do not present dndsR results as validated.
+## 5. Interpret honestly
 
-From the code, `calculate_dnds` wraps `orthologr::dNdS()` with DIAMOND best hits and the Comeron method by default.
+Read [docs/interpretation.md](../../docs/interpretation.md) before explaining results. The essentials:
 
-General dN/dS background, not specific to dndsR:
+- **dN/dS above 1 is a candidate, not proof of positive selection.** dndsR applies a threshold to a point estimate. In simulations of 600-codon neutral genes, up to 35% exceeded 1 with the default method.
+- Look at dN and dS as well as the ratio. Small dS makes ratios unstable, and large dS (above roughly 1 to 2) suggests saturation. dS = 0 gives NA.
+- The default Comeron method tends to give lower ratios than true values in simulation. Evidence: [docs/validation/estimators.md](../../docs/validation/estimators.md).
+- Reciprocal best hits can mispair paralogs, especially in polyploids. Annotation errors can look like selection.
+- Enrichment tests treat genes as independent.
+- `dnds_state_contrast --level gene` is experimental. Do not base conclusions on it.
+- Results from dndsR before 0.3.0 should not be reused; see [NEWS.md](../../NEWS.md).
 
-- A ratio below 1 is consistent with purifying selection, near 1 with neutral evolution, and above 1 with positive selection. These readings are not proof: a whole-gene ratio averages over sites and lineages.
-- Very small or saturated dS makes ratios unstable. Check dN and dS, not only the ratio.
-- Misassigned orthologs, poor alignments, and annotation or frame errors can create false signals. Best-hit pairing is a heuristic, especially in polyploids.
-- Enrichment comparisons need matching annotation versions between genomes, as the README warns.
+Report the version, commit, image digest, command, and the number of excluded genes. Parameters and input hashes are in `<comparison>_dnds_provenance.json`.
 
-Report the dndsR commit, image digest, command, and parameters with any result.
-
-## 5. Native installation and troubleshooting
-
-Native installation is **unverified**. It needs the dependencies in `DESCRIPTION`, DIAMOND, OrthoFinder, and the patched orthologr. `INSTALL.md` is partial and describes itself as temporary. Prefer the container.
+## 6. Troubleshooting
 
 - `command not found: dndsr`: add `~/.local/bin` to `PATH`, then run `hash -r`.
-- `Unknown command` or `Unknown option`: dndsR stops rather than ignoring a typo. Run `dndsr --help` or `dndsr <command> --help`.
-- `jobs failed`: a parallel job failed. The message includes each error; logs are in the comparison folder. Retry with `--threads 1` if the cause is unclear, and check memory if a worker died.
-- The image tag is older than this code. Report that mismatch if a command fails on a missing dependency.
+- `Unknown command` or `Unknown option`: dndsR stops on typos. Run `dndsr --help` or `dndsr <command> --help`.
+- `Sequence files not found`: run `extract_cds` first, with the same `-o`.
+- `jobs failed`: the message gives each error, and logs are in the comparison folder. Retry with `-t 1`, and check memory if a worker died.
+- Enrichment writes no table: a small dataset may lose terms to `--max-prop` (default 0.2), `--min-pos`, or `--min-total`. Read the log before relaxing them.
+- `dndsr doctor` and `tools/dndsr-install doctor` check the installation.
 
 ## Citation
 
-No DOI or formal citation exists yet. Cite the repository URL and exact commit: https://github.com/Scrumpis/dndsR
+No DOI exists yet. Use [CITATION.cff](../../CITATION.cff) with the exact commit, and also cite orthologr, DIAMOND, and Comeron (1995).

@@ -22,6 +22,31 @@ result$pair <- sub("^spA_", "", result$query_id)
 value <- function(pair, column) result[[column]][result$pair == pair]
 expected <- function(pair, column) reference[[column]][reference$pair == pair]
 
+test_that("the user-facing example check passes", {
+  checks <- suppressMessages(verify_example("."))
+  expect_true(all(checks$passed))
+  expect_gte(nrow(checks), 13L)
+})
+
+test_that("the user-facing example check catches wrong results", {
+  dir.create("broken")
+  file.copy("truth", "broken", recursive = TRUE)
+  dir.create("broken/example_AvB")
+  file.copy(list.files("example_AvB", full.names = TRUE), "broken/example_AvB")
+  wrong <- utils::read.delim("example_AvB/example_AvB_dnds.tsv")
+  wrong$dNdS[wrong$query_id == "spA_g28"] <- 1.615
+  utils::write.table(wrong, "broken/example_AvB/example_AvB_dnds.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
+  expect_error(suppressMessages(verify_example("broken")), "example checks failed")
+})
+
+test_that("the example can be copied, once", {
+  folder <- file.path(tempdir(), "copied-example")
+  suppressMessages(dndsr_example(folder))
+  expect_true(file.exists(file.path(folder, "comparison_file.txt")))
+  expect_error(suppressMessages(dndsr_example(folder)), "already")
+  expect_error(verify_example(tempdir()), "No results")
+})
+
 test_that("every written CDS matches the designed sequence exactly", {
   for (species in c("spA", "spB")) {
     got <- Biostrings::readDNAStringSet(file.path("example_AvB", paste0(species, "_CDS.fasta")))

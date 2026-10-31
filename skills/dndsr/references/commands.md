@@ -1,6 +1,6 @@
 # dndsR commands
 
-The list comes from `dndsr --help`. Descriptions come from the README and have not been verified by running the commands. Use `dndsr <command> --help` for arguments.
+Every command is also an R function with the same name and options, except `example`, which is `dndsr_example()`. Use `dndsr <command> --help` for arguments.
 
 | Command | Documented purpose |
 |---|---|
@@ -14,7 +14,9 @@ The list comes from `dndsr --help`. Descriptions come from the README and have n
 | `dnds_ideogram` | Ideogram of binned dN/dS across a genome |
 | `dnds_summary` | dN/dS distributions and statistics, optionally by region |
 | `dnds_contrast` | Contrasts between comparisons |
-| `dnds_state_contrast` | Gene-level contrasts |
+| `dnds_state_contrast` | Contrasts of selection states; `--level gene` is experimental |
+| `example` | Copy the bundled example to a folder |
+| `verify_example` | Check example results against independent values |
 
 ## Global options
 
@@ -26,11 +28,11 @@ The list comes from `dndsr --help`. Descriptions come from the README and have n
 | `-v`, `--verbose` | Verbose logging |
 | `-w`, `--warnings` | `off`, `summary`, or `all` |
 
-Option names accept `-` or `_` as separators.
+Option and command names accept `-` or `_` as separators. Unknown options are errors.
 
 ## Comparison file
 
-Whitespace-delimited with one comparison per row, documented as `comparison_name query_fasta query_gff subject_fasta subject_gff`. Paths containing spaces must be double-quoted.
+Whitespace-delimited with one comparison per row: `comparison_name query_fasta query_gff subject_fasta subject_gff`. Paths containing spaces must be double-quoted.
 
 ```
 Cform_v_Calbum ./path_to/Cformosanum.fasta ./path_to/Cformosanum.gff ./path_to/Calbum.fasta ./path_to/Calbum.gff
