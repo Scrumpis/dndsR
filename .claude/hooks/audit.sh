@@ -40,7 +40,14 @@ case $(jq -r '.hook_event_name // empty' <<<"$input") in
     dir=$(dirname "$transcript")
     # A subagent event may report .../<session>/subagents/agent-*.jsonl.
     [ "$(basename "$dir")" != subagents ] || dir=$(dirname "$(dirname "$dir")")
-    [ -d "$dir" ] && cp -pRu "$dir/." "$audit/transcripts/" 2>/dev/null
+    [ -d "$dir" ] || exit 0
+    # Compare content, never timestamps: the archive may be recursively touched to
+    # survive the scratch purge, and that must not stop updated files being copied.
+    (cd "$dir" && find . -type f -print0) | while IFS= read -r -d '' f; do
+      target=$audit/transcripts/$f
+      cmp -s "$dir/$f" "$target" && continue
+      mkdir -p "$(dirname "$target")" && cp -p "$dir/$f" "$target"
+    done
     ;;
 esac
 exit 0

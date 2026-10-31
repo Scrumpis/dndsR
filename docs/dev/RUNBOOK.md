@@ -27,9 +27,9 @@ Pushing needs GitHub credentials on the machine that pushes.
 The HPC default R lacks many dependencies, so use the image. Keep images and caches outside the clone. This example installs the current tree into a temporary library:
 
 ```
-SIF=<path to dndsr image>
-LIB=$(mktemp -d)
-singularity exec --cleanenv --bind "$PWD,$LIB" "$SIF" R CMD INSTALL --library="$LIB" "$PWD"
+export DNDSR_SIF=<path to dndsr image> DNDSR_DEV_LIB=<writable folder outside the clone>
+tools/dev/in-container.sh Rscript -e 'packageVersion("dndsR")'   # installs this tree first
+tools/dev/run-tests.sh
 ```
 
 ## Inspect the audit trail
@@ -50,6 +50,8 @@ jq -c 'select(.category == "test")' .audit/events.jsonl
 ```
 
 Native originals are in `~/.claude/projects/<encoded-project-path>/`, and Claude Code deletes them after `cleanupPeriodDays` (30 days by default). The archive keeps copies: every `SessionStart`, `Stop`, `SubagentStop`, `PreCompact`, and `SessionEnd` copies new or changed files from the project's transcript directory.
+
+Timestamps in the archive are not meaningful, because files may be touched to survive the scratch purge. The archive sync compares content, and `tools/dev/audit-manifest.sh` records SHA-256 hashes; run it with `--check` to look for unrecorded content.
 
 Tracked, public-safe records: `STATUS.md`, `DECISIONS.md`, and `SESSION_LOG.md` in `docs/dev/`. They hold summaries, not transcripts.
 
