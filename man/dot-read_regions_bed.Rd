@@ -19,7 +19,7 @@
 Returns a data.frame with columns: seqname, start, end, region_name
 }
 \details{
-Robust to headerless BED files: tries header=TRUE, then falls back to header=FALSE.
+Accepts files with or without a header: a first line with numeric start and end columns is treated as data.
 
 Coordinate conventions:
 \itemize{

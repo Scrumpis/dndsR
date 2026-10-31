@@ -164,17 +164,20 @@ append_annotations <- function(dnds_file = NULL,
   ## ---------- term patterns & normalizers ----------
   .default_term_patterns <- function() {
     list(
-      GO      = "GO:\\d{7}",
-      IPR     = "(?:InterPro:)?IPR\\d{6}",
-      KEGG    = "(?:KEGG:)?K\\d{5}|map\\d{5}",
-      PANTHER = "PTHR\\d{5,6}(?:\\:SF\\d+)?",
-      PFAM    = "PF\\d{5}",
-      TIGRFAM = "TIGR\\d{5}",
-      COG     = "COG\\d{4}"
+      GO      = "(?<![A-Za-z0-9])GO:\\d{7}(?![A-Za-z0-9])",
+      IPR     = "(?<![A-Za-z0-9])(?:InterPro:)?IPR\\d{6}(?![A-Za-z0-9])",
+      KEGG    = "(?<![A-Za-z0-9])(?:KEGG:)?(?:K\\d{5}|map\\d{5})(?![A-Za-z0-9])",
+      PANTHER = "(?<![A-Za-z0-9])PTHR\\d{5,6}(?:\\:SF\\d+)?(?![A-Za-z0-9])",
+      PFAM    = "(?<![A-Za-z0-9])PF\\d{5}(?![A-Za-z0-9])",
+      TIGRFAM = "(?<![A-Za-z0-9])TIGR\\d{5}(?![A-Za-z0-9])",
+      COG     = "(?<![A-Za-z0-9])COG\\d{4}(?![A-Za-z0-9])"
     )
   }
   .default_normalizers <- function() {
-    list(IPR = function(x) sub("^InterPro:", "", x, ignore.case = TRUE))
+    list(
+      IPR = function(x) sub("^InterPro:", "", x, ignore.case = TRUE),
+      KEGG = function(x) sub("^KEGG:", "", x, ignore.case = TRUE)
+    )
   }
 
   .parse_custom <- function(custom) {
@@ -199,7 +202,8 @@ append_annotations <- function(dnds_file = NULL,
   .extract_terms_from_string <- function(attr_string, patterns, normalizers, case_insensitive = TRUE) {
     out <- structure(vector("list", length(patterns)), names = names(patterns))
     if (isTRUE(is.na(attr_string)) || !nzchar(attr_string)) return(out)
-    s <- attr_string
+    # Identifiers such as ID=K12345.1 name the feature; they are not functional terms.
+    s <- gsub("(^|;)\\s*(ID|Parent)=[^;]*", "\\1", attr_string, perl = TRUE)
     for (lab in names(patterns)) {
       rx <- patterns[[lab]]
       hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE,
@@ -317,9 +321,19 @@ append_annotations <- function(dnds_file = NULL,
     out
   }
 
-  ## Memoized subtree unions WITH CYCLE GUARDS
+  ## Memoized subtree unions WITH CYCLE GUARDS.
+  ## An ID is only unique within one GFF, and annotation tools often reuse names such as
+  ## g1 across genomes, so these caches must be emptied before each GFF.
+  subtree_caches <- list(
+    terms = new.env(hash = TRUE, parent = emptyenv()),
+    attrs = new.env(hash = TRUE, parent = emptyenv()),
+    coords = new.env(hash = TRUE, parent = emptyenv())
+  )
+  .reset_subtree_caches <- function() {
+    for (e in subtree_caches) rm(list = ls(e, all.names = TRUE), envir = e)
+  }
   .subtree_terms <- local({
-    cache <- new.env(hash = TRUE, parent = emptyenv())
+    cache <- subtree_caches$terms
     INPROG <- new.env(hash = TRUE, parent = emptyenv())
 
     function(id, children_env, own_terms_env) {
@@ -339,7 +353,7 @@ append_annotations <- function(dnds_file = NULL,
   })
 
   .subtree_attrs <- local({
-    cache <- new.env(hash = TRUE, parent = emptyenv())
+    cache <- subtree_caches$attrs
     INPROG <- new.env(hash = TRUE, parent = emptyenv())
 
     function(id, children_env, own_attrs_env) {
@@ -359,7 +373,7 @@ append_annotations <- function(dnds_file = NULL,
   })
 
   .subtree_coords <- local({
-    cache <- new.env(hash = TRUE, parent = emptyenv())
+    cache <- subtree_caches$coords
     INPROG <- new.env(hash = TRUE, parent = emptyenv())
 
     function(id, children_env, own_coords_env) {
@@ -411,6 +425,7 @@ append_annotations <- function(dnds_file = NULL,
   ## Annotate a set of IDs -> data.frame(ID, GFF_SEQID, GFF_START, GFF_END, ATTR, <terms...>)
   .annotate_id_set <- function(ids, children_env, own_terms_env, own_attrs_env, own_coords_env,
                                labs, collapse_sep = ";", threads = 1L) {
+    .reset_subtree_caches()
     to_row <- function(id) {
       terms  <- .subtree_terms(id, children_env, own_terms_env)
       attrs  <- .subtree_attrs(id, children_env, own_attrs_env)

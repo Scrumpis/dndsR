@@ -89,7 +89,7 @@ set by this wrapper, it will override the wrapper default, except for \code{quer
 }
 \value{
 (Invisibly) a character vector of output TSV paths (batch mode), or a single output TSV path
-(single mode). Comparisons skipped due to missing inputs are omitted from batch outputs.
+(single mode). Missing inputs are an error.
 }
 \description{
 Wraps \code{orthologr::dNdS()} to provide batch execution, sensible defaults,
@@ -117,4 +117,11 @@ where \code{<suffix>} is \code{cds_suffix} or \code{protein_suffix} depending on
 This function requires the \pkg{orthologr} package. For Biostrings >= 2.77.1, alignment helpers
 were moved into \pkg{pwalign}; ensure \pkg{pwalign} is installed if your \pkg{orthologr} version uses it.
 We provide a patched orthologr version in the Docker image.
+
+\strong{Provenance:} each result has a \code{<comparison_name>_dnds_provenance.json} file
+recording software versions, parameters, and MD5 hashes of the sequence inputs. If a
+result already exists and \code{overwrite = FALSE}, it is kept, but dndsR says so if the
+hashes no longer match or if the result predates this record.
+
+Any orthologr output files about discarded sequences are written in the comparison folder.
 }

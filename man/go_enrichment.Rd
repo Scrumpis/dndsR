@@ -48,7 +48,9 @@ columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{statistic}{topGO statistic: usually "fisher" (default) or "ks".}
 
-\item{pos_threshold}{Numeric; dNdS > pos_threshold defines "positive" (default 1).}
+\item{pos_threshold}{Numeric OR character quantile spec. If numeric, dNdS > pos_threshold defines "positive".
+If character, use "q\if{html}{\out{<prob>}}" or "quantile:\if{html}{\out{<prob>}}" (e.g., "q0.95") to set the threshold to that quantile
+of dNdS \emph{after filtering} (and after drop_rows_without_go if enabled).}
 
 \item{max_dnds}{Drop rows with dNdS >= max_dnds or NA (default 10).}
 

@@ -21,9 +21,11 @@
 
   if (ci_method == "normal") {
     ci <- m + c(-1.96, 1.96) * se
+  } else if (n < 2L) {
+    ci <- c(NA_real_, NA_real_)
   } else {
     if (!is.null(seed)) set.seed(seed)
-    means <- replicate(n_boot, mean(sample(x, size = n, replace = TRUE)))
+    means <- replicate(n_boot, mean(x[sample.int(n, size = n, replace = TRUE)]))
     ci <- stats::quantile(means, probs = c(0.025, 0.975),
                           names = FALSE, na.rm = TRUE)
   }

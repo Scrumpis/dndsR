@@ -15,8 +15,7 @@ Default is \code{"dNdS"}.}
 \item{filter_expr}{Optional character string representing a logical
 expression evaluated within the data frame (e.g. \code{"gene_type == 'CDS'"}).
 If it evaluates to length 1 it is recycled; if it evaluates to length
-\code{nrow(d)} it is used directly. Any other result or errors cause a
-warning and the expression is ignored.}
+\code{nrow(d)} it is used directly.}
 
 \item{max_dnds}{Numeric. Rows with dN/dS values greater than or equal
 to this threshold are removed. Default is \code{10}.}
@@ -38,7 +37,8 @@ supplied via \code{filter_expr}.
 }
 }
 \details{
-If \code{filter_expr} fails to parse/evaluate or returns a non-logical / wrong-length
-result, it will be ignored with a warning (rather than stopping).
+A \code{filter_expr} that cannot be evaluated, or gives the wrong type or length, is an
+error: running unfiltered could give plausible but wrong results. Rows where it gives
+\code{NA} are removed.
 }
 \keyword{internal}

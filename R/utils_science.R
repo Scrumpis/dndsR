@@ -97,3 +97,25 @@
     identical(old$subject_md5, unname(tools::md5sum(subject_file)))
   if (same) NULL else "its sequence inputs have changed"
 }
+
+#' Assign genes of significant terms to all of their ancestors
+#'
+#' Used by the parent-child method: a parent is tested without the genes already explained
+#' by a significant descendant, including through a non-significant intermediate term.
+#'
+#' @param order_terms Terms ordered from most specific to most general.
+#' @param sig_terms Terms found significant.
+#' @param term2rows List mapping each term to its gene rows.
+#' @param parents_map List mapping each term to its parents.
+#' @param nodes All terms that need an entry in the result.
+#' @return List mapping each term to the rows claimed by its significant descendants.
+#' @keywords internal
+.propagate_claims <- function(order_terms, sig_terms, term2rows, parents_map, nodes) {
+  claimed <- stats::setNames(rep(list(integer(0)), length(nodes)), nodes)
+  for (t in order_terms) {
+    passed_up <- claimed[[t]]
+    if (t %in% sig_terms) passed_up <- union(passed_up, term2rows[[t]])
+    for (p in parents_map[[t]]) claimed[[p]] <- union(claimed[[p]], passed_up)
+  }
+  claimed
+}

@@ -408,7 +408,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
     # Bookkeeping before filtering
     n_total <- nrow(d_raw)
     n_removed_na     <- sum(is.na(d_raw$dNdS))
-    n_removed_ge_max <- sum(is.finite(d_raw$dNdS) & d_raw$dNdS >= max_dnds)
+    n_removed_ge_max <- sum(!is.na(d_raw$dNdS) & d_raw$dNdS >= max_dnds)
 
     # Apply filtering
     d <- .filter_dnds(d_raw, filter_expr = filter_expr, max_dnds = max_dnds)

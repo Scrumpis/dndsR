@@ -1,6 +1,6 @@
 # dndsR
 
-R package and CLI for pairwise dN/dS calculation, annotation, enrichment, and visualization. Roadmap: audit `dev`, merge to `main`, release v0.3.0, then v1.0.0 for publication. Current state: [docs/dev/STATUS.md](docs/dev/STATUS.md). How to inspect and resume work: [docs/dev/RUNBOOK.md](docs/dev/RUNBOOK.md).
+dndsR is a proper R package, callable from R and intended to be fit for CRAN one day, and also a containerized command-line tool. It serves people and AI agents equally, with ease of use as a primary goal. It does pairwise dN/dS calculation, annotation, enrichment, and visualization. Roadmap: audit `dev`, merge to `main`, release v0.3.0, then v1.0.0 for publication. Current state: [docs/dev/STATUS.md](docs/dev/STATUS.md). How to inspect and resume work: [docs/dev/RUNBOOK.md](docs/dev/RUNBOOK.md).
 
 ## Repository facts
 

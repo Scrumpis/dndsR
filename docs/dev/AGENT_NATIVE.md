@@ -2,7 +2,15 @@
 
 This is a permanent project policy.
 
-dndsR is both a standalone scientific package usable without AI and a portable Agent Skill that gives compatible agents the knowledge to run it correctly. A person must never need an AI agent, and an agent must never need undocumented project knowledge. A feature is complete only when both can use it.
+## What dndsR is
+
+- **A real R package.** Every analysis is a documented function that can be called from R. Package changes should keep it fit for CRAN one day: clean `R CMD check`, optional dependencies guarded, nothing written outside the paths a user gives.
+- **A command-line tool with containers.** The CLI is the recommended route for large analyses, and it must not be the only one.
+- **Accessible to people and AI agents.** Ease of use comes first for both.
+
+The R and CLI interfaces have the same capabilities. Tutorials cover both.
+
+dndsR is also a portable Agent Skill that gives compatible agents the knowledge to run it correctly. A person must never need an AI agent, and an agent must never need undocumented project knowledge. A feature is complete only when both can use it.
 
 The per-change checklist is in `.claude/rules/skill-maintenance.md`. No model is trained or fine-tuned; expertise lives in version-controlled instructions, references, scripts, and tests.
 

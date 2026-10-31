@@ -122,8 +122,8 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
   .ensure_fai <- function(fasta) {
     fai <- paste0(fasta, ".fai")
     if (!file.exists(fai)) {
-      code <- suppressWarnings(system2("samtools", c("faidx", shQuote(fasta)), stdout = TRUE, stderr = TRUE))
-      if (!file.exists(fai)) die("Failed to create FAI for %s. samtools said:\n%s", fasta, paste(code, collapse = "\n"))
+      Rsamtools::indexFa(fasta)
+      if (!file.exists(fai)) die("Failed to create FAI for %s.", fasta)
     }
     fai
   }
@@ -210,7 +210,8 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
     miss <- setdiff(id_col, names(d))
     if (length(miss)) die("Input missing required column(s): %s", paste(miss, collapse = ", "))
     ids <- d[[id_col]]
-    m   <- id_map[ids, , drop = FALSE]
+    # Exact matching: rownames lookup would let g10 partially match g101.
+    m   <- id_map[match(ids, rownames(id_map)), , drop = FALSE]
     d[[paste0(out_prefix, "_gff_seqname")]] <- m$chr
     d[[paste0(out_prefix, "_gff_start")]]   <- m$start
     d
@@ -352,7 +353,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
       ln <- log(d$dNdS + 1)
       d$ln_dNdS      <- ln
       d$ln_neg_dNdS  <- ifelse(d$dNdS >= 1, NA_real_, ln)
-      d$ln_pos_dNdS  <- ifelse(d$dNdS <  1, NA_real_, ln)
+      d$ln_pos_dNdS  <- ifelse(d$dNdS <= 1, NA_real_, ln)
 
       win <- stats::aggregate(
         list(total_raw_dNdS    = d$dNdS,
@@ -361,7 +362,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
              total_ln_pos_dNdS = d$ln_pos_dNdS,
              n_genes           = rep(1L, nrow(d)),
              neg_genes         = as.integer(d$dNdS < 1),
-             pos_genes         = as.integer(d$dNdS >= 1)),
+             pos_genes         = as.integer(d$dNdS > 1)),
         by = list(Chr = d[[chr_col]],
                   Start = (d[[start_col]] %/% window_size) * window_size),
         FUN = function(x) if (is.numeric(x)) sum(x, na.rm = TRUE) else sum(x)

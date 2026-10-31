@@ -1031,9 +1031,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       return(NULL)
     }
 
+    # Terms with no retained relationship are still tested, with their full gene sets.
     order_terms <- .topo_specific_first(children_map)
+    order_terms <- c(order_terms, setdiff(names(term2rows), order_terms))
 
-    nodes <- unique(c(names(children_map), unlist(children_map, use.names = FALSE)))
+    nodes <- unique(c(order_terms, names(children_map), unlist(children_map, use.names = FALSE)))
     parents_map <- stats::setNames(vector("list", length(nodes)), nodes)
     for (p in names(children_map)) for (c in children_map[[p]]) parents_map[[c]] <- c(parents_map[[c]], p)
 
@@ -1052,11 +1054,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
         kids <- children_map[[t]]
         if (!is.null(kids) && length(kids)) {
-          kids_sig <- intersect(kids, sig_terms)
-          if (length(kids_sig)) {
-            kids_claimed <- unique(unlist(claimed[kids_sig], use.names = FALSE))
-            members <- setdiff(members, kids_claimed)
-          }
+          members <- setdiff(members, claimed[[t]])
         }
 
         tot <- length(members); if (tot < min_total) next
@@ -1099,17 +1097,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
 
     .pc_claimed_from_sig <- function(sig_terms) {
-      claimed <- stats::setNames(vector("list", length(nodes)), nodes)
-      for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
-      if (!length(sig_terms)) return(claimed)
-
-      for (t in order_terms) {
-        if (!(t %in% sig_terms)) next
-        members <- term2rows[[t]]
-        an <- parents_map[[t]]
-        if (length(an)) for (a_name in an) claimed[[a_name]] <- unique(c(claimed[[a_name]], members))
-      }
-      claimed
+      .propagate_claims(order_terms, sig_terms, term2rows, parents_map, nodes)
     }
 
     res1 <- .pc_pass(order_terms, term2rows, all_id, pos_id, children_map)
@@ -1341,7 +1329,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     df <- .apply_filter(d, filter_expr)
     if (!nrow(df)) return(list())
 
-    filter_fun <- function(v, keep_types = NULL) {
+    filter_fun <- function(v, keep_types = NULL, unmatched = keep_unmatched) {
       vapply(
         v,
         .filter_terms_string,
@@ -1349,7 +1337,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         allowed_types = keep_types,
         type_by_ipr = type_by_ipr,
         exclude_set = exclude_set,
-        keep_unmatched = keep_unmatched
+        keep_unmatched = unmatched
       )
     }
 
@@ -1367,7 +1355,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         tp_use <- c(tp)
 
         df2 <- df
-        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp_use)
+        # A term with no known type belongs to no stratum, so it is not tested in any.
+        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp_use, unmatched = FALSE)
 
         if (identical(method, "fisher")) {
           res <- .pooled_enrichment(df2, side, allowed_types = NULL, do_adjust = FALSE)

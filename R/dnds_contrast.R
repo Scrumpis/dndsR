@@ -262,7 +262,8 @@
 #' @param pos_threshold Numeric threshold for calling "positive selection"
 #'   (genes with dN/dS > pos_threshold are counted in the paired enrichment test; default 1).
 #'
-#' @param drop_zero_deltas Logical; if TRUE, drop delta==0 before Wilcoxon (legacy behavior).
+#' @param drop_zero_deltas Logical; kept for compatibility. `stats::wilcox.test()` already
+#'   drops zero differences, so this does not change the p-value.
 #'   Default FALSE (keep zeros; ties handled by wilcox.test).
 #'
 #' @param dedup_keys What to do if focal merge keys are duplicated within A or B:
@@ -445,10 +446,8 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
     c <- sum(!Apos & Bpos)
     d <- sum(!Apos & !Bpos)
 
-    mcn_p <- tryCatch(
-      stats::mcnemar.test(matrix(c(a, b, c, d), nrow = 2, byrow = TRUE))$p.value,
-      error = function(e) NA_real_
-    )
+    # With no discordant pairs the test is undefined.
+    mcn_p <- if ((b + c) == 0L) NA_real_ else stats::mcnemar.test(matrix(c(a, b, c, d), nrow = 2, byrow = TRUE))$p.value
 
     bin_p <- NA_real_
     if ((b + c) > 0) {

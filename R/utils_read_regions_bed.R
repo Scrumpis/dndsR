@@ -2,7 +2,7 @@
 #'
 #' Returns a data.frame with columns: seqname, start, end, region_name
 #'
-#' Robust to headerless BED files: tries header=TRUE, then falls back to header=FALSE.
+#' Accepts files with or without a header: a first line with numeric start and end columns is treated as data.
 #'
 #' Coordinate conventions:
 #'   - regions_coord = "bed0": interpret as BED 0-based, half-open interval
@@ -31,10 +31,10 @@
   }
   if (!file.exists(regions_bed)) stop("regions_bed not found: ", regions_bed)
 
-  reg_raw <- try(.read_ws(regions_bed, header_try = TRUE), silent = TRUE)
-  if (inherits(reg_raw, "try-error") || ncol(reg_raw) < 3) {
-    reg_raw <- .read_ws(regions_bed, header_try = FALSE)
-  }
+  # A first line with numeric start and end is data, not a header.
+  first <- strsplit(trimws(readLines(regions_bed, n = 1L, warn = FALSE)), "\\s+")[[1]]
+  has_header <- length(first) >= 3L && anyNA(suppressWarnings(as.numeric(first[2:3])))
+  reg_raw <- .read_ws(regions_bed, header_try = has_header)
   if (ncol(reg_raw) < 3) stop("regions_bed must have at least 3 columns: seqname, start, end.")
 
   reg_raw <- .clean_colnames(reg_raw)

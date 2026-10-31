@@ -49,6 +49,7 @@ mutate <- function(cds, n_syn, n_non) {
 }
 
 # Designed classes: name, synonymous changes, nonsynonymous changes, term annotation.
+# Terms are real identifiers assigned arbitrarily, so that lookups work; they mean nothing here.
 n_codons <- 300
 spec <- rbind(
   data.frame(id = "g01", class = "identical", syn = 0, non = 0),
@@ -60,16 +61,18 @@ spec <- rbind(
   data.frame(id = sprintf("g%02d", 26:28), class = "structure", syn = 30, non = 10),
   data.frame(id = c("g29", "g30", "g35", "g36"), class = "multi_isoform", syn = 30, non = 10)
 )
-spec$term <- ifelse(spec$class == "excess_nonsynonymous", "InterPro:IPR000111",
-                    ifelse(spec$class == "conserved", "InterPro:IPR000222", "InterPro:IPR000333"))
+spec$term <- ifelse(spec$class == "excess_nonsynonymous", "InterPro:IPR000001",
+                    ifelse(spec$class == "conserved", "InterPro:IPR000003", "InterPro:IPR000007"))
 spec$go <- ifelse(spec$class == "excess_nonsynonymous", "GO:0006952", "GO:0008150")
+spec$kegg <- ifelse(spec$class == "excess_nonsynonymous", "KEGG:K00001", "KEGG:K00002")
 
 genes <- list()
 truth <- list()
 for (i in seq_len(nrow(spec))) {
   a <- random_cds(n_codons)
   b <- mutate(a, spec$syn[i], spec$non[i])
-  genes[[spec$id[i]]] <- list(a = a, b = b)
+  # A second subject for contrasts: conserved at every gene, whatever its class against B.
+  genes[[spec$id[i]]] <- list(a = a, b = b, c = mutate(a, 40, 8))
   truth[[spec$id[i]]] <- data.frame(pair = spec$id[i], class = spec$class[i], syn_changes = spec$syn[i],
                                     nonsyn_changes = spec$non[i], note = "")
 }
@@ -78,12 +81,12 @@ for (i in seq_len(nrow(spec))) {
 stop_a <- random_cds(n_codons)
 stop_b <- mutate(stop_a, 20, 5)
 stop_b[150] <- "TGA"
-genes$g31 <- list(a = stop_a, b = stop_b)
+genes$g31 <- list(a = stop_a, b = stop_b, c = mutate(stop_a, 40, 8))
 truth$g31 <- data.frame(pair = "g31", class = "internal_stop_subject", syn_changes = 20, nonsyn_changes = 5,
                         note = "subject has an in-frame stop at codon 150")
 frame_a <- random_cds(n_codons)
 frame_b <- mutate(frame_a, 20, 5)
-genes$g32 <- list(a = c(frame_a, "A"), b = c(frame_b, "A"))
+genes$g32 <- list(a = c(frame_a, "A"), b = c(frame_b, "A"), c = c(mutate(frame_a, 40, 8), "A"))
 truth$g32 <- data.frame(pair = "g32", class = "length_not_multiple_of_3", syn_changes = 20, nonsyn_changes = 5,
                         note = "both CDS have one trailing extra base")
 only_a <- random_cds(n_codons)
@@ -148,7 +151,7 @@ write_species <- function(prefix, side, ids, extra) {
     gid <- paste0(prefix, "_", id)
     s <- spec[spec$id == id, ]
     attrs <- paste0("ID=", gid, ";Name=", gid)
-    if (nrow(s)) attrs <- paste0(attrs, ";Dbxref=", s$term, ";Ontology_term=", s$go)
+    if (nrow(s)) attrs <- paste0(attrs, ";Dbxref=", s$term, ",", s$kegg, ";Ontology_term=", s$go)
     g <- to_chr(c(1L, glen))
     line <- function(type, r, at, phase = ".") {
       paste(chrom, "synthetic", type, r[1], r[2], ".", st$strand, phase, at, sep = "\t")
@@ -203,9 +206,14 @@ ids_a <- c(names(genes), "g33")
 ids_b <- c(names(genes), "g34")
 write_species("spA", "a", ids_a, list(g33 = only_a))
 write_species("spB", "b", ids_b, list(g34 = only_b))
+write_species("spC", "c", names(genes), list())
 
 truth_tbl <- do.call(rbind, truth)
 rownames(truth_tbl) <- NULL
 write.table(truth_tbl, file.path(out, "truth", "designed_substitutions.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 writeLines("example_AvB spA.fasta spA.gff3 spB.fasta spB.gff3", file.path(out, "comparison_file.txt"))
+writeLines(c("example_AvB spA.fasta spA.gff3 spB.fasta spB.gff3", "example_AvC spA.fasta spA.gff3 spC.fasta spC.gff3"),
+           file.path(out, "two_comparisons.txt"))
+writeLines("AvB_vs_AvC example_AvB query example_AvC query", file.path(out, "contrast_file.txt"))
+writeLines("Chr1 0 6000 first_6kb", file.path(out, "regions.bed"))
 cat("Wrote example to", out, "\n")

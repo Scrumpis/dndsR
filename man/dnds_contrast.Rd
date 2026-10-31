@@ -61,7 +61,8 @@ and delta ECDF per contrast.}
 \item{pos_threshold}{Numeric threshold for calling "positive selection"
 (genes with dN/dS > pos_threshold are counted in the paired enrichment test; default 1).}
 
-\item{drop_zero_deltas}{Logical; if TRUE, drop delta==0 before Wilcoxon (legacy behavior).
+\item{drop_zero_deltas}{Logical; kept for compatibility. \code{stats::wilcox.test()} already
+drops zero differences, so this does not change the p-value.
 Default FALSE (keep zeros; ties handled by wilcox.test).}
 
 \item{dedup_keys}{What to do if focal merge keys are duplicated within A or B:

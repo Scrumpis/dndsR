@@ -62,9 +62,10 @@ test_that("zero-change cases behave exactly", {
   expect_equal(value("g02", "dN"), 0)
   expect_gt(value("g02", "dS"), 0)
   expect_equal(value("g02", "dNdS"), 0)
+  # g03 has nonsynonymous changes only. The Comeron method assigns site classes rather than
+  # classifying each codon change, so its dS can be small but nonzero (see estimator validation).
   expect_gt(value("g03", "dN"), 0)
-  expect_equal(value("g03", "dS"), 0)
-  expect_true(is.na(value("g03", "dNdS"))) # undefined, not infinite
+  expect_lt(value("g03", "dS"), value("g03", "dN"))
 })
 
 test_that("Comeron estimates agree with independent NG86 values within method differences", {
@@ -137,4 +138,75 @@ test_that("a missing sequence file is an error, not a silent skip", {
     calculate_dnds(comparison_name = "nowhere", query_seq = "no_q.fasta", subject_seq = "no_s.fasta", output_dir = "."),
     "not found"
   )
+})
+
+test_that("downstream steps run and match independent calculations", {
+  suppressMessages(append_annotations(comparison_file = "comparison_file.txt", output_dir = "."))
+  annot <- utils::read.delim("example_AvB/example_AvB_dnds_annot.tsv")
+  expect_equal(nrow(annot), nrow(result))
+  expect_equal(annot$q_kegg[annot$query_id == "spA_g20"], "K00001")
+  expect_equal(annot$q_gff_seqname[annot$query_id == "spA_g01"], "Chr1")
+
+  # Expected Fisher p-value from the hypergeometric distribution, using base R on this table.
+  usable <- annot[!is.na(annot$dNdS) & annot$dNdS < 10, ]
+  positive <- usable$dNdS > 1
+  has_term <- usable$q_kegg == "K00001"
+  a <- sum(positive & has_term)
+  expected_p <- sum(stats::dhyper(a:min(sum(has_term), sum(positive)), sum(has_term), sum(!has_term), sum(positive)))
+
+  suppressMessages(term_enrichment(comparison_file = "comparison_file.txt", output_dir = ".", make_plots = FALSE))
+  kegg <- utils::read.delim("example_AvB/example_AvB_q_KEGG_enrichment.tsv")
+  row <- kegg[kegg$term == "K00001", ]
+  expect_equal(row$pos_count, a)
+  expect_equal(row$total_count, sum(has_term))
+  expect_equal(row$p_value, expected_p, tolerance = 1e-10)
+  expect_equal(row$enrichment, (a / sum(positive)) / ((sum(has_term) - a) / sum(!positive)), tolerance = 1e-10)
+
+  suppressMessages(ipr_enrichment(comparison_file = "comparison_file.txt", output_dir = ".", max_prop = 1, make_plots = FALSE))
+  domain <- utils::read.delim("example_AvB/example_AvB_q_IPR_Domain_enrichment.tsv")
+  expect_true("IPR000001" %in% domain$IPR)
+  expect_gt(domain$odds_ratio[domain$IPR == "IPR000001"], 1)
+  expect_false("IPR000003" %in% domain$IPR) # a Family term, tested only in its own stratum
+})
+
+test_that("region summaries count the right genes", {
+  annot <- utils::read.delim("example_AvB/example_AvB_dnds_annot.tsv")
+  suppressMessages(dnds_summary(comparison_file = "comparison_file.txt", output_dir = ".", regions_bed = "regions.bed", make_plots = FALSE))
+  got <- utils::read.delim("example_AvB/example_AvB_dnds_summary.tsv")
+  ok <- !is.na(annot$dNdS) & annot$dNdS < 10
+  # BED 0-6000 is 1-6000 in GFF coordinates; a gene counts if it overlaps.
+  inside <- ok & annot$q_gff_seqname == "Chr1" & annot$q_gff_start <= 6000 & annot$q_gff_end >= 1
+  row <- got[got$scope == "regional" & got$side == "query" & got$region_status == "region", ]
+  expect_equal(row$n, sum(inside))
+  expect_equal(row$mean_dnds, mean(annot$dNdS[inside]), tolerance = 1e-6)
+  everything <- got[got$scope == "global", ]
+  expect_equal(everything$n, sum(ok))
+  expect_equal(everything$n_removed_na, sum(is.na(annot$dNdS)))
+})
+
+test_that("contrasts have the right direction and pairing", {
+  suppressMessages(suppressWarnings({
+    extract_cds(comparison_file = "two_comparisons.txt", output_dir = ".")
+    calculate_dnds(comparison_file = "two_comparisons.txt", output_dir = ".", comp_cores = 2)
+    append_annotations(comparison_file = "two_comparisons.txt", output_dir = ".")
+    dnds_contrast(comparison_file = "two_comparisons.txt", contrast_file = "contrast_file.txt", output_dir = ".", make_plots = FALSE)
+  }))
+  got <- utils::read.delim("contrast/AvB_vs_AvC_global_q_vs_q_dnds_contrast.tsv")
+  a <- utils::read.delim("example_AvB/example_AvB_dnds_annot.tsv")
+  b <- utils::read.delim("example_AvC/example_AvC_dnds_annot.tsv")
+  shared <- merge(a, b, by = "query_id")
+  shared <- shared[is.finite(shared$dNdS.x) & is.finite(shared$dNdS.y) & shared$dNdS.x < 10 & shared$dNdS.y < 10, ]
+  delta <- shared$dNdS.x - shared$dNdS.y
+  expect_equal(got$n, nrow(shared))
+  expect_equal(got$mean_delta, mean(delta), tolerance = 1e-8)
+  expect_gt(got$mean_delta, 0) # genes with excess nonsynonymous changes against B only
+  expect_equal(got$wilcox_p_value, stats::wilcox.test(delta)$p.value, tolerance = 1e-8)
+  expect_equal(got$n_pos_A, sum(shared$dNdS.x > 1))
+  expect_equal(got$n_pos_B, sum(shared$dNdS.y > 1))
+})
+
+test_that("ideograms are written", {
+  skip_if_not_installed("RIdeogram")
+  suppressMessages(dnds_ideogram(comparison_file = "comparison_file.txt", output_dir = ".", sides = "query"))
+  expect_true(length(list.files("example_AvB", "ideogram\\.svg$")) > 0L)
 })

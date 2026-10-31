@@ -25,7 +25,6 @@ Imports:
     ggplot2,
     jsonlite,
     methods,
-    orthologr,
     parallel,
     Rsamtools,
     S4Vectors,
@@ -47,6 +46,7 @@ Suggests:
     IHW,
     lme4,
     metablastr,
+    orthologr,
     pwalign,
     qvalue,
     rdiamond,
@@ -58,5 +58,5 @@ SystemRequirements:
     DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)
 Config/testthat/edition: 3
 ByteCompile: true
-RoxygenNote: 7.3.3
 Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.1

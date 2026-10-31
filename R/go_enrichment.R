@@ -153,28 +153,7 @@ go_enrichment <- function(
   }
 
   .apply_filter <- function(d) {
-    keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
-
-    if (!is.null(filter_expr) && nzchar(filter_expr)) {
-      ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-
-      if (inherits(ok, "try-error")) {
-        warning("[go_enrichment] filter_expr failed: ", filter_expr, call. = FALSE)
-      } else {
-        ok <- as.logical(ok)
-
-        if (length(ok) == 1L) ok <- rep(ok, nrow(d))
-
-        if (length(ok) != nrow(d)) {
-          warning("[go_enrichment] filter_expr returned length ", length(ok),
-                  " but expected ", nrow(d), "; ignoring filter.", call. = FALSE)
-        } else {
-          keep <- keep & ok
-        }
-      }
-    }
-
-    d[keep, , drop = FALSE]
+    .filter_dnds(d, filter_expr = filter_expr, max_dnds = max_dnds)
   }
 
   .resolve_pos_threshold <- function(dnds_vals, pos_threshold, verbose = FALSE) {
@@ -609,8 +588,12 @@ go_enrichment <- function(
 
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
     if (n_pos == 0L) return(NULL)
-    n_all <- length(geneList)
-    enrichment <- (sig_counts / n_pos) / (annotated / n_all)
+    n_nonpos <- length(geneList) - n_pos
+    # Same definition as ipr_enrichment and term_enrichment: rate in positives / rate in the rest.
+    pos_rate <- sig_counts / n_pos
+    nonpos_rate <- if (n_nonpos > 0L) (annotated - sig_counts) / n_nonpos else rep(NA_real_, length(sig_counts))
+    enrichment <- ifelse(nonpos_rate == 0 & pos_rate > 0, Inf,
+                         ifelse(nonpos_rate == 0 & pos_rate == 0, 1, pos_rate / nonpos_rate))
 
     out <- data.frame(
       GO_ID = all_terms,
@@ -620,6 +603,7 @@ go_enrichment <- function(
       significant = sig_counts,
       raw_p = raw_p,
       p_adj = p_adj,
+      p_adjust_method = p_adjust,
       enrichment = enrichment,
       label = ifelse(
         is.na(term_name) | !nzchar(term_name),

@@ -782,6 +782,10 @@ dnds_state_contrast <- function(level            = c("pairwise", "gene"),
                                 gene_out_dir      = "gene_level_state_contrast") {
 
   level      <- match.arg(level)
+  if (identical(level, "gene")) {
+    message("[dnds_state_contrast] level='gene' is experimental and not validated. ",
+            "See docs/validation/known-issues.md before interpreting its results.")
+  }
   fdr_method <- match.arg(fdr_method)
   side       <- match.arg(side)
   group_mode <- match.arg(group_mode)

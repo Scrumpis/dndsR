@@ -1,0 +1,2 @@
+example_AvB spA.fasta spA.gff3 spB.fasta spB.gff3
+example_AvC spA.fasta spA.gff3 spC.fasta spC.gff3

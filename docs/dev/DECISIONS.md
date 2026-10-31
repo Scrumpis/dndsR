@@ -10,6 +10,7 @@
 | 2026-10-31 | No plugin manifest or CI workflow in Phase 0. | Nothing released to package yet; a workflow cannot be tested locally. Simplicity. |
 | 2026-10-31 | Git hook sources are tracked in `tools/dev/githooks`; `tools/dev/setup.sh` copies them to `.git/hooks`. | `tools/dev/test-safeguards.sh` showed that a tracked `core.hooksPath` disappears when `main` is checked out, leaving `main` unprotected. No previous hooks existed to preserve. |
 | 2026-10-31 | `extract_cds` uses the longest valid isoform per gene instead of `cdsBy(by = "gene")`, and excludes CDS with in-frame stops or lengths not divisible by 3. | The old call produced mis-ordered and chimeric sequences, and dN/dS 1.615 instead of about 0.11 for a designed gene: `docs/validation/cds-extraction.md`. Longest isoform is a common convention, and `group_by = "tx"` remains. |
+| 2026-10-31 | dndsR stays a real R package fit for CRAN one day, as well as a containerized CLI, for people and agents equally. | Maintainer instruction. CRAN needs GitHub-only `orthologr` to be optional, so it moved to `Suggests` with a clear runtime error. |
 | 2026-10-31 | Provenance uses content hashes, never file dates. | Scratch is purged after 45 days and the maintainer may recursively touch files. |
 | 2026-10-31 | The skill documents only the Singularity install and CLI discovery as verified. | See `skills/dndsr/references/verification.md`. |
 

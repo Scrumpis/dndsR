@@ -46,13 +46,17 @@ On Windows, runs sequentially (no forking).}
 
 \item{comparison_file}{Optional comparison table path or data.frame.}
 
-\item{group_by}{"gene" or "tx" for how CDS are grouped/named.}
+\item{group_by}{How CDS are grouped and named. \code{"gene"} (default) writes one CDS per
+gene: the longest isoform with a valid CDS, named by gene ID. \code{"tx"}
+writes every transcript, named by transcript ID.}
 
 \item{export_proteins}{If TRUE, also write translated proteins as AA FASTA.}
 
-\item{genetic_code}{Integer NCBI code for translation (1 = Standard).}
+\item{genetic_code}{Integer NCBI code used for translation and stop detection
+(1 = Standard). dN/dS estimation itself assumes the standard code.}
 
-\item{keep_internal_stops}{If FALSE, drop sequences with internal stops (post-translation).}
+\item{keep_internal_stops}{If FALSE (default), CDS with an in-frame stop or a length
+that is not a multiple of 3 are left out of the outputs and listed in the QC table.}
 
 \item{cds_suffix}{Filename suffix for CDS FASTA outputs. Default "_CDS.fasta".}
 
@@ -74,4 +78,9 @@ In batch mode, reads a whitespace-delimited comparison file (tabs/spaces) with e
 Subject inputs may be left blank/NA to run query-only extraction.
 
 TxDb genome build metadata is not required for CDS extraction and is intentionally ignored.
+
+Each genome also gets a QC table, \verb{<genome>_CDS_qc.tsv}, with one row per candidate CDS:
+\code{id}, \code{transcript}, \code{n_isoforms}, \code{length_nt}, \code{multiple_of_3}, \code{internal_stop}, \code{written}.
+Existing CDS outputs without a QC table were made by dndsR before 0.3.0 and are
+regenerated, because those versions could assemble exons incorrectly.
 }
