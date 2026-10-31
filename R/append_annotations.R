@@ -70,7 +70,10 @@ append_annotations <- function(dnds_file = NULL,
   plapply <- function(X, FUN, threads = 1L, ...) {
     threads <- max(1L, as.integer(threads))
     if (.Platform$OS.type != "windows" && threads > 1L) {
-      return(parallel::mclapply(X, FUN, mc.cores = threads, mc.preschedule = TRUE, ...))
+      # Prescheduled, because there can be one job per gene ID.
+      res <- suppressWarnings(parallel::mclapply(X, FUN, mc.cores = threads, mc.preschedule = TRUE, ...))
+      .check_workers(res, "append_annotations", lost = any(vapply(res, is.null, logical(1))))
+      return(res)
     } else {
       return(lapply(X, FUN, ...))
     }
@@ -483,6 +486,7 @@ append_annotations <- function(dnds_file = NULL,
         silent = TRUE
       )
       res <- parallel::mccollect(list(j1, j2), wait = TRUE)
+      .check_workers(res, "append_annotations", lost = length(res) < 2L || any(vapply(res, is.null, logical(1))))
       q_ann <- res[[1]]; s_ann <- res[[2]]
     } else {
       q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, q_maps$own_coords, labs, threads = tq)

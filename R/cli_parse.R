@@ -14,7 +14,10 @@
     "-T" = "threads",
 
     "-w" = "warnings",
-    "-W" = "warnings"
+    "-W" = "warnings",
+
+    "-v" = "verbose",
+    "-V" = "verbose"
   )
 }
 
@@ -36,18 +39,37 @@
   )
 }
 
+#' Options whose values are lists, written with commas (for example `--sides query,subject`)
 #' @keywords internal
-cli_cast <- function(x) {
+.cli_list_options <- c(
+  "sides", "ontologies", "focal_sides", "dedup_keys", "exclude_terms", "term_blocklist", "term_seps", "terms"
+)
+
+#' Options whose values are names or paths and must stay exactly as typed
+#' @keywords internal
+.cli_text_option <- function(key) {
+  key %in% c("comparison_name", "custom", "filter_expr", "pattern", "term_type") ||
+    grepl("(_file|_fasta|_gff|_seq|_dir|_bed|_path|_regex|_suffix|_pattern|_name)$", key)
+}
+
+#' Convert one command-line value to its R type
+#'
+#' @param x The value as typed.
+#' @param key The canonical option name in snake_case.
+#' @keywords internal
+cli_cast <- function(x, key = "") {
+  if (.cli_text_option(key)) return(x)
+  if (key %in% .cli_list_options) {
+    if (grepl(",", x, fixed = TRUE)) return(trimws(strsplit(x, ",", fixed = TRUE)[[1]]))
+    return(x)
+  }
+
   xl <- tolower(trimws(x))
-  if (xl %in% c("true","false")) return(xl == "true")
-  if (xl %in% c("na")) return(NA)
-  if (xl %in% c("null","none")) return(NULL)
-
-  # comma -> character vector (nice for --sides query,subject)
-  if (grepl(",", x, fixed = TRUE)) return(trimws(strsplit(x, ",", fixed = TRUE)[[1]]))
-
-  if (grepl("^\\d+$", xl)) return(as.integer(xl))
-  if (grepl("^\\d*\\.?\\d+(e[+-]?\\d+)?$", xl, ignore.case = TRUE)) return(as.numeric(xl))
+  if (xl %in% c("true", "false")) return(xl == "true")
+  if (xl == "na") return(NA)
+  if (xl == "null") return(NULL)
+  if (grepl("^[+-]?\\d+$", xl)) return(as.integer(xl))
+  if (grepl("^[+-]?\\d*\\.?\\d+(e[+-]?\\d+)?$", xl) || xl %in% c("inf", "+inf", "-inf")) return(as.numeric(xl))
   x
 }
 
@@ -63,11 +85,11 @@ cli_parse_args <- function(args) {
     key <- gsub("-", "_", key)  # accept kebab-case and snake_case
 
     # flag?
-    if (i == length(args) || grepl("^--", args[[i+1]])) {
+    if (i == length(args) || grepl("^--", args[[i + 1]])) {
       out[[key]] <- TRUE
       i <- i + 1
     } else {
-      out[[key]] <- cli_cast(args[[i+1]])
+      out[[key]] <- cli_cast(args[[i + 1]], key)
       i <- i + 2
     }
   }
@@ -89,13 +111,14 @@ cli_parse_args <- function(args) {
   out <- character()
   i <- 1
 
-  is_opt <- function(x) grepl("^-", x)
+  # A leading minus starts an option unless it is a negative number.
+  is_opt <- function(x) grepl("^-", x) && !grepl("^-(\\d|\\.\\d|[Ii]nf$)", x)
 
   while (i <= length(args)) {
     a <- args[[i]]
 
     # handle -X=value or --long=value
-    if (grepl("=", a, fixed = TRUE)) {
+    if (grepl("^-[^=]*=", a)) {
       parts <- strsplit(a, "=", fixed = TRUE)[[1]]
       k <- parts[[1]]
       v <- paste(parts[-1], collapse = "=") # keep any extra '='

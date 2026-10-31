@@ -26,6 +26,7 @@ Imports:
     jsonlite,
     methods,
     orthologr,
+    parallel,
     Rsamtools,
     S4Vectors,
     scales,
@@ -33,6 +34,8 @@ Imports:
     stats,
     svglite,
     sysfonts,
+    tools,
+    txdbmaker,
     utils,
     xml2
 Remotes:
@@ -40,28 +43,19 @@ Remotes:
     drostlab/rdiamond,
     drostlab/metablastr
 Suggests:
-    dplyr,
-    knitr,
     GO.db,
     IHW,
-    IRanges,
     lme4,
     metablastr,
-    optparse,
     pwalign,
     qvalue,
     rdiamond,
-    readr,
     RIdeogram,
-    systemfonts,
-    rmarkdown,
     testthat,
     withr,
-    topGO,
-    txdbmaker
+    topGO
 SystemRequirements:
     DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)
-VignetteBuilder: knitr
 Config/testthat/edition: 3
 ByteCompile: true
 RoxygenNote: 7.3.3

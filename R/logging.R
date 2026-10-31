@@ -17,9 +17,9 @@
   out_n <- sink.number(type = "output")
   msg_n <- sink.number(type = "message")
 
-  warn_mode <- getOption("dndsR.warnings", "off")   # off|summary|all
+  warn_mode <- getOption("dndsR.warnings", "summary")   # off|summary|all
   warn_mode <- tolower(as.character(warn_mode))[1L]
-  if (is.na(warn_mode) || !nzchar(warn_mode)) warn_mode <- "off"
+  if (is.na(warn_mode) || !nzchar(warn_mode)) warn_mode <- "summary"
 
   # Default is "off" (no cap) -> print all warnings in summary
   warn_max_opt <- getOption("dndsR.warnings_max", NULL)
@@ -66,9 +66,15 @@
   }
   cat("\n")
 
+  # Record errors in the log before they reach the caller.
+  log_error <- function(e) {
+    cat(sprintf("\n[%s] ERROR: %s\n", tag, conditionMessage(e)))
+  }
+
   if (capture_warnings) {
     withCallingHandlers(
       { force(expr) },
+      error = log_error,
       warning = function(w) {
         msg <- conditionMessage(w)
         call_txt <- conditionCall(w)
@@ -87,6 +93,6 @@
     )
   } else {
     # warnings behave normally (not intercepted)
-    force(expr)
+    withCallingHandlers(force(expr), error = log_error)
   }
 }

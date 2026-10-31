@@ -405,19 +405,7 @@ extract_cds <- function(comparison_name = NULL,
       )
     }
 
-    if (threads > 1L && nrow(tasks_unique) > 1L && .Platform$OS.type != "windows") {
-      res_list <- parallel::mclapply(
-        seq_len(nrow(tasks_unique)),
-        run_one_task,
-        mc.cores = min(threads, nrow(tasks_unique)),
-        mc.preschedule = FALSE
-      )
-    } else {
-      if (threads > 1L && .Platform$OS.type == "windows") {
-        warning("[extract_cds] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-      }
-      res_list <- lapply(seq_len(nrow(tasks_unique)), run_one_task)
-    }
+    res_list <- .parallel_lapply(seq_len(nrow(tasks_unique)), run_one_task, threads, "extract_cds")
 
     # Map results by out_base for fast per-comparison assembly
     res_by_outbase <- stats::setNames(res_list, tasks_unique$out_base)

@@ -100,8 +100,8 @@ Report the dndsR commit, image digest, command, and parameters with any result.
 Native installation is **unverified**. It needs the dependencies in `DESCRIPTION`, DIAMOND, OrthoFinder, and the patched orthologr. `INSTALL.md` is partial and describes itself as temporary. Prefer the container.
 
 - `command not found: dndsr`: add `~/.local/bin` to `PATH`, then run `hash -r`.
-- `Unknown command`: the CLI uses `dnds_contrast` and `dnds_state_contrast`. The README's plural spellings do not exist.
-- A file-not-found problem under multithreading may not appear in the logs (README known issue). Retry with `-t 1`.
+- `Unknown command` or `Unknown option`: dndsR stops rather than ignoring a typo. Run `dndsr --help` or `dndsr <command> --help`.
+- `jobs failed`: a parallel job failed. The message includes each error; logs are in the comparison folder. Retry with `--threads 1` if the cause is unclear, and check memory if a worker died.
 - The image tag is older than this code. Report that mismatch if a command fails on a missing dependency.
 
 ## Citation

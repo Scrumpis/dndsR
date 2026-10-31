@@ -674,19 +674,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       )
     }
 
-    if (threads > 1L && .Platform$OS.type != "windows") {
-      outs_list <- parallel::mclapply(
-        seq_len(nrow(jobs)),
-        run_one_job,
-        mc.cores = threads,
-        mc.preschedule = FALSE
-      )
-    } else {
-      if (threads > 1L && .Platform$OS.type == "windows") {
-        warning("[term_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-      }
-      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
-    }
+    outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "term_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
     .msg("All term enrichments complete.")
@@ -735,19 +723,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
     )
   }
 
-  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
-    outs_list <- parallel::mclapply(
-      sides,
-      run_one_side,
-      mc.cores = min(threads, length(sides)),
-      mc.preschedule = FALSE
-    )
-  } else {
-    if (threads > 1L && .Platform$OS.type == "windows") {
-      warning("[term_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-    }
-    outs_list <- lapply(sides, run_one_side)
-  }
+  outs_list <- .parallel_lapply(sides, run_one_side, threads, "term_enrichment")
 
   outs <- unlist(outs_list, use.names = FALSE)
   .msg("Term enrichment complete for: ", dnds_annot_file)

@@ -1488,8 +1488,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .run_comp_side <- function(comp_name, comp_dir, side) {
     in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) {
-      warning("Annotated dN/dS file not found: ", in_file, call. = FALSE)
-      return(character(0))
+      stop("Annotated dN/dS file not found: ", in_file, ". Run append_annotations first.", call. = FALSE)
     }
 
     d <- utils::read.table(in_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
@@ -1630,19 +1629,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       out_k
     }
 
-    if (threads > 1L && .Platform$OS.type != "windows") {
-      outs_list <- parallel::mclapply(
-        seq_len(nrow(jobs)),
-        run_one_job,
-        mc.cores = threads,
-        mc.preschedule = FALSE
-      )
-    } else {
-      if (threads > 1L && .Platform$OS.type == "windows") {
-        warning("[ipr_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-      }
-      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
-    }
+    outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "ipr_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
     message("All IPR enrichments complete.")
@@ -1677,19 +1664,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     out_sd
   }
 
-  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
-    outs_list <- parallel::mclapply(
-      sides,
-      run_one_side,
-      mc.cores = min(threads, length(sides)),
-      mc.preschedule = FALSE
-    )
-  } else {
-    if (threads > 1L && .Platform$OS.type == "windows") {
-      warning("[ipr_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-    }
-    outs_list <- lapply(sides, run_one_side)
-  }
+  outs_list <- .parallel_lapply(sides, run_one_side, threads, "ipr_enrichment")
 
   outs <- unlist(outs_list, use.names = FALSE)
   message("IPR enrichment complete for: ", dnds_annot_file)

@@ -110,6 +110,9 @@ calculate_dnds <- function(comparison_file = NULL,
     stop("Supply only one of comparison_file (batch mode) or seq_list_file (FASTA-only list mode).", call. = FALSE)
   }
 
+  dots <- list(...)
+  dots[c("threads", "verbose")] <- NULL
+
   # ---- dependency guards ----
   .need_pkg <- function(pkg, msg = NULL) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
@@ -392,7 +395,7 @@ calculate_dnds <- function(comparison_file = NULL,
     )
 
     # user-supplied overrides / additions
-    user <- list(...)
+    user <- dots
     if (length(user)) {
       nms <- names(user)
 
@@ -426,7 +429,10 @@ calculate_dnds <- function(comparison_file = NULL,
         # Only forward arguments orthologr::dNdS knows
         dnds_formals <- names(formals(orthologr::dNdS))
         nms <- names(user)
-        user <- user[nms %in% dnds_formals]
+        if (!all(nms %in% dnds_formals)) {
+          stop("Not an option of calculate_dnds or orthologr::dNdS: ",
+               paste(setdiff(nms, dnds_formals), collapse = ", "), call. = FALSE)
+        }
 
         overlap <- intersect(names(user), names(args))
         if (length(overlap)) {

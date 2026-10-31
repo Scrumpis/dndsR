@@ -19,7 +19,6 @@ dndsR before 0.3.0 could assemble CDS incorrectly (`docs/validation/cds-extracti
 
 - The README uses `dnds_contrasts` and `dnds_state_contrasts`; the CLI has `dnds_contrast` and `dnds_state_contrast`.
 - The README references `dndsR_usage_vignette.Rmd`, which does not exist. `inst/extdata/dndsR-vignette.Rmd` names example files that are not in the repository.
-- `dndsr --help` shows `--comparison-file <int>`, although it takes a path, and omits `--output-dir`.
 - The `tools/dndsr-install` help uses the image tag `0.2.0`; the published tag is `v0.2.0`.
 - The README setup step `bash source ~/.bashrc` is not a valid command.
 - The image's `lme4` (a suggested dependency) and `roxygen2` are absent.
