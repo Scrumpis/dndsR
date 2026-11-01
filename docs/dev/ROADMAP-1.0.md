@@ -82,3 +82,7 @@ No unnecessary statistical machinery or dependencies.
 - A `dndsr update` command.
 - Other estimators in the image.
 - New analysis types or new plots.
+
+## Scaling
+
+Every step should use the CPUs it is given, as far as the work allows. Measurements and order: [performance.md](../validation/performance.md). Changes must leave every output byte-identical, checked by `test-threads.R` and on the public pair. Start after v0.3.0 is tagged.

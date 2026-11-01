@@ -27,4 +27,6 @@ Interpretation limits and the estimator's bias are covered in [interpretation](.
 | `go_enrichment(include_definition = FALSE)` always stops with an error | Open |
 | What was run on which route is in [installation](installation.md) | See there |
 | A `git pull` in the clone reinstalls dndsR automatically on the next run, so the analysis version can change silently. Provenance records the version | Open; pin a tag for production analyses |
+| `--threads` gives `append_annotations` no speedup, and `extract_cds` and the enrichment commands use at most 2 workers per comparison. See [thread scaling](performance.md) | Open |
+| `calculate_dnds` needs about 1 GB per core. Called from an R session that already ran the workflow, 32 cores was killed at 96 GB with an unclear error | Open; use fewer cores or a fresh session |
 | Windows runs sequentially and has not been tested | Open |
