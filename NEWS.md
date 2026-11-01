@@ -2,7 +2,7 @@
 
 ## Rerun earlier analyses
 
-Defects in earlier versions can change results. Rerun analyses made with earlier versions, following `docs/migrating-to-0.3.md`. On real genomes, every affected gene was wrong: `docs/validation/real-genomes.md`.
+Defects in earlier versions can change results. Rerun analyses made with earlier versions, following `docs/migrating-to-0.3.md`. Between *A. thaliana* and *A. lyrata*, public genomes, every affected gene was wrong, and calls of dN/dS above 1 fell from 1,503 to 206: `docs/validation/public-genome.md`.
 
 - **CDS assembly (all results).** With the default `group_by = "gene"`, multi-exon genes on the minus strand were assembled in the wrong exon order, and genes with several isoforms became chimeras of all isoforms. A designed gene with a true dN/dS near 0.11 was reported as 1.6. See `docs/validation/cds-extraction.md`.
 - **Wrong-genome annotations (`append_annotations`).** A gene ID present in both genomes, as with tools that name genes `g1`, `g2`, and so on, took its terms and coordinates from the first genome read.

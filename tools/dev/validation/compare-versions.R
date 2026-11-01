@@ -18,11 +18,12 @@ stem <- function(path) tools::file_path_sans_ext(basename(path))
 # Structure of every gene, and gffread's CDS for every transcript.
 genome_table <- function(fa, gff) {
   txdb <- suppressMessages(suppressWarnings(makeTxDbFromGFF(file.path(work, gff), format = "gff3")))
-  cds <- cdsBy(txdb, by = "tx", use.names = TRUE)
-  map <- suppressMessages(AnnotationDbi::select(txdb, keys = names(cds), keytype = "TXNAME", columns = "GENEID"))
+  cds <- cdsBy(txdb, by = "tx")
+  map <- suppressMessages(AnnotationDbi::select(txdb, keys = names(cds), keytype = "TXID", columns = c("TXNAME", "GENEID")))
+  map <- map[match(names(cds), map$TXID), ]
+  named <- dndsR:::.label_transcripts(map$TXID, map$TXNAME, map$GENEID)
   tx <- data.frame(
-    tx = names(cds),
-    gene = map$GENEID[match(names(cds), map$TXNAME)],
+    tx = named$tx, gene = named$gene,
     strand = as.character(unlist(unique(strand(cds)))[seq_along(cds)]),
     n_cds_parts = lengths(cds),
     stringsAsFactors = FALSE
@@ -31,9 +32,15 @@ genome_table <- function(fa, gff) {
   # gffread needs a writable, indexed FASTA, so it gets a private link.
   link <- tempfile(fileext = ".fa")
   file.symlink(normalizePath(file.path(work, fa)), link)
-  status <- system2(gffread, c("-x", out, "-g", link, file.path(work, gff)), stdout = FALSE, stderr = FALSE)
+  # gffread stops on a strand of "?", used for some trans-spliced organelle genes.
+  clean_gff <- tempfile(fileext = ".gff")
+  gff_lines <- readLines(file.path(work, gff))
+  writeLines(gff_lines[!grepl("^[^#\\t]*\\t[^\\t]*\\t[^\\t]*\\t[^\\t]*\\t[^\\t]*\\t[^\\t]*\\t\\?\\t", gff_lines)], clean_gff)
+  status <- system2(gffread, c("-x", out, "-g", link, clean_gff), stdout = FALSE, stderr = FALSE)
   stopifnot(status == 0L)
-  list(tx = tx, gffread = as.character(readDNAStringSet(out)))
+  g <- as.character(readDNAStringSet(out))
+  names(g) <- sub("^rna-", "", sub(" .*", "", names(g)))
+  list(tx = tx, gffread = g)
 }
 
 classify <- function(n_isoforms, strand, parts) {
@@ -74,6 +81,7 @@ for (i in seq_len(nrow(comparisons))) {
                  cur_written = sum(d$written),
                  cur_matches_gffread = sum(d$cur_equals_gffread, na.rm = TRUE),
                  cur_differs_from_gffread = sum(!d$cur_equals_gffread, na.rm = TRUE),
+                 cur_not_compared = sum(is.na(d$cur_equals_gffread) & d$written),
                  old_matches_gffread = sum(d$old_equals_gffread, na.rm = TRUE),
                  old_differs_from_gffread = sum(!d$old_equals_gffread, na.rm = TRUE),
                  cur_internal_stop = sum(d$internal_stop %in% TRUE),

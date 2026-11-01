@@ -12,6 +12,7 @@ Open issues that affect results or use. Fixed defects are in [NEWS](../../NEWS.m
 | Default CDS with a first exon of nonzero GFF phase (partial genes) are not trimmed to frame | Open; they are often excluded by the in-frame stop check | Check annotation quality |
 | `split_comparisons --mode haplotype` treats any trailing `_<number>` as a haplotype, so `scaffold_12` becomes haplotype 12 | Open | Check the labels it reports |
 | Term filters using `min_pos` select on the test statistic before multiple-testing correction | Open | See [interpretation](../interpretation.md) |
+| A dN/dS has no uncertainty attached, and `Comeron95` truncates undefined terms without flagging them | Open; see `docs/dev/ROADMAP-1.0.md` | See [interpretation](../interpretation.md) |
 | Fixed 1.96 in normal confidence intervals; dependence between genes; no adjustment across contrasts | Documented | See [interpretation](../interpretation.md) |
 
 Interpretation limits and the estimator's bias are covered in [interpretation](../interpretation.md) and [estimator validation](estimators.md).

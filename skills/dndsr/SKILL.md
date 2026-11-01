@@ -74,9 +74,9 @@ Check `<comparison>/<genome>_CDS_qc.tsv` for exclusions, and the number of pairs
 
 Read [docs/interpretation.md](../../docs/interpretation.md) before explaining results. The essentials:
 
-- **dN/dS above 1 is a candidate, not proof of positive selection.** dndsR applies a threshold to a point estimate. In simulations of 600-codon neutral genes, up to 35% exceeded 1 with the default method.
+- **dN/dS above 1 is a candidate, not proof of positive selection.** dndsR applies a threshold to a point estimate. In simulations with realistic codon usage, about half of truly neutral genes exceed 1.
 - Look at dN and dS as well as the ratio. Small dS makes ratios unstable, and large dS (above roughly 1 to 2) suggests saturation. dS = 0 gives NA.
-- The default Comeron method tends to give lower ratios than true values in simulation. Evidence: [docs/validation/estimators.md](../../docs/validation/estimators.md).
+- The default Comeron method compresses ratios: very low ones read high, and high ones read low, more so at high divergence. Evidence: [docs/validation/estimators.md](../../docs/validation/estimators.md). Agreement with PAML and KaKs_Calculator on real genes: [docs/validation/public-genome.md](../../docs/validation/public-genome.md).
 - Reciprocal best hits can mispair paralogs, especially in polyploids. Annotation errors can look like selection.
 - Enrichment tests treat genes as independent.
 - `dnds_state_contrast --level gene` is disabled, because its results were not meaningful.

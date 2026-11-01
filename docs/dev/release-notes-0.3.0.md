@@ -17,7 +17,7 @@ v0.1.0 and v0.2.0 were pre-releases that had not been scientifically validated. 
 | First region lost | A regions file with no header | One region left out of `dnds_summary` and `dnds_contrast` |
 | Enrichment errors | InterPro parent-child method; terms with no known type; a filter that could not be evaluated | Wrong tests, or a run that was silently unfiltered |
 
-In *A. thaliana* TAIR10.1, all 5,655 multi-exon minus-strand genes and all 10,695 multi-isoform genes had incorrect sequences, as judged against gffread. In a designed test, a gene with a true dN/dS of about 0.11 was reported as 1.6.
+In *A. thaliana* TAIR10.1, all 5,655 multi-exon minus-strand genes and all 10,695 multi-isoform genes had incorrect sequences, as judged against gffread. Comparing *A. thaliana* with *A. lyrata*, public genomes, the old code reported 1,503 pairs with dN/dS above 1, and the corrected code reports 206. Evidence: `docs/validation/public-genome.md`.
 
 Enrichment, ideograms, summaries, and contrasts built on these values are affected too, even where some genes in a table were correct. Single-exon genes and plus-strand genes with one isoform had correct sequences.
 

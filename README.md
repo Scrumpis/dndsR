@@ -46,6 +46,7 @@ The last command checks your results against independently established values an
 - [Output files](docs/output-files.md)
 - [Interpreting results](docs/interpretation.md): read this before drawing conclusions
 - [Installation options](INSTALL.md): containers, conda, and R
+- [How dndsR computes its results](docs/methods.md)
 - [Validation evidence](docs/validation/README.md) and [known issues](docs/validation/known-issues.md)
 - [Changes between versions](NEWS.md)
 

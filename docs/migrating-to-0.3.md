@@ -6,7 +6,7 @@
 
 | Bug | Affected if | Effect |
 |---|---|---|
-| CDS assembled in the wrong exon order | Multi-exon genes on the minus strand: nearly every genome | All such genes are wrong. False dN/dS above 1, high dS, undefined ratios, lost orthologs |
+| CDS assembled in the wrong exon order | Multi-exon genes on the minus strand: nearly every genome | All such genes are wrong. False dN/dS above 1, high dS, undefined ratios, lost orthologs ([public example](validation/public-genome.md)) |
 | Isoforms concatenated into chimeras | Genes with more than one annotated isoform | Sequences about twice the expected length, usually with stops |
 | Annotation from the wrong genome | A gene ID also appears in a genome processed earlier in the same run, at one thread | Wrong terms and coordinates |
 | Empty annotations | RefSeq-style GFF IDs, such as `gene-` and `rna-` | No annotations or coordinates, without an error |

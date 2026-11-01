@@ -14,18 +14,16 @@ These are readings, not proofs. A whole-gene ratio averages over all sites and t
 
 ## A ratio above 1 is not proof of positive selection
 
-dndsR's `dNdS > 1` is a threshold on a point estimate with no uncertainty attached. In our simulations, 600-codon genes evolving under true neutrality had an estimated ratio above 1 in up to 35% of cases with the default method (see [estimator validation](validation/estimators.md)). In a genome with many thousands of nearly neutral genes, this can be a large number of genes.
+dndsR's `dNdS > 1` is a threshold on a point estimate with no uncertainty attached. In simulations with realistic codon usage, **about half of truly neutral genes exceed 1** at ordinary divergence, as any roughly unbiased estimate would ([evidence](validation/estimators.md)). In a genome with many thousands of nearly neutral genes, this can be a large number of genes. Established methods can also disagree about which side of 1 a gene falls on.
 
 Treat dN/dS above 1 as a candidate list. To support a claim about particular genes, use methods that model selection, such as likelihood-ratio tests with more than two sequences, and look at the alignments.
-
-Established methods can also disagree about which side of 1 a gene falls on.
 
 ## Before you trust a value
 
 - **Small dS.** With few synonymous changes, the ratio is unstable: one substitution can change it greatly. Look at dN and dS, not just the ratio. dndsR does not filter on dS by default. You can add one, for example `--filter-expr "dS > 0.01"` in the enrichment commands.
 - **Large dS.** Above roughly 1 to 2, synonymous sites are close to saturation and dS is unreliable. High dS can also make a ratio look conserved.
 - **dS = 0.** The ratio is reported as NA and left out of enrichment tests, even if dN is greater than 0. Such genes are not reported as positive.
-- **The method.** The default Comeron method tends to overestimate dS and underestimate dN relative to our simulated truth, which pulls ratios down. For example, a true ratio of 2 gives a median near 1.45 to 1.9. It does not account for codon usage. This makes `> 1` somewhat conservative but does not remove false positives.
+- **The method.** The default Comeron method compresses ratios: in simulations with realistic codon usage, it was accurate near a ratio of 0.5 to 1, read high at very low ratios, and read low at high ones (a true ratio of 2 gave about 1.6 to 1.9), and more so at high divergence. Related methods do the same. It does not account for codon usage.
 - **The site model.** The Comeron method assigns sites to degeneracy classes. A gene designed with only amino-acid changes can therefore still get a small nonzero dS.
 
 ## Pipeline assumptions

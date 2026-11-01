@@ -4,7 +4,9 @@ What has actually been checked, and how. Commit SHAs are in `git log` and the pr
 
 | Topic | Evidence | Where |
 |---|---|---|
-| Real genomes | Old against current code, with gffread; method and public results | [real-genomes.md](real-genomes.md) |
+| Public genome pair | Old against current code, with gffread, PAML, and KaKs_Calculator | [public-genome.md](public-genome.md) |
+| Other real genomes | Method and public results only | [real-genomes.md](real-genomes.md) |
+| Validation rules | What must hold before a release | [criteria.md](criteria.md) |
 | Installation routes | What ran, and what could not | [installation.md](installation.md) |
 | CDS assembly | Output equals designed sequences | [cds-extraction.md](cds-extraction.md), `tests/testthat/test-example-pipeline.R` |
 | dN/dS estimation | Compared with PAML, KaKs_Calculator, independent NG86, and simulated truth | [estimators.md](estimators.md) |

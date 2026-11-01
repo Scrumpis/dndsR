@@ -1,5 +1,7 @@
 # Real-genome validation
 
+The fullest public evidence is the [public genome pair](public-genome.md). This page adds what else was found on real data.
+
 ## Result on a public genome
 
 Old code (`c8b534f`, the same CDS logic as v0.1.0 and v0.2.0) against current code on *Arabidopsis thaliana* TAIR10.1 RefSeq, with gffread 0.12.9 as an independent source of CDS:

@@ -1,0 +1,7 @@
+comparison	set	pairs	identical_value	median_abs_change	p95_abs_change	max_abs_change	old_above_1	cur_above_1	lost_above_1	gained_above_1	changed_above_0.5x
+AtAl	all_comparable	17300	7396	0.0215	1.039069	20.28634	1331	161	1206	36	4906
+AtAl	cds_changed	10740	836	0.1656	1.53697	20.28634	1222	52	1206	36	4906
+AtAl	cds_unchanged	6560	6560	0	0	0	109	109	0	0	0
+AtAl	q_multi_exon_minus_changed	3296	495	0.298745	2.642675	20.28634	845	24	836	15	1993
+AtAl	q_multi_isoform_changed	6750	328	0.14785	0.843099999999999	8.1105	371	23	365	17	2800
+AtAl	both_genes_unaffected_structure	6560	6560	0	0	0	109	109	0	0	0
