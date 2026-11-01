@@ -61,7 +61,7 @@ grep -c '>' example_AvB/spA_CDS.fasta
 head -1 example_AvB/spA_CDS_qc.tsv
 ```
 
-There are 34 candidate genes in `spA`, and 33 are written. The one excluded, `spA_g32`, has a length that is not a multiple of 3. See `written` in the QC table.
+`spA` has 35 genes with coding sequences, and 34 are written. The one excluded, `spA_g32`, has a length that is not a multiple of 3. See the `written` column in the QC table.
 
 ## 6. Calculate dN/dS
 
@@ -79,7 +79,7 @@ cut -f1-5 example_AvB/example_AvB_dnds.tsv | head -5
 |---|---:|---:|---:|---|
 | g01 | 0 | 0 | NA | Identical sequences, so the ratio is undefined |
 | g02 | 0 | 0.14 | 0 | Only synonymous changes |
-| g20 | about 0.09 | about 0.02 | about 5.6 | Designed with far more nonsynonymous changes |
+| g20 | 0.09 | 0.02 | 5.6 | Designed with far more nonsynonymous changes |
 
 Small differences in dN and dS from the second decimal are expected between estimators, but the same version on the same input gives the same values.
 

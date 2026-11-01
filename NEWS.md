@@ -19,6 +19,7 @@ Defects in earlier versions can change results. Rerun analyses made with earlier
 - New documentation: tutorials, output files, interpretation, and validation evidence. A portable Agent Skill is in `skills/dndsr/`.
 - `tools/dndsr-install install --bind` makes other folders available in the container.
 - Command names accept hyphens: `dndsr extract-cds`.
+- `ipr_enrichment` works without internet access, using its bundled InterPro list, and says so.
 
 ## Behavior changes
 

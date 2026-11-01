@@ -24,12 +24,12 @@ export HOME=$work/home
 case $agent in
   claude)
     CLAUDE_CONFIG_DIR=$real_home/.claude timeout 1500 claude -p ${model:+--model "$model"} \
-      --allowedTools "Bash Read Write Edit Skill" --output-format json "$prompt" >"$out/claude.json" 2>"$out/stderr.txt"
+      --allowedTools "Bash Read Write Edit Skill" --output-format json "$prompt" </dev/null >"$out/claude.json" 2>"$out/stderr.txt"
     rc=$?
     jq -r '.result // empty' "$out/claude.json" >"$out/answer.md"
     ;;
   codex)
-    CODEX_HOME=$real_home/.codex timeout 1500 codex exec --skip-git-repo-check -s workspace-write "$prompt" >"$out/answer.md" 2>"$out/stderr.txt"
+    CODEX_HOME=$real_home/.codex timeout 1500 codex exec --skip-git-repo-check -s workspace-write "$prompt" </dev/null >"$out/answer.md" 2>"$out/stderr.txt"
     rc=$?
     ;;
   *) echo "unknown agent: $agent" >&2; exit 2 ;;

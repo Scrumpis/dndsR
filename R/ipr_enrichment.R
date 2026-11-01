@@ -1172,40 +1172,45 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
 
     cur_rel <- .detect_current_release(timeout_s = max(entries_timeout_s, tree_timeout_s))
-    if (!nzchar(cur_rel) || !is.finite(.num(cur_rel))) {
-      stop("[ipr_enrichment] Auto-detection of current InterPro release failed. ",
-           "Please specify 'interpro_release' manually or provide local copies of ",
-           "'entry.list' and 'ParentChildTreeFile.txt'.")
-    }
-
-    cur_cov <- .coverage_for_current(iprs_all, timeout_s = max(entries_timeout_s, tree_timeout_s))
-
-    step_sz <- 2.0
-    max_back <- 12L
-    bt <- .backtrack_release_until_full(iprs_all, cur_rel, step = step_sz, max_backtrack = max_back,
-                                        timeout_s = max(entries_timeout_s, tree_timeout_s))
-
-    chosen_release <- bt$release
-    best_cov       <- bt$coverage
-    backtrack_meta <- list(
-      current_release_detected = cur_rel,
-      current_coverage_estimate = cur_cov,
-      attempted_releases = bt$tried,
-      attempted_coverages = bt$coverages,
-      autodetect_caps = list(
-        max_files_scanned = .MAX_FILES_FOR_AUTODETECT,
-        max_iprs_collected = .MAX_IPRS_FOR_AUTODETECT
-      )
-    )
-
-    if (is.na(best_cov)) {
-      message("[ipr_enrichment] Could not estimate coverage across releases; using current_release endpoints.")
-      chosen_release <- NULL
+    if (!isTRUE(!is.na(cur_rel) && nzchar(cur_rel) && is.finite(.num(cur_rel)))) {
+      # Compute nodes often have no internet, and the bundled list covers this case.
+      if (!identical(entries_source, "auto")) {
+        stop("[ipr_enrichment] Could not detect the current InterPro release. ",
+             "Specify 'interpro_release', or provide local copies of ",
+             "'entry.list' and 'ParentChildTreeFile.txt'.", call. = FALSE)
+      }
+      message("[ipr_enrichment] Could not reach InterPro, so the InterPro entry list bundled with dndsR ",
+              "is used. To use a specific release, give --entries-path.")
     } else {
-      message(sprintf("[ipr_enrichment] Selected InterPro release %s (coverage %.3f)", chosen_release, best_cov))
-      if (is.finite(strict_coverage) && best_cov < strict_coverage) {
-        stop(sprintf("Coverage %.3f < strict_coverage=%.2f for selected release %s.",
-                     best_cov, strict_coverage, chosen_release))
+      cur_cov <- .coverage_for_current(iprs_all, timeout_s = max(entries_timeout_s, tree_timeout_s))
+
+      step_sz <- 2.0
+      max_back <- 12L
+      bt <- .backtrack_release_until_full(iprs_all, cur_rel, step = step_sz, max_backtrack = max_back,
+                                          timeout_s = max(entries_timeout_s, tree_timeout_s))
+
+      chosen_release <- bt$release
+      best_cov       <- bt$coverage
+      backtrack_meta <- list(
+        current_release_detected = cur_rel,
+        current_coverage_estimate = cur_cov,
+        attempted_releases = bt$tried,
+        attempted_coverages = bt$coverages,
+        autodetect_caps = list(
+          max_files_scanned = .MAX_FILES_FOR_AUTODETECT,
+          max_iprs_collected = .MAX_IPRS_FOR_AUTODETECT
+        )
+      )
+
+      if (is.na(best_cov)) {
+        message("[ipr_enrichment] Could not estimate coverage across releases; using current_release endpoints.")
+        chosen_release <- NULL
+      } else {
+        message(sprintf("[ipr_enrichment] Selected InterPro release %s (coverage %.3f)", chosen_release, best_cov))
+        if (is.finite(strict_coverage) && best_cov < strict_coverage) {
+          stop(sprintf("Coverage %.3f < strict_coverage=%.2f for selected release %s.",
+                       best_cov, strict_coverage, chosen_release))
+        }
       }
     }
   }

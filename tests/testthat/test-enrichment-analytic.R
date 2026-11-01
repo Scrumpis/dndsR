@@ -43,6 +43,24 @@ test_that("InterPro Fisher tests and BH adjustment match hand calculation", {
   expect_equal(row$enrichment, (10 / 12) / (2 / 28), tolerance = 1e-10)
 })
 
+test_that("InterPro enrichment works with no internet access", {
+  dir <- withr::local_tempdir()
+  ids <- domains(2)
+  term <- c(rep(ids[1], 10), rep(ids[2], 2), rep(ids[1], 2), rep(ids[2], 26))
+  annotated_table(file.path(dir, "t_dnds_annot.tsv"), c(rep(2, 12), rep(0.1, 28)), ipr = term)
+  # A proxy that refuses connections stands in for a compute node without internet.
+  withr::local_envvar(http_proxy = "http://127.0.0.1:9", https_proxy = "http://127.0.0.1:9", ftp_proxy = "http://127.0.0.1:9")
+  expect_message(
+    ipr_enrichment(dnds_annot_file = file.path(dir, "t_dnds_annot.tsv"), sides = "query", make_plots = FALSE,
+                   max_prop = 1, min_total = 1, min_pos = 1, entries_timeout_s = 2, tree_timeout_s = 2),
+    "bundled"
+  )
+  got <- utils::read.delim(file.path(dir, "t_q_IPR_Domain_enrichment.tsv"))
+  expect_equal(got$p_value[got$IPR == ids[1]], upper_tail(10L, 12L, 12L, 40L), tolerance = 1e-10)
+  prov <- jsonlite::read_json(file.path(dir, "t_interpro_provenance.json"))
+  expect_match(paste(unlist(prov), collapse = " "), "bundled")
+})
+
 test_that("the parent-child method removes genes explained by a significant child", {
   dir <- withr::local_tempdir()
   ids <- domains(3)

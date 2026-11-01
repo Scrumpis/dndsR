@@ -32,6 +32,8 @@ bash -x "$script" >"$work/output.txt" 2>&1 || {
   exit 1
 }
 grep -F "All 14 example checks passed." "$work/output.txt"
+# Facts the tutorial states about the example.
+grep -qx "34" "$work/output.txt" || { echo "FAILED: spA no longer has 34 written CDS" >&2; exit 1; }
 grep -Fq "example_AvB_q_KEGG_enrichment.tsv" "$work/output.txt" || { echo "FAILED: KEGG output missing" >&2; exit 1; }
 grep -Fq "example_AvB_q_IPR_Domain_enrichment.tsv" "$work/output.txt" || { echo "FAILED: IPR output missing" >&2; exit 1; }
 echo "Tutorial OK: every command ran in a clean HOME"

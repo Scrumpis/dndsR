@@ -91,6 +91,7 @@ Report the version, commit, image digest, command, and the number of excluded ge
 - `Sequence files not found`: run `extract_cds` first, with the same `-o`.
 - `jobs failed`: the message gives each error, and logs are in the comparison folder. Retry with `-t 1`, and check memory if a worker died.
 - Enrichment writes no table: a small dataset may lose terms to `--max-prop` (default 0.2), `--min-pos`, or `--min-total`. Read the log before relaxing them.
+- Singularity cannot start, for example without `/dev/fuse`: try Apptainer or the conda route. Report what you changed.
 - `dndsr doctor` and `tools/dndsr-install doctor` check the installation.
 
 ## Citation
