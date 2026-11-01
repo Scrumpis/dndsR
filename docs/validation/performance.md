@@ -1,6 +1,6 @@
 # Thread scaling
 
-How much each step gains from more threads, on the public *A. thaliana* and *A. lyrata* pair: 22,146 pairs, one comparison, with InterPro and GO terms on the query only. Code `59faf30`, image `dndsr_v0.2.0_sha256-726657e9`. Each row is one run in a fresh process under Slurm, with `dndsr <step> -c comparison.txt -t <threads>`, so times are not averaged. Memory is Slurm's `MaxRSS` for that step.
+How much each step gains from more threads, on the public *A. thaliana* and *A. lyrata* pair: 22,146 pairs, one comparison, with InterPro and GO terms on the query only. Code `59faf30`, image `dndsr_v0.2.0_sha256-726657e9`. Each time is a single run under Slurm, not an average. The 16- and 32-core dN/dS runs and the 8-thread runs of later steps used a fresh process, with `dndsr <step> -c comparison.txt -t <threads>`. `extract_cds`, the 8-core dN/dS run, and the 1-thread runs shared one R session, calling the same functions. Memory is Slurm's `MaxRSS` for the fresh-process steps.
 
 | Step | Time by threads | Peak memory | What limits it |
 |---|---|---|---|
