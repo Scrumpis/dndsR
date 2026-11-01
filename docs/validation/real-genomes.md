@@ -7,7 +7,7 @@ On real genomes, the coding-sequence bug in dndsR versions up to `c8b534f` (incl
 - **Every multi-exon gene on the minus strand was assembled wrongly, and so was every gene with more than one isoform.** That was 40% of genes in *C. formosanum* and *C. quinoa* (about 12,000 per genome), and 60% in *A. thaliana*.
 - **About half of the comparable gene pairs changed their CDS** (49% and 47%).
 - **Most genes reported with dN/dS above 1 were artifacts.** Over the whole table, calls fell from 1,241 to 436 in *C. formosanum* and from 1,049 to 212 in *C. quinoa*.
-- **About 15% more ortholog pairs were found** after the fix, because garbled sequences had lost their matches.
+- **12 to 15% more ortholog pairs were found** after the fix, because garbled sequences had lost their matches.
 - **Significant enrichment terms changed almost entirely** (Jaccard similarity of significant sets: 0 to 0.09).
 - The current code's CDS match independent `gffread` output for **all** tested genes, and its dN/dS agree closely with PAML and KaKs_Calculator (Spearman 0.95 to 0.98 for the ratio).
 
