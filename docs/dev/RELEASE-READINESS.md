@@ -1,14 +1,16 @@
 # Release readiness: v0.3.0 candidate
 
-**Recommendation: NO-GO until the Apptainer steps pass in CI, then ready for the maintainer's decisions.** R checks and the real Docker image pass on GitHub. Unpublished real-genome results stay outside Git.
+**Recommendation: GO on the evidence, subject to the maintainer's setup and approval.** No code-side blocker remains. Unpublished real-genome results stay outside Git.
 
 ## Blocking the release
 
-1. **Push `dev`, and confirm the `container` workflow,** whose Apptainer install step failed at `fca3306`, so its Apptainer tests and the new test step have not run on GitHub.
-2. **Rulesets and Docker Hub setup:** `GITHUB-SETUP.md`.
+Only the maintainer can do these:
+
+1. **Rulesets and Docker Hub setup:** `GITHUB-SETUP.md`. As read from the public API at `f84521f`, `protect_main` still requires 1 approval, and no `dev` or tag ruleset is visible.
+2. **Authorization** for the one "Update branch" merge of `main` into `dev`.
 3. **Final approval** to merge, tag, and publish.
 
-## CI at `fca3306`
+## CI at `f84521f`
 
 | Workflow | Result |
 |---|---|
@@ -18,8 +20,13 @@
 | `container`: real `docker build` from a clean checkout | **Pass** |
 | `container`: full container checks in the Docker image | **Pass** |
 | `container`: R tutorial in the Docker image | **Pass** |
-| `container`: installing Apptainer | Fail: third-party action could not install on the runner. Replaced with conda Apptainer. Not yet confirmed |
-| `container`: Apptainer checks, documented installer | Not run on GitHub. Tested locally |
+| `container`: package tests in the Docker image | **Pass** |
+| `container`: Apptainer 1.5.4 from conda, checks on the image | **Pass** |
+| `container`: documented installer with Apptainer | **Pass** |
+
+Step and job results are from the public API. Job logs need a login and were not read.
+
+`R/`, `inst/`, `skills/`, `tools/Dockerfile`, `tools/dndsr-install`, `DESCRIPTION`, and `NAMESPACE` have no differences between `c1eda04` and `f84521f`, so the agent test and the local checks below still describe this code. `R/`, `inst/`, `tools/Dockerfile`, `DESCRIPTION`, and `NAMESPACE` also have no differences from `59faf30`, the commit used for the public-genome comparison.
 
 ## Local evidence at the final code
 

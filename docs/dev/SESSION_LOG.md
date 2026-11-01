@@ -2,6 +2,12 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-01: v0.3.0 release readiness
+
+- **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`
+- **Done:** public-genome validation, estimator characterization, Docker build and Apptainer fixes for CI, and release records. All workflows pass at `f84521f`.
+- **Failed or not done:** the Codex agent test stays partial and was not rerun. Nothing was merged, tagged, or published by agents.
+
 ## 2026-10-31: autonomous development toward v0.3.0
 
 - **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6` (same as the bootstrap)

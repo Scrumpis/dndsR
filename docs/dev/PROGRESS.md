@@ -14,6 +14,9 @@ Done: audit, core fixes, statistical fixes, CLI and failure handling, example an
 
 ## Checkpoints
 
+### CI green on every workflow
+At `f84521f`: `R-CMD-check` on all platforms, `install`, `skill`, and `container`, including package tests in the Docker image, Apptainer, and the documented installer. The third-party Apptainer action was replaced with conda-forge Apptainer. No code-side blocker remains for v0.3.0.
+
 ### Public-genome validation and estimator correction
 A. thaliana against A. lyrata: `docs/validation/public-genome.md`. Comeron investigated: `docs/validation/estimators.md`. Isoform sensitivity measured. Criteria, roadmap, and methods added. Gene-level contrast disabled. Publishing workflow added, off until enabled. Waiting: pushes and CI, since this session cannot push.
 

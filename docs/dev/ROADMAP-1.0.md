@@ -32,8 +32,8 @@ Keeping the default as is but changing what enrichment means is a scientific dec
 
 | # | Item | Status |
 |---|---|---|
-| 12 | CI green on all platforms | **R checks pass on all platforms.** Apptainer in CI awaits the next push |
-| 13 | Docker-built image passes container checks | **Done** at `fca3306` |
+| 12 | CI green on all platforms | **Done** at `f84521f`, including Apptainer. Keep green |
+| 13 | Docker-built image passes container checks | **Done** at `f84521f`, including package tests in the image |
 | 14 | Determinism | **Done for dN/dS** across thread counts. Add downstream steps with #7 |
 | 15 | Documented examples run | **Done:** tutorial, R tutorial, and container checks. `your-own-data.md` uses placeholder files |
 | 16 | Failures are explicit | **Done** for known paths, with tests |
