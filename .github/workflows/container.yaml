@@ -14,7 +14,7 @@ permissions: read-all
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
@@ -40,20 +40,36 @@ jobs:
       - name: Record the packages in the image
         run: docker run --rm dndsr:test cat /opt/dndsr-package-versions.tsv >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: eWaterCycle/setup-apptainer@v2
+      - name: Run the package tests in the image
+        run: |
+          mkdir -p work-tests
+          chmod 777 work-tests
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work-tests:/work" -v "$PWD:/repo:ro" -w /work dndsr:test \
+            Rscript /repo/tools/dev/run-package-tests.R /repo/tests/testthat
+
+      # The same rootless Apptainer route an HPC user can have, from conda-forge.
+      - uses: mamba-org/setup-micromamba@v2
         with:
-          apptainer-version: 1.4.5
+          environment-name: apptainer
+          create-args: -c conda-forge apptainer=1.5.4
+
+      - name: Allow user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Test the image with Apptainer, as on HPC
+        shell: bash -el {0}
         run: |
           version=$(awk -F': *' '$1=="Version"{print $2}' DESCRIPTION)
+          apptainer --version
           docker save dndsr:test -o image.tar
           apptainer build dndsr.sif docker-archive://image.tar
+          rm -f image.tar
           mkdir -p work-apptainer
           cd work-apptainer
-          apptainer exec --cleanenv --bind "$PWD" --pwd "$PWD" ../dndsr.sif bash "$GITHUB_WORKSPACE/tools/dev/container-checks.sh" "$version"
+          apptainer exec --cleanenv --bind "$PWD" --bind "$GITHUB_WORKSPACE" --pwd "$PWD" ../dndsr.sif bash "$GITHUB_WORKSPACE/tools/dev/container-checks.sh" "$version"
 
       - name: Test the documented installer with Apptainer
+        shell: bash -el {0}
         run: |
           export HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/home/.local/bin:$PATH"
           mkdir -p "$HOME"
