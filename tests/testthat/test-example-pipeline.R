@@ -5,18 +5,14 @@ skip_if_not_installed("orthologr")
 skip_if_not_installed("txdbmaker")
 skip_if(Sys.which("diamond") == "", "DIAMOND is not on PATH")
 
-example <- system.file("extdata", "example", package = "dndsR")
-work <- withr::local_tempdir(.local_envir = teardown_env())
-file.copy(list.files(example, full.names = TRUE), work, recursive = TRUE)
-old <- setwd(work)
-withr::defer(setwd(old), teardown_env())
+use_example_copy()
 
 truth <- function(species) {
   Biostrings::readDNAStringSet(file.path("truth", paste0(species, "_longest_isoform_cds.fasta")))
 }
 reference <- utils::read.delim("truth/ng86_reference.tsv", na.strings = c("NA", ""))
 suppressMessages(extract_cds(comparison_file = "comparison_file.txt", output_dir = "."))
-suppressMessages(suppressWarnings(calculate_dnds(comparison_file = "comparison_file.txt", output_dir = ".", comp_cores = 2)))
+suppressMessages(suppressWarnings(calculate_dnds(comparison_file = "comparison_file.txt", output_dir = ".", comp_cores = test_cores())))
 result <- utils::read.delim("example_AvB/example_AvB_dnds.tsv")
 result$pair <- sub("^spA_", "", result$query_id)
 value <- function(pair, column) result[[column]][result$pair == pair]
@@ -207,31 +203,4 @@ test_that("region summaries count the right genes", {
   everything <- got[got$scope == "global", ]
   expect_equal(everything$n, sum(ok))
   expect_equal(everything$n_removed_na, sum(is.na(annot$dNdS)))
-})
-
-test_that("contrasts have the right direction and pairing", {
-  suppressMessages(suppressWarnings({
-    extract_cds(comparison_file = "two_comparisons.txt", output_dir = ".")
-    calculate_dnds(comparison_file = "two_comparisons.txt", output_dir = ".", comp_cores = 2)
-    append_annotations(comparison_file = "two_comparisons.txt", output_dir = ".")
-    dnds_contrast(comparison_file = "two_comparisons.txt", contrast_file = "contrast_file.txt", output_dir = ".", make_plots = FALSE)
-  }))
-  got <- utils::read.delim("contrast/AvB_vs_AvC_global_q_vs_q_dnds_contrast.tsv")
-  a <- utils::read.delim("example_AvB/example_AvB_dnds_annot.tsv")
-  b <- utils::read.delim("example_AvC/example_AvC_dnds_annot.tsv")
-  shared <- merge(a, b, by = "query_id")
-  shared <- shared[is.finite(shared$dNdS.x) & is.finite(shared$dNdS.y) & shared$dNdS.x < 10 & shared$dNdS.y < 10, ]
-  delta <- shared$dNdS.x - shared$dNdS.y
-  expect_equal(got$n, nrow(shared))
-  expect_equal(got$mean_delta, mean(delta), tolerance = 1e-8)
-  expect_gt(got$mean_delta, 0) # genes with excess nonsynonymous changes against B only
-  expect_equal(got$wilcox_p_value, stats::wilcox.test(delta)$p.value, tolerance = 1e-8)
-  expect_equal(got$n_pos_A, sum(shared$dNdS.x > 1))
-  expect_equal(got$n_pos_B, sum(shared$dNdS.y > 1))
-})
-
-test_that("ideograms are written", {
-  skip_if_not_installed("RIdeogram")
-  suppressMessages(dnds_ideogram(comparison_file = "comparison_file.txt", output_dir = ".", sides = "query"))
-  expect_true(length(list.files("example_AvB", "ideogram\\.svg$")) > 0L)
 })

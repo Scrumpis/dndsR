@@ -36,7 +36,7 @@ Details are in `.claude/rules/`.
 - Set up a clone once: `tools/dev/setup.sh`.
 - Keep dependencies declared in `DESCRIPTION`, and in `tools/Dockerfile` and `tools/environment.yml` when needed. The HPC default R lacks many dependencies, so run package code in the pinned container (see the runbook).
 - Regenerate `man/` and `NAMESPACE` with roxygen2 rather than editing them by hand. roxygen2 is not in the current image.
-- Before committing, run what applies: `tools/dev/run-tests.sh`, `tools/dev/test-tutorial.sh`, `tools/dev/test-safeguards.sh`, `Rscript --vanilla tools/dev/validate-skill.R`, and `R CMD check`.
+- Before committing, run `tools/dev/check.sh`, which runs the package tests, tutorial, safeguards, and skill validation side by side. Use `--fast` while developing. CI runs `R CMD check`.
 - Heavy genome-scale jobs go through Slurm. Treat real genomes as read-only.
 
 ## Evidence

@@ -5,7 +5,7 @@ name: container
 on:
   push:
     branches: [dev]
-    paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/container-checks.sh", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
+    paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/container-checks.sh", "tools/dev/run-package-tests.R", "tests/**", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
   pull_request:
     branches: [main]
   workflow_dispatch:
