@@ -14,7 +14,7 @@ Every command is also an R function with the same name and options, except `exam
 | `dnds_ideogram` | Ideogram of binned dN/dS across a genome |
 | `dnds_summary` | dN/dS distributions and statistics, optionally by region |
 | `dnds_contrast` | Contrasts between comparisons |
-| `dnds_state_contrast` | Contrasts of selection states; `--level gene` is experimental |
+| `dnds_state_contrast` | Contrasts of selection states between groups; `--level gene` is disabled |
 | `example` | Copy the bundled example to a folder |
 | `verify_example` | Check example results against independent values |
 
@@ -35,7 +35,7 @@ Option and command names accept `-` or `_` as separators. Unknown options are er
 Whitespace-delimited with one comparison per row: `comparison_name query_fasta query_gff subject_fasta subject_gff`. Paths containing spaces must be double-quoted.
 
 ```
-Cform_v_Calbum ./path_to/Cformosanum.fasta ./path_to/Cformosanum.gff ./path_to/Calbum.fasta ./path_to/Calbum.gff
+sp1_v_sp2 ./path_to/sp1.fasta ./path_to/sp1.gff ./path_to/sp2.fasta ./path_to/sp2.gff
 ```
 
 The default `calculate_dnds` output path, from the code, is `<output_dir>/<comparison_name>/<comparison_name>_dnds.tsv`.

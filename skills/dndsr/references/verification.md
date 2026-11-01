@@ -17,7 +17,7 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b
 | `extract_cds`, `calculate_dnds`, `append_annotations`, `term_enrichment`, `ipr_enrichment`, `dnds_summary`, `dnds_contrast`, `split_comparisons`, pairwise `dnds_state_contrast` | Results compared with independent values in tests | Pass |
 | `go_enrichment`, `ipr_enrichment` (including parent-child), `dnds_ideogram` windows | Constructed cases with hypergeometric or hand-calculated answers | Pass |
 | Rendered plots | Run on the example with the bundled Liberation Sans font | See `docs/validation/` |
-| Real genomes: *C. formosanum*, *C. quinoa*, *A. thaliana* | `docs/validation/real-genomes.md` | CDS match gffread for all tested genes; dN/dS agree with PAML and KaKs_Calculator |
+| Real genomes | `docs/validation/real-genomes.md` | CDS match gffread for all tested genes, including *A. thaliana* |
 | Apptainer, conda, candidate image | `docs/validation/installation.md` | Pass |
 | Skill discovery | Claude Code 2.1.316 and Codex CLI 0.165.0 in a clone | Found |
 

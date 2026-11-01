@@ -122,7 +122,8 @@ COPY . /opt/dndsR
 RUN R CMD INSTALL --clean /opt/dndsR \
   && install -m 0755 /opt/dndsR/inst/scripts/dndsr /usr/local/bin/dndsr \
   && Rscript -e "stopifnot(requireNamespace('dndsR', quietly=TRUE))" \
-  && dndsr __commands
+  && dndsr __commands \
+  && Rscript -e "ip <- installed.packages()[, c('Package', 'Version')]; write.table(ip[order(ip[, 'Package']), ], '/opt/dndsr-package-versions.tsv', sep = '\t', quote = FALSE, row.names = FALSE); cat(R.version.string, file = '/opt/dndsr-r-version.txt')"
 
 WORKDIR /work
 CMD ["dndsr", "--help"]

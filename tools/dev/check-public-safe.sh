@@ -9,7 +9,7 @@ LARGE_OK='^inst/extdata/interpro_entry\.list\.tsv$'
 # Fragments are split so this script does not match itself.
 SECRET='(gh[pousr]_[A-Za-z0-9]{20}|github_pat_[A-Za-z0-9_]{20}|sk-ant-[a-z]|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE'' KEY)'
 PRIVATE_PATH='(/mnt/(gs''[0-9]+|ffs''[0-9]+|home)/|/home/[a-z0-9_]+/|/Users/[A-Za-z0-9_]+/)'
-BAD_NAME='(^|/)(\.audit|\.git-credentials|\.env|id_rsa|id_ed25519)(/|$)|\.(jsonl|sif|sqfs|pem|key|bam|cram|fastq|fq)(\.gz)?$'
+BAD_NAME='(^|/)(docs/validation/real-genomes/|\.audit|\.git-credentials|\.env|id_rsa|id_ed25519)(/|$)|\.(jsonl|sif|sqfs|pem|key|bam|cram|fastq|fq)(\.gz)?$'
 
 case "${1:---staged}" in
   --staged) files=$(git diff --cached --name-only --diff-filter=ACMR) ; show() { git show ":$1"; } ;;

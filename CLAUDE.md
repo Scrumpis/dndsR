@@ -11,7 +11,7 @@ Verified by reading the code on `dev`:
 - `calculate_dnds()` wraps `orthologr::dNdS()`. Its defaults are `aligner = "diamond"`, `sensitivity_mode = "fast"`, and `dnds_method = "Comeron"`, which stays the default for v0.3.0.
 - The published image (v0.2.0) holds dependencies only: `tools/dndsr-install` installs dndsR from the clone into a host R library and creates a `dndsr` shim that runs it in the container. `tools/Dockerfile` now also installs dndsR in the image, for future releases.
 - Tests are in `tests/testthat/`. Expected values come from outside dndsR. `dndsr verify_example` is the user-facing check. Real-genome comparisons are in `tools/dev/validation/`, and should be rerun before a release.
-- Workflows in `.github/workflows/` run on `dev`, but have never run on this code as of the last status update.
+- Workflows in `.github/workflows/` run on `dev` and pull requests. `publish.yaml` publishes only from approved tags, and is off until enabled.
 
 Validation evidence and its limits are in `docs/validation/`. Say which claims you verified and which are assumptions.
 
@@ -47,7 +47,7 @@ Details are in `.claude/rules/`.
 
 ## Files
 
-- Never commit transcripts, credentials, private paths, containers, temporary output, or bulky results. `tools/dev/check-public-safe.sh` checks staged files.
+- Never commit transcripts, credentials, private paths, containers, temporary output, or bulky results. **Never commit unpublished biological data or findings, including aggregate counts and species-level summaries.** Public validation docs use public genomes or synthetic data. `tools/dev/check-public-safe.sh` checks staged files.
 - Put temporary files outside the repository. Agents may delete files they generated in the same session without asking. Anything else: inspect it first and do not delete it without approval.
 - Do not delete code, docs, tests, or results without a documented reason and explicit approval.
 

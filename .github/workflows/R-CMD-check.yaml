@@ -17,6 +17,8 @@ permissions: read-all
 jobs:
   check:
     runs-on: ${{ matrix.config.os }}
+    # R-devel and its Bioconductor change often, so they inform without blocking a release.
+    continue-on-error: ${{ matrix.config.r == 'devel' }}
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
@@ -35,7 +37,7 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -49,12 +51,28 @@ jobs:
         with:
           extra-packages: any::rcmdcheck
           needs: check
-          upgrade: true
+          upgrade: 'TRUE'
 
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+
+      # Logs need a login, so also report check problems as public annotations.
+      - name: Annotate check problems
+        if: failure()
+        shell: bash
+        run: |
+          f=$(find check -name 00check.log | head -n 1)
+          if [ -n "$f" ]; then
+            msg=$(grep -E -A6 'ERROR|WARNING' "$f" | tail -n 25 | sed 's/%/%25/g' | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-2500)
+            echo "::error title=R CMD check::$msg"
+          fi
+          t=$(find check -name 'testthat.Rout.fail' | head -n 1)
+          if [ -n "$t" ]; then
+            msg=$(tail -n 25 "$t" | sed 's/%/%25/g' | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-2500)
+            echo "::error title=Test failures::$msg"
+          fi
 
   # One stable result for the check that the protect_main ruleset requires.
   R-CMD-check:

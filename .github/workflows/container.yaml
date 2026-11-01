@@ -1,10 +1,11 @@
-# Builds the container and runs the example in it, without publishing anything.
+# Builds the image from a clean checkout and tests it under Docker and Apptainer.
+# Nothing is published here. See publish.yaml.
 name: container
 
 on:
   push:
     branches: [dev]
-    paths: ["tools/Dockerfile", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
+    paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/container-checks.sh", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -14,19 +15,47 @@ permissions: read-all
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build
-        run: docker build -f tools/Dockerfile -t dndsr:test .
+        run: docker build --pull --no-cache -f tools/Dockerfile -t dndsr:test .
 
-      - name: Run the example and verify it
+      - name: Test the image with Docker
         run: |
-          docker run --rm -v "$PWD/work:/work" -u "$(id -u):$(id -g)" dndsr:test dndsr example -o /work/example
-          cat > run.sh <<'EOF'
-          set -e
+          version=$(awk -F': *' '$1=="Version"{print $2}' DESCRIPTION)
+          mkdir -p work
+          chmod 777 work
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work:/work" -w /work \
+            -v "$PWD/tools/dev/container-checks.sh:/checks.sh:ro" dndsr:test bash /checks.sh "$version"
+
+      - name: Record the packages in the image
+        run: docker run --rm dndsr:test cat /opt/dndsr-package-versions.tsv >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.4.5
+
+      - name: Test the image with Apptainer, as on HPC
+        run: |
+          version=$(awk -F': *' '$1=="Version"{print $2}' DESCRIPTION)
+          docker save dndsr:test -o image.tar
+          apptainer build dndsr.sif docker-archive://image.tar
+          mkdir -p work-apptainer
+          cd work-apptainer
+          apptainer exec --cleanenv --bind "$PWD" --pwd "$PWD" ../dndsr.sif bash "$GITHUB_WORKSPACE/tools/dev/container-checks.sh" "$version"
+
+      - name: Test the documented installer with Apptainer
+        run: |
+          export HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/home/.local/bin:$PATH"
+          mkdir -p "$HOME"
+          tools/dndsr-install install --engine apptainer --sif dndsr.sif
+          tools/dndsr-install doctor
+          dndsr doctor
+          mkdir -p "$RUNNER_TEMP/shim" && cd "$RUNNER_TEMP/shim"
+          dndsr example
+          cd dndsr_example
           dndsr extract_cds -c comparison_file.txt
           dndsr calculate_dnds -c comparison_file.txt -t 2
           dndsr verify_example
-          EOF
-          docker run --rm -v "$PWD/work:/work" -v "$PWD/run.sh:/run.sh:ro" -w /work/example -u "$(id -u):$(id -g)" dndsr:test bash /run.sh

@@ -18,7 +18,7 @@ dndsR's `dNdS > 1` is a threshold on a point estimate with no uncertainty attach
 
 Treat dN/dS above 1 as a candidate list. To support a claim about particular genes, use methods that model selection, such as likelihood-ratio tests with more than two sequences, and look at the alignments.
 
-On real genomes, about 8 to 11% of a sample enriched for high ratios fell on opposite sides of 1 between established methods ([evidence](validation/real-genomes.md)).
+Established methods can also disagree about which side of 1 a gene falls on.
 
 ## Before you trust a value
 
@@ -48,7 +48,7 @@ On real genomes, about 8 to 11% of a sample enriched for high ratios fell on opp
 
 - Genes are tested as independent, although neighboring genes share history. Region p-values can be too small.
 - `dnds_contrast` compares genes in one genome across two comparisons, so it is confounded by each comparison's divergence time. No correction is applied across contrasts.
-- `dnds_state_contrast` at gene level is experimental. See [known issues](validation/known-issues.md).
+- `dnds_state_contrast --level gene` is disabled. See [known issues](validation/known-issues.md).
 
 ## What to report
 

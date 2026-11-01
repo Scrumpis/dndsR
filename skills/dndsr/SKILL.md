@@ -79,8 +79,8 @@ Read [docs/interpretation.md](../../docs/interpretation.md) before explaining re
 - The default Comeron method tends to give lower ratios than true values in simulation. Evidence: [docs/validation/estimators.md](../../docs/validation/estimators.md).
 - Reciprocal best hits can mispair paralogs, especially in polyploids. Annotation errors can look like selection.
 - Enrichment tests treat genes as independent.
-- `dnds_state_contrast --level gene` is experimental. Do not base conclusions on it.
-- Results from dndsR before 0.3.0 should not be reused. In tested genomes, most of their dN/dS calls above 1 were artifacts. See [docs/migrating-to-0.3.md](../../docs/migrating-to-0.3.md).
+- `dnds_state_contrast --level gene` is disabled, because its results were not meaningful.
+- Results from dndsR before 0.3.0 should not be reused. They can contain false dN/dS above 1. See [docs/migrating-to-0.3.md](../../docs/migrating-to-0.3.md).
 
 Report the version, commit, image digest, command, and the number of excluded genes. Parameters and input hashes are in `<comparison>_dnds_provenance.json`.
 

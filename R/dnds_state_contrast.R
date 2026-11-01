@@ -633,7 +633,8 @@
 #' @section Core mode:
 #' Choose whether observations are ortholog pairs ("pairwise") or aggregated gene-side observations ("gene").
 #'
-#' @param level Character. Analysis level: \code{"pairwise"} or \code{"gene"}.
+#' @param level Character. Analysis level: \code{"pairwise"}. \code{"gene"} is disabled and
+#'   stops with an error, because it does not give meaningful results.
 #'
 #' @section Input selection (single vs batch):
 #' Single mode analyzes one table (or one list of tables in gene mode). Batch mode iterates over comparisons.
@@ -782,9 +783,16 @@ dnds_state_contrast <- function(level            = c("pairwise", "gene"),
                                 gene_out_dir      = "gene_level_state_contrast") {
 
   level      <- match.arg(level)
-  if (identical(level, "gene")) {
-    message("[dnds_state_contrast] level='gene' is experimental and not validated. ",
-            "See docs/validation/known-issues.md before interpreting its results.")
+  # Gene level gives results that look real but carry no information: see
+  # docs/dev/state-contrast-design.md. The option exists only for developing a replacement.
+  if (identical(level, "gene") && !isTRUE(getOption("dndsR.allow_invalid_gene_contrast", FALSE))) {
+    stop(
+      "dnds_state_contrast(level = 'gene') is disabled, because its results are not meaningful: ",
+      "each pair's value enters both groups, so a single table gives an odds ratio of 1 and p = 1 ",
+      "whatever the data, and genes in separate files are not combined. ",
+      "Use level = 'pairwise' with a 'group' column. See docs/validation/known-issues.md.",
+      call. = FALSE
+    )
   }
   fdr_method <- match.arg(fdr_method)
   side       <- match.arg(side)

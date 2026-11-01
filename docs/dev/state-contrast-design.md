@@ -1,6 +1,6 @@
 # Gene-level `dnds_state_contrast`: problems and a possible design
 
-Status: experimental, not validated, and not to be used for conclusions. Nothing here has been implemented. A redesign needs the maintainer's scientific decision. Pairwise mode is separate, and its odds ratio matches a hand calculation in `tests/testthat/test-statistics.R`.
+Status: disabled in v0.3.0, and stops with an error. No replacement has been implemented. A redesign needs the maintainer's scientific decision. Pairwise mode is separate, and its odds ratio matches a hand calculation in `tests/testthat/test-statistics.R`.
 
 ## Confirmed by running (commit `a1ef194`)
 
@@ -24,10 +24,10 @@ The question the mode seems meant to answer is whether genes in one group (subge
 
 ## Defensible options
 
-1. **Paired, within-triad.** For homeolog triads, compare each gene's dN/dS against the same outgroup, then test within-triad differences. Each triad is the unit, so shared history is controlled. This needs a triad definition, and the maintainer's own analyses suggest this is the real interest. It is the recommended starting point.
+1. **Paired, within-triad.** For homeolog triads, compare each gene's dN/dS against the same outgroup, then test within-triad differences. Each triad is the unit, so shared history is controlled. This needs a triad definition. It is the recommended starting point.
 2. **Mixed model with a pair or gene random effect,** on rows that each use one side of a pair, chosen by an explicit rule. It is flexible, but the rule decides the answer.
 3. **Remove gene level,** and document how to do this with pairwise mode plus a user-defined `group` column. This is simplest, and keeps the package honest until a design is chosen.
 
 Whichever is chosen needs simulation under a known null to confirm false-positive rates before use.
 
-Recommendation for v0.3.0: keep it experimental, as now. For v1.0.0: choose option 1 or 3.
+For v1.0.0: choose option 1 or 3.

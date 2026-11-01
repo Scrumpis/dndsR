@@ -6,12 +6,12 @@
 
 | Bug | Affected if | Effect |
 |---|---|---|
-| CDS assembled in the wrong exon order | Multi-exon genes on the minus strand: nearly every genome | About half of pairs changed in tested genomes. False dN/dS above 1, high dS, undefined ratios, lost orthologs |
+| CDS assembled in the wrong exon order | Multi-exon genes on the minus strand: nearly every genome | All such genes are wrong. False dN/dS above 1, high dS, undefined ratios, lost orthologs |
 | Isoforms concatenated into chimeras | Genes with more than one annotated isoform | Sequences about twice the expected length, usually with stops |
 | Annotation from the wrong genome | A gene ID also appears in a genome processed earlier in the same run, at one thread | Wrong terms and coordinates |
 | Empty annotations | RefSeq-style GFF IDs, such as `gene-` and `rna-` | No annotations or coordinates, without an error |
 | First BED region lost | Headerless regions file | One region was missing |
-| Enrichment | Results from any of the above, plus the fixes listed in [NEWS](../NEWS.md) | Significant terms changed almost entirely in tested genomes |
+| Enrichment | Results from any of the above, plus the fixes listed in [NEWS](../NEWS.md) | Significant terms can change substantially |
 
 Single-exon genes and plus-strand genes with one isoform were assembled correctly, and their dN/dS do not change, though downstream summaries and enrichment that include other genes do.
 

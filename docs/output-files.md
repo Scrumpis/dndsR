@@ -61,4 +61,4 @@ The tested groups: positive genes have `dNdS > pos_threshold` (default 1), and t
 
 ## dnds_state_contrast
 
-Experimental at `--level gene`. At the default `--level pairwise`, it classifies each row as Positive, Neutral, or Purifying and compares groups given by a `group` column in `--dnds-table-file`. `<label>_dnds_state_contrasts.tsv` has `state`, `groupA`, `groupB`, `model`, `log_or`, `se`, `p_value`, `p_adj`, `odds_ratio` (A relative to B), `or_ci_lower`, and `or_ci_upper`.
+`--level gene` is disabled, because its results were not meaningful. The default, `--level pairwise`, classifies each row as Positive, Neutral, or Purifying and compares groups given by a `group` column in `--dnds-table-file`. `<label>_dnds_state_contrasts.tsv` has `state`, `groupA`, `groupB`, `model`, `log_or`, `se`, `p_value`, `p_adj`, `odds_ratio` (A relative to B), `or_ci_lower`, and `or_ci_upper`.

@@ -40,7 +40,8 @@ dnds_state_contrast(
 )
 }
 \arguments{
-\item{level}{Character. Analysis level: \code{"pairwise"} or \code{"gene"}.}
+\item{level}{Character. Analysis level: \code{"pairwise"}. \code{"gene"} is disabled and
+stops with an error, because it does not give meaningful results.}
 
 \item{dnds_table_file}{Character. Path to a single input TSV.
 In pairwise mode, this is a pairwise dN/dS table containing \code{dnds_col} and \code{group_col}.

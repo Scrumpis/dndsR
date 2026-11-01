@@ -161,3 +161,28 @@ test_that("identifier prefixes are removed only at the start", {
   expect_equal(.normalize_gff_id(c("gene-AT1", "rna-NM_1.2", "cds-NP_1", "mygene-1", "g1", NA)),
                c("AT1", "NM_1.2", "NP_1", "mygene-1", "g1", NA))
 })
+
+test_that("gene-level state contrast fails instead of returning meaningless values", {
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  n <- 200L
+  d <- data.frame(
+    query_id = sprintf("q%03d", seq_len(n)), subject_id = sprintf("s%03d", seq_len(n)),
+    dNdS = c(rep(2, 60), rep(0.1, 140)), q_gff_seqname = "Chr1B", s_gff_seqname = "Chr1C",
+    q_gff_start = seq_len(n), q_gff_end = seq_len(n) + 10L, s_gff_start = seq_len(n), s_gff_end = seq_len(n) + 10L
+  )
+  utils::write.table(d, "one_dnds_annot.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
+  expect_error(
+    dnds_state_contrast(level = "gene", dnds_annot_files = "one_dnds_annot.tsv", min_pairs = 1, make_plots = FALSE),
+    "disabled"
+  )
+  expect_length(list.files(".", "state_contrasts"), 0L)
+
+  # This documents why: with the check bypassed for development, 30% of genes above 1 still
+  # gives no effect, by construction. If this ever fails, the design has changed.
+  withr::local_options(dndsR.allow_invalid_gene_contrast = TRUE)
+  got <- suppressMessages(suppressWarnings(
+    dnds_state_contrast(level = "gene", dnds_annot_files = "one_dnds_annot.tsv", min_pairs = 1, make_plots = FALSE)
+  ))
+  expect_equal(got$results$odds_ratio[got$results$state == "Positive"], 1, tolerance = 1e-6)
+})
