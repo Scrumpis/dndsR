@@ -88,9 +88,9 @@ estimate <- function(pair) {
 }
 
 # Codon usage from a real CDS FASTA (public genome).
-lines <- readLines(usage_fasta)
-seqs <- lines[!startsWith(lines, ">")]
-all_codons <- unlist(lapply(seqs[seq(1, length(seqs), length.out = min(length(seqs), 3000))], function(x) substring(x, seq(1, nchar(x) - 2, 3), seq(3, nchar(x), 3))))
+seqs <- as.character(Biostrings::readDNAStringSet(usage_fasta))
+seqs <- seqs[nchar(seqs) >= 30L & nchar(seqs) %% 3L == 0L]
+all_codons <- unlist(lapply(seqs, function(x) substring(x, seq(1, nchar(x) - 2, 3), seq(3, nchar(x), 3))))
 counts <- table(factor(toupper(all_codons), levels = sense))
 usage <- list(uniform = rep(1 / n, n), empirical = as.numeric(counts) / sum(counts))
 

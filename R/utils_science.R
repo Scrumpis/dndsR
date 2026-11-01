@@ -151,3 +151,25 @@
   }
   invisible(NULL)
 }
+
+#' Give every transcript a usable, unique name
+#'
+#' Transcript names can be missing or repeated in real annotations. A missing or repeated
+#' name becomes `<gene>.tx<id>`, and a transcript with no gene is treated as its own gene.
+#'
+#' @param id Internal transcript IDs.
+#' @param name Transcript names; may contain `NA` or duplicates.
+#' @param gene Gene IDs; may contain `NA`.
+#' @return List with `tx` (unique names) and `gene` (no `NA`).
+#' @keywords internal
+.label_transcripts <- function(id, name, gene) {
+  no_gene <- is.na(gene)
+  fallback <- ifelse(no_gene, paste0("tx", id), paste0(gene, ".tx", id))
+  bad <- is.na(name) | !nzchar(name) | duplicated(name)
+  tx <- ifelse(bad, fallback, name)
+  if (any(no_gene)) {
+    message("  - ", sum(no_gene), " transcript(s) have no parent gene and were named by transcript ID")
+  }
+  gene[no_gene] <- tx[no_gene]
+  list(tx = tx, gene = gene)
+}

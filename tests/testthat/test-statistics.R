@@ -186,3 +186,37 @@ test_that("gene-level state contrast fails instead of returning meaningless valu
   ))
   expect_equal(got$results$odds_ratio[got$results$state == "Positive"], 1, tolerance = 1e-6)
 })
+
+test_that("missing and duplicated transcript names are handled", {
+  got <- .label_transcripts(
+    id = c("1", "2", "3", "4", "5"),
+    name = c("NM_1", NA, "dup", "dup", NA),
+    gene = c("g1", "g2", "g3", "g3", NA)
+  )
+  expect_equal(got$tx, c("NM_1", "g2.tx2", "dup", "g3.tx4", "tx5"))
+  expect_equal(got$gene, c("g1", "g2", "g3", "g3", "tx5"))
+  expect_false(anyDuplicated(got$tx) > 0L)
+})
+
+test_that("extraction works when only some transcripts have transcript_id", {
+  skip_if_not_installed("txdbmaker")
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  example <- system.file("extdata", "example", package = "dndsR")
+  file.copy(file.path(example, "spA.fasta"), ".")
+  gff <- readLines(file.path(example, "spA.gff3"))
+  # As in real RefSeq files: an attribute on some transcripts, and one name used twice.
+  mrna <- which(grepl("\tmRNA\t", gff))
+  gff[mrna[1]] <- paste0(gff[mrna[1]], ";transcript_id=NM_1")
+  gff[mrna[2]] <- paste0(gff[mrna[2]], ";transcript_id=NM_2")
+  gff[mrna[3]] <- paste0(gff[mrna[3]], ";transcript_id=NM_2")
+  writeLines(gff, "mixed.gff3")
+  suppressMessages(suppressWarnings(extract_cds(
+    comparison_name = "c", query_fasta = "spA.fasta", query_gff = "mixed.gff3", output_dir = "."
+  )))
+  got <- Biostrings::readDNAStringSet("c/spA_CDS.fasta")
+  want <- Biostrings::readDNAStringSet(file.path(example, "truth", "spA_longest_isoform_cds.fasta"))
+  same <- !grepl("g30$", names(got))
+  expect_identical(as.character(got[same]), as.character(want[names(got)[same]]))
+  expect_length(got, 34L)
+})

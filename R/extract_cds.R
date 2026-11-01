@@ -123,18 +123,16 @@ extract_cds <- function(comparison_name = NULL,
     # Group by transcript in both modes. cdsBy(by = "gene") returns the CDS parts of all
     # isoforms together in genomic order, which is not a valid coding sequence for
     # multi-isoform genes or for multi-exon genes on the minus strand.
-    tx_cds <- GenomicFeatures::cdsBy(txdb, by = "tx", use.names = TRUE)
-    gene <- names(tx_cds)
-    if (by == "gene") {
-      tx_gene <- suppressMessages(AnnotationDbi::select(
-        txdb, keys = names(tx_cds), keytype = "TXNAME", columns = "GENEID"
-      ))
-      gene <- tx_gene$GENEID[match(names(tx_cds), tx_gene$TXNAME)]
-      if (anyNA(gene)) {
-        message("  - ", sum(is.na(gene)), " transcript(s) have no parent gene and were named by transcript ID")
-        gene[is.na(gene)] <- names(tx_cds)[is.na(gene)]
-      }
-    }
+    # Index by Bioconductor's internal ID: transcript names can be missing or duplicated,
+    # for example when only some transcripts in a RefSeq GFF have transcript_id.
+    tx_cds <- GenomicFeatures::cdsBy(txdb, by = "tx")
+    tx_meta <- suppressMessages(AnnotationDbi::select(
+      txdb, keys = names(tx_cds), keytype = "TXID", columns = c("TXNAME", "GENEID")
+    ))
+    tx_meta <- tx_meta[match(names(tx_cds), tx_meta$TXID), , drop = FALSE]
+    named <- .label_transcripts(tx_meta$TXID, tx_meta$TXNAME, tx_meta$GENEID)
+    names(tx_cds) <- named$tx
+    gene <- if (by == "gene") named$gene else named$tx
     list(cds = tx_cds, gene = gene)
   }
 
