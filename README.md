@@ -23,7 +23,7 @@
 On Linux with Singularity or Apptainer (replace `singularity` with `apptainer` if needed). This takes a few minutes and a 1.3 GB download. The commands install into your home directory.
 
 ```
-git clone --branch dev https://github.com/Scrumpis/dndsR
+git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
 tools/dndsr-install install --engine singularity --sif dndsr.sif

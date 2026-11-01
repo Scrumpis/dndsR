@@ -28,7 +28,7 @@ If `dndsr --help` lists commands, go to step 3. Without containers, use the test
 Tell the user first: this downloads 1.3 GB, and writes to `~/.config/dndsr`, `~/.dndsr/rlib`, and `~/.local/bin`. The image holds dependencies; dndsR is installed from the clone, which must stay in place. Replace `singularity` with `apptainer` if that is what is available (untested).
 
 ```
-git clone --branch dev https://github.com/Scrumpis/dndsR
+git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
 tools/dndsr-install install --engine singularity --sif dndsr.sif

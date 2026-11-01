@@ -90,6 +90,16 @@ allowed "rebase unpushed commits"     git rebase -q origin/dev
 sameref main "$main0"; sameref v0.2.0 "$tag0"
 [ "$(git -C "$tmp/remote.git" rev-parse main)" = "$main0" ] && ok "remote main unchanged" || no "remote main moved"
 [ "$(git -C "$tmp/remote.git" rev-parse v0.2.0)" = "$tag0" ] && ok "remote tag unchanged" || no "remote tag moved"
+
+# The maintainer's "Update branch" on GitHub: dev may follow it, but not make its own.
+git reset -q --hard origin/dev
+git clone -q --branch dev "$tmp/remote.git" "$tmp/github"
+git -C "$tmp/github" -c user.name=m -c user.email=m@example.invalid merge -q --no-edit origin/main
+git -C "$tmp/github" push -q origin dev
+allowed "fetch the maintainer's merge" git fetch -q origin
+blocked "merge main locally, once fetched" git merge -q --no-ff --no-edit main
+allowed "follow the maintainer's merge" git pull -q --ff-only origin dev
+[ "$(git rev-parse dev)" = "$(git rev-parse origin/dev)" ] && ok "dev equals origin/dev" || no "dev did not follow origin/dev"
 [ -s .audit/git-events.tsv ] && ok "commit and push events logged" || no "git events not logged"
 
 # The hooks that are really installed in this repository must match their sources.

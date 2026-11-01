@@ -21,7 +21,7 @@ Recommended, under **Settings > Rules > Rulesets**:
 
 This keeps every merge going through a pull request with passing checks, without a general bypass that could also skip checks. Setting approvals to 0 removes only a review that one person cannot give anyway.
 
-**Merging `main` into `dev`:** the up-to-date rule needs it once, and project policy requires your authorization. It adds a merge commit with no change to `dev`'s content, since `main`'s two extra commits cancel out. After you authorize it, use the "Update branch" button on the pull request.
+**Merging `main` into `dev`:** the up-to-date rule needs it once, and project policy requires your authorization. It adds a merge commit with no change to `dev`'s content. This was verified: `main`'s tree (`21b3b53`) is identical to the merge base `9094341`'s, because its two extra commits cancel out, so a three-way merge yields `dev`'s tree unchanged. `main`'s two commits are obsolete and contribute nothing to the release: one adds an `R/dnds_summary.R` and the next deletes it, and `dev`'s own `R/dnds_summary.R` is what ships. They stay in `main`'s history, because removing them would mean rewriting a protected branch. Use the "Update branch" button on the pull request, and a merge commit rather than squash. Then `git pull --ff-only origin dev` in your clone: the local hook lets `dev` follow `origin/dev`, and still blocks merging `main` locally.
 
 ## Docker Hub publishing
 

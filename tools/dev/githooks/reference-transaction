@@ -23,6 +23,8 @@ while read -r old new ref; do
       ;;
     "$DEV_BRANCH")
       [ "$new" != "$ZERO" ] || continue
+      # Following origin/dev is fine: only the maintainer can put a merge there.
+      [ "$new" != "$(git rev-parse -q --verify refs/remotes/origin/dev)" ] || continue
       for m in refs/heads/main refs/remotes/origin/main; do
         tip=$(git rev-parse -q --verify "$m") || continue
         if contains "$tip" "$new" && ! contains "$tip" "$current"; then

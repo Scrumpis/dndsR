@@ -1,6 +1,6 @@
 # Release readiness: v0.3.0 candidate
 
-**Recommendation: GO on the evidence, subject to the maintainer's setup and approval.** No code-side blocker remains. Unpublished real-genome results stay outside Git.
+**The maintainer agreed: GO on the evidence, with limitations documented, subject to setup and final approval to merge, tag, and publish.** No code-side blocker remains. Unpublished real-genome results stay outside Git.
 
 ## Blocking the release
 

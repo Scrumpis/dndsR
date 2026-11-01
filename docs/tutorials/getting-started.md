@@ -7,7 +7,7 @@ You need bash, git, Singularity, and network access. The image is a 1.3 GB downl
 ## 1. Get the code
 
 ```
-git clone --branch dev https://github.com/Scrumpis/dndsR
+git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 ```
 

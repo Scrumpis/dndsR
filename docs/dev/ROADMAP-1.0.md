@@ -1,62 +1,84 @@
 # Roadmap to v1.0.0
 
-Goal: a scientifically defensible, reproducible, and accessible dndsR, suitable for a preprint. This lists what evidence shows is missing, not features. Items are dropped if they prove unnecessary.
+v0.3.0 establishes a corrected, working foundation. v1.0.0 establishes a scientifically validated, reproducible, publication-ready tool. There are no intermediate versions for their own sake.
 
-## Critical scientific validation
+Scientific validity comes before new functionality. Existing behavior that is correct, tested, and documented is left alone. Items are dropped if the evidence shows they are unnecessary. The publication must state what dndsR can reliably estimate, and what biological conclusions cannot be established from those estimates alone.
 
-| # | Item | Why | Status |
-|---|---|---|---|
-| 1 | Characterize the estimator | Interpretation depends on it | **Done:** `docs/validation/estimators.md`. No error found; compresses ratios, property of the method family |
-| 2 | Quantitative criteria | Evidence should be judged by stated rules | **Done:** `docs/validation/criteria.md`; revisit as evidence grows |
-| 3 | Public real-genome workflow | Publishable evidence without private data | **Done for CDS through dN/dS:** `docs/validation/public-genome.md` |
-| 4 | Isoform sensitivity of dN/dS | Longest isoform is a convention | **Done for one pair:** range above 0.1 in 22% of multi-isoform pairs; 0.3% cross 1 (`docs/validation/public-genome.md`) |
-| 5 | Uncertainty for per-gene dN/dS | Half of neutral genes exceed 1, so a bare ratio cannot support claims about individual genes | **Open, and the most important scientific decision.** Options below |
-| 6 | Enrichment on a public annotated genome | Public evidence so far uses constructed cases | Open. Needs public GO or InterPro annotations for *A. thaliana* |
-| 7 | Null calibration of enrichment | Selecting on `min_pos`, plus gene dependence, may inflate significance | Open. Permuting positive labels on the public pair gives empirical false-positive rates |
-| 8 | Orthology accuracy | Best-hit pairing is a heuristic | Open. Compare RBH pairs with a public ortholog resource for *A. thaliana* and *A. lyrata* |
-| 9 | Independently verify biological results | Consistency between tools is not biological truth | Open. Compare the public pair's dS and gene-level rank against published values, citing only what is confirmed |
-| 10 | Gene-level `dnds_state_contrast` | Disabled | Remove it from the v1.0.0 interface unless a design passes null simulation. Decision for the maintainer: `state-contrast-design.md` |
-| 11 | Saturation warning | `Comeron95` truncates undefined terms silently | Open. Small: flag high dS and truncated values in QC |
+## Priority 1: functional enrichment validation
 
-### Options for item 5
+Is the enrichment workflow statistically defensible on real annotated data, and what are the smallest corrections needed?
 
-The smallest defensible remedy comes first:
-
-1. **Strengthen language only.** Done in this release: above 1 is a candidate list.
-2. **Report a per-gene bootstrap interval,** resampling codons, and base positive calls on the interval's lower bound as an optional stricter filter. It changes no default, and is simple and method-independent. **Recommended.**
-3. **Add a pairwise likelihood-ratio test** with PAML codeml. More formal but adds a heavy dependency, and pairwise tests have low power and ω across sites is unmodeled.
-
-Keeping the default as is but changing what enrichment means is a scientific decision for the maintainer.
-
-## Critical reliability
-
-| # | Item | Status |
+| Item | Approach | Status |
 |---|---|---|
-| 12 | CI green on all platforms | **Done** at `f84521f`, including Apptainer. Keep green |
-| 13 | Docker-built image passes container checks | **Done** at `f84521f`, including package tests in the image |
-| 14 | Determinism | **Done for dN/dS** across thread counts. Add downstream steps with #7 |
-| 15 | Documented examples run | **Done:** tutorial, R tutorial, and container checks. `your-own-data.md` uses placeholder files |
-| 16 | Failures are explicit | **Done** for known paths, with tests |
-| 17 | Skill tested at the release commit | Repeat at each release |
+| Real annotations | Public GO or InterPro annotations for *A. thaliana*, through the whole workflow | Open |
+| Null calibration | Empirical false-positive rates. Not only unrestricted label permutation, which assumes genes are exchangeable | Open |
+| Candidate selection | How the threshold on a point estimate, `min_pos`, and `max_dnds` affect results | Open |
+| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | Open |
+| Dependence | Tandem clusters and shared terms, which Fisher's test assumes away | Open |
 
-## Publication readiness
+## Priority 2: orthology accuracy
 
-| # | Item | Status |
+| Item | Approach | Status |
 |---|---|---|
-| 18 | Methods description | **Draft:** `docs/methods.md` |
-| 19 | Reproducibility materials | Scripts exist. Package the public pair's commands as one runnable recipe |
-| 20 | Benchmark of time and memory | Open. Slurm accounting for the public pair is a start |
-| 21 | Zenodo DOI, CITATION | Prepared. Awaits approval |
-| 22 | Keep unreleased findings out of public artifacts | In force, with a check |
+| Accuracy of reciprocal best hits | Benchmark against independent, established orthology resources for the public pair | Open |
+| Failure modes | Paralogs, gene duplication, isoform effects | Partly: isoform effect on dN/dS is measured, not its effect on pairing |
+| Downstream effect | Whether errors materially change dN/dS conclusions | Open |
 
-## Optional, only if users need it
+## Priority 3: independent estimator validation
+
+Existing comparisons with PAML and KaKs_Calculator stay, and are expanded only where necessary.
+
+| Item | Approach | Status |
+|---|---|---|
+| Bias and variance | Across biologically meaningful simulation regimes | Partly: `docs/validation/estimators.md` |
+| Saturation and failure conditions | Where estimates stop being reliable, using dS and gene length | Open |
+| Confidence intervals | First investigate whether intervals are useful and calibrated. **No bootstrap feature unless that is established** | Open, investigation only |
+| Estimation against testing | State clearly that dN/dS is a descriptive estimate, not a test of selection | Started: `docs/interpretation.md` |
+
+A neutral gene's point estimate falling above 1 about half the time is expected behavior, not an estimator defect. The issue to manage is users reading dN/dS above 1 as statistically significant evidence of positive selection.
+
+## Priority 4: end-to-end public demonstration
+
+| Item | Status |
+|---|---|
+| One fully reproducible public-genome workflow, including annotation and enrichment | Done through dN/dS: `docs/validation/public-genome.md`. Annotation and enrichment are open |
+| Biological plausibility against independent published evidence, citing only what is confirmed | Open |
+| The whole analysis as a simple, executable tutorial | Open |
+
+## Priority 5: interface cleanup and QC
+
+| Item | Status |
+|---|---|
+| Remove gene-level `dnds_state_contrast` from the supported interface, unless a statistically valid design is demonstrated | Open. See `state-contrast-design.md` |
+| dS saturation, unreliable-estimate, and other QC warnings where evidence supports them | Open. `Comeron95` truncates undefined terms silently |
+
+No unnecessary statistical machinery or dependencies.
+
+## Keep true throughout
+
+| Item | Status |
+|---|---|
+| CI passes on all platforms, including Apptainer and package tests in the image | Done at `f84521f`. Keep it so |
+| Determinism | Done for dN/dS across thread counts. Add downstream steps with Priority 1 |
+| Documented examples run, and failures are explicit | Done for known paths |
+| Skill tested at the release commit | Repeat at each release |
+| Human-native and agent-native: simple install, clear workflows, reproducible examples | Ongoing: `AGENT_NATIVE.md` |
+| Unreleased findings stay out of public artifacts | In force, with a check |
+
+## Publication materials
+
+| Item | Status |
+|---|---|
+| Methods description | Draft: `docs/methods.md` |
+| Results evidence | `docs/validation/`, growing with the priorities above |
+| Benchmark of time and memory | Open. Slurm accounting for the public pair is a start |
+| Zenodo DOI, CITATION | Prepared. Needs approval |
+
+## Deferred, only if users need them
 
 - Docker on macOS and Windows testing.
 - A plugin or marketplace package for the skill.
 - CRAN submission: `orthologr` is GitHub-only and blocks it for now.
 - A `dndsr update` command.
-- Other estimators in the image, such as KaKs_Calculator's. Useful for sensitivity analyses, not required.
-
-## Not planned
-
-New analysis types or new plots, before the above is complete.
+- Other estimators in the image.
+- New analysis types or new plots.

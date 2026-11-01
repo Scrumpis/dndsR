@@ -42,7 +42,7 @@ tools/dndsr-install install --engine docker --image scrumpis/dndsr@sha256:726657
 The simplest way to use dndsR from R. No compiling, and it includes DIAMOND.
 
 ```
-git clone --branch dev https://github.com/Scrumpis/dndsR
+git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 conda env create -f tools/environment.yml
 conda activate dndsr
