@@ -6,7 +6,7 @@ Open issues that affect results or use. Fixed defects are in [NEWS](../../NEWS.m
 
 | Issue | Status | What to do |
 |---|---|---|
-| `dnds_state_contrast --level gene`: a code audit found that genes from separate comparison files are not aggregated, one regions file is applied to both genomes, and when both sides fall into the two groups, effects can be zero by construction | Experimental, not validated, prints a message. It also stops on genomes whose sequence names do not show a subgenome. The rest is not confirmed by running; redesign is a scientific decision | Do not use for conclusions |
+| `dnds_state_contrast --level gene`: confirmed by running that a single table gives no effect by construction (log odds 0, p = 1), and that genes in separate files are not combined. See `docs/dev/state-contrast-design.md` | Experimental, prints a message; redesign is a scientific decision | Do not use for conclusions |
 | `dnds_state_contrast` regions use a different coordinate convention from `dnds_summary`: BED starts are not converted | Documented in its help | Check your coordinates |
 | Zero-cell state contrasts produce no row, shrinking the multiple-testing family; mixed-model warnings are suppressed | Open | Treat `dnds_state_contrast` results as exploratory |
 | Default CDS with a first exon of nonzero GFF phase (partial genes) are not trimmed to frame | Open; they are often excluded by the in-frame stop check | Check annotation quality |

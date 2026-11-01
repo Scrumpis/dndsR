@@ -4,7 +4,8 @@
 |---|---|---|
 | Singularity or Apptainer | Linux and HPC clusters; no root needed | Singularity tested |
 | Docker | Linux, macOS, and Windows with Docker | Not tested |
-| Native R | Interactive R use | Package tests pass with the image's R packages; a from-scratch native install has not been tested |
+| Conda or micromamba | R use on Linux, including HPC, with prebuilt packages | Tested from scratch on Linux |
+| Native R from CRAN and Bioconductor | When you manage your own R and system libraries | Failed on the tested HPC module; see below |
 
 The published image holds dependencies. `tools/dndsr-install` installs dndsR from your clone into a home-directory R library, so keep the clone in place.
 
@@ -36,7 +37,25 @@ docker pull scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6
 tools/dndsr-install install --engine docker --image scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831 --docker-platform linux/amd64
 ```
 
+## Conda or micromamba
+
+The simplest way to use dndsR from R. No compiling, and it includes DIAMOND.
+
+```
+git clone --branch dev https://github.com/Scrumpis/dndsR
+cd dndsR
+conda env create -f tools/environment.yml
+conda activate dndsr
+Rscript -e "options(repos = c(CRAN = 'https://cloud.r-project.org', BiocManager::repositories())); remotes::install_github('drostlab/orthologr@06c3098adfba1e32135d904f72ea81a76902c664', upgrade = 'never')"
+R CMD INSTALL .
+install -m 0755 inst/scripts/dndsr "$CONDA_PREFIX/bin/dndsr"
+```
+
+Then `dndsr example` works as in the [tutorial](docs/tutorials/getting-started.md), and `library(dndsR)` works in R.
+
 ## Native R
+
+Prefer conda unless you already manage a working Bioconductor setup. In testing on an HPC R 4.5.1 module, this route failed: `rtracklayer` did not compile against the cluster's OpenSSL, and `rsvg` (needed by the optional `RIdeogram`) needs librsvg. Your system may differ.
 
 You need R 4.5 or later (older R versions cannot install the current Bioconductor packages this needs), a C++ compiler, and DIAMOND 2.1.8 or later on your `PATH`.
 

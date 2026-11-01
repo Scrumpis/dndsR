@@ -37,7 +37,7 @@ R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
   missing <- c('AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures','GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO','IHW','qvalue','rtracklayer','pwalign','txdbmaker')[ \
     !vapply(c('AnnotationDbi','BiocGenerics','Biostrings','GenomicFeatures','GenomeInfoDb','GO.db','IRanges','Rsamtools','S4Vectors','topGO','IHW','qvalue','rtracklayer','pwalign','txdbmaker'), requireNamespace, logical(1), quietly=TRUE) ]; \
   if (length(missing)) stop('Missing Bioc packages after install: ', paste(missing, collapse=', '))"
-R -q -e "options(warn=2); remotes::install_github(c('drostlab/metablastr@${METABLASTR_REF}','drostlab/rdiamond@${RDIAMOND_REF}','drostlab/orthologr@${ORTHOLOGR_REF}'), upgrade='never', dependencies=FALSE); \
+R -q -e "options(repos = BiocManager::repositories()); remotes::install_github(c('drostlab/metablastr@${METABLASTR_REF}','drostlab/rdiamond@${RDIAMOND_REF}','drostlab/orthologr@${ORTHOLOGR_REF}'), upgrade='never'); \
     missing <- c('metablastr','rdiamond','orthologr')[!vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE)]; \
     if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
 Rscript -e "stopifnot( \

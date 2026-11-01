@@ -58,7 +58,7 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
 ARG ORTHOLOGR_REF=06c3098adfba1e32135d904f72ea81a76902c664
 ARG METABLASTR_REF=02dad6daf9f4a0675317177ff434ae9bbcec535f
 ARG RDIAMOND_REF=d8b4006d5f2793ecf8b97a7560fa005b7a3420ee
-RUN R -q -e "options(warn=2); remotes::install_github(c('drostlab/metablastr@${METABLASTR_REF}','drostlab/rdiamond@${RDIAMOND_REF}','drostlab/orthologr@${ORTHOLOGR_REF}'), upgrade='never', dependencies=FALSE); \
+RUN R -q -e "options(repos = BiocManager::repositories()); remotes::install_github(c('drostlab/metablastr@${METABLASTR_REF}','drostlab/rdiamond@${RDIAMOND_REF}','drostlab/orthologr@${ORTHOLOGR_REF}'), upgrade='never'); \
     missing <- c('metablastr','rdiamond','orthologr')[!vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE)]; \
     if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
 
