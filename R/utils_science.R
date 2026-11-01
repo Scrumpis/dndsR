@@ -173,3 +173,51 @@
   gene[no_gene] <- tx[no_gene]
   list(tx = tx, gene = gene)
 }
+
+#' Read the feature lines of a GFF3 file
+#'
+#' Only a `#` at the start of a line begins a comment. Inside an attribute it is legal text,
+#' which R's `comment.char` readers would treat as the end of the line. Lines after `##FASTA`
+#' are sequence, not features. Files without tabs are split on whitespace, with anything after
+#' the eighth field kept as the attributes.
+#'
+#' @param path GFF3 file, which may be compressed.
+#' @return A data frame with `seqid`, `source`, `type`, `start`, `end`, `score`, `strand`,
+#'   `phase`, and `attributes`. Empty, `.`, and `NA` fields are `NA`.
+#' @keywords internal
+.read_gff_features <- function(path) {
+  lines <- sub("\r$", "", readLines(path, warn = FALSE))
+  fasta <- which(startsWith(lines, "##FASTA"))
+  if (length(fasta)) lines <- lines[seq_len(fasta[1L] - 1L)]
+  lines <- lines[nzchar(trimws(lines)) & !startsWith(lines, "#")]
+  if (!length(lines)) stop("GFF has no feature lines: ", path, call. = FALSE)
+  untabbed <- !grepl("\t", lines)
+  lines[untabbed] <- sub("^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+",
+                         "\\1\t\\2\t\\3\t\\4\t\\5\t\\6\t\\7\t\\8\t", lines[untabbed], perl = TRUE)
+  fields <- strsplit(lines, "\t", fixed = TRUE)
+  if (!any(lengths(fields) >= 8L)) stop("GFF appears malformed or unreadable: ", path, call. = FALSE)
+  column <- function(k) {
+    v <- vapply(fields, `[`, character(1), k)
+    v[v %in% c("", ".", "NA")] <- NA_character_
+    v
+  }
+  columns <- lapply(seq_len(9L), column)
+  names(columns) <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
+  columns$start <- suppressWarnings(as.integer(columns$start))
+  columns$end <- suppressWarnings(as.integer(columns$end))
+  as.data.frame(columns, stringsAsFactors = FALSE)
+}
+
+#' Decode the percent-encoded characters GFF3 uses inside attribute values
+#'
+#' @param x Attribute text.
+#' @return `x`, with reserved characters decoded. `%25` is decoded last, so that `%252C`
+#'   becomes the literal text `%2C`.
+#' @keywords internal
+.decode_gff3 <- function(x) {
+  if (!any(grepl("%", x, fixed = TRUE))) return(x)
+  codes <- c("%09" = "\t", "%0A" = "\n", "%0D" = "\r", "%23" = "#", "%26" = "&", "%2C" = ",",
+             "%3A" = ":", "%3B" = ";", "%3D" = "=", "%25" = "%")
+  for (code in names(codes)) x <- gsub(code, codes[[code]], x, ignore.case = TRUE)
+  x
+}

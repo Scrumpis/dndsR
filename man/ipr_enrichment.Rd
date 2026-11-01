@@ -77,9 +77,9 @@ with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gf
 positives and background) for that side. When stratify_by_type=TRUE, this filtering
 is applied independently within each ENTRY_TYPE analysis.}
 
-\item{min_total}{Minimum total occurrences (pos+nonpos) required for a term (default 2).}
+\item{min_total}{Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).}
 
-\item{min_pos}{Minimum positive occurrences required for a term (default 2).}
+\item{min_pos}{Minimum positive occurrences for a term to be reported (default 2).}
 
 \item{max_prop}{Maximum allowed proportion of the background annotated set
 that may be assigned to a term (default 0.20). Terms with
@@ -209,7 +209,10 @@ Default InterPro resources (EMBL-EBI):
 \section{Term frequency and multiple-testing filters}{
 
 \itemize{
-\item Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
+\item Rare and overly broad terms are removed before testing, using \code{min_total} and \code{max_prop}.
+These do not depend on the outcome, so they define the family of tests that is corrected.
+\item Terms with few positive genes are removed after correction, using \code{min_pos}. It changes
+which rows are written, not their p-values.
 }
 }
 

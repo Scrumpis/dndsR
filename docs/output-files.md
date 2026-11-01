@@ -43,8 +43,9 @@ Each command also writes a plot, and a log for each side.
 
 The tested groups: positive genes have `dNdS > pos_threshold` (default 1), and the rest are other genes passing the filter (`dNdS` not NA and below `max_dnds`, default 10).
 
-- `ipr_enrichment` and `term_enrichment`: `pos_count`, `nonpos_count`, `pos_total`, `nonpos_total`, `total_count`, `odds_ratio`, `ci_lower`, `ci_upper`, `p_value` (one-sided Fisher's exact test), `p_adj`, `enrichment`.
-- `go_enrichment`: `annotated`, `significant`, `raw_p`, `p_adj`, `p_adjust_method`, `enrichment`. With the default `p_adjust_method` of `none`, `p_adj` equals `raw_p`.
+- `ipr_enrichment` and `term_enrichment`: `pos_count`, `nonpos_count`, `pos_total`, `nonpos_total`, `total_count`, `odds_ratio`, `ci_lower`, `ci_upper`, `p_value` (one-sided Fisher's exact test, not corrected for multiple testing), `p_adj` (corrected by `p_adjust_method`), `p_adjust_method`, `n_tested`, `enrichment`.
+- Correction spans every term meeting `min_total` and, for `ipr_enrichment`, `max_prop`. `n_tested` is that number. `min_pos` then chooses which rows are written, so a table usually has fewer rows than `n_tested`, and `p_adj` cannot be recalculated from the rows alone.
+- `go_enrichment`: `annotated`, `significant`, `raw_p`, `p_adj`, `p_adjust_method`, `enrichment`. With the default `p_adjust_method` of `none`, **`p_adj` equals `raw_p`: it is not corrected for multiple testing**, despite its name.
 - `enrichment` everywhere is the proportion of positive genes with the term divided by the proportion of other genes with it.
 
 ## dnds_ideogram

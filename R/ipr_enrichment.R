@@ -32,10 +32,13 @@
 #'   is applied independently within each ENTRY_TYPE analysis.
 #'
 #' @section Term frequency and multiple-testing filters:
-#' - Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
+#' - Rare and overly broad terms are removed before testing, using `min_total` and `max_prop`.
+#'   These do not depend on the outcome, so they define the family of tests that is corrected.
+#' - Terms with few positive genes are removed after correction, using `min_pos`. It changes
+#'   which rows are written, not their p-values.
 #'
-#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 2).
-#' @param min_pos   Minimum positive occurrences required for a term (default 2).
+#' @param min_total Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).
+#' @param min_pos   Minimum positive occurrences for a term to be reported (default 2).
 #' @param max_prop Maximum allowed proportion of the background annotated set
 #'   that may be assigned to a term (default 0.20). Terms with
 #'   (pos_count + nonpos_count) / (pos_total + nonpos_total) > max_prop
@@ -541,6 +544,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   # as qvalue and other tests are NA intolerant
   .adjust_pvals <- function(res, method, alpha) {
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
+    res$p_adjust_method <- method
+    res$n_tested <- nrow(res)
 
     p <- res$p_value
 
@@ -620,6 +625,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       } else {
         warning("IHW not installed; falling back to BH.", call. = FALSE)
         res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
+        res$p_adjust_method <- "BH"
       }
 
     } else { # "none"
@@ -901,7 +907,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     vec_all <- as.character(vec_all)
     vec_pos <- as.character(vec_pos)
     n_pos <- length(vec_pos); n_all <- length(vec_all); n_bg <- n_all - n_pos
-    if (n_pos == 0L || n_all == 0L || n_bg < 0L) return(NULL)
+    # A type with no positive genes is still tested: it counts toward global correction.
+    if (n_all == 0L || n_bg < 0L) return(NULL)
     all_tab <- .count_terms_from_vec(vec_all)
     pos_tab <- .count_terms_from_vec(vec_pos)
     if (length(all_tab) == 0) return(NULL)
@@ -958,14 +965,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
     lapply(term2rows, unique)
   }
-  .filter_terms_by_thresholds <- function(term2rows, pos_ids, all_ids, min_total, min_pos, max_prop) {
+  .filter_terms_by_thresholds <- function(term2rows, all_ids, min_total, max_prop) {
     keep <- list(); n_all <- length(all_ids)
     for (t in names(term2rows)) {
       members <- intersect(term2rows[[t]], all_ids)
       tot <- length(members)
-      pos <- length(intersect(members, pos_ids))
       prop <- if (n_all > 0) tot / n_all else 0
-      if (tot >= min_total && pos >= min_pos && prop <= max_prop) keep[[t]] <- members
+      if (tot >= min_total && prop <= max_prop) keep[[t]] <- members
     }
     keep
   }
@@ -1010,7 +1016,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     n_all <- nrow(df); if (!n_all) return(NULL)
     pos_id <- which(df$dNdS > pos_threshold); all_id <- seq_len(n_all)
     term2rows_all <- .build_term2rows(df, term_col); if (!length(term2rows_all)) return(NULL)
-    term2rows <- .filter_terms_by_thresholds(term2rows_all, pos_id, all_id, min_total, min_pos, max_prop)
+    term2rows <- .filter_terms_by_thresholds(term2rows_all, all_id, min_total, max_prop)
     if (!length(term2rows)) return(NULL)
     type_terms <- names(term2rows)
 
@@ -1050,17 +1056,17 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
       for (t in order_terms) {
         members <- intersect(term2rows[[t]], all_id)
-        if (!length(members)) next
 
         kids <- children_map[[t]]
         if (!is.null(kids) && length(kids)) {
           members <- setdiff(members, claimed[[t]])
         }
 
-        tot <- length(members); if (tot < min_total) next
+        # Every eligible term stays in the corrected family, even if little of it remains
+        # after its children claim genes. Rows too small to report are dropped afterwards.
+        tot <- length(members)
         a <- length(intersect(members, pos_id)); c <- tot - a
         b <- n_pos - a; d <- n_bg - c
-        if (a < min_pos) next
 
         ft <- try(stats::fisher.test(matrix(c(a,c,b,d), nrow = 2), alternative = "greater"), silent = TRUE)
         ci <- c(NA_real_, NA_real_); or <- NA_real_; p <- NA_real_
@@ -1093,7 +1099,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     .pc_sig_terms <- function(res) {
       if (is.null(res) || !nrow(res)) return(character(0))
-      res$IPR[is.finite(res$p_adj) & !is.na(res$p_adj) & res$p_adj <= parent_child_alpha]
+      res$IPR[is.finite(res$p_adj) & !is.na(res$p_adj) & res$p_adj <= parent_child_alpha &
+                res$total_count >= min_total & res$pos_count >= min_pos]
     }
 
     .pc_claimed_from_sig <- function(sig_terms) {
@@ -1126,6 +1133,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       res2 <- res2[novelty_ok[res2$IPR], , drop = FALSE]
     }
 
+    res2 <- res2[res2$total_count >= min_total & res2$pos_count >= min_pos, , drop = FALSE]
+    if (!nrow(res2)) return(NULL)
     res2[order(res2$p_adj, -res2$enrichment, res2$IPR), , drop = FALSE]
   }
 
@@ -1276,6 +1285,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   exclude_set <- .build_exclude_set(exclude_seeds)
 
+  # min_pos chooses the rows to report, after correction.
+  .report_only <- function(res) res[res$pos_count >= min_pos, , drop = FALSE]
+
   # ---------- pooled helper ----------
   .pooled_enrichment <- function(df, side, allowed_types = NULL, do_adjust = TRUE) {
     prefix <- if (side == "query") "q_" else "s_"
@@ -1309,14 +1321,15 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     n_all <- length(vec_all)
     prop  <- res$total_count / max(n_all, 1)
-    keep  <- (res$total_count >= min_total) & (res$pos_count >= min_pos) & (prop <= max_prop)
+    # The tested family must not depend on the outcome, and pos_count is the outcome.
+    keep  <- (res$total_count >= min_total) & (prop <= max_prop)
     res <- res[keep, , drop = FALSE]
     if (!nrow(res)) return(NULL)
 
     res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
 
     if (isTRUE(do_adjust)) {
-      res <- .adjust_pvals(res, fdr_method, alpha)
+      res <- .report_only(.adjust_pvals(res, fdr_method, alpha))
     } else {
       res$p_adj <- NA_real_
     }
@@ -1424,6 +1437,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
               .adjust_pvals(x, fdr_method, alpha)
             })
           }
+          results <- Filter(nrow, lapply(results, .report_only))
         }
       }
 

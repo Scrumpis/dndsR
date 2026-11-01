@@ -599,7 +599,7 @@ go_enrichment <- function(
     out <- data.frame(
       GO_ID = all_terms,
       term_name = term_name,
-      term_def = if (isTRUE(include_definition)) term_def else NULL,
+      term_def = term_def,
       annotated = annotated,
       significant = sig_counts,
       raw_p = raw_p,
@@ -616,6 +616,7 @@ go_enrichment <- function(
       comparison = comp,
       stringsAsFactors = FALSE
     )
+    if (!isTRUE(include_definition)) out$term_def <- NULL
 
     out_file <- file.path(
       comp_dir,

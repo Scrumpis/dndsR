@@ -34,8 +34,11 @@
 #' @param top_n Integer; number of rows to include in the plot (default 20).
 #' @param drop_rows_without_term Logical; if TRUE (default), rows with no term in the
 #'   tested column are removed from BOTH positives and background before counting.
-#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 0).
-#' @param min_pos Minimum positive occurrences required for a term (default 0).
+#' @param min_total Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).
+#'   This does not depend on the outcome, so it defines the family of tests that is corrected.
+#' @param min_pos Minimum positive occurrences for a term to be reported (default 2). It is applied
+#'   after correction, because filtering on the outcome first makes adjusted p-values invalid. It
+#'   changes which rows are written, not their p-values.
 #' @param fdr_method One of `"BH"`, `"IHW"`, `"qvalue"`, `"none"`. Default `"BH"`.
 #' @param alpha FDR level for IHW weighting (default 0.05).
 #' @param term_seps Candidate separators to auto-detect per column
@@ -300,6 +303,8 @@ term_enrichment <- function(dnds_annot_file = NULL,
 
   .adjust_pvals <- function(res) {
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
+    res$p_adjust_method <- fdr_method
+    res$n_tested <- nrow(res)
 
     if (fdr_method == "BH") {
       res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
@@ -309,6 +314,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       } else {
         warning("qvalue not installed; falling back to BH.", call. = FALSE)
         res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+        res$p_adjust_method <- "BH"
       }
     } else if (fdr_method == "IHW") {
       if (requireNamespace("IHW", quietly = TRUE)) {
@@ -317,6 +323,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       } else {
         warning("IHW not installed; falling back to BH.", call. = FALSE)
         res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+        res$p_adjust_method <- "BH"
       }
     } else {
       res$p_adj <- res$p_value
@@ -452,7 +459,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       )
     ) +
       ggplot2::geom_point() +
-      .padj_scale(upper = upper, legend_name = "adj p") +
+      .padj_scale(upper = upper, legend_name = if (fdr_method == "none") "p" else "adj p") +
       ggplot2::labs(
         x = "Enrichment (pos/bg)",
         y = ylab,
@@ -561,11 +568,14 @@ term_enrichment <- function(dnds_annot_file = NULL,
     res <- .fisher_enrichment(vec_all, vec_pos, sep = sep_here, drop_empty = drop_rows_without_term)
     if (is.null(res) || !nrow(res)) return(NULL)
 
-    keep <- (res$total_count >= min_total) & (res$pos_count >= min_pos)
-    res <- res[keep, , drop = FALSE]
+    # The tested family must not depend on the outcome, and pos_count is the outcome.
+    res <- res[res$total_count >= min_total, , drop = FALSE]
     if (!nrow(res)) return(NULL)
 
     res <- .adjust_pvals(res)
+
+    res <- res[res$pos_count >= min_pos, , drop = FALSE]
+    if (!nrow(res)) return(NULL)
 
     res$side <- side
     res$term_type <- term_type

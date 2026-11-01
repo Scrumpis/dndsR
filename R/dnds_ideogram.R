@@ -173,11 +173,9 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
   .gff_index <- function(gff_path, restrict_gene = FALSE) {
     if (!file.exists(gff_path)) die("GFF not found: %s", gff_path)
-    g <- try(utils::read.table(gff_path, sep = "\t", quote = "", comment.char = "#",
-                               header = FALSE, stringsAsFactors = FALSE, fill = TRUE,
-                               col.names = paste0("V", 1:9)), silent = TRUE)
+    g <- try(.read_gff_features(gff_path), silent = TRUE)
     if (inherits(g, "try-error")) die("Could not read GFF: %s", gff_path)
-    if (ncol(g) < 9) die("GFF appears malformed (<9 columns): %s", gff_path)
+    names(g) <- paste0("V", 1:9)
     if (restrict_gene && "V3" %in% names(g) && any(g$V3 == "gene", na.rm = TRUE)) {
       g <- g[g$V3 == "gene", , drop = FALSE]
     }

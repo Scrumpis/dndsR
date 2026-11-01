@@ -71,9 +71,12 @@ to further filter rows (e.g., \code{"q_seqname == s_seqname"}). Default NULL.}
 \item{drop_rows_without_term}{Logical; if TRUE (default), rows with no term in the
 tested column are removed from BOTH positives and background before counting.}
 
-\item{min_total}{Minimum total occurrences (pos+nonpos) required for a term (default 0).}
+\item{min_total}{Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).
+This does not depend on the outcome, so it defines the family of tests that is corrected.}
 
-\item{min_pos}{Minimum positive occurrences required for a term (default 0).}
+\item{min_pos}{Minimum positive occurrences for a term to be reported (default 2). It is applied
+after correction, because filtering on the outcome first makes adjusted p-values invalid. It
+changes which rows are written, not their p-values.}
 
 \item{fdr_method}{One of \code{"BH"}, \code{"IHW"}, \code{"qvalue"}, \code{"none"}. Default \code{"BH"}.}
 

@@ -36,10 +36,27 @@ Treat dN/dS above 1 as a candidate list. To support a claim about particular gen
 
 ## Enrichment tests
 
-- Each row is treated as independent. Genes are not independent in practice (tandem duplicates, shared function), so p-values can be too small.
-- `go_enrichment` defaults to topGO's `weight01` algorithm with unadjusted p-values, a common topGO practice, because its tests depend on each other. Applying BH to them has no standard FDR meaning.
-- `min_pos` filters terms using the positive count, which is part of the test statistic, before BH. On a real genome pair with no true association, this gave `term_enrichment` and `ipr_enrichment` a significant term in 58% and 95% of runs, where 5% is nominal. Treat their `p_adj` as a ranking until this is resolved. See [enrichment calibration](validation/enrichment.md).
-- Most of a default `go_enrichment` list at p < 0.05 can arise by chance: 19 biological-process terms were observed on that pair, and 12 on average with no association.
+**What a result means.** A significant term says that genes with a high dN/dS carry that term more often than other annotated genes in this table. It is not evidence that the term's function evolved under positive selection, and it does not show that any single gene did. Treat it as a lead to test by other means, such as codon-site or branch-site models and independent data.
+
+**Raw and adjusted values.**
+
+- `p_value` and `raw_p` are not corrected for multiple testing. With thousands of terms, many fall below 0.05 by chance.
+- In `ipr_enrichment` and `term_enrichment`, `p_adj` is corrected across `n_tested` terms by `p_adjust_method`.
+- In `go_enrichment`, `p_adj` by default **equals** `raw_p`. topGO's `weight01` tests depend on each other, so BH has no standard FDR meaning for them. Its output is a ranking, not a list of discoveries. Do not report terms below 0.05 as significant without a further check of what chance alone gives on your data.
+
+**What selects the candidates.** Positive genes are not a random sample of genes, so a term can be enriched with no link to selection:
+
+- **Gene length.** Short genes have noisier ratios and pass dN/dS > 1 far more often. Terms common among short genes, such as secreted peptides, are favored.
+- **dS.** The ratio is unstable when dS is small, so genes with few synonymous differences pass more easily. At high divergence, dS saturates.
+- **Annotation completeness.** Unannotated genes take no part in these tests, and in practice many positive genes are unannotated. Well-studied gene families are favored.
+- **Dependence.** Tandem duplicates and genes sharing a term are not independent, although Fisher's test assumes they are.
+- **The candidate rule.** Results change with `pos_threshold`, `max_dnds`, and filters. Check whether a conclusion survives other reasonable choices.
+
+dndsR does not correct for length, dS, or annotation. This is a limitation: see [enrichment calibration](validation/enrichment.md).
+
+**Also:**
+
+- `min_total` and `max_prop` choose what is tested, and `min_pos` chooses what is reported, after correction.
 - `max_dnds` (default 10) drops the most extreme ratios, which are usually artifacts but occasionally real, and the enrichment commands do not report how many.
 - Compare only genomes annotated with the same term database version.
 

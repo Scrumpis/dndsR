@@ -97,70 +97,6 @@ append_annotations <- function(dnds_file = NULL,
     df2[, req, drop = FALSE]
   }
 
-  # ---- Fast GFF reader with pure-R fallbacks (no shell) ----
-  .read_gff <- function(path) {
-    start_time <- proc.time()[["elapsed"]]
-    ok9 <- function(x) is.data.frame(x) && ncol(x) >= 9L
-
-    use_fread <- requireNamespace("data.table", quietly = TRUE)
-
-    if (use_fread) {
-      modes <- list(
-        list(sep = "\t", tag = "fread(tab,comment)"),
-        list(sep = "auto", tag = "fread(auto,comment)"),
-        list(sep = " ", tag = "fread(space,comment)")
-      )
-      for (mode in modes) {
-        g <- try(data.table::fread(
-          file = path,
-          sep = mode$sep,
-          header = FALSE,
-          quote = "",
-          data.table = FALSE,
-          showProgress = FALSE,
-          fill = TRUE,
-          comment = "#",
-          skipEmptyLines = TRUE,
-          select = 1:9,
-          col.names = paste0("V", 1:9),
-          colClasses = c("character","character","character",
-                         "integer","integer","character",
-                         "character","character","character"),
-          na.strings = c("", "NA", ".")
-        ), silent = TRUE)
-        if (!inherits(g, "try-error") && ok9(g)) {
-          names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-          et <- proc.time()[["elapsed"]] - start_time
-          vmsg(sprintf("GFF read via %s in %.3fs; rows=%s: %s",
-                       mode$tag, et, format(nrow(g), big.mark=","), basename(path)))
-          return(g)
-        }
-      }
-    }
-
-    for (sep in c("\t", "")) {
-      g <- try(utils::read.table(path, sep = sep, header = FALSE, quote = "",
-                                 stringsAsFactors = FALSE, comment.char = "#", fill = TRUE,
-                                 colClasses = c("character","character","character",
-                                                "integer","integer","character",
-                                                "character","character","character")),
-               silent = TRUE)
-      if (!inherits(g, "try-error") && ok9(g)) {
-        names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-        et <- proc.time()[["elapsed"]] - start_time
-        vmsg(sprintf("GFF read via base (sep='%s') in %.3fs; rows=%s: %s",
-                     if (sep=="") "any whitespace" else "\\t",
-                     et, format(nrow(g), big.mark=","), basename(path)))
-        if (sep == "") {
-          vmsg("Warning: parsed with sep=''; if attribute values contain unescaped spaces, they may be split.")
-        }
-        return(g)
-      }
-    }
-
-    stop("GFF appears malformed or unreadable: ", path)
-  }
-
   ## ---------- term patterns & normalizers ----------
   .default_term_patterns <- function() {
     list(
@@ -206,10 +142,7 @@ append_annotations <- function(dnds_file = NULL,
     s <- gsub("(^|;)\\s*(ID|Parent)=[^;]*", "\\1", attr_string, perl = TRUE)
     # GFF3 encodes separators inside values, as in GO:0000001%2CGO:0000002. Decode them so
     # that each term stands alone. Decoding follows removal of IDs, which are not terms.
-    s <- gsub("%2C", ",", s, ignore.case = TRUE)
-    s <- gsub("%3B", ";", s, ignore.case = TRUE)
-    s <- gsub("%3D", "=", s, ignore.case = TRUE)
-    s <- gsub("%26", "&", s, ignore.case = TRUE)
+    s <- .decode_gff3(s)
     for (lab in names(patterns)) {
       rx <- patterns[[lab]]
       hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE,
@@ -487,9 +420,9 @@ append_annotations <- function(dnds_file = NULL,
               setdiff(names(patterns), std_order))
 
     vmsg("Precomputing query-side maps...")
-    q_maps <- .precompute_maps_and_terms(.read_gff(q_gff), patterns, normalizers)
+    q_maps <- .precompute_maps_and_terms(.read_gff_features(q_gff), patterns, normalizers)
     vmsg("Precomputing subject-side maps...")
-    s_maps <- .precompute_maps_and_terms(.read_gff(s_gff), patterns, normalizers)
+    s_maps <- .precompute_maps_and_terms(.read_gff_features(s_gff), patterns, normalizers)
 
     q_ids <- unique(dnds$query_id)
     s_ids <- unique(dnds$subject_id)
