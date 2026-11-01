@@ -1,6 +1,8 @@
 # Release readiness: v0.3.0 candidate
 
-**The maintainer agreed: GO on the evidence, with limitations documented, subject to setup and final approval to merge, tag, and publish.** No code-side blocker remains. Unpublished real-genome results stay outside Git.
+**The maintainer agreed GO on the evidence at `f84521f`, before the finding below, subject to setup and final approval to merge, tag, and publish.** Unpublished real-genome results stay outside Git.
+
+**New finding needing a decision before release.** `term_enrichment` and `ipr_enrichment` filter by `min_pos` before BH. With no true association, 58% and 95% of runs report a significant term, where 5% is nominal: [enrichment calibration](../validation/enrichment.md). The options are to fix it in v0.3.0 (BH across all terms meeting `min_total`, 48 significant terms becoming 18 on the public pair, with a test and documentation), or to release with the limitation stated and fix it for v1.0.0. No package code has changed.
 
 ## Blocking the release
 

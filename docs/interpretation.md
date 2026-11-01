@@ -38,7 +38,8 @@ Treat dN/dS above 1 as a candidate list. To support a claim about particular gen
 
 - Each row is treated as independent. Genes are not independent in practice (tandem duplicates, shared function), so p-values can be too small.
 - `go_enrichment` defaults to topGO's `weight01` algorithm with unadjusted p-values, a common topGO practice, because its tests depend on each other. Applying BH to them has no standard FDR meaning.
-- `min_pos` filters terms using the positive count, which is part of the test statistic. Terms removed this way shrink the set of tests corrected for multiple testing, which can make adjusted p-values less conservative.
+- `min_pos` filters terms using the positive count, which is part of the test statistic, before BH. On a real genome pair with no true association, this gave `term_enrichment` and `ipr_enrichment` a significant term in 58% and 95% of runs, where 5% is nominal. Treat their `p_adj` as a ranking until this is resolved. See [enrichment calibration](validation/enrichment.md).
+- Most of a default `go_enrichment` list at p < 0.05 can arise by chance: 19 biological-process terms were observed on that pair, and 12 on average with no association.
 - `max_dnds` (default 10) drops the most extreme ratios, which are usually artifacts but occasionally real, and the enrichment commands do not report how many.
 - Compare only genomes annotated with the same term database version.
 

@@ -10,11 +10,11 @@ Is the enrichment workflow statistically defensible on real annotated data, and 
 
 | Item | Approach | Status |
 |---|---|---|
-| Real annotations | Public GO or InterPro annotations for *A. thaliana*, through the whole workflow | Open |
-| Null calibration | Empirical false-positive rates. Not only unrestricted label permutation, which assumes genes are exchangeable | Open |
-| Candidate selection | How the threshold on a point estimate, `min_pos`, and `max_dnds` affect results | Open |
-| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | Open |
-| Dependence | Tandem clusters and shared terms, which Fisher's test assumes away | Open |
+| Real annotations | Public GO or InterPro annotations for *A. thaliana*, through the whole workflow | **Done:** [enrichment.md](../validation/enrichment.md) |
+| Null calibration | Empirical false-positive rates. Not only unrestricted label permutation, which assumes genes are exchangeable | **Done for one pair. Filter-then-BH fails; the correction needs a decision** |
+| Candidate selection | How the threshold on a point estimate, `min_pos`, and `max_dnds` affect results | **Measured,** except `max_dnds` |
+| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | **Measured** for coverage, length, and dS. Expression and conservation are open |
+| Dependence | Tandem clusters and shared terms, which Fisher's test assumes away | **Measured:** collapse and genomic rotation |
 
 ## Priority 2: orthology accuracy
 

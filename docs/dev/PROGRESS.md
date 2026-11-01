@@ -14,6 +14,9 @@ Done: audit, core fixes, statistical fixes, CLI and failure handling, example an
 
 ## Checkpoints
 
+### Measure enrichment calibration on real public annotations
+Public GO and InterPro on *A. thaliana* against *A. lyrata*: `docs/validation/enrichment.md`. The default `term_enrichment` and `ipr_enrichment` are not calibrated. No package code changed.
+
 ### CI green on every workflow
 At `f84521f`: `R-CMD-check` on all platforms, `install`, `skill`, and `container`, including package tests in the Docker image, Apptainer, and the documented installer. The third-party Apptainer action was replaced with conda-forge Apptainer. No code-side blocker remains for v0.3.0.
 

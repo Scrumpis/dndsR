@@ -78,7 +78,7 @@ A public RefSeq genome where only some transcripts have `transcript_id` made the
 
 ## Shared identifiers and annotation
 
-No gene IDs are shared between these two genomes. RefSeq-style IDs matched, so annotations and coordinates are present in the current table. These RefSeq annotations carry few functional terms, so enrichment was not tested on this pair; see `tests/testthat/test-enrichment-analytic.R` and `docs/validation/real-genomes.md`.
+No gene IDs are shared between these two genomes. RefSeq-style IDs matched, so annotations and coordinates are present in the current table. Enrichment on this pair, with public GO and InterPro terms added, is in [enrichment.md](enrichment.md).
 
 ## Isoform choice
 

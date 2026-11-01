@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-01: enrichment validation and faster tests
+
+- **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`
+- **Done:** enrichment calibration on the public pair, with real functions and three nulls. Tests run in parallel, with `tools/dev/check.sh`.
+- **Found:** `min_pos` before BH is badly anti-conservative; GFF `#` truncation; `include_definition = FALSE` crash. None is fixed: `dev` is the release source, and these need a decision.
+- **Failed or not done:** nothing pushed, merged, tagged, or published. The literature comparison of the top terms has not been done.
+
 ## 2026-11-01: v0.3.0 release readiness
 
 - **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`
