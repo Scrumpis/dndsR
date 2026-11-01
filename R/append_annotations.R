@@ -204,6 +204,12 @@ append_annotations <- function(dnds_file = NULL,
     if (isTRUE(is.na(attr_string)) || !nzchar(attr_string)) return(out)
     # Identifiers such as ID=K12345.1 name the feature; they are not functional terms.
     s <- gsub("(^|;)\\s*(ID|Parent)=[^;]*", "\\1", attr_string, perl = TRUE)
+    # GFF3 encodes separators inside values, as in GO:0000001%2CGO:0000002. Decode them so
+    # that each term stands alone. Decoding follows removal of IDs, which are not terms.
+    s <- gsub("%2C", ",", s, ignore.case = TRUE)
+    s <- gsub("%3B", ";", s, ignore.case = TRUE)
+    s <- gsub("%3D", "=", s, ignore.case = TRUE)
+    s <- gsub("%26", "&", s, ignore.case = TRUE)
     for (lab in names(patterns)) {
       rx <- patterns[[lab]]
       hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE,

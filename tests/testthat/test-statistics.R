@@ -26,6 +26,20 @@ test_that("feature names are not mistaken for functional terms", {
   expect_false("q_pfam" %in% names(got) && !is.na(got$q_pfam))
 })
 
+test_that("every term is found in GFF3 lists, including encoded separators", {
+  dir <- withr::local_tempdir()
+  q <- file.path(dir, "q.gff")
+  # Attributes as they appear in real annotations: %2C for commas, and pipes in notes.
+  attrs <- paste0("ID=g1;Ontology_term=GO:0004127%2CGO:0006207%2cGO:0006221,GO:0009041;",
+                  "Dbxref=InterPro:IPR000001%2CInterPro:IPR000002;Note=x:(InterPro|IPR000850|Name)")
+  writeLines(paste("chr1", "x", "mRNA", 1, 100, ".", "+", ".", attrs, sep = "\t"), q)
+  dnds <- file.path(dir, "d.tsv")
+  writeLines(c("query_id\tsubject_id\tdN\tdS\tdNdS", "g1\tg1\t0.1\t0.2\t0.5"), dnds)
+  got <- suppressMessages(append_annotations(dnds_file = dnds, query_gff = q, subject_gff = q))
+  expect_setequal(strsplit(got$q_go, ";")[[1]], c("GO:0004127", "GO:0006207", "GO:0006221", "GO:0009041"))
+  expect_setequal(strsplit(got$q_ipr, ";")[[1]], c("IPR000001", "IPR000002", "IPR000850"))
+})
+
 test_that("headerless BED files keep their first region", {
   bed <- withr::local_tempfile(fileext = ".bed")
   writeLines(c("chr1 100 200 R1", "chr2 100 200 R2"), bed)
