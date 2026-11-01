@@ -2,10 +2,11 @@
 
 ## Rerun earlier analyses
 
-Three defects in earlier versions can change results, including every dN/dS value for affected genes. Rerun analyses made with earlier versions.
+Defects in earlier versions can change results. Rerun analyses made with earlier versions, following `docs/migrating-to-0.3.md`. On real genomes, every affected gene was wrong, about half of pairs changed, and most dN/dS calls above 1 were artifacts: `docs/validation/real-genomes.md`.
 
 - **CDS assembly (all results).** With the default `group_by = "gene"`, multi-exon genes on the minus strand were assembled in the wrong exon order, and genes with several isoforms became chimeras of all isoforms. A designed gene with a true dN/dS near 0.11 was reported as 1.6. See `docs/validation/cds-extraction.md`.
 - **Wrong-genome annotations (`append_annotations`).** A gene ID present in both genomes, as with tools that name genes `g1`, `g2`, and so on, took its terms and coordinates from the first genome read.
+- **Empty annotations.** RefSeq-style IDs such as `gene-AT1G01010` were not matched, so `append_annotations` and `dnds_ideogram` found no annotations or coordinates. It now also stops if no IDs match.
 - **Lost regions.** A headerless regions file lost its first region in `dnds_summary` and `dnds_contrast`.
 
 `extract_cds` regenerates old outputs automatically. `calculate_dnds` keeps an existing result but tells you it may be out of date. Add `--overwrite` to recalculate.
@@ -35,5 +36,7 @@ Three defects in earlier versions can change results, including every dN/dS valu
 
 ## Dependencies
 
+- The bundled Arial font is replaced with Liberation Sans Bold (SIL Open Font License). Plots look nearly the same.
+- `tools/environment.yml` gives a tested conda installation.
 - `orthologr` moved to `Suggests`, and `calculate_dnds` explains how to get it if missing. The orthologr patch is no longer needed.
 - `tools/Dockerfile` pins its base image and tools, and installs dndsR into the image. It could not previously be rebuilt, because upstream orthologr had absorbed the patch.

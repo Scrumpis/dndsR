@@ -1,0 +1,3 @@
+comparison	query_ids	subject_ids	shared_ids	pairs_with_same_id	annot_rows_old	annot_rows_cur
+Cformosanum_BvC	392901	369052	0	0	16053	18458
+Cquinoa_BvA	372879	349922	0	0	15081	16880

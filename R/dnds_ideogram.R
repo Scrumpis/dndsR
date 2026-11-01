@@ -198,7 +198,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
       }
       NA_character_
     }
-    ids <- vapply(split_attrs, collect_first, character(1))
+    ids <- .normalize_gff_id(vapply(split_attrs, collect_first, character(1)))
     keep <- !is.na(ids) & nzchar(ids)
     df <- data.frame(id = ids[keep], chr = seqid[keep], start = start[keep], stringsAsFactors = FALSE)
     df <- df[!duplicated(df$id), , drop = FALSE]

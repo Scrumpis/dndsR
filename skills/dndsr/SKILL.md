@@ -21,7 +21,7 @@ command -v apptainer singularity docker Rscript
 command -v dndsr && dndsr --help
 ```
 
-If `dndsr --help` lists commands, go to step 3. If R has dndsR (`Rscript -e 'packageVersion("dndsR")'`), every command below is also a function: see [Using dndsR from R](../../docs/tutorials/using-r.md).
+If `dndsr --help` lists commands, go to step 3. Without containers, use the tested conda route in [INSTALL.md](../../INSTALL.md). If R has dndsR (`Rscript -e 'packageVersion("dndsR")'`), every command below is also a function: see [Using dndsR from R](../../docs/tutorials/using-r.md).
 
 ## 2. Install
 
@@ -80,7 +80,7 @@ Read [docs/interpretation.md](../../docs/interpretation.md) before explaining re
 - Reciprocal best hits can mispair paralogs, especially in polyploids. Annotation errors can look like selection.
 - Enrichment tests treat genes as independent.
 - `dnds_state_contrast --level gene` is experimental. Do not base conclusions on it.
-- Results from dndsR before 0.3.0 should not be reused; see [NEWS.md](../../NEWS.md).
+- Results from dndsR before 0.3.0 should not be reused. In tested genomes, most of their dN/dS calls above 1 were artifacts. See [docs/migrating-to-0.3.md](../../docs/migrating-to-0.3.md).
 
 Report the version, commit, image digest, command, and the number of excluded genes. Parameters and input hashes are in `<comparison>_dnds_provenance.json`.
 

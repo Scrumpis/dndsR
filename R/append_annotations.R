@@ -258,13 +258,14 @@ append_annotations <- function(dnds_file = NULL,
       key <- vapply(kv, `[`, "", 1L)
       val <- vapply(kv, function(x) if (length(x) > 1) x[2] else "", "")
       names(val) <- key
-      id  <- unname(val["ID"])
+      # extract_cds names sequences as Bioconductor does, without prefixes such as gene-.
+      id  <- .normalize_gff_id(unname(val["ID"]))
       par <- unname(val["Parent"])
 
       if (!is.na(id) && nzchar(id)) {
         # children edges
         if (!is.na(par) && nzchar(par)) {
-          for (p in strsplit(par, ",", fixed = TRUE)[[1]]) {
+          for (p in .normalize_gff_id(strsplit(par, ",", fixed = TRUE)[[1]])) {
             if (identical(p, id)) next
             cur <- if (exists(p, envir = children, inherits = FALSE)) get(p, envir = children) else character(0)
             assign(p, unique(c(cur, id)), envir = children)
@@ -507,6 +508,9 @@ append_annotations <- function(dnds_file = NULL,
       q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, q_maps$own_coords, labs, threads = tq)
       s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, s_maps$own_coords, labs, threads = ts)
     }
+
+    .check_id_match(q_ann$GFF_SEQID, "query")
+    .check_id_match(s_ann$GFF_SEQID, "subject")
 
     present_labs <- labs[vapply(labs, function(L) {
       qa <- q_ann[[L]]; sa <- s_ann[[L]]

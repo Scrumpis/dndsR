@@ -1,0 +1,5 @@
+comparison	version	pairs	ratio_na	ds_zero	dn_zero	both_zero	dn_na	ds_na	ratio_infinite	ratio_above_1	ratio_at_least_10	ds_above_2	ds_below_0.01	median_ds	median_ratio
+Cformosanum_BvC	old	16053	1489	316	508	97	1	1173	0	1241	9	347	429	0.073895	0.3578
+Cformosanum_BvC	cur	18458	363	249	736	96	0	114	0	436	0	52	281	0.06459	0.2522
+Cquinoa_BvA	old	15081	1092	136	256	52	0	956	0	1049	4	310	116	0.1179	0.3373
+Cquinoa_BvA	cur	16880	262	89	305	51	0	173	0	212	0	92	58	0.1096	0.2389

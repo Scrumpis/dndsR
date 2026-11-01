@@ -1,0 +1,13 @@
+comparison	set	pairs	identical_value	median_abs_change	p95_abs_change	max_abs_change	old_above_1	cur_above_1	lost_above_1	gained_above_1	changed_above_0.5x
+Cformosanum_BvC	all_comparable	12426	6863	0	1.041525	21.3585	1081	306	850	75	2705
+Cformosanum_BvC	cds_changed	6041	478	0.18748	1.90962	21.3585	897	122	850	75	2705
+Cformosanum_BvC	cds_unchanged	6385	6385	0	0	0	184	184	0	0	0
+Cformosanum_BvC	q_multi_exon_minus_changed	4866	441	0.21915	2.1835125	21.3585	871	95	836	60	2371
+Cformosanum_BvC	q_multi_isoform_changed	0	0	NA	NA	NA	0	0	0	0	0
+Cformosanum_BvC	both_genes_unaffected_structure	6385	6385	0	0	0	184	184	0	0	0
+Cquinoa_BvA	all_comparable	12284	6896	0	0.984325000000001	20.7325	941	148	824	31	2733
+Cquinoa_BvA	cds_changed	5812	424	0.20325	1.680805	20.7325	843	50	824	31	2733
+Cquinoa_BvA	cds_unchanged	6472	6472	0	0	0	98	98	0	0	0
+Cquinoa_BvA	q_multi_exon_minus_changed	4892	404	0.2361	1.910175	20.7325	833	41	816	24	2477
+Cquinoa_BvA	q_multi_isoform_changed	0	0	NA	NA	NA	0	0	0	0	0
+Cquinoa_BvA	both_genes_unaffected_structure	6472	6472	0	0	0	98	98	0	0	0

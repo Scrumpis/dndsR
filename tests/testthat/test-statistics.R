@@ -116,3 +116,34 @@ test_that("pairwise state contrasts match a directly fitted logistic model", {
   expect_equal(nrow(row), 1L)
   expect_equal(row$odds_ratio, (30 / 70) / (10 / 90), tolerance = 1e-5)
 })
+
+test_that("RefSeq-style IDs connect sequences to their annotations", {
+  skip_if_not_installed("txdbmaker")
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  example <- system.file("extdata", "example", package = "dndsR")
+  file.copy(file.path(example, "spA.fasta"), ".")
+  gff <- readLines(file.path(example, "spA.gff3"))
+  # Rewrite to the prefixes used by NCBI: gene-, rna-, and cds-.
+  gff <- sub("\tgene\t(.*)ID=", "\tgene\t\\1ID=gene-", gff)
+  gff <- sub("\tmRNA\t(.*)ID=([^;]*);Parent=", "\tmRNA\t\\1ID=rna-\\2;Parent=gene-", gff)
+  gff <- sub("\tCDS\t(.*)ID=([^;]*);Parent=", "\tCDS\t\\1ID=cds-\\2;Parent=rna-", gff)
+  gff <- gff[!grepl("\texon\t", gff)]
+  writeLines(gff, "ncbi.gff3")
+  suppressMessages(extract_cds(comparison_name = "c", query_fasta = "spA.fasta", query_gff = "ncbi.gff3", output_dir = "."))
+  ids <- sub(">", "", grep(">", readLines("c/spA_CDS.fasta"), value = TRUE))
+  expect_true("spA_g01" %in% ids) # the prefix is gone
+  writeLines(c("query_id\tsubject_id\tdN\tdS\tdNdS", paste(ids, ids, 0.1, 0.2, 0.5, sep = "\t")), "d.tsv")
+  got <- suppressMessages(append_annotations(dnds_file = "d.tsv", query_gff = "ncbi.gff3", subject_gff = "ncbi.gff3"))
+  expect_false(anyNA(got$q_gff_start))
+  expect_equal(got$q_ipr[got$query_id == "spA_g01"], "IPR000007")
+  expect_error(
+    suppressMessages(append_annotations(dnds_file = "d.tsv", query_gff = file.path(example, "spB.gff3"), subject_gff = "ncbi.gff3")),
+    "None of the"
+  )
+})
+
+test_that("identifier prefixes are removed only at the start", {
+  expect_equal(.normalize_gff_id(c("gene-AT1", "rna-NM_1.2", "cds-NP_1", "mygene-1", "g1", NA)),
+               c("AT1", "NM_1.2", "NP_1", "mygene-1", "g1", NA))
+})

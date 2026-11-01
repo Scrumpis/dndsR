@@ -1,0 +1,36 @@
+# A clean conda install, following INSTALL.md, then the example.
+name: install
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  conda:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: tools/environment.yml
+      - name: Install dndsR
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Rscript -e "options(repos = c(CRAN = 'https://cloud.r-project.org', BiocManager::repositories())); remotes::install_github('drostlab/orthologr@06c3098adfba1e32135d904f72ea81a76902c664', upgrade = 'never')"
+          R CMD INSTALL .
+          install -m 0755 inst/scripts/dndsr "$CONDA_PREFIX/bin/dndsr"
+      - name: Run the example
+        run: |
+          dndsr example -o "$RUNNER_TEMP/example"
+          cd "$RUNNER_TEMP/example"
+          dndsr extract_cds -c comparison_file.txt
+          dndsr calculate_dnds -c comparison_file.txt -t 2
+          dndsr verify_example

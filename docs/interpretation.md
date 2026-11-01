@@ -18,6 +18,8 @@ dndsR's `dNdS > 1` is a threshold on a point estimate with no uncertainty attach
 
 Treat dN/dS above 1 as a candidate list. To support a claim about particular genes, use methods that model selection, such as likelihood-ratio tests with more than two sequences, and look at the alignments.
 
+On real genomes, about 8 to 11% of a sample enriched for high ratios fell on opposite sides of 1 between established methods ([evidence](validation/real-genomes.md)).
+
 ## Before you trust a value
 
 - **Small dS.** With few synonymous changes, the ratio is unstable: one substitution can change it greatly. Look at dN and dS, not just the ratio. dndsR does not filter on dS by default. You can add one, for example `--filter-expr "dS > 0.01"` in the enrichment commands.

@@ -1,0 +1,13 @@
+comparison	side	class	genes	cur_written	cur_matches_gffread	cur_differs_from_gffread	old_matches_gffread	old_differs_from_gffread	cur_internal_stop	cur_length_not_3n	old_with_internal_stop_or_changed
+Cformosanum_BvC	q	multi_exon_minus	12504	12504	12504	0	0	12504	0	0	12504
+Cformosanum_BvC	q	multi_exon_plus	12449	12449	12449	0	12449	0	0	0	0
+Cformosanum_BvC	q	single_exon	5954	5954	5954	0	5954	0	0	0	0
+Cformosanum_BvC	s	multi_exon_minus	11485	11485	11485	0	0	11485	0	0	11485
+Cformosanum_BvC	s	multi_exon_plus	11490	11490	11490	0	11490	0	0	0	0
+Cformosanum_BvC	s	single_exon	5449	5449	5449	0	5449	0	0	0	0
+Cquinoa_BvA	q	multi_exon_minus	12242	12242	12242	0	0	12242	0	0	12242
+Cquinoa_BvA	q	multi_exon_plus	12288	12288	12288	0	12288	0	0	0	0
+Cquinoa_BvA	q	single_exon	6087	6087	6087	0	6087	0	0	0	0
+Cquinoa_BvA	s	multi_exon_minus	11155	11155	11155	0	0	11155	0	0	11155
+Cquinoa_BvA	s	multi_exon_plus	11208	11208	11208	0	11208	0	0	0	0
+Cquinoa_BvA	s	single_exon	5692	5692	5692	0	5692	0	0	0	0

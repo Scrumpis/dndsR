@@ -119,3 +119,35 @@
   }
   claimed
 }
+
+#' Remove the type prefix from a GFF identifier
+#'
+#' RefSeq annotations use IDs such as `gene-AT1G01010` and `rna-NM_099983.2`. Bioconductor
+#' drops these prefixes when it builds gene models, so `extract_cds()` names sequences
+#' without them, and lookups in a GFF must do the same.
+#'
+#' @param x Identifiers.
+#' @return Identifiers without a leading `gene-`, `rna-`, `transcript-`, `cds-`, or `exon-`.
+#' @keywords internal
+.normalize_gff_id <- function(x) {
+  sub("^(gene|rna|transcript|cds|exon)-", "", x)
+}
+
+#' Stop or report when dN/dS gene IDs are not found in a GFF
+#'
+#' @param seqid Sequence name found for each gene; NA or empty where the gene was not found.
+#' @param side Which genome this is, for the message.
+#' @return `NULL`, invisibly.
+#' @keywords internal
+.check_id_match <- function(seqid, side) {
+  missing <- is.na(seqid) | !nzchar(seqid)
+  if (length(seqid) && all(missing)) {
+    stop("None of the ", length(seqid), " ", side, " gene IDs were found in its GFF. ",
+         "Check that this is the GFF used for extract_cds.", call. = FALSE)
+  }
+  if (any(missing)) {
+    message("  - ", sum(missing), " of ", length(seqid), " ", side, " gene IDs were not found in its GFF; ",
+            "their annotations are empty.")
+  }
+  invisible(NULL)
+}
