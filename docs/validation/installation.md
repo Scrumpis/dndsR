@@ -6,12 +6,12 @@ Only what actually ran. Scripts are in `tools/dev/validation/` and `tools/dev/`.
 |---|---|---|---|
 | Published image with `tools/dndsr-install` | Singularity CE 4.1.2, Linux amd64 HPC | `tools/dev/test-tutorial.sh`, every tutorial command, clean `HOME` | Pass, 14 of 14 |
 | Same | Apptainer 1.5.4 (rootless, from conda-forge), Linux amd64 HPC | Same, with only Apptainer on `PATH` | Pass, 14 of 14 |
-| Candidate image with dndsR inside | Built with Apptainer from the Dockerfile's `RUN` steps, base image pinned; R 4.6.1, orthologr 0.4.3 | `tools/dev/container-checks.sh` | See `docs/dev/RELEASE-READINESS.md` |
+| Candidate image with dndsR inside | Built with Apptainer from the Dockerfile's `RUN` steps at `c1eda04`, base image pinned; R 4.6.1, orthologr 0.4.3 | `tools/dev/container-checks.sh` | All container checks pass |
 | Real `docker build` | GitHub Actions, `ubuntu-latest`, at `b59cf23` | `container.yaml`, Build step | Build succeeded. The test step after it failed; see `docs/dev/RELEASE-READINESS.md` |
 | Conda install on GitHub Actions | `ubuntu-latest`, at `b59cf23` | `install.yaml` | Pass |
 | Conda (`tools/environment.yml`) | R 4.5.3 from conda-forge and bioconda, micromamba 2.5.0, clean `HOME` | `tools/dev/validation/test-conda.sb` | Pass, 14 of 14, CLI and R |
 | R from CRAN and Bioconductor on an HPC R 4.5.1 module | Clean library, following `INSTALL.md` | `tools/dev/validation/test-native.sb` | **Fail:** `rtracklayer` did not compile against the module's OpenSSL, and `rsvg` needs librsvg. Conda is recommended instead |
-| Fresh Claude agent | Clean clone, plain request | `tools/dev/test-agent.sh` | See `docs/dev/RELEASE-READINESS.md` |
+| Fresh Claude agent | Clean clone, plain request, at `c1eda04` | `tools/dev/test-agent.sh` | Installed, ran the example, and explained results and caveats correctly. Its results, rechecked separately, pass 14 of 14 |
 | Fresh Codex agent, sandboxed | `workspace-write` sandbox, no network, no `/dev/fuse` | `tools/dev/test-agent.sh` | Partial: Singularity could not start in its sandbox, so it unpacked the image and ran it under Bubblewrap. It reported all 14 checks passed and gave correct caveats, and our on-disk checks could not confirm this because of the different install path. It found two defects, both fixed |
 | `R CMD check` | Published image | `R CMD build`, `R CMD check --no-manual` | See `docs/dev/RELEASE-READINESS.md` |
 

@@ -82,4 +82,16 @@ No gene IDs are shared between these two genomes. RefSeq-style IDs matched, so a
 
 ## Isoform choice
 
-See the section below, when the analysis is complete, and `data/isoform_summary.tsv`.
+How much does choosing the longest isoform matter? Of 22,146 pairs, 10,576 (48%) have at least one multi-isoform gene. For a random sample of 1,000 of them, every valid isoform combination (up to 16 per pair) was aligned separately with the Comeron method. 996 had at least two combinations with a defined ratio.
+
+| Spread in dN/dS across isoform combinations | Share or value |
+|---|---:|
+| Median range | 0.018 |
+| 90th percentile of range | 0.18 |
+| Range above 0.1 | 22% |
+| Maximum at least twice the minimum | 14% |
+| Crosses 1 | 0.3% (3 pairs) |
+
+Isoform choice rarely matters, but it matters noticeably for about a fifth of multi-isoform pairs, or roughly one in ten of all pairs. It seldom moves a gene across 1 here, partly because most genes here are far from 1. The longest isoform is typically close to the middle of the combinations: the median absolute difference from the median combination is 0.0025. This supports the longest-isoform default as reasonable, not as uniquely correct.
+
+Limits: this uses one genome pair with one alignment method, and most annotated isoforms in these two annotations come from automated pipelines.

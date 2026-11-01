@@ -14,6 +14,9 @@ Done: audit, core fixes, statistical fixes, CLI and failure handling, example an
 
 ## Checkpoints
 
+### Public-genome validation and estimator correction
+A. thaliana against A. lyrata: `docs/validation/public-genome.md`. Comeron investigated: `docs/validation/estimators.md`. Isoform sensitivity measured. Criteria, roadmap, and methods added. Gene-level contrast disabled. Publishing workflow added, off until enabled. Waiting: pushes and CI, since this session cannot push.
+
 Commit SHAs are in `git log`. Each subject below is a commit subject.
 
 ### Real-genome validation campaign

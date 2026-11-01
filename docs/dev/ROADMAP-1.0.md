@@ -9,7 +9,7 @@ Goal: a scientifically defensible, reproducible, and accessible dndsR, suitable 
 | 1 | Characterize the estimator | Interpretation depends on it | **Done:** `docs/validation/estimators.md`. No error found; compresses ratios, property of the method family |
 | 2 | Quantitative criteria | Evidence should be judged by stated rules | **Done:** `docs/validation/criteria.md`; revisit as evidence grows |
 | 3 | Public real-genome workflow | Publishable evidence without private data | **Done for CDS through dN/dS:** `docs/validation/public-genome.md` |
-| 4 | Isoform sensitivity of dN/dS | Longest isoform is a convention | **In progress:** `tools/dev/validation/isoform-effects.R` |
+| 4 | Isoform sensitivity of dN/dS | Longest isoform is a convention | **Done for one pair:** range above 0.1 in 22% of multi-isoform pairs; 0.3% cross 1 (`docs/validation/public-genome.md`) |
 | 5 | Uncertainty for per-gene dN/dS | Half of neutral genes exceed 1, so a bare ratio cannot support claims about individual genes | **Open, and the most important scientific decision.** Options below |
 | 6 | Enrichment on a public annotated genome | Public evidence so far uses constructed cases | Open. Needs public GO or InterPro annotations for *A. thaliana* |
 | 7 | Null calibration of enrichment | Selecting on `min_pos`, plus gene dependence, may inflate significance | Open. Permuting positive labels on the public pair gives empirical false-positive rates |
