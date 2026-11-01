@@ -1,42 +1,74 @@
 # Release readiness: v0.3.0 candidate
 
-**Assessment: a good candidate, not yet ready to release.** The code on `dev` passes every local check, but CI has never run on it, its container has never been built, and it has not been run on real genomes. Publishing also needs the maintainer's decisions below.
+**Recommendation: NO-GO today, with a short path to GO.** The software evidence is strong, but one required gate could not run: nothing has been pushed, because this machine has no GitHub credentials. So CI, a real `docker build`, and macOS and Windows checks have never happened. The code is not the blocker; the remaining work is running what is already written.
 
-## Evidence
+## Evidence at the final code
+
+Commit `fedd59e` for code. Later commits change only documentation.
 
 | Check | Result |
 |---|---|
-| `R CMD check --no-manual`, in the image, `lme4` absent | Status OK |
-| Package tests | 44 tests, 204 expectations, 0 failed, 0 skipped |
+| `R CMD check --no-manual`, in the published image, `lme4` absent | Status OK: no errors, warnings, or notes |
+| Package tests | 53 tests, 256 expectations, 0 failed, 0 skipped |
 | `dndsr verify_example` | 14 of 14 |
-| Tutorial commands in a clean `HOME` | Pass |
+| Tutorial commands, clean `HOME`, Singularity | Pass (`fedd59e`) |
+| Tutorial commands, clean `HOME`, rootless Apptainer 1.5.4 | Pass at an earlier commit (`7ae5a6a` or before); installer and tutorial unchanged in behavior since |
+| Candidate image, built from the Dockerfile's `RUN` steps through Apptainer | Built and passes 14 of 14; dN and dS match the reference exactly, on R 4.6.1 |
+| Clean conda install | Pass, 14 of 14, CLI and R |
 | Fresh Claude agent, clean clone, plain request | 7 of 7 script-checked criteria |
+| Fresh sandboxed Codex agent | Partial; see below |
 | Git safeguards | 88 of 88 |
-| Estimators against PAML, KaKs_Calculator, and simulated truth | No error found; bias documented |
+| Real genomes | `docs/validation/real-genomes.md` |
+| Estimators | `docs/validation/estimators.md` |
 
 ## Blocking the release
 
-| Item | Why | Owner |
+| Gate | Status | Who |
 |---|---|---|
-| Push `dev`, then get CI green | CI on `dev` and the new workflows have never run. macOS, Windows, and other R versions are untested | Maintainer pushes, then fix findings |
-| Build and test the new image | The Dockerfile has not been built, since no Docker is available here. `container.yaml` does it on push | CI |
-| Run on real genomes | Everything so far is on a designed example, so problems of scale and messy annotations are untested. Comparing a pair of real genomes between `c8b534f` and this version would also show how much the CDS bug changed real results | Maintainer's data |
-| Decide the items below | They need the maintainer | Maintainer |
+| Push `dev`, then CI green on all workflows | **Not run. No GitHub credentials on this machine.** Expect some first-run failures | Maintainer provides credentials or pushes; then fix findings |
+| `docker build` of `tools/Dockerfile` | **Not run.** Its steps ran through Apptainer, but Docker has not parsed the file or applied `.dockerignore`. `container.yaml` does this | CI |
+| Regenerate affected Chenopodium analyses | **Needs a decision.** Project results use the old code | Maintainer |
+| Publishing decisions below | Waiting | Maintainer |
 
 ## Decisions for the maintainer
 
-1. **Default estimator.** Comeron stays the default, and it reads low in simulation (true ω of 2 gives a median of about 1.45 to 1.9). YN-type methods were closer, but need KaKs_Calculator in the image and would change every result. Recommendation: keep Comeron for v0.3.0, add KaKs_Calculator to the image, and decide before v1.0.0.
-2. **Announcing the CDS bug.** Results from v0.1.0 and v0.2.0 can be wrong. Recommendation: add a notice to those release pages and contact known users. Check any manuscripts or talks that used earlier results. The earlier version also gave some genes wrong-genome annotations.
-3. **The bundled Arial font.** `inst/fonts/ArialBold.ttf` is proprietary and redistribution rights are unconfirmed, which matters for public archiving and CRAN. Recommendation: replace it with an openly licensed font such as Liberation Sans before Zenodo archiving.
-4. **Gene-level `dnds_state_contrast`.** A code audit found design problems. It is marked experimental. Recommendation: exclude it from claims in v1.0.0 unless redesigned, because the right design is a scientific choice.
-5. **`main` ruleset.** The workflow now reports a check named `R-CMD-check`, which should satisfy the requirement, but this is unconfirmed until a pull request runs. The required approving review cannot come from the pull request's author, so a sole maintainer needs a bypass or second reviewer.
-6. **Publishing.** Merging to `main`, tagging, pushing an image, the GitHub release, and Zenodo all await authorization. See `RELEASE.md`.
-7. **`.audit` location.** It is on scratch with the clone, so it depends on regular touching. Copying it to durable storage would protect the record: `tools/dev/setup.sh --audit-dir <path>`.
+1. **Authorize the v0.1.0 and v0.2.0 warnings.** Drafts: `release-notice-draft.md`. Recommendation: post them as soon as possible, since those releases are public and the effects are large.
+2. **Review your own results.** Figures and enrichment built on `Chenopod_dnds` used affected code.
+3. **Default estimator.** Comeron stays for v0.3.0, as directed. It read low in simulation, and agreed well with other methods on real genes. Recommendation: add KaKs_Calculator to the image and decide before v1.0.0.
+4. **Gene-level `dnds_state_contrast`.** Confirmed by running that it gives no usable result. It stays experimental. Recommendation: `state-contrast-design.md`, option 1 or 3, before v1.0.0.
+5. **`main` ruleset.** Whether the new `R-CMD-check` job satisfies it is unconfirmed until a pull request runs, and the required approval cannot come from a pull request's author.
+6. **Is the aggregate real-genome summary fit to publish?** `docs/validation/real-genomes/` has per-comparison counts from *C. formosanum* and *C. album* data. No sequences or gene IDs are included. Please confirm before pushing if those genomes are unpublished.
+7. **Agent pushes.** You authorized pushing to `dev`. The project guard still denies it, because agents cannot push here anyway. To allow it, remove the push rules from `.claude/settings.json` and `.claude/hooks/git-guard.sh`.
+8. **`.audit` location.** Its scratch location depends on regular touching.
 
-## Not done
+## Bugs in earlier versions
 
-- A Codex end-to-end run: an unsandboxed Codex run was refused by this session's safety controls, and the sandboxed mode now in `test-agent.sh` has not been run. Codex does discover the skill.
-- Docker, Apptainer, macOS, Windows, and from-scratch native installation are untested.
-- `go_enrichment` p-values and `dnds_ideogram` content are not independently validated, only confirmed to run.
-- A plugin or marketplace package for the skill.
-- Items in `docs/validation/known-issues.md`.
+| Bug | Versions | Evidence |
+|---|---|---|
+| Wrong exon order on the minus strand | v0.1.0, v0.2.0, `main`, `dev` to `c8b534f` | All such genes in three plant genomes |
+| Chimeric multi-isoform CDS | Same | All 10,695 such genes in *A. thaliana* |
+| Wrong-genome annotations at one thread | Same | `docs/validation/real-genomes/annotation-leak.md` |
+| Empty annotations for RefSeq-style IDs | Same | *A. thaliana* |
+| Failed runs reporting success, ignored options, misread values | Same | Tests |
+| Statistical fixes | Same | `NEWS.md` |
+
+Consequences and rerun steps: `docs/migrating-to-0.3.md`.
+
+## Regression caught during this work
+
+A pattern fix made during this release lost every GO term after the first in `%2C`-separated lists, the standard GFF3 encoding. Unit tests did not catch it, but comparison with real annotations did, and it was fixed with a test. It shows that real-genome comparison should remain part of release checks.
+
+## Not done or not tested
+
+- Docker, macOS, Windows, GitHub Actions: not available here.
+- R from CRAN and Bioconductor failed on the tested HPC module, because of `rtracklayer` and OpenSSL. Conda is the recommended route.
+- **Codex:** the sandbox blocked Singularity (no `/dev/fuse`), so the agent unpacked the image and ran it under Bubblewrap. It reports passing all 14 checks, but our disk checks could not confirm it, so this is not a clean pass. Its run found two real defects, both fixed.
+- Real-genome tests cover three plant genomes. Multi-isoform dN/dS was not compared end to end, because only *A. thaliana* has isoforms here, and there was no suitable partner.
+- `dnds_ideogram` content on real genomes was only confirmed to render.
+- `docs/validation/known-issues.md` lists open items.
+
+## Path to GO
+
+1. Push `dev` (see the report in `PROGRESS.md`), and fix what CI finds.
+2. Decide items 1, 2, 5, and 6.
+3. Run the steps in `RELEASE.md`.

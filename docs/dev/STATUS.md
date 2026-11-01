@@ -2,7 +2,7 @@
 
 Update this at the end of each substantive session. Identify things by commit and hash, not by date.
 
-**Phase:** v0.3.0 candidate on `dev`, awaiting a push, CI, and the maintainer's decisions. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
+**Phase:** v0.3.0 candidate on `dev`, validated on real genomes and in the environments available here, awaiting a push, CI, and the maintainer's decisions. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
 
 ## Identity
 
@@ -20,7 +20,6 @@ A read-only trial merge of the original `dev` into `main` had no conflicts. `mai
 
 ## Next
 
-1. The maintainer pushes `dev`. Agents do not push.
-2. Fix whatever CI finds, including the first image build.
-3. Test on real genomes.
-4. The maintainer decides the items in `RELEASE-READINESS.md`, then follows `RELEASE.md`.
+1. Push `dev`. This machine has no GitHub credentials. Agents have authorization, but the project guard denies pushes until the maintainer changes it.
+2. Fix whatever CI finds, including the first real `docker build`.
+3. The maintainer decides the items in `RELEASE-READINESS.md`, then follows `RELEASE.md`.

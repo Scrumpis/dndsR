@@ -16,6 +16,9 @@ Done: audit, core fixes, statistical fixes, CLI and failure handling, example an
 
 Commit SHAs are in `git log`. Each subject below is a commit subject.
 
+### Real-genome validation campaign
+Slurm runs of `c8b534f` and current code on *C. formosanum* and *C. quinoa* subgenome pairs, *A. thaliana* CDS, and a batch with shared IDs. Results: `docs/validation/real-genomes.md`. Found and fixed: empty annotations for RefSeq IDs, a Dockerfile dependency failure, `ipr_enrichment` failing offline, a stale tutorial count, and a GO regression from this release. Replaced Arial with Liberation Sans. Blocked: pushing, CI, Docker, because there are no GitHub credentials or Docker here. Runtime outputs are in the `dndsr-runtime` folder beside the clone.
+
 ### Add end-to-end agent test and release materials
 A fresh Claude agent in a clean clone passed 7 of 7 script-checked criteria. `R CMD check`: Status OK. Tests: 44, 204 expectations, none failed or skipped. Safeguards: 88 of 88. An unsandboxed Codex run was refused by session safety controls, so `test-agent.sh` now uses Codex's sandbox and that run remains to be done.
 

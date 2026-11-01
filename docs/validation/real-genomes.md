@@ -18,7 +18,7 @@ Earlier analyses are affected. An existing *C. formosanum* result table in the m
 | Item | Detail |
 |---|---|
 | Old code | `c8b534f` |
-| Current code | `f6cde64`, unchanged for these steps since |
+| Current code | `f6cde64` for CDS and dN/dS, whose code is unchanged since. `fedd59e` for annotation and enrichment |
 | Image, both versions | digest in `skills/dndsr/SKILL.md`; R 4.5.2, orthologr 0.4.2, DIAMOND 2.1.14 |
 | Comparison 1 | *C. formosanum* subgenomes B and C (`CheFo_v3`) |
 | Comparison 2 | *C. quinoa* subgenomes B and A (`CheQu_v2`, a public genome) |
@@ -110,18 +110,22 @@ Each version ran its own enrichment on its own results, with defaults, so these 
 |---|---|---:|---:|---:|
 | *C. formosanum*, query | InterPro | 4 | 7 | 0 |
 | *C. formosanum*, subject | InterPro | 4 | 8 | 1 |
-| *C. formosanum*, query | GO | 20 | 7 | 0 |
-| *C. formosanum*, subject | GO | 22 | 6 | 0 |
+| *C. formosanum*, query | GO | 20 | 13 | 0 |
+| *C. formosanum*, subject | GO | 22 | 16 | 0 |
 | *C. quinoa*, query | InterPro | 16 | 6 | 0 |
 | *C. quinoa*, subject | InterPro | 16 | 4 | 0 |
-| *C. quinoa*, query | GO | 14 | 4 | 0 |
-| *C. quinoa*, subject | GO | 21 | 3 | 0 |
+| *C. quinoa*, query | GO | 14 | 8 | 0 |
+| *C. quinoa*, subject | GO | 21 | 9 | 0 |
+
+These tables use current code at `fedd59e`, after the fix below.
 
 Old enrichment conclusions should not be carried forward. The default `ipr_enrichment` chooses an InterPro release using a network lookup and records it in `*_interpro_provenance.json`.
 
 ## Defect found by this work
 
 **RefSeq-style annotations got no annotations at all.** Bioconductor removes `gene-` and `rna-` prefixes, so `extract_cds` writes `AT1G01010`, but `append_annotations` looked for `gene-AT1G01010` and left every annotation empty, without any error. `dnds_ideogram` used the same lookup. Fixed, with regression tests, and `append_annotations` now stops if no IDs match and reports partial mismatches.
+
+**A regression from this release, fixed.** A stricter term pattern lost every GO term after the first in lists encoded as `GO:1%2CGO:2`, the GFF3 standard. It was found in this comparison: 5,391 of 15,992 rows in one comparison lost terms. GFF3 escapes are now decoded first, with a regression test. After the fix, GO terms match the old code wherever the annotation leak does not apply: see [annotation-leak.md](real-genomes/annotation-leak.md).
 
 ## Duplicate identifiers across genomes
 

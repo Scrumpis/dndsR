@@ -8,12 +8,12 @@ Verified by reading the code on `dev`:
 
 - `R/<command>.R` holds exported analysis functions. `R/cli_<command>.R` holds thin wrappers whose `target` attribute names the function.
 - `R/cli_main.R` finds commands by looking for `cli_*` functions in the namespace. `R/cli_parse.R` parses arguments. `inst/scripts/dndsr` calls `dndsR::cli_main()`.
-- `calculate_dnds()` wraps `orthologr::dNdS()`. Its defaults are `aligner = "diamond"`, `sensitivity_mode = "fast"`, and `dnds_method = "Comeron"`.
-- `tools/Dockerfile` builds a runtime image with dependencies only. dndsR is not in the image: `tools/dndsr-install` installs it from the clone into a host R library and creates a `dndsr` shim that runs it in the container.
-- The image needs a patched orthologr (`inst/patches/orthologr-pwalign.patch`).
-- There is no `tests/` directory, and `.github/workflows/R-CMD-check.yaml` runs only for `main`/`master`.
+- `calculate_dnds()` wraps `orthologr::dNdS()`. Its defaults are `aligner = "diamond"`, `sensitivity_mode = "fast"`, and `dnds_method = "Comeron"`, which stays the default for v0.3.0.
+- The published image (v0.2.0) holds dependencies only: `tools/dndsr-install` installs dndsR from the clone into a host R library and creates a `dndsr` shim that runs it in the container. `tools/Dockerfile` now also installs dndsR in the image, for future releases.
+- Tests are in `tests/testthat/`. Expected values come from outside dndsR. `dndsr verify_example` is the user-facing check. Real-genome comparisons are in `tools/dev/validation/`, and should be rerun before a release.
+- Workflows in `.github/workflows/` run on `dev`, but have never run on this code as of the last status update.
 
-Everything else, including whether the science is correct, is unaudited. Say which claims you verified and which are assumptions.
+Validation evidence and its limits are in `docs/validation/`. Say which claims you verified and which are assumptions.
 
 ## Two kinds of agent
 
@@ -34,9 +34,10 @@ Details are in `.claude/rules/`.
 ## Development
 
 - Set up a clone once: `tools/dev/setup.sh`.
-- Keep dependencies declared in `DESCRIPTION`, and in `tools/Dockerfile` when the image needs them. The HPC default R lacks many dependencies, so run package code in the pinned container (see the runbook).
+- Keep dependencies declared in `DESCRIPTION`, and in `tools/Dockerfile` and `tools/environment.yml` when needed. The HPC default R lacks many dependencies, so run package code in the pinned container (see the runbook).
 - Regenerate `man/` and `NAMESPACE` with roxygen2 rather than editing them by hand. roxygen2 is not in the current image.
-- Before committing, run what applies: `tools/dev/test-safeguards.sh`, `Rscript --vanilla tools/dev/validate-skill.R`, and package tests or `R CMD check`.
+- Before committing, run what applies: `tools/dev/run-tests.sh`, `tools/dev/test-tutorial.sh`, `tools/dev/test-safeguards.sh`, `Rscript --vanilla tools/dev/validate-skill.R`, and `R CMD check`.
+- Heavy genome-scale jobs go through Slurm. Treat real genomes as read-only.
 
 ## Evidence
 
