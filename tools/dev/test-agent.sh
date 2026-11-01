@@ -39,8 +39,9 @@ echo "agent exit code: $rc"
 # Independent checks of what is actually on disk.
 pass=0 fail=0
 ok() { if eval "$2"; then pass=$((pass + 1)); echo "ok    $1"; else fail=$((fail + 1)); echo "FAIL  $1"; fi; }
-find_result() { find "$work" -name example_AvB_dnds.tsv -print -quit; }
-result=$(find_result)
+# Agents may choose their own scratch folder, so also look where the answer says it worked.
+mentioned=$(grep -oE '/(tmp|var/tmp|scratch)[A-Za-z0-9_./-]*' "$out/answer.md" | sed 's/[.]$//' | sort -u)
+result=$(for place in "$work" $mentioned; do [ -e "$place" ] && find "$place" -name example_AvB_dnds.tsv -print -quit 2>/dev/null; done | head -n 1)
 ok "dndsr was installed" '[ -x "$HOME/.local/bin/dndsr" ]'
 ok "the example produced a dN/dS table" '[ -n "$result" ]'
 if [ -n "$result" ]; then
