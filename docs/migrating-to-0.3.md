@@ -1,6 +1,6 @@
 # Migrating to dndsR 0.3
 
-**Results from dndsR 0.2.x and earlier should not be reused for dN/dS, enrichment, or summaries.** Please rerun them. Evidence: [real-genome validation](validation/real-genomes.md).
+**v0.1.0 and v0.2.0 were unvalidated pre-releases. Results from them should not be reused for dN/dS, enrichment, or summaries.** Please rerun them. Evidence: [real-genome validation](validation/real-genomes.md).
 
 ## Which results are affected
 

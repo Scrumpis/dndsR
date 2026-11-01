@@ -14,6 +14,8 @@ What has actually been checked, and how. Commit SHAs are in `git log` and the pr
 | GO and InterPro p-values, BH, descendants, ideogram windows | Hypergeometric and hand-calculated answers | `tests/testthat/test-enrichment-analytic.R` |
 | CLI behavior and exit codes | Unit tests and real subprocess runs | `tests/testthat/test-cli.R` |
 | Installation and tutorial | Commands run from the tutorial in a clean `HOME` | `tools/dev/test-tutorial.sh` |
+| Fixed defects | Each defect mapped to the test that catches it | [regression-coverage.md](regression-coverage.md) |
+| R tutorial | Every block is run | `tools/dev/test-r-tutorial.R` |
 | User self-check | `dndsr verify_example`, and a test that it catches wrong values | `R/example.R` |
 
 Not validated: [known issues](known-issues.md); ideogram appearance beyond rendering checks.

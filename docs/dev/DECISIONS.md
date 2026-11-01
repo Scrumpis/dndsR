@@ -20,6 +20,10 @@
 | 2026-10-31 | Agents may delete files they generated in the same session without asking. | Maintainer instruction. The guard still protects `.git` and `.audit`. |
 | 2026-10-31 | Deleted unused helpers, the stale vignette, and the orthologr patch. | No references in code; the vignette named files that did not exist; the patch can no longer apply. Git history keeps them. |
 
+| 2026-11-01 | Correctness notice goes in the v0.3.0 release notes, `docs/validation/`, the migration guide, and a README notice removed in the next release. No emails, pinned issue, or Docker Hub notice. | Maintainer decision: pre-releases, with no evidence of external adoption. |
+| 2026-11-01 | Published `dev` history is not rewritten. Unpublished results stay out of current files and future commits. | Maintainer decision: exposure was limited to aggregate figures. |
+| 2026-11-01 | Gene-level `dnds_state_contrast` stops with an error. | Confirmed by running that it gives no meaningful result. |
+
 ## Open questions
 
 Decisions for release are in `RELEASE-READINESS.md`.

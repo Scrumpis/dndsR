@@ -3,6 +3,8 @@
 [![R-CMD-check](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
+> **Correctness notice:** v0.1.0 and v0.2.0 were unvalidated pre-releases with defects that can give wrong dN/dS, including false signals of positive selection. Please recompute any results from them. [What was affected and how to rerun](docs/migrating-to-0.3.md).
+
 **dndsR** calculates and analyzes dN/dS between orthologous genes in pairwise genome comparisons, starting from genome FASTA and GFF3 files. It is an R package you can call from R, and a command-line tool that runs in a container. It is meant to be easy to use, for researchers and for AI agents alike.
 
 | Step | Command | R function |
@@ -52,10 +54,6 @@ Use `dndsr --help` or `dndsr <command> --help` for every option.
 ## For AI agents
 
 [skills/dndsr/SKILL.md](skills/dndsr/SKILL.md) is a portable [Agent Skill](https://agentskills.io) with tested commands, interpretation guidance, and limits. Claude Code and Codex find it automatically in this repository. Elsewhere, copy or link `skills/dndsr` to your agent's skills folder.
-
-## Important: results from before 0.3.0
-
-Earlier versions could assemble CDS incorrectly for multi-exon genes on the minus strand and for genes with several isoforms, which can give false signals of positive selection. They could also give a gene annotations from the wrong genome. [Rerun earlier analyses](NEWS.md).
 
 ## Contributing
 

@@ -30,6 +30,13 @@ jobs:
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work:/work" -w /work \
             -v "$PWD/tools/dev/container-checks.sh:/checks.sh:ro" dndsr:test bash /checks.sh "$version"
 
+      - name: Run the R tutorial in the image
+        run: |
+          mkdir -p work-r
+          chmod 777 work-r
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work-r:/work" -v "$PWD:/repo:ro" -w /work dndsr:test \
+            Rscript /repo/tools/dev/test-r-tutorial.R /repo/docs/tutorials/using-r.md
+
       - name: Record the packages in the image
         run: docker run --rm dndsr:test cat /opt/dndsr-package-versions.tsv >> "$GITHUB_STEP_SUMMARY"
 

@@ -22,7 +22,7 @@ Later results replace this table.
 
 ## Decisions for the maintainer
 
-See the session report and `GITHUB-SETUP.md`: approval of the notices in `release-notice-draft.md`, ruleset changes, Docker Hub setup, whether to rewrite published `dev` history, and final release approval.
+See the session report and `GITHUB-SETUP.md`: ruleset changes, Docker Hub setup, and final release approval. Release notes: `release-notes-0.3.0.md`. Published `dev` history stays as is, by the maintainer's decision.
 
 ## Not done or not tested
 
