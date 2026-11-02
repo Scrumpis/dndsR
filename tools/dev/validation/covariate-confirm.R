@@ -4,6 +4,7 @@
 # <labels> is a sim-genome.R table, or permute:S, rotate:S, strata5:S, strata10:S.
 # With DNDSR_FILTER set, passes it as filter_expr, to measure a sensitivity filter.
 # With DNDSR_POS_THRESHOLD set, passes it as pos_threshold, for example q0.95.
+# With DNDSR_ONTOLOGIES set, as BP or BP,MF, tests those GO branches only.
 # With DNDSR_KEEP_TABLE set, keeps the labeled table there, so that covariate-refit.py can test the same labels.
 # Writes the format enrichment-methods-summary.py reads. "fisher" is BH on the table's fisher_p.
 suppressMessages(library(dndsR))
@@ -43,7 +44,8 @@ threshold <- Sys.getenv("DNDSR_POS_THRESHOLD", "1")
 if (grepl("^[0-9.]+$", threshold)) threshold <- as.numeric(threshold)
 keep <- Sys.getenv("DNDSR_KEEP_TABLE")
 if (nzchar(keep)) file.copy(f, keep, overwrite = TRUE)
-files <- suppressMessages(covariate_enrichment(dnds_annot_file = f, sides = "query", min_pos = 0, verbose = FALSE, pos_threshold = threshold, filter_expr = if (nzchar(filter)) filter))
+ontologies <- strsplit(Sys.getenv("DNDSR_ONTOLOGIES", "BP,MF,CC"), ",", fixed = TRUE)[[1]]
+files <- suppressMessages(covariate_enrichment(dnds_annot_file = f, sides = "query", min_pos = 0, verbose = FALSE, pos_threshold = threshold, ontologies = ontologies, filter_expr = if (nzchar(filter)) filter))
 rows <- list()
 for (path in files) {
   t <- read.delim(path, quote = "", stringsAsFactors = FALSE)
