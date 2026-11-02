@@ -35,6 +35,13 @@
 | 2026-11-02 | No bootstrap interval feature. | Coverage measured and not established: `docs/validation/estimators.md`. Roadmap condition not met. |
 | 2026-11-02 | `go_enrichment`, `ipr_enrichment`, and `term_enrichment` keep their defaults and are not removed. | Changing them is the maintainer's decision. The excess of false terms is documented. |
 | 2026-11-02 | Candidate selection and enrichment thresholds stay as they are. No terms removed. | Standing maintainer instruction. |
+| 2026-11-02 | `covariate_enrichment` accepted as a documented public command, with limits stated. `go_enrichment` and `term_enrichment` warn on every run and record it, with defaults unchanged. Next version is v0.4.0. | Maintainer decision. |
+| 2026-11-02 | The notice goes in a `_notice.json` beside the tables, not in a new column. | Tables stay byte-identical, so existing scripts and comparisons still work. |
+| 2026-11-02 | `pos_threshold` text that cannot be used now stops `term_enrichment`, `ipr_enrichment`, and `covariate_enrichment`, which compared it as text and found no positive genes. `covariate_enrichment` honors quantiles, as `go_enrichment` does. | A silent wrong result. No valid input changes. Regression tests added. |
+| 2026-11-02 | `q0.95` is not recommended for a primary list. | 11.0% at AtAl InterPro `strata5`, above the rule: `enrichment-confounding.md`. |
+| 2026-11-02 | Correctness notice and DOI badge stay in the README for v0.4.0. | Maintainer added them after v0.3.0, and asked that neither be lost. |
+| 2026-11-02 | The audit archive moved to `~/.local/share/dndsr-audit`, mode 700. The original stays as `.audit.moved.*`. | Maintainer instruction. 27 files hash-identical in both copies. |
+| 2026-11-02 | v0.4.0's documents point at the v0.3.0 image's digest. | A tag's documents cannot name an image built from it. dndsr-install puts this code ahead of the copy in the image. |
 
 ## Open questions
 
@@ -42,12 +49,6 @@ Decisions for release are in `RELEASE-READINESS.md`.
 
 | Question | Why it matters | Owner |
 |---|---|---|
-| Approve `covariate_enrichment`, and name it the primary list for publication? | Public interface, and it is the list the checklist tells people to report. | Maintainer |
-| Should `go_enrichment` and `term_enrichment` warn, or change defaults, now that their excess is measured? | Up to 65–70% false-term rates at one pair. | Maintainer |
-| Tag a release containing `covariate_enrichment` before a publication analysis? | v0.3.0 lacks it. Recommended: tag, so that the analysis names one version. A commit and digest would also pin it. | Maintainer |
-| `publish` run at `d5f4b21` is waiting for approval, and `scrumpis/dndsr:v0.3.0` does not exist yet. | The digest follow-up in `RELEASE.md` is blocked until it runs. | Maintainer |
-| v0.3.0's release page has no assets and does not use `release-notes-0.3.0.md`. | Those notes carry the correctness notice. | Maintainer |
-| Merge `main` back into `dev`? | `dev` lacks the merge commit and PR #3's badge. | Maintainer |
-| Can the `main` ruleset be satisfied? It requires 1 approving review and a check named `R-CMD-check`, but the workflow's jobs are named like `ubuntu-latest (release)`. | May block the v0.3.0 merge. Not yet tested against a pull request. A sole maintainer also cannot approve their own pull request without a bypass. | Maintainer |
-| Should v0.3.0 get a new image? The only image predates this code and was built for v0.2.0. | The skill must link a release to one digest. | Maintainer |
-| Where should `.audit` live for the long term? | Scratch is purged after 45 days unless touched. Hashes in `.audit/manifest.sha256` detect loss of content but cannot restore it. | Maintainer |
+| Should `go_enrichment` and `term_enrichment` change defaults, now that they warn? | Up to 65-70% false-term rates at one pair. | Maintainer |
+| v0.3.0's release page shows `<from the publish workflow>` for its digest. | It is `sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11`. | Maintainer |
+| The Docker Hub `latest` tag still points at the v0.2.0 image, and `publish.yaml` never moves it. | Someone who pulls `latest` gets older dependencies. | Maintainer |

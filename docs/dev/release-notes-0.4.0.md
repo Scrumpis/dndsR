@@ -17,6 +17,8 @@ Draft until tagged. Fill in the image digest once the publish workflow has run.
 
 `go_enrichment`'s excess of false terms is larger than v0.3.0's documents say: 43% of simulated runs at one pair, where they say 9.5%. [Estimator](../validation/estimators.md) and [ortholog](../validation/orthology.md) benchmarks are new.
 
+Results on the v0.3.0 image differ slightly from those on the v0.2.0 image, in 15 of about 22,000 pairs between *A. thaliana* and *A. lyrata*, because very small E-values are read differently. Values for shared pairs are identical. [Details](../validation/stack-comparison.md).
+
 ## Faster
 
 `ipr_enrichment` about 25 times and `append_annotations` about 2.5 times, with byte-identical tables on the public pair.

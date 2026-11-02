@@ -168,9 +168,37 @@ Terms that come and go have `p_adj` just under or over 0.05, and many rest on 2 
 - `covariate-verify.py` recalculated term counts, Fisher's p-values, and BH without dndsR on the AtAl GO table of 2,978 terms and InterPro table of 1,490 terms, with no differences. It does not refit the splines. Tests use `pbinom`, `phyper`, and hand arithmetic for the tail.
 - Tables are byte-identical at 1 and 2 threads, for 3 pairs.
 
+## Independent reproduction, at v0.4.0
+
+Three questions, on 100 runs per null scenario, at AtAl and the held-out SlSt: 1,200 runs, 2 term families, and 2 thresholds. Table: [data/covariate_reproduction_cells.tsv](data/covariate_reproduction_cells.tsv). Scripts: `covariate-repro-task.sh`, `covariate-repro-summary.py`.
+
+| Question | Compared | Result |
+|---:|---|---|
+| Do the simulations regenerate? | `sim-genome.R`, from the seed, on the newer image, against the stored file | 12 of 12 byte-identical |
+| Does the result hold on the newer stack? | v0.4.0 candidate on the v0.3.0 image, against the original runs on the v0.2.0 image, same labels | The same significant terms in 2,399 of 2,400 comparisons. The other is one GO run, AtAl `permute` |
+| Does it hold without dndsR's code? | `covariate-refit.py`: splines, logistic fit, tail, and BH written in Python from the method's description, with no R, on the same labeled tables | The same significant terms in all 4,800 comparisons, at both thresholds |
+
+On one run compared in full, 2,942 GO and 1,490 InterPro terms: fitted probabilities agree within 4e-14, deviance agrees, no count differs, and `p_adj` agrees exactly. This closes the gap left by `covariate-verify.py`, which does not refit the splines.
+
+**A failure on the way, in the check.** The first refit used plain Newton steps, and diverged when positives were rare and dS had a long tail: deviance 143,681 against R's 834.9. It reported false terms in up to 100% of runs. R's fit was right, and a damped step fixed the refit. Those outputs are not evidence, and `permute` and `rotate` had agreed only because a flat fit has nothing to diverge on.
+
+**A reproduction is not a broader claim.** These rerun the same evidence, so its limits below stay as they are.
+
+### Quantile thresholds
+
+`--pos-threshold q0.95` was not part of the method's selection. On the same labels, worst false-term rate across null scenarios, except `strata10`, which keeps real associations:
+
+| Threshold | AtAl | SlSt |
+|---|---:|---:|
+| `dNdS > 1` | 5.0% (2.2-11.2), InterPro `strata5` | 2.0% (0.6-7.0), InterPro `permute` |
+| `q0.95` | **11.0% (6.3-18.6)**, InterPro `strata5` | 5.0% (2.2-11.2), InterPro `bylen` |
+
+And 57% at AtAl InterPro `strata10`, against 3% at `dNdS > 1`. Shuffles within bins keep real associations in part, and a threshold passing many more genes is better able to detect them, so this may not be purely false terms. It cannot be told apart here, so **`q0.95` does not meet the rule, and calibration is not established for it.** Use `dNdS > 1` for a primary list.
+
 ## Limits
 
-- **Confirmed at 4 plant pairs in 2 families, with 2 sources of terms.** Other clades, polyploids, and other annotation pipelines are untested. For those, run the simulation on your own table.
+- **Confirmed at 4 plant pairs in 2 families, with 2 sources of terms, at `dNdS > 1`.** This does not establish false discovery control in general, and it has not been validated for detecting real selection in real genomes. Other clades, polyploids, other annotation pipelines, and quantile thresholds are untested or not established. For those, run the simulation on your own table.
+- Calibration ran on the v0.2.0 image. The v0.3.0 image gives slightly different pairs: [stack comparison](stack-comparison.md).
 - Only 100 to 300 runs per cell, so the interval on any one rate is wide.
 - It treats genes as independent, and the fitted probabilities as known. Tandem families share history, and `rotate` tests that only in part.
 - The floor is one setting, with no sensitivity analysis. It is why the test stays valid with few positive genes, and it can make tests conservative for terms of genes the model rules out.

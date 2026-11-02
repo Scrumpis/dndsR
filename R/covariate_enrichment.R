@@ -25,9 +25,10 @@
 #' Its false-term rate was measured in simulation at 4 plant pairs from 2 families, for
 #' `pos_threshold = 1`. This does not establish false discovery control for every dataset, and it has
 #' not been validated for detecting real selection in real genomes. It does not adjust for annotation
-#' completeness or for dependence between genes such as tandem duplicates and homeologs. Polyploids,
-#' other clades, and quantile thresholds were not part of that evidence: for those, run the simulation
-#' on your own table, as described in `docs/validation/enrichment-confounding.md`.
+#' completeness or for dependence between genes such as tandem duplicates and homeologs. Polyploids
+#' and other clades were not part of that evidence, and at `q0.95` it exceeded 5% in one setting, so a
+#' quantile is not established: for those, run the simulation on your own table, as described in
+#' `docs/validation/enrichment-confounding.md`.
 #'
 #' @section Which genes are tested:
 #' Each side and term type has its own universe: pairs in the table that pass `filter_expr` and

@@ -84,9 +84,10 @@ leads to test by other means. It treats genes as independent, and treats fitted 
 Its false-term rate was measured in simulation at 4 plant pairs from 2 families, for
 \code{pos_threshold = 1}. This does not establish false discovery control for every dataset, and it has
 not been validated for detecting real selection in real genomes. It does not adjust for annotation
-completeness or for dependence between genes such as tandem duplicates and homeologs. Polyploids,
-other clades, and quantile thresholds were not part of that evidence: for those, run the simulation
-on your own table, as described in \code{docs/validation/enrichment-confounding.md}.
+completeness or for dependence between genes such as tandem duplicates and homeologs. Polyploids
+and other clades were not part of that evidence, and at \code{q0.95} it exceeded 5\% in one setting, so a
+quantile is not established: for those, run the simulation on your own table, as described in
+\code{docs/validation/enrichment-confounding.md}.
 }
 
 \section{Which genes are tested}{

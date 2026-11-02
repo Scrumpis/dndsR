@@ -30,7 +30,7 @@ Decide these before running, and write them down:
 
 - [ ] Which comparisons, and which is query.
 - [ ] Which terms, with the database version.
-- [ ] The candidate rule. `covariate_enrichment` defaults to `--pos-threshold 1`, `--max-dnds 10`, `--min-total 10`, `--min-pos 2`. Do not change these after seeing term lists. If you want to explore them, report all of what you tried.
+- [ ] The candidate rule. `covariate_enrichment` defaults to `--pos-threshold 1`, `--max-dnds 10`, `--min-total 10`, `--min-pos 2`. A quantile threshold is not calibrated by the same evidence: [details](validation/enrichment-confounding.md#quantile-thresholds). Do not change these after seeing term lists. If you want to explore them, report all of what you tried.
 
 ## 3. Run
 

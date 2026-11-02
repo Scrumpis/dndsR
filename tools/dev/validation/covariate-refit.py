@@ -10,7 +10,7 @@ Written from the method as documented in docs/methods.md, not from R/covariate_e
 - natural cubic splines from the truncated-power basis in Hastie, Tibshirani, and Friedman, Elements of
   Statistical Learning, eq. 5.4-5.5. Fitted values do not depend on which basis spans the same space.
   Boundary knots at the range and interior knots at the 1/3 and 2/3 quantiles, 3 degrees of freedom.
-- logistic regression by Newton steps on a QR factorization
+- logistic regression by Newton steps with step-halving
 - Poisson-binomial tail by direct convolution
 - Benjamini-Hochberg by the step-up definition
 Needs numpy. go_ancestors.tsv has columns ontology, term, ancestor, as enrichment-go-ancestors.R writes it.
@@ -41,22 +41,31 @@ def fit(y, length, ds):
     b, _ = natural_basis(np.log(ds))
     X = np.column_stack([np.ones(len(y)), a, b])
     X[:, 1:] = (X[:, 1:] - X[:, 1:].mean(0)) / X[:, 1:].std(0)
-    Q, R = np.linalg.qr(X)
     beta = np.zeros(X.shape[1])
     beta[0] = np.log(y.mean() / (1 - y.mean()))
-    last = np.inf
+
+    def deviance(b):
+        e = np.clip(X @ b, -700, 700)
+        return 2 * np.sum(np.logaddexp(0, e) - y * e)
+
+    last = deviance(beta)
     for _ in range(100):
-        eta = X @ beta
+        eta = np.clip(X @ beta, -700, 700)
         mu = np.clip(1 / (1 + np.exp(-eta)), 1e-15, 1 - 1e-15)
-        dev = -2 * np.sum(y * np.log(mu) + (1 - y) * np.log(1 - mu))
-        if abs(dev - last) < 1e-11 * (abs(dev) + 0.1):
-            break
-        last = dev
         w = mu * (1 - mu)
         z = eta + (y - mu) / w
         sw = np.sqrt(w)
-        beta = np.linalg.lstsq(X * sw[:, None], z * sw, rcond=None)[0]
-    return 1 / (1 + np.exp(-(X @ beta)))
+        step = np.linalg.lstsq(X * sw[:, None], z * sw, rcond=None)[0] - beta
+        # A full Newton step can overshoot when positives are rare and a covariate has a long tail.
+        t = 1.0
+        while deviance(beta + t * step) > last and t > 1e-8:
+            t /= 2
+        beta = beta + t * step
+        dev = deviance(beta)
+        if abs(dev - last) < 1e-11 * (abs(dev) + 0.1):
+            break
+        last = dev
+    return 1 / (1 + np.exp(-np.clip(X @ beta, -700, 700)))
 
 
 def tail(p, k):

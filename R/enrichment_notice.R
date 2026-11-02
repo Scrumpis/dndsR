@@ -8,11 +8,11 @@
 #' @keywords internal
 .enrichment_notice <- function(command) {
   rate <- c(
-    go_enrichment = "at default settings reported at least one false term in up to 43% of runs",
+    go_enrichment = "default settings reported at least one false term in up to 43% of runs",
     term_enrichment = "Fisher's test, which this command uses, reported at least one false term in up to about 70% of runs"
   )[[command]]
   paste0("[", command, "] Calibration notice: this test does not adjust for gene length or dS. In simulated evolution ",
-         "with annotation unrelated to omega, it ", rate, " at one plant pair (A. thaliana against A. lyrata), and ",
+         "with annotation unrelated to omega, ", rate, " at one plant pair (A. thaliana against A. lyrata), and ",
          "much less at others. Treat its terms as exploratory. covariate_enrichment adjusts for length and dS, and ",
          "has its own limits. Evidence: docs/validation/enrichment-confounding.md.")
 }

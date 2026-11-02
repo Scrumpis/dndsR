@@ -53,3 +53,6 @@ From the software audit.
 
 ### Fix CDS assembly for minus-strand and multi-isoform genes
 Fixed the CDS assembly bug (`docs/validation/cds-extraction.md`), added the designed example, independent NG86 reference, first tests, input hashes, and hash-based audit archiving.
+
+### v0.4.0 candidate
+Accepted `covariate_enrichment`, added calibration warnings and their record, fixed a silent failure on text thresholds, reproduced the method without R, and compared image stacks. See `SESSION_LOG.md`.
