@@ -45,6 +45,7 @@ Later commits change only documentation and validation scripts: `R/`, `inst/`, `
 | R tutorial in that image | 4 blocks ran |
 | Full CLI workflow on the public pair, against the previous candidate | `AtAl_dnds.tsv`, summary, and ideogram SVGs byte-identical. Annotated table differs on the 73 recovered rows only |
 | Null models and independent recalculation | [enrichment.md](../validation/enrichment.md) |
+| Fresh Claude agent at `cf4e61a`, `tools/dev/test-agent.sh claude` | 7 of 7 checks; its results pass an independent `verify_example`, 14 of 14 |
 | Thread determinism on the real table | Annotated table and all `term_enrichment`, `ipr_enrichment`, and `go_enrichment` tables byte-identical at 1 and 8 threads |
 
 ## Local evidence at earlier code
