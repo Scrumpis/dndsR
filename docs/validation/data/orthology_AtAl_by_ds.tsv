@@ -1,0 +1,9 @@
+class	agree	disagree	unscored	disagree_pct_of_scored
+dS below 0.02	14	0	10	0.0
+0.02 to 0.1	2166	13	1077	0.6
+0.1 to 0.3	11470	144	6019	1.2
+0.3 to 0.8	183	236	526	56.3
+0.8 to 1.5	7	79	91	91.9
+1.5 and above	0	31	34	100.0
+above 3 x median (0.424)	56	312	424	84.8
+at most 3 x median (0.424)	13784	191	7333	1.4

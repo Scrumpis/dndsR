@@ -1,0 +1,119 @@
+# Enrichment: gene length, dS, and an adjusted test
+
+Short genes and genes with small dS pass dN/dS > 1 far more often. Can that alone make a term look enriched, and can a simple adjustment remove it without losing real signals?
+
+**Answer.** Yes to both, on this evidence. dndsR's existing tests report false terms in up to 70% of simulated genomes where omega has no link to annotation. One candidate met a rule fixed before the results, and is now `covariate_enrichment`. It does not replace the defaults, which are the maintainer's decision.
+
+## Design
+
+The labels in [enrichment.md](enrichment.md) are shuffled, so they keep length and dS only as far as the shuffle does. Here, labels come from estimator noise:
+
+- **Simulation (`sim-genome.R`).** Each gene keeps its real codons as an ancestor, and its length, dS, and terms. Omega is drawn independently of any term, and sequences then evolve under a codon model. **dndsR's real Comeron estimator gives each gene's dN/dS, and so its label.**
+  - `long`: omega drawn from long genes' observed dN/dS, whatever a gene's length.
+  - `bylen`: the same, scaled by the median dN/dS of the gene's length decile.
+  - `spike_F_W`: `bylen`, then a share F of the genes in 5 chosen InterPro terms (20 to 300 genes) get omega W. This is a known signal, for power and false discovery.
+- **Reassignments (`enrichment-methods.R`).** `permute`, `rotate` (around the genome, which keeps neighbors), and `strata5` and `strata10` (shuffles within bins of length, dS, and annotation richness). `strata10` keeps labels close to their real genes, so real associations can remain. It is not a clean null, and is reported anyway.
+- **Pairs.** *A. thaliana* against *A. lyrata* (`AtAl`, median dS 0.14, 206 genes above 1), *Capsella rubella* (`AtCr`, 0.27, 17), and *Brassica rapa* (`AtBr`, 0.44, 3). GCF_000375325.1 and GCF_000309985.3 with the same *A. thaliana* terms as [enrichment.md](enrichment.md).
+
+A null run counts as false if any term is significant at BH 0.05. For spikes, a term is false unless it is spiked, or overlaps spiked genes beyond chance (hypergeometric p < 0.001). Tables: [data/](data/), `enrichment_methods_*.tsv`, with 95% Wilson intervals.
+
+The simulation reproduces the real gradient. In a pilot `bylen` run, positive genes fell from 2.22% to 0.14% across length quintiles, against 3.06% to 0.09% in real data. Across `bylen` runs, the median was 134.5 positive genes against 206 real ones, so if anything this understates the problem for *A. lyrata*. **Limits:** no indels, no recombination, one omega per gene, stationary codon usage.
+
+## Candidates, and the rule
+
+All run on the same labels.
+
+| Name | Test |
+|---|---|
+| `fisher` | Fisher's test on all ancestors. Equals `go_enrichment(algorithm = "classic")` and `term_enrichment` |
+| `go_default` | The real `go_enrichment()` defaults (`weight01`), on every fifth seed |
+| `pb_len`, `pb_len_ds` | Poisson-binomial tail, with probabilities from logistic regression on splines of log length (4 df), or log length and log dS (4 df each) |
+| `pb_add3` | The same, 3 df each |
+| `pb_floor` | `pb_add3`, with no probability below a tenth of the positive rate |
+| `pb_rich` | `pb_add3`, and log term count |
+| `cmh_5x5`, `cmh_10x10` | Exact stratified test across bins of length and dS |
+| `filter` | Fisher's test on genes of at least 150 amino acids and dS at least 0.05 |
+
+An interaction term was tried first, in a pilot, and dropped before these runs: with about 100 positive genes the fit separates, giving probabilities near 1e-14 and p-values near 1e-263. That is why these use additive terms and low degrees of freedom. The candidates, including the floor of a tenth, were fixed in the script before any calibration run.
+
+**Rule, stated before the results.** Eligible: at most 5% of runs with a false term in every null family, by point estimate, across pairs. Among those, take the highest power at spikes. The effect on real term lists is reported after, and does not count.
+
+## Results
+
+Largest false-term rate across 36 cells (3 pairs, GO and InterPro, 6 nulls), with `go_default` in 18:
+
+| Method | Worst rate | Where | Cells above 5% |
+|---|---:|---|---:|
+| `fisher` | 69.8% | AtAl GO `bylen` | 8 |
+| `go_default` | 60.0% | AtAl `strata10` (43.0% on the clean null, `bylen`) | 4 |
+| `pb_len` | 11.6% | AtBr GO `permute` | 1 |
+| `pb_len_ds` | 36.2% | AtBr GO `permute` | 12 |
+| `pb_add3` | 27.6% | AtBr GO `rotate` | 7 |
+| `pb_rich` | 37.2% | AtBr GO `permute` | 8 |
+| `cmh_5x5` | 9.0% | AtAl GO `bylen` | 2 |
+| `filter` | 9.7% | AtAl IPR `strata5` | 1 |
+| **`pb_floor`** | **2.7%** (upper limit 5.2) | AtAl IPR `strata5` | **0** |
+| **`cmh_10x10`** | **2.3%** (upper limit 4.7) | AtAl IPR `strata10` | **0** |
+
+So `pb_floor` and `cmh_10x10` are eligible. **Without the floor the logistic tests fail badly when few genes are positive**, as in *B. rapa*, where most terms carry fits near zero.
+
+Share of spiked InterPro terms found, mean across spike settings:
+
+| Method | AtAl | AtCr | AtBr |
+|---|---:|---:|---:|
+| `pb_floor` | **77.3%** | **95.6%** | **92.8%** |
+| `cmh_10x10` | 75.3% | 94.0% | 91.0% |
+| `fisher`, for comparison | 70.9% | 95.6% | 94.5% |
+
+So the rule selects `pb_floor`, which is what `covariate_enrichment` implements. It is not more powerful than Fisher's everywhere: in *B. rapa* it finds slightly fewer. In *A. lyrata* it finds more, and far fewer false terms. False discovery at spikes, AtAl:
+
+| Spike (share, omega) | `go_default`, GO | `fisher`, GO | `pb_floor`, GO | `fisher`, IPR | `pb_floor`, IPR |
+|---|---:|---:|---:|---:|---:|
+| 0.05, 1.5 | 43.3% | 58.7% | 0.8% | 22.8% | 0.7% |
+| 0.1, 3 | 15.4% | 35.9% | 2.2% | 8.2% | 0.7% |
+| 0.2, 3 | 11.6% | 13.1% | 0.9% | 4.5% | 0.6% |
+| 0.5, 3 | 6.0% | 5.7% | 1.9% | 2.7% | 0.6% |
+
+**This revises the 9.5% in [enrichment.md](enrichment.md).** That figure comes from a shuffle within bins. With labels from estimator noise, `go_enrichment`'s defaults gave a false term in 43.0% of `bylen` runs at AtAl (95% interval 33.7–52.8, 100 runs), and in 3.3% of `long` runs (0.9–11.4, 60 runs). So length is the main driver. The excess falls with divergence: at AtCr, 5.0% (1.7–13.7, 60 runs) and 0%. At AtBr, with so few positive genes, it was 0% (0–6.4, 56 runs) and 11.1% (3.9–28.1, 27 runs), so these are rough.
+
+## Real term lists
+
+These did not affect the choice. *A. lyrata*, query side, at BH 0.05:
+
+| Test | GO | InterPro |
+|---|---:|---:|
+| `go_enrichment` defaults | 4 | not applicable |
+| Fisher's test | 9 | 24 |
+| `covariate_enrichment` | **0** | **16** |
+
+All 9 Fisher GO terms drop, including extracellular region, GO:0005576. Of the 24 InterPro terms, 15 stay, mainly F-box and Kelch families; 9 drop, among them defensin-like IPR010851; and IPR013089 joins. With *C. rubella* and *B. rapa*, `covariate_enrichment` finds no terms, with 17 and 3 genes above 1. That is low power, not a result about those genes.
+
+**One outside comparison, chosen after seeing the result, so it supports rather than validates.** Mondragón-Palomino, Stam, John-Arputharaj, and Dresselhaus (2017, *BMC Evolutionary Biology*, doi:10.1186/s12862-017-1099-4) tested the defensin-like family in *Arabidopsis* species with codeml and FUBAR, and report that "neutral evolution prevails throughout the DEFL family". That fits defensin-like not surviving adjustment. It is one family, and we did not test the families that stay against any independent evidence.
+
+## Checks
+
+- `covariate_enrichment` gives the same terms, and p-values within rounding, as the prototype, for 3 pairs.
+- `covariate-verify.py` recalculated term counts, Fisher's p-values, and BH without dndsR on the AtAl GO table of 2,978 terms and InterPro table of 1,490 terms, with no differences. It does not refit the splines. Tests use `pbinom`, `phyper`, and hand arithmetic for the tail.
+- Tables are byte-identical at 1 and 2 threads, for 3 pairs.
+
+## Limits
+
+- **The method was chosen on the runs above.** See the confirmation, on new seeds and a new pair, below.
+- All pairs share one query genome, one family, and one annotation. See the held-out pair below.
+- It treats genes as independent, and the fitted probabilities as known. Tandem families share history, and `rotate` tests that only in part.
+- The floor is one setting, with no sensitivity analysis. It is why the test stays valid with few positive genes, and it can make tests conservative for terms of genes the model rules out.
+- It does not adjust for annotation completeness.
+- Power falls fast with divergence, whatever the method, since few genes then pass 1.
+- A term here remains a lead. This is about false associations with term labels, not evidence of selection.
+
+## Rebuild
+
+```
+Rscript tools/dev/validation/sim-genome.R <dnds_annot.tsv> <query CDS FASTA> <scenario> <seed> <sim.tsv.gz>
+Rscript tools/dev/validation/enrichment-methods.R <dnds_annot.tsv> <go_ancestors.tsv> <sim.tsv.gz or permute:S ...> <terms_S.tsv>
+python3 tools/dev/validation/enrichment-methods-summary.py <runs dir> <dnds_annot.tsv> <go_ancestors.tsv> <prefix>
+Rscript tools/dev/validation/covariate-confirm.R <dnds_annot.tsv> <sim.tsv.gz or permute:S ...> <terms_S.tsv>
+python3 tools/dev/validation/covariate-verify.py <dnds_annot.tsv> <table.tsv> <go_ancestors.tsv> q
+```
+
+Image `dndsr_v0.2.0_sha256-726657e9`, library at v0.3.0's code, seeds in the scripts' manifests: 100,000 and up for selection, 900,000 and up for confirmation. Input hashes for AtCr and AtBr: Crubella `947fda8f49900a8a` (FASTA), `322af545d18743bf` (GFF); Brapa `afd6ca07cea49c74` (FASTA), `1520fb8661ae3dbd` (GFF).
