@@ -4,7 +4,7 @@ description: Installs and runs dndsR, an R package and CLI for pairwise dN/dS an
 license: MIT
 compatibility: Needs bash and git, plus Singularity, Apptainer, or Docker, or an R installation with dndsR's dependencies. Only Linux amd64 with Singularity has been tested. Cloning and pulling the image need network access unless both are already present.
 metadata:
-  software-version: "0.3.0.9000"
+  software-version: "0.4.0"
   skill-status: "core workflow tested on a designed example and public genomes; see references/verification.md"
 ---
 
@@ -28,9 +28,9 @@ If `dndsr --help` lists commands, go to step 3. Without containers, use the test
 Tell the user first: this downloads 1.3 GB, and writes to `~/.config/dndsr`, `~/.dndsr/rlib`, and `~/.local/bin`. The image holds dependencies; dndsR is installed from the clone, which must stay in place. Replace `singularity` with `apptainer` if that is what is available (untested).
 
 ```
-git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
+git clone --branch v0.4.0 https://github.com/Scrumpis/dndsR
 cd dndsR
-singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
+singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11
 tools/dndsr-install install --engine singularity --sif dndsr.sif
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -71,7 +71,7 @@ dndsr dnds_summary -c comparison_file.txt --regions-bed regions.bed
 
 Check `<comparison>/<genome>_CDS_qc.tsv` for exclusions, and the number of pairs in `<comparison>_dnds.tsv`, before interpreting results. `calculate_dnds` reports undefined, low-dS, high-dS, and outlier pairs: pass that on to the user.
 
-`covariate_enrichment` is not in v0.3.0. It needs a version later than that, so check `dndsr --help` lists it.
+`covariate_enrichment` needs v0.4.0 or later, so check that `dndsr --help` lists it. `go_enrichment` and `term_enrichment` give a calibration warning on every run, and record it in `<comparison>_go_enrichment_notice.json` or `<comparison>_term_enrichment_notice.json`: pass it on to the user. Their defaults and tables are unchanged.
 
 A complete run on public genomes, with measured time and memory: [docs/tutorials/public-genomes.md](../../docs/tutorials/public-genomes.md). For a publication, follow [docs/publication-protocol.md](../../docs/publication-protocol.md).
 
@@ -83,7 +83,7 @@ Read [docs/interpretation.md](../../docs/interpretation.md) before explaining re
 - Look at dN and dS as well as the ratio. Small dS makes ratios unstable, and dS = 0 gives NA. Above dS 0.8, estimates of high ratios fall far short and ortholog pairs are often wrong: [docs/validation/estimators.md](../../docs/validation/estimators.md), [docs/validation/orthology.md](../../docs/validation/orthology.md).
 - The default Comeron method compresses ratios: very low ones read high, and high ones read low, more so at high divergence. Evidence: [docs/validation/estimators.md](../../docs/validation/estimators.md). Agreement with PAML and KaKs_Calculator on real genes: [docs/validation/public-genome.md](../../docs/validation/public-genome.md).
 - Reciprocal best hits can mispair paralogs, especially in polyploids. Annotation errors can look like selection.
-- `go_enrichment`, `ipr_enrichment`, and `term_enrichment` treat genes as independent, and do not correct for gene length, dS, or annotation completeness, which all affect which genes pass dN/dS > 1. Under simulated evolution where annotation has no link to omega, they can report false terms in up to about half of runs: [docs/validation/enrichment-confounding.md](../../docs/validation/enrichment-confounding.md). For a term list to report, prefer `covariate_enrichment`, which adjusts for length and dS, and say which you used. It does not adjust for annotation completeness or dependence between genes. Terms near `p_adj` 0.05 change with the annotation release or a filter, so report whether each term you discuss is stable.
+- `go_enrichment`, `ipr_enrichment`, and `term_enrichment` treat genes as independent, and do not correct for gene length, dS, or annotation completeness, which all affect which genes pass dN/dS > 1. Under simulated evolution where annotation has no link to omega, they can report false terms in up to about half of runs: [docs/validation/enrichment-confounding.md](../../docs/validation/enrichment-confounding.md). For a term list to report, prefer `covariate_enrichment`, which adjusts for length and dS, and say which you used. It does not adjust for annotation completeness or dependence between genes. Its calibration comes from simulation at 4 plant pairs: it does not establish false discovery control in general, and it has not been validated for detecting real selection in real genomes. Polyploids are untested: run the simulation on the user's own table. Terms near `p_adj` 0.05 change with the annotation release or a filter, so report whether each term you discuss is stable.
 - Few genes above 1 means little power. In the public comparisons, genes above 1 fell from 206 at median dS 0.14 to 3 at median dS 0.44. A short list at high divergence is not evidence of absence.
 - Multiple-testing correction limits false positives under no association. It does not remove gene length, dS, or annotation bias. A significant term is a lead, not evidence that a function evolved under selection. Report it that way.
 - Report `p_adj`, not `p_value` or `raw_p`, which are uncorrected. `p_adj` is corrected across `n_tested` terms, and `min_pos` changes only which rows are written. By default, `ipr_enrichment` and `go_enrichment` use one family across all their tables. `--adjust-scope per_type` (`ipr_enrichment`) and `--adjust-scope per_ontology` (`go_enrichment`) correct each table separately, so do not treat terms pooled across those tables as corrected together; `--p-adjust none` (`go_enrichment`) and `--fdr-method none` (`ipr_enrichment`) leave `p_adj` uncorrected. Check `adjust_scope` and `p_adjust_method` in the table.

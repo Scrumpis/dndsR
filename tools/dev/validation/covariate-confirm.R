@@ -3,6 +3,8 @@
 #   Rscript covariate-confirm.R <dnds_annot.tsv> <labels> <out.tsv>
 # <labels> is a sim-genome.R table, or permute:S, rotate:S, strata5:S, strata10:S.
 # With DNDSR_FILTER set, passes it as filter_expr, to measure a sensitivity filter.
+# With DNDSR_POS_THRESHOLD set, passes it as pos_threshold, for example q0.95.
+# With DNDSR_KEEP_TABLE set, keeps the labeled table there, so that covariate-refit.py can test the same labels.
 # Writes the format enrichment-methods-summary.py reads. "fisher" is BH on the table's fisher_p.
 suppressMessages(library(dndsR))
 args <- commandArgs(TRUE)
@@ -37,7 +39,11 @@ if (grepl("\\.gz$", labels)) {
 w <- tempfile("cov"); dir.create(w); f <- file.path(w, "N_dnds_annot.tsv")
 write.table(d, f, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
 filter <- Sys.getenv("DNDSR_FILTER")
-files <- suppressMessages(covariate_enrichment(dnds_annot_file = f, sides = "query", min_pos = 0, verbose = FALSE, filter_expr = if (nzchar(filter)) filter))
+threshold <- Sys.getenv("DNDSR_POS_THRESHOLD", "1")
+if (grepl("^[0-9.]+$", threshold)) threshold <- as.numeric(threshold)
+keep <- Sys.getenv("DNDSR_KEEP_TABLE")
+if (nzchar(keep)) file.copy(f, keep, overwrite = TRUE)
+files <- suppressMessages(covariate_enrichment(dnds_annot_file = f, sides = "query", min_pos = 0, verbose = FALSE, pos_threshold = threshold, filter_expr = if (nzchar(filter)) filter))
 rows <- list()
 for (path in files) {
   t <- read.delim(path, quote = "", stringsAsFactors = FALSE)

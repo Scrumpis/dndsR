@@ -4,7 +4,7 @@ Only checks actually run are listed. Update these when the relevant software cha
 
 ## Environment
 
-Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831`: R 4.5.2, DIAMOND 2.1.14, OrthoFinder 2.5.4, orthologr 0.4.2, pwalign 1.6.0, topGO 2.62.0, IHW 1.38.0, qvalue 2.42.0, RIdeogram 0.2.2. dndsR itself is not in this image.
+Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11` (v0.3.0): R 4.6.2, DIAMOND 2.1.14, orthologr 0.4.3, pwalign 1.8.0, topGO 2.64.0, GO.db 3.23.1, IHW 1.40.0, qvalue 2.44.0, RIdeogram 0.2.2. It contains dndsR 0.3.0, and dndsr-install puts the clone's code ahead of it. Evidence from before v0.4.0 used the v0.2.0 image, which has older versions: `docs/validation/stack-comparison.md`.
 
 ## Tested
 

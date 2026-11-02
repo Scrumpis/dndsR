@@ -111,3 +111,29 @@ test_that("missing inputs fail with a clear message", {
   expect_error(covariate_enrichment(), "either comparison_file")
   expect_error(covariate_enrichment(dnds_annot_file = file.path(dir, "no.tsv")), "not found")
 })
+
+test_that("a quantile threshold equals the same number given directly, and is recorded", {
+  dir <- withr::local_tempdir(); f <- file.path(dir, "N_dnds_annot.tsv")
+  d <- confounded()
+  set.seed(3); d$dNdS <- exp(stats::rnorm(nrow(d), -1, 1)); d$dNdS[d$q_len < 120] <- d$dNdS[d$q_len < 120] * 3; d <- d[d$dNdS < 10, ]
+  utils::write.table(d, f, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
+  by_q <- utils::read.delim(suppressMessages(covariate_enrichment(dnds_annot_file = f, terms = "ipr", sides = "query", pos_threshold = "q0.95")))
+  cutoff <- stats::quantile(d$dNdS, 0.95, names = FALSE, type = 7)
+  by_n <- utils::read.delim(suppressMessages(covariate_enrichment(dnds_annot_file = f, terms = "ipr", sides = "query", pos_threshold = cutoff)))
+  expect_equal(by_q, by_n)
+  expect_equal(unique(by_q$threshold), cutoff)
+  expect_equal(unique(by_q$pos_total), sum(d$dNdS > cutoff))
+  expect_equal(sum(d$dNdS > cutoff), ceiling(0.05 * nrow(d)))
+  spelled <- utils::read.delim(suppressMessages(covariate_enrichment(dnds_annot_file = f, terms = "ipr", sides = "query", pos_threshold = "quantile:0.95")))
+  expect_equal(spelled, by_q)
+})
+
+test_that("a threshold that cannot be used stops, rather than finding no positive genes", {
+  dir <- withr::local_tempdir(); f <- file.path(dir, "N_dnds_annot.tsv")
+  utils::write.table(confounded(), f, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
+  for (bad in list("q95", "high", c(1, 2), NA_real_, "q1.5")) {
+    expect_error(covariate_enrichment(dnds_annot_file = f, terms = "ipr", sides = "query", pos_threshold = bad), "pos_threshold must be")
+  }
+  expect_error(suppressMessages(term_enrichment(dnds_annot_file = f, pos_threshold = "q0.95")), "pos_threshold must be one number")
+  expect_error(suppressMessages(ipr_enrichment(dnds_annot_file = f, pos_threshold = "q0.95")), "pos_threshold must be one number")
+})

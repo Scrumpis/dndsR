@@ -21,13 +21,32 @@
 #' This adjusts for two known confounders, and does not make a term evidence of selection. Terms remain
 #' leads to test by other means. It treats genes as independent, and treats fitted probabilities as known.
 #'
+#' @section Limits:
+#' Its false-term rate was measured in simulation at 4 plant pairs from 2 families, for
+#' `pos_threshold = 1`. This does not establish false discovery control for every dataset, and it has
+#' not been validated for detecting real selection in real genomes. It does not adjust for annotation
+#' completeness or for dependence between genes such as tandem duplicates and homeologs. Polyploids,
+#' other clades, and quantile thresholds were not part of that evidence: for those, run the simulation
+#' on your own table, as described in `docs/validation/enrichment-confounding.md`.
+#'
+#' @section Which genes are tested:
+#' Each side and term type has its own universe: pairs in the table that pass `filter_expr` and
+#' `max_dnds`, with defined dN/dS, dS above 0, a known length, and at least one term of that type.
+#' Pairs with dS of 0, whose dN/dS is undefined, and unannotated genes take no part. The table's pairs
+#' define the background, so a table restricted to retained homeologs asks about those homeologs, not
+#' about the whole genome. Query and subject share each pair's dN/dS, and comparisons sharing genes share
+#' their signal, so agreement between sides or between comparisons of one genome is not independent
+#' replication.
+#'
 #' @param dnds_annot_file Path to one `<comparison>_dnds_annot.tsv`.
 #' @param comparison_file Batch mode: a comparison file, as for the other commands.
 #' @param output_dir Root folder with per-comparison folders (batch mode).
 #' @param terms Term types to test, among `"go"` and `"ipr"`. A type with no column is skipped.
 #' @param sides Sides to test, among `"query"` and `"subject"`.
 #' @param ontologies GO branches, among `"BP"`, `"MF"`, and `"CC"`.
-#' @param pos_threshold `dNdS > pos_threshold` defines a positive gene (default 1).
+#' @param pos_threshold `dNdS > pos_threshold` defines a positive gene (default 1). As in
+#'   `go_enrichment()`, it can be a quantile of dN/dS, `"q0.95"` or `"quantile:0.95"`, taken separately in
+#'   each universe. The value used is in the `threshold` column.
 #' @param max_dnds Drops rows with `dNdS >= max_dnds` or undefined `dNdS` (default 10).
 #' @param filter_expr Optional logical expression evaluated in the table.
 #' @param min_total A term is tested if at least this many genes in the universe carry it (default 10).
@@ -37,7 +56,7 @@
 #' @param verbose If `TRUE`, reports what was tested.
 #'
 #' @return Invisibly, the paths of the TSV files written. Columns: `term`, `term_type`, `ontology`,
-#'   `term_name`, `universe`, `pos_total`, `total_count`, `pos_count`, `expected` (positive genes
+#'   `term_name`, `threshold`, `universe`, `pos_total`, `total_count`, `pos_count`, `expected` (positive genes
 #'   predicted from length and dS, after the floor), `obs_over_expected`, `fisher_p` (without adjustment, for
 #'   comparison), `p_value`, `p_adj` (BH), `n_tested`, and `model`.
 #' @export
@@ -58,6 +77,7 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
   sides <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
   ontologies <- match.arg(ontologies, choices = c("BP", "MF", "CC"), several.ok = TRUE)
   threads <- max(1L, suppressWarnings(as.integer(threads)), na.rm = TRUE)
+  .covariate_threshold(pos_threshold, 1) # stops now if the value is not usable
   if (is.null(dnds_annot_file) == is.null(comparison_file)) {
     stop("Provide either comparison_file (batch) or dnds_annot_file (single).", call. = FALSE)
   }
@@ -86,6 +106,21 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
   failed <- vapply(out, inherits, logical(1), "try-error")
   if (any(failed)) stop(paste(unlist(out[failed]), collapse = "\n"), call. = FALSE)
   invisible(unlist(out, use.names = FALSE))
+}
+
+#' The dN/dS value above which a gene is positive
+#'
+#' @param pos_threshold One number, or a quantile written `"q0.95"` or `"quantile:0.95"`.
+#' @param dnds dN/dS of the genes in a universe. The quantile definition matches `go_enrichment()`.
+#' @return One number.
+#' @keywords internal
+.covariate_threshold <- function(pos_threshold, dnds) {
+  if (is.numeric(pos_threshold) && length(pos_threshold) == 1L && is.finite(pos_threshold)) return(as.numeric(pos_threshold))
+  if (is.character(pos_threshold) && length(pos_threshold) == 1L && grepl("^(q|quantile:)\\s*0?\\.[0-9]+$", trimws(pos_threshold), ignore.case = TRUE)) {
+    q <- as.numeric(sub("^(q|quantile:)\\s*", "", trimws(pos_threshold), ignore.case = TRUE))
+    if (q > 0 && q < 1) return(as.numeric(stats::quantile(dnds, probs = q, na.rm = TRUE, names = FALSE, type = 7)))
+  }
+  stop("[covariate_enrichment] pos_threshold must be one number, or a quantile such as 'q0.95' or 'quantile:0.95'.", call. = FALSE)
 }
 
 #' Upper tail of a Poisson-binomial distribution
@@ -154,7 +189,7 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
   ds <- suppressWarnings(as.numeric(d$dS)); len <- suppressWarnings(as.numeric(d[[len_col]]))
   usable <- is.finite(ds) & ds > 0 & is.finite(len) & len > 0
   d <- d[usable, , drop = FALSE]; ds <- ds[usable]; len <- len[usable]
-  positive <- as.numeric(d$dNdS) > pos_threshold
+  dnds <- as.numeric(d$dNdS)
   base <- sub("_dnds_annot\\.tsv$", "", basename(path))
   split_terms <- function(x) {
     x <- as.character(x)
@@ -164,7 +199,10 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
   test_universe <- function(gene_terms) {
     has <- lengths(gene_terms) > 0L
     if (!any(has)) return(NULL)
-    .covariate_test_universe(positive[has], len[has], ds[has], gene_terms[has], min_total)
+    threshold <- .covariate_threshold(pos_threshold, dnds[has])
+    r <- .covariate_test_universe(dnds[has] > threshold, len[has], ds[has], gene_terms[has], min_total)
+    if (!is.null(r)) r$threshold <- threshold
+    r
   }
   for (type in terms) {
     col <- paste0(prefix, "_", type)
@@ -206,7 +244,7 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
                       base, side, toupper(type), max(res$pos_total)))
     }
     res <- res[res$pos_count >= min_pos, , drop = FALSE]
-    res <- res[order(res$p_value, res$term), c("term", "term_type", "ontology", "term_name", "universe", "pos_total", "total_count", "pos_count",
+    res <- res[order(res$p_value, res$term), c("term", "term_type", "ontology", "term_name", "threshold", "universe", "pos_total", "total_count", "pos_count",
                                                "expected", "obs_over_expected", "fisher_p", "p_value", "p_adj", "n_tested", "model"), drop = FALSE]
     out <- file.path(dirname(path), sprintf("%s_%s_%s_covariate_enrichment.tsv", base, prefix, toupper(type)))
     utils::write.table(res, out, sep = "\t", quote = FALSE, row.names = FALSE, na = "")

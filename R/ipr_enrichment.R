@@ -194,6 +194,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   tree_source <- match.arg(tree_source)
   method <- match.arg(method)
 
+  .require_numeric_threshold(pos_threshold, "ipr_enrichment")
   threads <- suppressWarnings(as.integer(threads))
   if (is.na(threads) || threads < 1L) threads <- 1L
   message(sprintf("[ipr_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))

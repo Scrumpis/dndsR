@@ -11,7 +11,7 @@ Every command is also an R function with the same name and options, except `exam
 | `ipr_enrichment` | InterPro term enrichment under positive selection |
 | `go_enrichment` | Gene Ontology enrichment with topGO |
 | `term_enrichment` | Enrichment of other terms, such as KEGG or PANTHER |
-| `covariate_enrichment` | GO and InterPro enrichment adjusted for gene length and dS |
+| `covariate_enrichment` | GO and InterPro enrichment adjusted for gene length and dS. `--pos-threshold` takes a number or a quantile such as `q0.95` |
 | `dnds_ideogram` | Ideogram of binned dN/dS across a genome |
 | `dnds_summary` | dN/dS distributions and statistics, optionally by region |
 | `dnds_contrast` | Contrasts between comparisons |

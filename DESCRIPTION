@@ -1,7 +1,7 @@
 Package: dndsR
 Type: Package
 Title: dN/dS Pipeline for Comparative Genomics
-Version: 0.3.0.9000
+Version: 0.4.0
 Authors@R: 
     person(given = "Nick", family = "Johnson", 
            email = "john7932@msu.edu", role = c("aut","cre"))

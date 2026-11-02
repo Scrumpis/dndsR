@@ -33,7 +33,9 @@ covariate_enrichment(
 
 \item{ontologies}{GO branches, among \code{"BP"}, \code{"MF"}, and \code{"CC"}.}
 
-\item{pos_threshold}{\code{dNdS > pos_threshold} defines a positive gene (default 1).}
+\item{pos_threshold}{\code{dNdS > pos_threshold} defines a positive gene (default 1). As in
+\code{go_enrichment()}, it can be a quantile of dN/dS, \code{"q0.95"} or \code{"quantile:0.95"}, taken separately in
+each universe. The value used is in the \code{threshold} column.}
 
 \item{max_dnds}{Drops rows with \code{dNdS >= max_dnds} or undefined \code{dNdS} (default 10).}
 
@@ -50,7 +52,7 @@ applied after correction, and changes which rows are written, not their p-values
 }
 \value{
 Invisibly, the paths of the TSV files written. Columns: \code{term}, \code{term_type}, \code{ontology},
-\code{term_name}, \code{universe}, \code{pos_total}, \code{total_count}, \code{pos_count}, \code{expected} (positive genes
+\code{term_name}, \code{threshold}, \code{universe}, \code{pos_total}, \code{total_count}, \code{pos_count}, \code{expected} (positive genes
 predicted from length and dS, after the floor), \code{obs_over_expected}, \code{fisher_p} (without adjustment, for
 comparison), \code{p_value}, \code{p_adj} (BH), \code{n_tested}, and \code{model}.
 }
@@ -77,3 +79,24 @@ This command does not use topGO's conditional algorithms.
 This adjusts for two known confounders, and does not make a term evidence of selection. Terms remain
 leads to test by other means. It treats genes as independent, and treats fitted probabilities as known.
 }
+\section{Limits}{
+
+Its false-term rate was measured in simulation at 4 plant pairs from 2 families, for
+\code{pos_threshold = 1}. This does not establish false discovery control for every dataset, and it has
+not been validated for detecting real selection in real genomes. It does not adjust for annotation
+completeness or for dependence between genes such as tandem duplicates and homeologs. Polyploids,
+other clades, and quantile thresholds were not part of that evidence: for those, run the simulation
+on your own table, as described in \code{docs/validation/enrichment-confounding.md}.
+}
+
+\section{Which genes are tested}{
+
+Each side and term type has its own universe: pairs in the table that pass \code{filter_expr} and
+\code{max_dnds}, with defined dN/dS, dS above 0, a known length, and at least one term of that type.
+Pairs with dS of 0, whose dN/dS is undefined, and unannotated genes take no part. The table's pairs
+define the background, so a table restricted to retained homeologs asks about those homeologs, not
+about the whole genome. Query and subject share each pair's dN/dS, and comparisons sharing genes share
+their signal, so agreement between sides or between comparisons of one genome is not independent
+replication.
+}
+

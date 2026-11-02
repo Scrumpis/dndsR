@@ -33,8 +33,8 @@ dndsr doctor
 Not yet tested. The image is `linux/amd64`, so Apple-silicon Macs run it under emulation, which can be slow on large genomes.
 
 ```
-docker pull scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
-tools/dndsr-install install --engine docker --image scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831 --docker-platform linux/amd64
+docker pull scrumpis/dndsr@sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11
+tools/dndsr-install install --engine docker --image scrumpis/dndsr@sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11 --docker-platform linux/amd64
 ```
 
 ## Conda or micromamba
@@ -42,7 +42,7 @@ tools/dndsr-install install --engine docker --image scrumpis/dndsr@sha256:726657
 The simplest way to use dndsR from R. No compiling, and it includes DIAMOND.
 
 ```
-git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
+git clone --branch v0.4.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 conda env create -f tools/environment.yml
 conda activate dndsr

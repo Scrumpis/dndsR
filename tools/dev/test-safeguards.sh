@@ -14,6 +14,12 @@ git clone -q --branch dev "$tmp/remote.git" "$tmp/work"
 cd "$tmp/work" || exit 1
 git config user.name test; git config user.email test@example.invalid
 git branch -q main origin/main
+# dev may already contain main, which makes a merge of main a no-op that proves nothing. Keep the
+# fixture's main ahead of dev, in this clone and its remote only.
+if git merge-base --is-ancestor main dev; then
+  git branch -qf main "$(git commit-tree -p main -m "fixture: main ahead of dev" "main^{tree}")"
+  git push -q origin main
+fi
 
 # Copy the current (possibly uncommitted) safeguards into the clone.
 mkdir -p tools .claude

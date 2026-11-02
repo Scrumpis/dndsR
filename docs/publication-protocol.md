@@ -70,7 +70,7 @@ How to read that report, from [estimator](validation/estimators.md) and [ortholo
 
 ## 5. Choose the term list
 
-Report `covariate_enrichment`'s `p_adj` as the primary list. It is the one test here with evidence of holding its false-term rate at both high and low numbers of positive genes, and it accounts for length and dS ([evidence](validation/enrichment-confounding.md)). Report `go_enrichment` and `ipr_enrichment` alongside, to show what the adjustment removes. Do not choose among them by which result you prefer.
+Report `covariate_enrichment`'s `p_adj` as the primary list. It is the one test here with simulation evidence of holding its false-term rate at both high and low numbers of positive genes, at `pos_threshold = 1` in 4 plant pairs, and it accounts for length and dS ([evidence](validation/enrichment-confounding.md)). Report `go_enrichment` and `ipr_enrichment` alongside, to show what the adjustment removes. Do not choose among them by which result you prefer.
 
 Check each term you intend to discuss:
 
@@ -84,6 +84,7 @@ dndsr covariate_enrichment --dnds-annot-file sensitivity/<comparison>_dnds_annot
 
   The repeat is [calibrated](validation/enrichment-confounding.md#the-ds-filter-in-the-checklist), so its list is valid too, and neither run is more correct. Report the terms in both as stable. A term in only one, especially one resting on 2 or 3 positive genes near `p_adj` 0.05, is fragile. Say which you report as primary before you see either: here, the unfiltered run.
 - [ ] **Do not rely on one family's genes being independent.** Tandem families share history. Look at whether a term's positive genes cluster on the genome: `q_gff_seqname` and `q_gff_start` in the annotated table.
+- [ ] **For a polyploid or another clade, check calibration on your own table.** The evidence does not cover them. See the end of this page. Homeologs carry much the same annotation and share each pair's dN/dS, so do not count agreement between sides or between comparisons of one genome as replication.
 - [ ] **Test by other means.** Use site or branch-site models with more than two sequences, on real alignments, before you claim selection on any gene or family.
 
 ## 6. What the results can and cannot support

@@ -1,8 +1,10 @@
-# dndsR (development)
+# dndsR 0.4.0
 
-Nothing here changes an existing default, algorithm, or output value.
+Nothing here changes an existing default, algorithm, or the content of an existing table.
 
-- New `covariate_enrichment()` and `dndsr covariate_enrichment`: GO and InterPro enrichment adjusted for gene length and dS. It is opt-in, and adds output files only. Evidence: `docs/validation/enrichment-confounding.md`.
+- `go_enrichment` and `term_enrichment` now warn on every run that they do not adjust for gene length or dS, with the false-term rates measured in simulation. They record this, with their settings, in `<comparison>_go_enrichment_notice.json` or `<comparison>_term_enrichment_notice.json`.
+- `term_enrichment` and `ipr_enrichment` now stop if `pos_threshold` is not one number. A text value such as `q0.95` used to be compared with dN/dS as text, so no gene was positive and the run looked like a real result with no terms.
+- New `covariate_enrichment()` and `dndsr covariate_enrichment`: GO and InterPro enrichment adjusted for gene length and dS. It is opt-in, and adds output files only. `--pos-threshold` takes a number or a quantile such as `q0.95`, as in `go_enrichment`; the value used is in the `threshold` column. Its simulation evidence does not establish false discovery control in general, and it has not been validated for detecting real selection. Evidence: `docs/validation/enrichment-confounding.md`.
 - `calculate_dnds` reports undefined, low-dS, high-dS, and outlier pairs, and says when fewer than 30 genes exceed 1. This is a message only.
 - `extract_cds` explains a failure from a trans-spliced gene, such as plastid rps12 in a RefSeq GFF3, and suggests removing organelles.
 - `split_comparisons --mode haplotype` warns above 8 labels, which may be scaffold numbers.

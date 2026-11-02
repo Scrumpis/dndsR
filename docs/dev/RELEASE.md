@@ -15,13 +15,13 @@ Each release links one git tag, one `software-version` in the skill, one image d
 1. Complete `docs/dev/GITHUB-SETUP.md`. Open a pull request from `dev` to `main`, and merge once its checks and review pass.
 2. Tag `vX.Y.Z` on `main`. `publish.yaml` checks the tag, waits for approval, builds, tests, and pushes that one version tag, recording the digest. You never build on a laptop. It never touches `latest`.
 3. In a follow-up commit through a pull request, replace the image digest in `skills/dndsr/`, `docs/tutorials/`, `README.md`, and `INSTALL.md` with the published one. Update `references/verification.md`, and rerun the tutorial test.
-4. Publish the GitHub release, using `docs/dev/release-notes-0.3.0.md` for v0.3.0, with the manifest and skill tarball that the workflow uploaded, and have Zenodo archive it. Add the DOI to `CITATION.cff`, `README.md`, and the skill.
+4. Publish the GitHub release, using `docs/dev/release-notes-<version>.md`, with the manifest and skill tarball that the workflow uploaded, and have Zenodo archive it. Add the DOI to `CITATION.cff`, `README.md`, and the skill.
 
 The published image's digest cannot be inside the commit it was built from, so tutorials in the tag still show the previous digest until step 3. The release notes should give the new one.
 
 ## After v0.3.0
 
-Remove the correctness notice from the top of `README.md` in the release after v0.3.0. Keep `docs/migrating-to-0.3.md`, `docs/validation/`, `NEWS.md`, and the v0.3.0 release notes permanently.
+The maintainer re-added the correctness notice and a DOI badge to `README.md` after v0.3.0 (PR #3), and both stay in v0.4.0. Remove the notice only when the maintainer decides. Keep `docs/migrating-to-0.3.md`, `docs/validation/`, `NEWS.md`, and the v0.3.0 release notes permanently.
 
 ## CRAN (later)
 
