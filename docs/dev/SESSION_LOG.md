@@ -2,6 +2,15 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-02: final enrichment defaults
+
+- **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`
+- **Start:** `40ff597`. **Software:** `eed1096`.
+- **Done:** `ipr_enrichment` global and `go_enrichment` BH by default, with selectable alternatives. Null models rerun. Independent recalculation, including GO. Unrelated outputs byte-identical. Earlier evidence preserved.
+- **Found by testing:** GO's default is 9.5% under `strata`, mostly GO:0005576, which length and dS largely reproduce; reported, not corrected. An ontology with no positive genes crashed topGO; fixed. `man/` usage lines were generated from an older install and showed the old defaults, while the code was right; regenerated.
+- **Errors of the validation itself:** the end-to-end job and parent-child null shared an output folder, which stopped 10 of 100 `strata` runs; left out and counted.
+- **Failed or not done:** nothing pushed, merged, tagged, or published. CI has not run on this code. No biological comparison of terms. Not measured: false discovery with real associations.
+
 ## 2026-11-01: enrichment correction
 
 - **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`

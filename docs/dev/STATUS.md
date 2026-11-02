@@ -2,7 +2,7 @@
 
 Update this at the end of each substantive session. Identify things by commit and hash, not by date.
 
-**Phase:** v0.3.0 candidate on `dev`, locally validated, ready for the maintainer's review. Software is at `1a363fb`, starting from `5d53ced`. CI last passed at `f84521f` and has not run on the enrichment correction. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
+**Phase:** v0.3.0 candidate on `dev`, locally validated. Software is at `eed1096`, starting from `5d53ced`. One statistical result awaits the maintainer: default GO enrichment is at 9.5% of runs under the `strata` null. CI last passed at `f84521f` and has not run on the enrichment changes. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
 
 ## Identity
 
@@ -20,6 +20,6 @@ A read-only trial merge of the original `dev` into `main` had no conflicts. `mai
 
 ## Next
 
-1. The maintainer pushes `dev`, and checks CI.
+1. The maintainer decides on the GO result under `strata`, pushes `dev`, and checks CI.
 2. The maintainer completes `GITHUB-SETUP.md`, reviews `docs/validation/enrichment.md`, then follows `RELEASE.md`. Agents do not push; this machine has no GitHub credentials.
 3. Continue `ROADMAP-1.0.md`: enrichment confounders and biological benchmarking, then Priority 2. Threading comes after v0.3.0: [performance.md](../validation/performance.md).
