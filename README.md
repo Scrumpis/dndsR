@@ -1,6 +1,7 @@
 # dndsR
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Scrumpis/dndsR/actions/workflows/R-CMD-check.yaml)
+[![DOI](https://zenodo.org/badge/927389986.svg)](https://doi.org/10.5281/zenodo.23879469)
 <!-- badges: end -->
 
 > **Correctness notice:** v0.1.0 and v0.2.0 were unvalidated pre-releases with defects that can give wrong dN/dS, including false signals of positive selection. Please recompute any results from them. [What was affected and how to rerun](docs/migrating-to-0.3.md).
