@@ -2,6 +2,11 @@
 
 Durable checkpoints for resuming autonomous work. Newest first. Evidence is in `docs/validation/`. The plan is at the end.
 
+## Checkpoints since the last release candidate
+
+### Correct enrichment multiple testing, GFF comments, and a GO crash
+Software at `1a363fb`. Evidence: `docs/validation/enrichment.md`.
+
 ## Environment
 
 - Runtime files live outside the clone, in a `dndsr-runtime` folder beside it: image, `SHA256SUMS`, R library, reference tools (PAML 4.10.10 and KaKs_Calculator 2.0.1 in a micromamba env). Recreate them as described in `RUNBOOK.md` if purged.

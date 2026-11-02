@@ -12,6 +12,7 @@ Open issues that affect results or use. Fixed defects are in [NEWS](../../NEWS.m
 | Default CDS with a first exon of nonzero GFF phase (partial genes) are not trimmed to frame | Open; they are often excluded by the in-frame stop check | Check annotation quality |
 | `split_comparisons --mode haplotype` treats any trailing `_<number>` as a haplotype, so `scaffold_12` becomes haplotype 12 | Open | Check the labels it reports |
 | Enrichment does not correct for gene length, dS, annotation completeness, or dependence between genes, all of which affect results. See [enrichment calibration](enrichment.md) | Documented; modeling is on the roadmap to v1.0.0 | See [interpretation](../interpretation.md) |
+| Default `ipr_enrichment` corrects within each InterPro entry type, so with no association 9–17% of runs had a significant term in some table on a real genome pair. See [enrichment calibration](enrichment.md) | Documented | Treat `p_adj` as per table, or use `adjust_scope = "global"`, which reached 0–6% |
 | Most of the default `go_enrichment` list at p < 0.05 cannot be told apart from noise. See [enrichment calibration](enrichment.md) | Documented | Use a stricter threshold, and validate terms independently |
 | A dN/dS has no uncertainty attached, and `Comeron95` truncates undefined terms without flagging them | Open; see `docs/dev/ROADMAP-1.0.md` | See [interpretation](../interpretation.md) |
 | Fixed 1.96 in normal confidence intervals; dependence between genes; no adjustment across contrasts | Documented | See [interpretation](../interpretation.md) |
@@ -27,4 +28,5 @@ Interpretation limits and the estimator's bias are covered in [interpretation](.
 | A `git pull` in the clone reinstalls dndsR automatically on the next run, so the analysis version can change silently. Provenance records the version | Open; pin a tag for production analyses |
 | `--threads` gives `append_annotations` no speedup, and `extract_cds` and the enrichment commands use at most 2 workers per comparison. See [thread scaling](performance.md) | Open |
 | `calculate_dnds` needs about 1 GB per core. Called from an R session that already ran the workflow, 32 cores was killed at 96 GB with an unclear error | Open; use fewer cores or a fresh session |
+| `ipr_enrichment` looks up the current InterPro release even with `entries_source = "local"`, and with no network stops with a message saying local files would avoid it. No wrong results. Use `auto_detect_release = FALSE` | Open |
 | Windows runs sequentially and has not been tested | Open |

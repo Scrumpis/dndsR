@@ -2,7 +2,7 @@
 
 Update this at the end of each substantive session. Identify things by commit and hash, not by date.
 
-**Phase:** v0.3.0 candidate on `dev`. All CI passes at `f84521f`. The release awaits the maintainer's decision on the enrichment finding, setup, and approval. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
+**Phase:** v0.3.0 candidate on `dev`, locally validated, ready for the maintainer's review. Software is at `1a363fb`, starting from `5d53ced`. CI last passed at `f84521f` and has not run on the enrichment correction. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
 
 ## Identity
 
@@ -20,6 +20,6 @@ A read-only trial merge of the original `dev` into `main` had no conflicts. `mai
 
 ## Next
 
-1. The maintainer completes `GITHUB-SETUP.md`, then follows `RELEASE.md`. Agents do not push; this machine has no GitHub credentials.
-2. The maintainer decides whether the `min_pos` correction goes in v0.3.0: `docs/validation/enrichment.md`.
-3. Continue `ROADMAP-1.0.md`, from Priority 1's remaining items and then Priority 2.
+1. The maintainer pushes `dev`, and checks CI.
+2. The maintainer completes `GITHUB-SETUP.md`, reviews `docs/validation/enrichment.md`, then follows `RELEASE.md`. Agents do not push; this machine has no GitHub credentials.
+3. Continue `ROADMAP-1.0.md`: enrichment confounders and biological benchmarking, then Priority 2. Threading comes after v0.3.0: [performance.md](../validation/performance.md).

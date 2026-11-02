@@ -23,6 +23,9 @@
 | 2026-11-01 | Correctness notice goes in the v0.3.0 release notes, `docs/validation/`, the migration guide, and a README notice removed in the next release. No emails, pinned issue, or Docker Hub notice. | Maintainer decision: pre-releases, with no evidence of external adoption. |
 | 2026-11-01 | Published `dev` history is not rewritten. Unpublished results stay out of current files and future commits. | Maintainer decision: exposure was limited to aggregate figures. |
 | 2026-11-01 | Gene-level `dnds_state_contrast` stops with an error. | Confirmed by running that it gives no meaningful result. |
+| 2026-11-01 | BH covers terms meeting `min_total` and `max_prop`; `min_pos` is report-only. GFF comments only at line start. | Maintainer approved. False-positive rates and before/after values are in `docs/validation/enrichment.md`. |
+| 2026-11-01 | `ipr_enrichment` keeps `adjust_scope = "per_type"` as its default, documented with its rate across tables. | Not a defect: each table is near nominal, and changing a default was not part of the approval. Maintainer may change it. |
+| 2026-11-01 | No correction for length or dS in v0.3.0. | Maintainer decision: stays on the v1.0.0 roadmap until validated. |
 
 ## Open questions
 

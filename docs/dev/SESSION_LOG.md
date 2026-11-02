@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-01: enrichment correction
+
+- **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`
+- **Start:** `5d53ced`. Maintainer approved the three fixes.
+- **Done:** BH before reporting filters; GFF comment parsing; GO crash. Null models rerun with real functions, before and after. Independent recalculation, GFF recovery check, and evidence in `docs/validation/enrichment.md`.
+- **Found by testing:** 73 pairs lost terms, not 71, which had counted one column at a time. Default `ipr_enrichment` is still 9–17% across tables, because it corrects per type; documented. `entries_source = "local"` still needs network unless release detection is off; recorded as open. An early parent-child run would have counted that network error as a clean run: stopped, fixed, and rerun.
+- **Failed or not done:** nothing pushed, merged, tagged, or published. CI has not run on this code. No biological comparison of terms.
+
 ## 2026-11-01: enrichment validation and faster tests
 
 - **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`

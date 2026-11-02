@@ -41,7 +41,8 @@ Treat dN/dS above 1 as a candidate list. To support a claim about particular gen
 **Raw and adjusted values.**
 
 - `p_value` and `raw_p` are not corrected for multiple testing. With thousands of terms, many fall below 0.05 by chance.
-- In `ipr_enrichment` and `term_enrichment`, `p_adj` is corrected across `n_tested` terms by `p_adjust_method`.
+- In `term_enrichment`, `p_adj` is corrected across `n_tested` terms by `p_adjust_method`.
+- In `ipr_enrichment`, by default, `p_adj` is corrected within each InterPro entry type, and each table has its own `n_tested`. On a real genome pair with no true association, 9–17% of runs had a significant term in some table, although each table alone was near 5%. So do not treat terms pooled from several tables as corrected together. For one family across all types, use `--adjust-scope global` in the CLI or `adjust_scope = "global"` in R, which reached 0–6% in the same test. The parent-child method does not support it.
 - In `go_enrichment`, `p_adj` by default **equals** `raw_p`. topGO's `weight01` tests depend on each other, so BH has no standard FDR meaning for them. Its output is a ranking, not a list of discoveries. Do not report terms below 0.05 as significant without a further check of what chance alone gives on your data.
 
 **What selects the candidates.** Positive genes are not a random sample of genes, so a term can be enriched with no link to selection:
@@ -52,7 +53,7 @@ Treat dN/dS above 1 as a candidate list. To support a claim about particular gen
 - **Dependence.** Tandem duplicates and genes sharing a term are not independent, although Fisher's test assumes they are.
 - **The candidate rule.** Results change with `pos_threshold`, `max_dnds`, and filters. Check whether a conclusion survives other reasonable choices.
 
-dndsR does not correct for length, dS, or annotation. This is a limitation: see [enrichment calibration](validation/enrichment.md).
+dndsR does not correct for length, dS, or annotation, and passing correction does not remove these effects: multiple-testing correction limits false positives when there is no association, and says nothing about why an association exists. This is a limitation: see [enrichment calibration](validation/enrichment.md).
 
 **Also:**
 

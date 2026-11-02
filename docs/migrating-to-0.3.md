@@ -38,5 +38,5 @@ Single-exon genes and plus-strand genes with one isoform were assembled correctl
 - `extract_cds` leaves invalid CDS out and writes a QC table. Use `--keep-internal-stops true` to include them.
 - A failing `--filter-expr` is now an error.
 - `go_enrichment`: `enrichment` has a new definition, and there is a new `p_adjust_method` column.
-- `ipr_enrichment` and `term_enrichment`: there are new `p_adjust_method` and `n_tested` columns, and `p_adj` is larger, because it corrects for every eligible term. `min_pos` no longer affects `p_adj`.
+- `ipr_enrichment` and `term_enrichment`: there are new `p_adjust_method` and `n_tested` columns, and `p_adj` is larger, because it corrects for every eligible term. `min_pos` no longer affects `p_adj`. On a public genome pair, significant `term_enrichment` terms fell from 48 to 18 for this reason. `ipr_enrichment` tables are still corrected per entry type: see [interpretation](interpretation.md).
 - The published image's dndsR is installed differently from 0.3.0 on. See [INSTALL.md](../INSTALL.md).

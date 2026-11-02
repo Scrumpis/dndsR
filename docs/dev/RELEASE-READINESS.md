@@ -1,8 +1,10 @@
 # Release readiness: v0.3.0 candidate
 
-**The maintainer agreed GO on the evidence at `f84521f`, before the finding below, subject to setup and final approval to merge, tag, and publish.** Unpublished real-genome results stay outside Git.
+**Local candidate ready for the maintainer's review, at the `dev` commit that adds this text. The software is at `1a363fb`.** It has not been through CI: the CI table below is from `f84521f`, before the enrichment correction. The maintainer's earlier GO at `f84521f` predates these changes, and final approval is still needed to merge, tag, and publish. Unpublished real-genome results stay outside Git.
 
-**New finding needing a decision before release.** `term_enrichment` and `ipr_enrichment` filter by `min_pos` before BH. With no true association, 58% and 95% of runs report a significant term, where 5% is nominal: [enrichment calibration](../validation/enrichment.md). The options are to fix it in v0.3.0 (BH across all terms meeting `min_total`, 48 significant terms becoming 18 on the public pair, with a test and documentation), or to release with the limitation stated and fix it for v1.0.0. No package code has changed.
+**Corrected since `f84521f`, with maintainer approval.** Multiple-testing correction in `term_enrichment` and `ipr_enrichment`; `#` in GFF attributes; the `go_enrichment(include_definition = FALSE)` crash. See [enrichment calibration](../validation/enrichment.md).
+
+**Limitations to read before approving.** Enrichment is corrected for multiple testing, not for gene length, dS, or annotation completeness. Default `ipr_enrichment` corrects each InterPro type separately, so across tables 9–17% of null runs have a significant term, documented and left as the default. No enrichment result has been compared with independent biological evidence.
 
 ## Blocking the release
 
@@ -30,7 +32,24 @@ Step and job results are from the public API. Job logs need a login and were not
 
 `R/`, `inst/`, `skills/`, `tools/Dockerfile`, `tools/dndsr-install`, `DESCRIPTION`, and `NAMESPACE` have no differences between `c1eda04` and `f84521f`, so the agent test and the local checks below still describe this code. `R/`, `inst/`, `tools/Dockerfile`, `DESCRIPTION`, and `NAMESPACE` also have no differences from `59faf30`, the commit used for the public-genome comparison.
 
-## Local evidence at the final code
+## Local evidence at `1a363fb`, the corrected code
+
+Later commits change only documentation and validation scripts: `R/`, `inst/`, `DESCRIPTION`, and `NAMESPACE` are unchanged.
+
+| Check | Result |
+|---|---|
+| `tools/dev/check.sh` at final HEAD: safeguards, skill, tests, tutorial | Pass. 78 tests, 333 expectations, 0 failed, 0 skipped |
+| `R CMD check --no-manual`, published image | Status OK. 328 passed, 0 failed, 5 expected warnings from tests that exercise no network and a missing file |
+| Candidate image from the Dockerfile's steps, via Apptainer, `container-checks.sh` | All pass |
+| Package tests in that image | 78 tests, 333 expectations, 0 failed, 0 skipped |
+| R tutorial in that image | 4 blocks ran |
+| Full CLI workflow on the public pair, against the previous candidate | `AtAl_dnds.tsv`, summary, and ideogram SVGs byte-identical. Annotated table differs on the 73 recovered rows only |
+| Null models and independent recalculation | [enrichment.md](../validation/enrichment.md) |
+| Thread determinism on the real table | Annotated table and all `term_enrichment`, `ipr_enrichment`, and `go_enrichment` tables byte-identical at 1 and 8 threads |
+
+## Local evidence at earlier code
+
+These were not rerun after the correction, unless also listed above.
 
 | Check | Result |
 |---|---|
@@ -53,5 +72,5 @@ Step and job results are from the public API. Job logs need a login and were not
 - R from CRAN and Bioconductor failed on the tested HPC module, because of `rtracklayer` and OpenSSL. Conda is the recommended route.
 - **Codex:** partial, and not rerun at the final commit. In its sandbox, Singularity could not start, so it ran the image under Bubblewrap.
 - Docker Hub push: cannot be tested without publishing.
-- Enrichment on a public annotated genome: constructed cases only. See `ROADMAP-1.0.md`.
+- Biological comparison of enrichment terms, and enrichment at other divergences: open. See `ROADMAP-1.0.md`.
 - Open items: `docs/validation/known-issues.md`.

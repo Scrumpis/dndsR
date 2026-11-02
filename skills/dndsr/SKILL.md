@@ -79,8 +79,8 @@ Read [docs/interpretation.md](../../docs/interpretation.md) before explaining re
 - The default Comeron method compresses ratios: very low ones read high, and high ones read low, more so at high divergence. Evidence: [docs/validation/estimators.md](../../docs/validation/estimators.md). Agreement with PAML and KaKs_Calculator on real genes: [docs/validation/public-genome.md](../../docs/validation/public-genome.md).
 - Reciprocal best hits can mispair paralogs, especially in polyploids. Annotation errors can look like selection.
 - Enrichment tests treat genes as independent, and do not correct for gene length, dS, or annotation completeness, which all affect which genes pass dN/dS > 1.
-- A significant term is a lead, not evidence that a function evolved under selection. Report it that way.
-- `go_enrichment`'s `p_adj` equals its uncorrected `raw_p` by default, so do not describe its terms below 0.05 as significant discoveries. In `ipr_enrichment` and `term_enrichment`, `p_adj` is corrected across `n_tested` terms, and `min_pos` changes only which rows are written.
+- Multiple-testing correction limits false positives under no association. It does not remove gene length, dS, or annotation bias. A significant term is a lead, not evidence that a function evolved under selection. Report it that way.
+- `go_enrichment`'s `p_adj` equals its uncorrected `raw_p` by default, so do not describe its terms below 0.05 as significant discoveries. In `ipr_enrichment` and `term_enrichment`, `p_adj` is corrected across `n_tested` terms, and `min_pos` changes only which rows are written. By default `ipr_enrichment` corrects each InterPro entry type separately, so do not treat terms pooled across its tables as corrected together; `--adjust-scope global` corrects across all types.
 - `dnds_state_contrast --level gene` is disabled, because its results were not meaningful.
 - Results from dndsR before 0.3.0 should not be reused. They can contain false dN/dS above 1. See [docs/migrating-to-0.3.md](../../docs/migrating-to-0.3.md).
 

@@ -78,7 +78,7 @@ A public RefSeq genome where only some transcripts have `transcript_id` made the
 
 ## Shared identifiers and annotation
 
-No gene IDs are shared between these two genomes. RefSeq-style IDs matched, so annotations and coordinates are present in the current table. Enrichment on this pair, with public GO and InterPro terms added, is in [enrichment.md](enrichment.md).
+No gene IDs are shared between these two genomes. RefSeq-style IDs matched, so annotations and coordinates are present in the current table. Enrichment on this pair, with public GO and InterPro terms added, is in [enrichment.md](enrichment.md), along with a check of the 73 pairs that lost terms to `#` in GFF attributes.
 
 ## Isoform choice
 
