@@ -888,13 +888,27 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       ipr <- parts[i]
       if (!is.null(exclude_set) && isTRUE(exclude_set[ipr])) { keep[i] <- FALSE; next }
       if (!is.null(allowed_types)) {
-        ty <- if (!is.null(type_by_ipr)) type_by_ipr[ipr] else NA_character_
-        keep[i] <- if (is.na(ty)) isTRUE(keep_unmatched) else ty %in% allowed_types
+        ty <- if (!is.null(type_by_ipr)) type_by_ipr[[ipr]] else NULL
+        keep[i] <- if (is.null(ty) || is.na(ty)) isTRUE(keep_unmatched) else ty %in% allowed_types
       } else keep[i] <- TRUE
     }
     parts2 <- parts[keep]
     if (!length(parts2)) return("")
     paste(parts2, collapse = term_sep)
+  }
+  # Each distinct term string is filtered once, and an environment replaces a named vector, whose
+  # lookup scans it. This was over 90% of the time on a real genome, and changes no result.
+  .filter_terms_vector <- function(v, allowed_types, type_by_ipr, exclude_set, keep_unmatched) {
+    type_env <- NULL
+    if (!is.null(type_by_ipr)) {
+      named <- !is.na(names(type_by_ipr)) & nzchar(names(type_by_ipr)) & !duplicated(names(type_by_ipr))
+      type_env <- list2env(as.list(type_by_ipr[named]), hash = TRUE, parent = emptyenv())
+    }
+    distinct <- unique(v)
+    filtered <- vapply(distinct, .filter_terms_string, FUN.VALUE = character(1), allowed_types = allowed_types,
+                       type_by_ipr = type_env, exclude_set = exclude_set, keep_unmatched = keep_unmatched,
+                       USE.NAMES = FALSE)
+    stats::setNames(filtered[match(v, distinct)], v)
   }
   .sanitize_type <- function(x) {
     x <- gsub("[^A-Za-z0-9]+", "_", x)
@@ -1156,7 +1170,10 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .MAX_FILES_FOR_AUTODETECT <- 50L
   .MAX_IPRS_FOR_AUTODETECT  <- 50000L
 
-  if (isTRUE(auto_detect_release) && is.null(interpro_release)) {
+  # With local entries and no remote tree, a release is never fetched, so there is nothing to detect.
+  needs_release <- !(identical(entries_source, "local") && tree_source %in% c("local", "none"))
+
+  if (isTRUE(auto_detect_release) && is.null(interpro_release) && needs_release) {
     iprs_all <- character(0)
 
     if (!is.null(comparison_file)) {
@@ -1297,15 +1314,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     col <- paste0(prefix, "ipr")
     if (!col %in% names(df) || !is.character(df[[col]])) return(NULL)
 
-    vec_all <- vapply(
-      df[[col]],
-      .filter_terms_string,
-      FUN.VALUE = character(1),
-      allowed_types = allowed_types,
-      type_by_ipr = type_by_ipr,
-      exclude_set = exclude_set,
-      keep_unmatched = keep_unmatched
-    )
+    vec_all <- .filter_terms_vector(df[[col]], allowed_types, type_by_ipr, exclude_set, keep_unmatched)
 
     # Filter rows once so pos/bg share the same annotation-aware universe
     if (isTRUE(drop_rows_without_term)) {
@@ -1351,15 +1360,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!nrow(df)) return(list())
 
     filter_fun <- function(v, keep_types = NULL, unmatched = keep_unmatched) {
-      vapply(
-        v,
-        .filter_terms_string,
-        FUN.VALUE = character(1),
-        allowed_types = keep_types,
-        type_by_ipr = type_by_ipr,
-        exclude_set = exclude_set,
-        keep_unmatched = unmatched
-      )
+      .filter_terms_vector(v, keep_types, type_by_ipr, exclude_set, unmatched)
     }
 
     results <- list()

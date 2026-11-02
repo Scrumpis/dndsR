@@ -43,6 +43,20 @@ test_that("InterPro Fisher tests and BH adjustment match hand calculation", {
   expect_equal(row$enrichment, (10 / 12) / (2 / 28), tolerance = 1e-10)
 })
 
+test_that("local InterPro files need no release lookup and no internet access", {
+  dir <- withr::local_tempdir()
+  ids <- domains(2)
+  term <- c(rep(ids[1], 10), rep(ids[2], 2), rep(ids[1], 2), rep(ids[2], 26))
+  annotated_table(file.path(dir, "t_dnds_annot.tsv"), c(rep(2, 12), rep(0.1, 28)), ipr = term)
+  withr::local_envvar(http_proxy = "http://127.0.0.1:9", https_proxy = "http://127.0.0.1:9", ftp_proxy = "http://127.0.0.1:9")
+  # auto_detect_release stays at its default, TRUE.
+  ipr_enrichment(dnds_annot_file = file.path(dir, "t_dnds_annot.tsv"), sides = "query", make_plots = FALSE,
+                 max_prop = 1, min_total = 1, min_pos = 1, tree_source = "none", entries_source = "local",
+                 entries_path = system.file("extdata", "interpro_entry.list.tsv", package = "dndsR"))
+  got <- utils::read.delim(file.path(dir, "t_q_IPR_Domain_enrichment.tsv"))
+  expect_equal(got$p_value[got$IPR == ids[1]], upper_tail(10L, 12L, 12L, 40L), tolerance = 1e-10)
+})
+
 test_that("InterPro enrichment works with no internet access", {
   dir <- withr::local_tempdir()
   ids <- domains(2)
