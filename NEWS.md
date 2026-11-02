@@ -30,10 +30,13 @@ Defects in earlier versions can change results. Rerun analyses made with earlier
 - Option values are kept as typed: `none` is no longer treated as unset (so `--fdr-method none` works), and names such as `007` and paths containing commas are preserved.
 - `filter_expr` that cannot be evaluated is now an error in every command, instead of running unfiltered in some. Rows where it gives NA are removed.
 - Each gene's CDS is its longest valid isoform.
-- `go_enrichment`: `enrichment` now has the same definition as the other enrichment commands, the proportion among positives divided by the proportion among other genes. A new column, `p_adjust_method`, states whether `p_adj` was adjusted.
+- **Default changed: `go_enrichment` now corrects `p_adj` by BH**, once across every tested term in all requested ontologies, for each comparison and side. It was a copy of `raw_p`. New options keep the old or other behavior: `p_adjust = "none"` (`--p-adjust none`), and `adjust_scope = "per_ontology"` (`--adjust-scope per_ontology`). New columns `p_adjust_method`, `adjust_scope`, and `n_tested`. Expect far fewer terms at `p_adj` ≤ 0.05: on a public genome pair, 4 rather than 31. Evidence and a remaining limitation: `docs/validation/enrichment.md`.
+- **Default changed: `ipr_enrichment` now corrects once across all eligible InterPro entry types**, including with `method = "parent_child"`, which previously did not support this. `adjust_scope = "per_type"` (`--adjust-scope per_type`) keeps correction within each type. New column `adjust_scope`. On a public genome pair, 15 significant terms rather than 20.
+- `go_enrichment` no longer stops with an error when an ontology has no positive genes.
+- `go_enrichment`: `enrichment` now has the same definition as the other enrichment commands, the proportion among positives divided by the proportion among other genes.
 - `ipr_enrichment` with `method = "parent_child"`: corrected the removal of genes explained by significant child terms, and terms with no parent or child in the tested set are now tested.
 - `ipr_enrichment` with stratification: terms of unknown type are no longer tested in every stratum.
-- `ipr_enrichment` and `term_enrichment`: new columns `p_adjust_method` and `n_tested`, the number of tests corrected for. It can exceed the number of rows written, so recalculating `p_adj` from the written rows will not match. A type with no positive genes now counts toward `adjust_scope = "global"`.
+- `ipr_enrichment` and `term_enrichment`: new columns `p_adjust_method` and `n_tested`, the number of tests corrected for. It can exceed the number of rows written, so recalculating `p_adj` from the written rows will not match. A type with no positive genes counts toward `n_tested` under `adjust_scope = "global"`.
 - `go_enrichment(include_definition = FALSE)` no longer stops with an error.
 - `append_annotations`: terms percent-encoded as GFF3 allows, such as `GO%3A0000001`, are now recognized.
 - `dnds_ideogram`: dN/dS exactly 1 no longer counts as positive, matching other commands.

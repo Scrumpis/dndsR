@@ -2,7 +2,7 @@
 
 Do the enrichment tests give false positives at the rate they claim? This page tests them on a real, publicly annotated genome pair. Everything here can be rebuilt with the scripts named below.
 
-**Result.** Before v0.3.0, the defaults of `term_enrichment` and `ipr_enrichment` were badly miscalibrated: with dN/dS assigned to genes at random, where any significant term is false, they reported one in 59–74% and 95–100% of runs. The cause was a filter applied before multiple-testing correction, and it is corrected in this release. `term_enrichment` now reports one in 1–3% of runs. Each `ipr_enrichment` table is at or near 5%, but its default corrects each InterPro entry type separately, so 9–17% of runs have a significant term in *some* table; `adjust_scope = "global"` brings that to 0–6%. `go_enrichment` was not affected by this defect, and its default list at p < 0.05 still cannot be told apart from noise by its size.
+**Result.** Before v0.3.0, the defaults of `term_enrichment` and `ipr_enrichment` were badly miscalibrated: with dN/dS assigned to genes at random, where any significant term is false, they reported one in 59–74% and 95–100% of runs. The cause, a filter applied before multiple-testing correction, is corrected. `ipr_enrichment` and `go_enrichment` now also apply BH across one family by default. `term_enrichment` and `ipr_enrichment` then report a significant term in 1–3% of null runs. `go_enrichment` does in 1.0% and 0.8% under `permute` and `rotate`, **but in 9.5% (7.0–12.8) under `strata`, above nominal.** Most of that excess is one term, extracellular region. See [GO enrichment](#go-enrichment) for what this means.
 
 These results concern false positives under no association. They do not show that the remaining terms reflect selection: see [what selects the candidates](#what-selects-the-candidates).
 
@@ -17,7 +17,7 @@ These results concern false positives under no association. They do not show tha
 | Per-gene table, after | The same workflow rerun with the corrected code | `56321306d1b52a23` |
 | InterPro tree, parent-child only | `ParentChildTreeFile.txt`, current release when downloaded | `3a40c7856308a0a8` |
 
-Code: before is commit `59faf30`, and after is `1a363fb`. Image `dndsr_v0.2.0_sha256-726657e9`. Seeds are 20261101 to 20261116 for real-function runs, 20262101 to 20262110 for parent-child, 20263101 to 20263110 for global correction, and 20261101 for 5,000 draws.
+Code: original is commit `59faf30`; the first correction is `1a363fb`; final defaults are the commit recorded in [RELEASE-READINESS.md](../dev/RELEASE-READINESS.md). Image `dndsr_v0.2.0_sha256-726657e9`. Seeds are 20261101 to 20261116 for real-function runs (`--adjust-scope per_type`: the first 8), 20262101 to 20262110 for parent-child (`per_type`: the first 5), 20263101 to 20263110 for `1a363fb`'s global runs, 20261101 for 5,000 draws, and 1001 to 1020 for GO. Earlier evidence is preserved in [enrichment-59faf30.md](enrichment-59faf30.md) and [enrichment-1a363fb.md](enrichment-1a363fb.md), with their data files beside the current ones.
 
 The workflow ran end to end. There are 22,146 pairs, of which 22,091 pass `max_dnds`, and 206 have dN/dS > 1. See [GFF recovery](#gff-recovery) for how appended terms were checked.
 
@@ -35,27 +35,31 @@ The dN/dS column is reassigned, so no term can be truly associated with it:
 
 **The defect.** `min_pos` removed terms with few positive genes before BH. That count is the test's outcome, so only terms that could be significant remained, and BH corrected for about 100 tests instead of about 7,200. Among all terms, 2% have p < 0.05, because Fisher's test is conservative on small counts. Among those kept, 26–34% do. In parent-child mode, the same filter also removed terms before the child-to-parent pass.
 
-**The correction.** BH now covers every term meeting `min_total` and `max_prop`, which do not depend on the outcome. `min_pos` only chooses which rows are written. `n_tested` gives the size of the family. The interface is unchanged. Terms that have no positive gene still count in the family, including an InterPro type with no positive gene under `adjust_scope = "global"`.
+**The correction.** BH now covers every term meeting `min_total` and `max_prop`, which do not depend on the outcome. `min_pos` only chooses which rows are written. `n_tested` gives the size of the family. Terms that have no positive gene still count in the family, including an InterPro type with no positive gene.
 
-**False positives.** The real functions at their defaults, except that `term_enrichment` is given `terms = "ipr", exclude_terms = NULL`, because by default it leaves InterPro and GO to their own commands. On null assignments, before (`59faf30`) and after (`1a363fb`) ([data](data/enrichment_real_null.tsv)). The figure is the share of runs with any significant term, with its 95% interval after correction. With no association, about 5% is nominal for a single BH family.
+**The final default.** `ipr_enrichment` now corrects once across all eligible InterPro entry types (`adjust_scope = "global"`). Before, each type had its own family, and a run had up to seven chances, so a list drawn from several tables was not corrected across them. `adjust_scope = "per_type"` (`--adjust-scope per_type`) keeps the old behavior. This is an intentional change to a default. In parent-child mode, the child-to-parent decisions are still made within each entry type, and the final `p_adj` is corrected across every type with parent-child edges.
 
-| Function | Null | Runs before / after | Before | After | Mean false terms, before → after |
+**False positives.** The real functions, except that `term_enrichment` is given `terms = "ipr", exclude_terms = NULL`, because by default it leaves InterPro and GO to their own commands. On null assignments ([data](data/enrichment_real_null.tsv)). The figure is the share of runs with any significant term, with its 95% interval.
+
+| Function | Null | Runs: original / final | Original (`59faf30`) | Final default | Mean false terms, original → final |
 |---|---|---|---|---|---|
 | `term_enrichment` | `permute` | 104 / 208 | 58.7% | **1.0%** (0.3–3.4) | 4.96 → 0.01 |
 | | `strata` | 104 / 208 | 94.2% | **2.9%** (1.3–6.1) | 8.50 → 0.03 |
 | | `rotate` | 104 / 208 | 74.0% | **1.9%** (0.8–4.8) | 6.18 → 0.04 |
-| `ipr_enrichment`, default | `permute` | 104 / 208 | 95.2% | **8.7%** (5.5–13.3) | 6.79 → 0.12 |
-| | `strata` | 104 / 208 | 100% | **16.8%** (12.4–22.5) | 9.16 → 0.20 |
-| | `rotate` | 104 / 208 | 98.1% | **8.7%** (5.5–13.3) | 7.31 → 0.12 |
-| `ipr_enrichment`, `adjust_scope = "global"` | `permute` | not run / 100 | | **1.0%** (0.2–5.4) | 0.03 after |
-| | `strata` | not run / 100 | | **6.0%** (2.8–12.5) | 0.08 after |
-| | `rotate` | not run / 100 | | **0.0%** (0.0–3.7) | 0.00 after |
-| `ipr_enrichment`, parent-child | `permute` | 50 / 100 | 72.0% | **1.0%** (0.2–5.4) | 3.76 → 0.01 |
-| | `strata` | 47 / 100 | 80.9% | **8.0%** (4.1–15.0) | 3.74 → 0.11 |
+| `ipr_enrichment` | `permute` | 104 / 208 | 95.2% | **1.0%** (0.3–3.4) | 6.79 → 0.01 |
+| | `strata` | 104 / 208 | 100% | **2.9%** (1.3–6.1) | 9.16 → 0.03 |
+| | `rotate` | 104 / 208 | 98.1% | **1.9%** (0.8–4.8) | 7.31 → 0.04 |
+| `ipr_enrichment`, parent-child | `permute` | 50 / 100 | 72.0% | **0.0%** (0.0–3.7) | 3.76 → 0.00 |
+| | `strata` | 47 / 90 | 80.9% | **2.2%** (0.6–7.7) | 3.74 → 0.03 |
 | | `rotate` | 50 / 100 | 78.0% | **0.0%** (0.0–3.7) | 3.64 → 0.00 |
 
-**Why default `ipr_enrichment` stays above 5%.** Its default, `adjust_scope = "per_type"`, gives each of up to seven InterPro entry types its own BH family, so a run has seven chances. Each table alone is near its nominal rate: over 208 runs per null, the highest rate is 5.3% (`strata`, Conserved site, 11 of 208), and all others are at most 3.8%. `p_adj` therefore means "corrected within this entry type". A list drawn from all the tables together has not been corrected across them. For one family across all types, use `adjust_scope = "global"` (`--adjust-scope global`), which brings the rate across all tables to 0–6%, and gives 5,202 tests on this data. The price on the real data is fewer terms: 15 significant, against 20 per type. Parent-child has two tables with edges in this data (Domain and Family) and does not support `global`. Under `strata`, its Domain and Family tables reached 3% and 5%.
+The selectable per-type correction, from [`1a363fb`'s runs](data/enrichment_real_null_1a363fb.tsv), which final code reproduces exactly on the seeds rerun (8 and 5 tasks): `ipr_enrichment` 8.7% (5.5–13.3), 16.8% (12.4–22.5), and 8.7% (5.5–13.3); parent-child 1.0% (0.2–5.4), 8.0% (4.1–15.0), and 0.0% (0.0–3.7), in the same order of nulls. Those are rates across all tables. Each table alone was at most 5.3%. An independent set of 100 runs per null with global correction, on other seeds at `1a363fb`, gave 1.0%, 6.0%, and 0.0%.
 
+Over the final default's 208 runs per null, no single `ipr_enrichment` table had a false term in more than 1.9% of runs. `term_enrichment` and `ipr_enrichment` have the same rates, on different families (7,208 and 5,202 terms), because the same draws produced nearly the same false terms: 5 of 624 runs differ in their count, and none changes whether the run has one.
+
+**Which error rate this is.** Under these nulls no association exists, so every significant term is false. For one run, any significant term makes the false discovery proportion 1, and none makes it 0. So the rate above is at once the family-wise error rate and the false discovery rate under the complete null, and BH at 0.05 aims to keep it at or below 5%. *It does not measure false discovery when real associations exist*, because none of these nulls contains one. BH does not control the family-wise rate then, only the false discovery rate, and only under assumptions on dependence that these terms need not meet. Results are also conditional on one genome pair.
+
+The two parent-child `strata` figures exclude 10 runs of 100 that were stopped by a validation accident, not by dndsR: a concurrent job replaced the output directory, and each task's run failed with `cannot open the connection`. They are recorded and left out, and the original's 3 of 50 are left out in the same way, for its own reason, no parent-child edges.
 **Corroboration.** A reimplementation, verified identical to the old `term_enrichment` on the 67 observed terms (largest p-value difference under 1e-10), allowed 5,000 draws per null on the corrected table ([data](data/enrichment_null_calibration.tsv)). "BH on all terms with ≥ 2 genes" is what `term_enrichment` now does:
 
 | Null | Old default: filter, then BH | BH on all terms with ≥ 2 genes | ≥ 5 genes | ≥ 10 genes |
@@ -64,22 +68,22 @@ The dN/dS column is reassigned, so no term can be truly associated with it:
 | `strata` | 90.6% | 3.4% | 5.6% | 5.5% |
 | `rotate` | 66.3% | 0.9% | 2.2% | 1.5% |
 
-**Independent check.** `enrichment-verify.py` recomputes Fisher's test and BH in plain Python, with none of dndsR's code, from the annotated table. For `term_enrichment` and each of the four `ipr_enrichment` tables on the real data, it agrees on which terms are reported, on `n_tested`, and on `p_value` and `p_adj` (largest relative difference 5.7e-11). The package's tests also compare against `phyper` and a BH calculated by hand, and show that shuffling the input's row order changes nothing.
+**Independent check.** `enrichment-verify.py` recomputes Fisher's test and BH in plain Python, with none of dndsR's code, from the annotated table. On the real data it agrees for `ipr_enrichment` with global, per-type, and no correction on which terms are reported, on `n_tested`, and on `p_value` and `p_adj` (largest relative difference 4.5e-11). It agreed for `term_enrichment` at `1a363fb` (5.7e-11), whose code has not changed. Parent-child's conditional values are covered by hand-calculated values in `tests/testthat/test-enrichment-family.R`, not by this script. The package's tests also compare against `phyper` and a BH calculated by hand, and show that shuffling the input's row order changes nothing.
 
 ### Real data, before and after
 
-Significant terms at `p_adj` ≤ 0.05 ([data](data/enrichment_before_after.tsv)). "Corrected" is the new code on the new table. No term is significant after that was not significant before. The same terms are significant on the old table too, so the recovered annotations did not change this list.
+Significant terms at `p_adj` ≤ 0.05 ([data](data/enrichment_before_after.tsv)). "Per type" is `1a363fb`'s default. No term is significant after that was not significant before. The same terms are significant on the old table too, so the recovered annotations did not change the first correction's list.
 
-| Function, table | Reported terms | Before | Corrected | Family size |
-|---|---|---|---|---|
-| `term_enrichment`, all InterPro | 67 | 48 | **18** | 7,208 |
-| `ipr_enrichment`, Domain | 21 | 16 | **4** | 1,972 |
-| `ipr_enrichment`, Family | 10 | 10 | **7** | 1,908 |
-| `ipr_enrichment`, Homologous superfamily | 15 | 9 | **6** | 913 |
-| `ipr_enrichment`, Repeat | 4 | 3 | **3** | 45 |
-| `ipr_enrichment`, `adjust_scope = "global"`, all four tables | 50 | not run | **15** | 5,202 |
-| `ipr_enrichment`, parent-child, Domain | 21 (19 before) | 14 | **3** | 1,972 |
-| `ipr_enrichment`, parent-child, Family | 10 (none before) | not tested | **7** | 1,908 |
+| Function, table | Reported terms | Original | Per type (`1a363fb`) | **Final default** | Final family size |
+|---|---|---|---|---|---|
+| `term_enrichment`, all InterPro | 67 | 48 | 18 | **18** | 7,208 |
+| `ipr_enrichment`, Domain | 21 | 16 | 4 | **4** | 5,202 |
+| `ipr_enrichment`, Family | 10 | 10 | 7 | **5** | 5,202 |
+| `ipr_enrichment`, Homologous superfamily | 15 | 9 | 6 | **4** | 5,202 |
+| `ipr_enrichment`, Repeat | 4 | 3 | 3 | **2** | 5,202 |
+| `ipr_enrichment`, all four | 50 | 38 | 20 | **15** | 5,202 |
+| `ipr_enrichment`, parent-child, Domain | 21 (19 before) | 14 | 3 | **3** | 3,880 |
+| `ipr_enrichment`, parent-child, Family | 10 (none before) | not tested | 7 | **5** | 3,880 |
 
 Before the correction, parent-child skipped Family, because the filter left it no parent-child edges.
 
@@ -110,28 +114,53 @@ Nine are also below 0.05 by Westfall-Young under all three nulls, and these are 
 
 ## GO enrichment
 
-The real `go_enrichment` at its defaults, on the corrected table, 200 runs per null ([data](data/enrichment_go_null.tsv)). It reports unadjusted `weight01` p-values, and never filtered by `min_pos`, so this procedure did not change. The recovered annotations add 7 tested BP terms and 1 MF term. Observed counts did not change, and the terms at p < 0.001 are the same.
+**The default.** `go_enrichment` now applies BH by default, in `p_adj`, and `raw_p` stays as topGO gives it. Before, `p_adj` by default was a copy of `raw_p`. One family covers every tested term in all requested ontologies, separately for each comparison and side, so each table's `n_tested` is the same and the tables can be pooled. `adjust_scope = "per_ontology"` gives each ontology its own family. `p_adjust = "none"` copies `raw_p` to `p_adj`, labelled `none` in `p_adjust_method` and `adjust_scope`. An ontology with no positive gene writes no table, and its terms stay in the family.
 
-| Ontology (terms) | Threshold | Observed | `permute` mean | `rotate` mean | `strata` mean |
+**Why.** Thousands of terms are tested, and there was no compelling reason not to correct. topGO's authors do not advocate against adjustment. They note that adjusted values can be misleading and very conservative because topology-aware tests are conditional, and add that this "is not necessary a bad thing" (topGO 2.62.0 vignette). BH's guarantee is not established for `weight01`'s conditional, dependent p-values, so the case rests on the measurements below: BH is applied to whatever p-values the chosen `algorithm` gives, and the same applies to `elim`, `weight`, and `classic`. `go_enrichment` has no parent-child mode. `go_enrichment` never filtered by `min_pos`.
+
+**Independent check.** `enrichment-verify.py go` recalculates BH from `raw_p` for global, per-ontology, and unadjusted tables, largest relative difference 5.2e-15. For `classic`, whose tests are not conditional, it recomputes each term's genes and raw p-value from the annotated table and GO.db's ancestor table, without topGO. All terms and counts agree, and p-values agree to 8.2e-11. `weight01`'s raw p-values have no such independent recalculation. Tests in `tests/testthat/test-enrichment-family.R` compare BH with hand values for all four algorithms.
+
+**False positives.** The real `go_enrichment` on null assignments, 400 runs per null ([data](data/enrichment_go_null.tsv), [by ontology](data/enrichment_go_null_by_ontology.tsv)). As above, the rate is both the family-wise rate and the false discovery rate under the complete null.
+
+| Algorithm, runs | Null | Mean terms at raw p < 0.05 | **Default, global** | Mean false terms | `per_ontology` | Default, without GO:0005576 |
+|---|---|---|---|---|---|---|
+| `weight01`, 400 | `permute` | 21.0 | **1.0%** (0.4–2.5) | 0.010 | 2.8% (1.5–4.9) | 1.0% (0.4–2.5) |
+| | `rotate` | 21.1 | **0.8%** (0.3–2.2) | 0.007 | 2.2% (1.2–4.2) | 0.8% (0.3–2.2) |
+| | `strata` | 11.6 | **9.5%** (7.0–12.8) | 0.100 | 20.5% (16.8–24.7) | 3.0% (1.7–5.2) |
+| `classic`, 200 | `permute` | 55.7 | 1.0% (0.3–3.6) | 0.010 | 5.0% (2.7–9.0) | 1.0% (0.3–3.6) |
+| | `rotate` | 59.5 | 0.0% (0.0–1.9) | 0.000 | 3.5% (1.7–7.0) | 0.0% (0.0–1.9) |
+| | `strata` | 25.9 | 10.5% (7.0–15.5) | 0.175 | 20.5% (15.5–26.6) | 4.0% (2.0–7.7) |
+
+**The remaining problem.** Under `strata`, the default's interval is above 5%. This is not a defect in the correction, which reaches about 1% where nothing is held linked to dN/dS. BH assumes p-values are valid under the null, and this term's are not. GO:0005576, extracellular region, is significant in 28 of the 38 `strata` runs that have a false term, and has raw p < 0.05 in 311 of 400 (78%). `strata` shuffles dN/dS only among genes of similar length, dS, and GO richness, so genes in the term keep more than their share of positive labels. Fisher's test takes those labels to be exchangeable across all genes, so its p-value is too small for this term whichever correction follows. It is a confounded term, in a default that does not model confounding. The final rate depends on a term's size too: this term is 14% of the universe, so a small shift is highly significant.
+
+How much of the real signal do length and dS reproduce? [`enrichment-go-confounding.py`](data/enrichment_go_confounding.tsv) shuffles within finer strata and counts positive genes from each term, with `classic` p-values, 300 draws. At random these terms would hold 14.8, 0.3, 0.1, and 0.2 positive genes:
+
+| Term (members; median length, others ~400 aa) | Observed positive | 5 × 5 bins | 10 × 10 bins | Draws as extreme as observed, 5 × 5 / 10 × 10 |
+|---|---|---|---|---|
+| GO:0005576 extracellular region (2,104; 346 aa) | 44 | 24.5 | 31.3 | 0 / 0 |
+| GO:0007267 cell-cell signaling (77; 101 aa) | 7 | 1.5 | 2.3 | 0 / 0 |
+| GO:0005179 hormone activity (46; 97 aa) | 4 | 1.0 | 1.4 | 1 / 1 |
+| GO:0019722 calcium-mediated signaling (66; 152 aa) | 4 | 1.1 | 1.1 | 1 / 1 |
+
+Holding length and dS within 10 bins each brings extracellular region to 31 of its 44 positive genes, where chance alone would give 15. So most of its excess can arise from those properties, though not all of it. The figures are descriptive: finer bins leave fewer genes to exchange, about 74 per stratum at 10 bins and 5 at 40 (in the data file), so at the extreme the shuffle returns the observed labels, and they are not error rates. Because these are `classic` counts, they differ from the `weight01` p-values below. No correction for this is made in v0.3.0: it needs validation, and is on the [v1.0.0 roadmap](../dev/ROADMAP-1.0.md).
+
+**Real data.** Significant terms at `p_adj` ≤ 0.05 among 2,978 tested. `p_adj` below 0.05 by the old default meant raw p below 0.05.
+
+| Ontology (terms) | Old default, `p_adj` = `raw_p` | **Final default** | `per_ontology` | `classic`, global |
+|---|---|---|---|---|
+| BP (1,963) | 19 | **2** | 1 | 2 |
+| MF (684) | 9 | **1** | 1 | 6 |
+| CC (331) | 3 | **1** | 1 | 1 |
+| All | 31 | **4** | 3 | 9 |
+
+| Term | Ontology | Positive of annotated | `raw_p` | `p_adj` | Smallest `raw_p` of any term in that ontology, over null runs: `permute` / `rotate` / `strata` |
 |---|---|---|---|---|---|
-| BP (1,963) | p < 0.05 | 19 | 12.4 | 12.2 | 5.2 |
-| | p < 0.001 | 6 | 0.32 | 0.20 | 0.14 |
-| MF (684) | p < 0.05 | 9 | 5.7 | 5.8 | 4.0 |
-| | p < 0.001 | 4 | 0.17 | 0.13 | 0.17 |
-| CC (331) | p < 0.05 | 3 | 3.0 | 3.2 | 2.6 |
-| | p < 0.001 | 1 | 0.07 | 0.07 | 0.31 |
+| GO:0005576 extracellular region | CC | 44 of 2,104 | 2.87e-10 | 8.56e-07 | 3.65e-5 / 2.16e-5 / 9.08e-9 |
+| GO:0007267 cell-cell signaling | BP | 7 of 77 | 9.80e-08 | 1.46e-04 | 5.73e-6 / 1.06e-5 / 2.4e-7 |
+| GO:0005179 hormone activity | MF | 4 of 46 | 7.26e-06 | 7.20e-03 | **5.64e-6** / 6.35e-5 / **4.12e-7** |
+| GO:0019722 calcium-mediated signaling | BP | 4 of 66 | 6.57e-05 | 4.89e-02 | **5.73e-6** / **1.06e-5** / **2.4e-7** |
 
-Observed counts at p < 0.05 are mostly inside the null's range, so most of that list could be noise. At p < 0.001, BP and MF exceed the nulls by more than ten-fold, and CC exceeds `strata` only three-fold. `weight01` p-values are conservative (well under 5% of terms fall below 0.05), so they are not ordinary p-values either way.
-
-The strongest single term is not reliably beyond chance:
-
-| Ontology | Strongest term | Observed p | Smallest null p: `permute` / `rotate` / `strata` |
-|---|---|---|---|
-| BP | cell-cell signaling (GO:0007267), 7 of 77 | 9.8e-8 | 5.7e-6 / 1.2e-5 / **5.6e-8** |
-| MF | hormone activity (GO:0005179), 4 of 46 | 7.3e-6 | **5.6e-6** / 3.0e-5 / **4.3e-6** |
-| CC | extracellular region (GO:0005576), 44 of 2,104 | 2.9e-10 | 3.7e-5 / 8.8e-6 / 5.4e-7 |
-
-Bold marks a null run that went beyond the observed value. These minima also move with small changes: on the table before the recovered annotations, the smallest BP `strata` p-value was above the observed one, and the smallest CC `strata` p-value was 1.9e-9. Extracellular region's strength under `strata` shows that it can arise from gene properties alone, because `strata` keeps dN/dS tied to length and dS, so positive genes stay short. It should not be read as evidence about extracellular proteins. BH on CC under `strata` reaches 18% of runs with a significant term, again because of that link.
+Bold marks a null run in which some term went beyond this term's observed value. Extracellular region should not be read as evidence about extracellular proteins, as the table of finer strata shows. Hormone activity and calcium-mediated signaling are not reliably beyond chance. All are leads, as in [interpretation](../interpretation.md).
 
 ## GFF recovery
 
@@ -152,7 +181,7 @@ Bold marks a null run that went beyond the observed value. These minima also mov
 | Terms lost by any pair | 0 |
 | All pairs in the GO source | 20,746 identical to it, up from 20,675. The other 1,400 pairs are absent from it and have no GO terms |
 
-Unrelated outputs from the two candidates are byte-identical: `AtAl_dnds.tsv`, `AtAl_dnds_summary.tsv`, and both ideogram SVGs. On the corrected code, the annotated table and every `term_enrichment`, `ipr_enrichment`, and `go_enrichment` table are byte-identical at 1 and 8 threads.
+Unrelated outputs are byte-identical before and after the default changes: `AtAl_dnds.tsv`, `AtAl_dnds_annot.tsv`, `AtAl_dnds_summary.tsv`, both ideogram SVGs, and both CDS FASTA files. On the final code, the annotated table and every `ipr_enrichment` and `go_enrichment` table are byte-identical at 1 and 8 threads.
 
 ## What selects the candidates
 
@@ -162,7 +191,7 @@ The positive genes are not a random sample ([data](data/enrichment_confounders.t
 - **dS.** It falls from 3.10% in the lowest fifth to 0.16% in the highest: dN/dS is a ratio, and is unstable when dS is small.
 - **Annotation.** 0.66% of annotated genes are positive, and 3.98% of unannotated genes. So 72 of 206 positive genes (35%) cannot contribute to any enrichment test.
 
-Under `strata`, which holds these constant, the corrected Fisher tests stay near 5%. That does not rule out confounding in the real labels: a significant term can still reflect short genes, so report term results with their gene lengths in mind.
+Under `strata`, which holds these constant within coarse strata, the corrected tests stay near 5% for InterPro terms, and not for one broad GO term ([above](#go-enrichment)). That does not rule out confounding in the real labels: a significant term can still reflect short genes, so report term results with their gene lengths in mind.
 
 The result also depends on the candidate rule ([data](data/enrichment_candidate_rules.tsv)):
 
@@ -184,11 +213,13 @@ Length matters more than a dS floor here. These figures use the old procedure, f
 | `min_pos` filtered before BH in `term_enrichment` and `ipr_enrichment` | Severe, above | Corrected at `1a363fb` |
 | The GFF reader treated `#` inside attributes as a comment | 79 lines truncated, and 73 pairs silently lost terms | Corrected at `1a363fb` |
 | `go_enrichment(include_definition = FALSE)` always stopped with an error | Explicit failure, no wrong results. Now removes `term_def`; every other field on the real data is identical | Corrected at `1a363fb` |
+| `go_enrichment` stopped when an ontology had no positive genes ("allGenes must be a factor with 2 levels") | Explicit failure, no wrong results. It now writes no table for that ontology, and its terms stay in the family | Corrected with the final defaults |
+| `p_adj` in `go_enrichment` was uncorrected by default; `ipr_enrichment` was corrected only within each type | Not defects, but defaults that overstated significance across tables. Maintainer chose to change both | Changed with the final defaults |
 | `ipr_enrichment` looks up the current InterPro release even with `entries_source = "local"`, and stops if it cannot connect, with a message that local files would avoid it | No wrong results. Set `auto_detect_release = FALSE` | Open: [known issues](known-issues.md) |
 
 ## Limits
 
-One genome pair, at one divergence. The correction controls false positives under no association; it does nothing for confounding when an association is real. `permute` and `rotate` do not hold confounders constant, and `strata` uses coarse strata and leaves dN/dS linked to length and dS within them. Nothing here measures power. No result has been compared with independent biological evidence. Modeling confounders and biological benchmarking stay on the [v1.0.0 roadmap](../dev/ROADMAP-1.0.md). The rank test in `enrichment-calibration.R` was run but is not interpreted here. `enrichment-verify.py` does not cover parent-child, whose expected values come from the package's constructed tests. Old-code runs were fewer than new-code runs, and parent-child old-code strata has 3 runs of 50 stopped by the error for no parent-child edges, left out and counted.
+One genome pair, at one divergence. The correction controls false positives under no association; it does nothing for confounding when an association is real, and it does not stop a term confounded with length or dS from passing under `strata`, as GO:0005576 shows. `permute` and `rotate` do not hold confounders constant, and `strata` uses coarse strata and leaves dN/dS linked to length and dS within them. Nothing here measures false discovery with real associations, or power. No result has been compared with independent biological evidence. Modeling confounders and biological benchmarking stay on the [v1.0.0 roadmap](../dev/ROADMAP-1.0.md). The rank test in `enrichment-calibration.R` was run but is not interpreted here. `enrichment-verify.py` does not cover parent-child, whose expected values come from the package's constructed tests. It does not recompute `weight01`'s raw p-values, only `classic`'s, and BH on `weight01`'s. `term_enrichment` writes one table for each term type, each with its own BH family, as `ipr_enrichment`'s `per_type` does, so do not pool terms across its tables as corrected together. Old-code runs were fewer than new-code runs.
 
 ## Rebuild
 
@@ -196,10 +227,14 @@ Run in the image, with `dndsR` installed, after building the table with `annotat
 
 ```
 Rscript tools/dev/validation/enrichment-real-null.R <dnds_annot.tsv> <runs per null> <seed> <outdir> [InterPro tree]
-IPR_ADJUST_SCOPE=global Rscript tools/dev/validation/enrichment-real-null.R <dnds_annot.tsv> <runs per null> <seed> <outdir>
+IPR_ADJUST_SCOPE=per_type Rscript tools/dev/validation/enrichment-real-null.R <dnds_annot.tsv> <runs per null> <seed> <outdir> [InterPro tree]
 python3 tools/dev/validation/enrichment-null-summary.py <label>=<outdir> ...
 Rscript tools/dev/validation/enrichment-calibration.R <dnds_annot.tsv> <old IPR enrichment.tsv> <term column> 5000 20261101 <outdir>
-Rscript tools/dev/validation/enrichment-go-null.R <dnds_annot.tsv> <task> <runs per null> <outdir>
+GO_ALGORITHM=classic Rscript tools/dev/validation/enrichment-go-null.R <dnds_annot.tsv> <task> <runs per null> <outdir>   # omit GO_ALGORITHM for the default
+python3 tools/dev/validation/enrichment-go-null-summary.py GO:0005576 <rates.tsv> <by_ontology.tsv> <label>=<outdir> ...
+Rscript tools/dev/validation/enrichment-go-ancestors.R <ancestors.tsv>
+python3 tools/dev/validation/enrichment-verify.py go <dnds_annot.tsv> <ancestors.tsv> <dir> <prefix> <algorithm> [node_min]
+python3 tools/dev/validation/enrichment-go-confounding.py <dnds_annot.tsv> <ancestors.tsv> <term> 1.68e-5 300 20261102
 python3 tools/dev/validation/enrichment-verify.py term <dnds_annot.tsv> <table> [min_total] [min_pos]
 python3 tools/dev/validation/enrichment-verify.py ipr <dnds_annot.tsv> <entry list> <dir> <prefix> [min_total] [min_pos] [max_prop]
 python3 tools/dev/validation/gff-recovery.py <old dnds_annot.tsv> <new dnds_annot.tsv> <truth.tsv> <query GFF>

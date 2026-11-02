@@ -32,8 +32,8 @@ Genes are called positive if `dNdS > pos_threshold` (default 1), among rows wher
 | Command | Test | Multiple testing |
 |---|---|---|
 | `term_enrichment` | One-sided Fisher's exact test per term, positive against other genes | BH by default |
-| `ipr_enrichment` | The same, separately for each InterPro entry type; optionally a parent-child method that removes genes explained by significant child terms | BH by default, within each type |
-| `go_enrichment` | topGO `weight01` with Fisher's test, on genes with GO terms in that ontology | None by default |
+| `ipr_enrichment` | The same, separately for each InterPro entry type; optionally a parent-child method that removes genes explained by significant child terms | BH by default, once across all eligible types |
+| `go_enrichment` | topGO `weight01` with Fisher's test, on genes with GO terms in that ontology | BH by default, once across all requested ontologies |
 
 `enrichment` is the proportion of positive genes with a term divided by the proportion of other genes with it.
 

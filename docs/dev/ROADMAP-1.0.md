@@ -13,7 +13,7 @@ Is the enrichment workflow statistically defensible on real annotated data, and 
 | Real annotations | Public GO or InterPro annotations for *A. thaliana*, through the whole workflow | **Done:** [enrichment.md](../validation/enrichment.md) |
 | Null calibration | Empirical false-positive rates. Not only unrestricted label permutation, which assumes genes are exchangeable | **Done for one pair. Filter-then-BH failed and is corrected at `1a363fb`.** Other divergences are open |
 | Candidate selection | How the threshold on a point estimate, `min_pos`, and `max_dnds` affect results | **Measured,** except `max_dnds` |
-| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | **Measured** for coverage, length, and dS. Expression and conservation are open |
+| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | **Measured** for coverage, length, and dS. Expression and conservation are open. **GO's default stays above nominal under `strata` (9.5%), mostly from GO:0005576,** whose excess is largely reproduced by length and dS: modeling this is the priority here |
 | Dependence | Tandem clusters and shared terms, which Fisher's test assumes away | **Measured:** collapse and genomic rotation |
 
 ## Priority 2: orthology accuracy

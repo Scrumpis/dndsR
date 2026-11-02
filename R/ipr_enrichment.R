@@ -62,10 +62,10 @@
 #'   Note: method="parent_child" is currently implemented only when stratify_by_type=TRUE.
 #' @param types Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 #'   = infer from data present in q_ipr/s_ipr (after exclusions).
-#' @param adjust_scope When stratified, "per_type" (adjust within each ENTRY_TYPE; default)
-#'   or "global" (adjust once across all ENTRY_TYPE results for a given comparison+side).
-#'   Note: method="parent_child" always uses per-type adjustment because the elim/claim
-#'   procedure depends on within-type adjusted p-values.
+#' @param adjust_scope When stratified, "global" (default; correct once across every eligible
+#'   term of all ENTRY_TYPEs, for a given comparison and side) or "per_type" (correct within
+#'   each ENTRY_TYPE). With method="parent_child", which terms claim genes from their parents
+#'   is decided within each type either way; this sets how the reported \code{p_adj} is corrected.
 #'
 #' @section InterPro metadata and release handling:
 #' Options for attaching InterPro names/types from entry.list and (optionally) selecting
@@ -160,7 +160,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            include_types = NULL,
                            stratify_by_type = TRUE,
                            types = NULL,
-                           adjust_scope = c("per_type","global"),
+                           adjust_scope = c("global","per_type"),
                            entries_source = c("auto","local","remote","none"),
                            entries_path   = NULL,
                            entries_url    = NULL,
@@ -546,6 +546,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
     res$p_adjust_method <- method
     res$n_tested <- nrow(res)
+    res$adjust_scope <- if (identical(method, "none")) "none" else if (isTRUE(stratify_by_type)) adjust_scope else "pooled"
 
     p <- res$p_value
 
@@ -1130,12 +1131,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         frac <- length(setdiff(members, kids_union)) / max(length(members), 1)
         if (frac < ancestor_novel_frac) novelty_ok[[t]] <- FALSE
       }
-      res2 <- res2[novelty_ok[res2$IPR], , drop = FALSE]
+    } else {
+      novelty_ok <- rep(TRUE, nrow(res2)); names(novelty_ok) <- res2$IPR
     }
 
-    res2 <- res2[res2$total_count >= min_total & res2$pos_count >= min_pos, , drop = FALSE]
-    if (!nrow(res2)) return(NULL)
-    res2[order(res2$p_adj, -res2$enrichment, res2$IPR), , drop = FALSE]
+    # Every term tested stays in the family. These rules only choose what is reported, once
+    # correction is done, which for global scope happens after all types have run.
+    res2$.report <- unname(novelty_ok[res2$IPR]) & res2$total_count >= min_total & res2$pos_count >= min_pos
+    res2
   }
 
   # ---------- Decide release & load InterPro resources ----------
@@ -1362,10 +1365,6 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     results <- list()
 
     if (!is.null(stratified_types)) {
-      if (identical(method, "parent_child") && identical(adjust_scope, "global")) {
-        warning("[ipr_enrichment] adjust_scope='global' is not supported for method='parent_child'; using per_type.", call. = FALSE)
-      }
-
       skipped_types <- character(0)
       ran_types <- character(0)
 
@@ -1424,20 +1423,25 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         )
       }
 
-      if (identical(method, "fisher") && length(results)) {
+      if (length(results)) {
         allres <- do.call(rbind, Filter(function(x) is.data.frame(x) && nrow(x) > 0, results))
 
         if (!is.null(allres) && nrow(allres)) {
           if (identical(adjust_scope, "global")) {
             allres <- .adjust_pvals(allres, fdr_method, alpha)
             results <- split(allres, allres$ENTRY_TYPE)
-          } else {
+          } else if (identical(method, "fisher")) {
             results <- lapply(results, function(x) {
               if (is.null(x) || !nrow(x)) return(x)
               .adjust_pvals(x, fdr_method, alpha)
             })
           }
-          results <- Filter(nrow, lapply(results, .report_only))
+          results <- Filter(nrow, lapply(results, function(x) {
+            if (!(".report" %in% names(x))) return(.report_only(x))
+            x <- x[x$.report, , drop = FALSE]
+            x$.report <- NULL
+            x
+          }))
         }
       }
 

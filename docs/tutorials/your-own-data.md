@@ -47,6 +47,8 @@ dndsr dnds_ideogram -c comparison_file.txt
 dndsr dnds_summary -c comparison_file.txt --regions-bed regions.bed
 ```
 
+`ipr_enrichment` and `go_enrichment` correct `p_adj` once across all their tables by default. To correct each table separately, add `--adjust-scope per_type` to `ipr_enrichment` or `--adjust-scope per_ontology` to `go_enrichment`. To get `p_adj` with no correction from `go_enrichment`, add `--p-adjust none`. See [interpretation](../interpretation.md) before reporting terms.
+
 To contrast comparisons that share a genome, make a contrast file with `name comparison_A side_A comparison_B side_B`, and run:
 
 ```

@@ -10,7 +10,7 @@ What has actually been checked, and how. Commit SHAs are in `git log` and the pr
 | Installation routes | What ran, and what could not | [installation.md](installation.md) |
 | CDS assembly | Output equals designed sequences | [cds-extraction.md](cds-extraction.md), `tests/testthat/test-example-pipeline.R` |
 | dN/dS estimation | Compared with PAML, KaKs_Calculator, independent NG86, and simulated truth | [estimators.md](estimators.md) |
-| Enrichment calibration | False-positive rates before and after the correction, on real public annotations, under three nulls; GFF recovery | [enrichment.md](enrichment.md) |
+| Enrichment calibration | False-positive rates before and after the correction and default changes, on real public annotations, under three nulls; GFF recovery | [enrichment.md](enrichment.md). Earlier evidence: [59faf30](enrichment-59faf30.md), [1a363fb](enrichment-1a363fb.md) |
 | Thread scaling | Time and memory per step, and identical results across thread counts | [performance.md](performance.md) |
 | Fisher tests | p-values equal an independent hypergeometric calculation | `test-example-pipeline.R` |
 | Region summaries and contrasts | Counts, means, deltas, and Wilcoxon p-values recalculated in base R | `test-example-pipeline.R` |

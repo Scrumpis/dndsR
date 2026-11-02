@@ -24,7 +24,7 @@ ipr_enrichment(
   include_types = NULL,
   stratify_by_type = TRUE,
   types = NULL,
-  adjust_scope = c("per_type", "global"),
+  adjust_scope = c("global", "per_type"),
   entries_source = c("auto", "local", "remote", "none"),
   entries_path = NULL,
   entries_url = NULL,
@@ -102,10 +102,10 @@ Note: method="parent_child" is currently implemented only when stratify_by_type=
 \item{types}{Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 = infer from data present in q_ipr/s_ipr (after exclusions).}
 
-\item{adjust_scope}{When stratified, "per_type" (adjust within each ENTRY_TYPE; default)
-or "global" (adjust once across all ENTRY_TYPE results for a given comparison+side).
-Note: method="parent_child" always uses per-type adjustment because the elim/claim
-procedure depends on within-type adjusted p-values.}
+\item{adjust_scope}{When stratified, "global" (default; correct once across every eligible
+term of all ENTRY_TYPEs, for a given comparison and side) or "per_type" (correct within
+each ENTRY_TYPE). With method="parent_child", which terms claim genes from their parents
+is decided within each type either way; this sets how the reported \code{p_adj} is corrected.}
 
 \item{entries_source}{Where to load InterPro entries from:
 "auto" (bundled static; default), "local" (use entries_path),

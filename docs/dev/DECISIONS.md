@@ -24,7 +24,10 @@
 | 2026-11-01 | Published `dev` history is not rewritten. Unpublished results stay out of current files and future commits. | Maintainer decision: exposure was limited to aggregate figures. |
 | 2026-11-01 | Gene-level `dnds_state_contrast` stops with an error. | Confirmed by running that it gives no meaningful result. |
 | 2026-11-01 | BH covers terms meeting `min_total` and `max_prop`; `min_pos` is report-only. GFF comments only at line start. | Maintainer approved. False-positive rates and before/after values are in `docs/validation/enrichment.md`. |
-| 2026-11-01 | `ipr_enrichment` keeps `adjust_scope = "per_type"` as its default, documented with its rate across tables. | Not a defect: each table is near nominal, and changing a default was not part of the approval. Maintainer may change it. |
+| 2026-11-01 | Superseded below. `ipr_enrichment` keeps `adjust_scope = "per_type"` as its default, documented with its rate across tables. | Not a defect: each table is near nominal, and changing a default was not part of the approval. Maintainer may change it. |
+| 2026-11-02 | `ipr_enrichment` defaults to `adjust_scope = "global"`, for Fisher and parent-child; `per_type` stays selectable. | Maintainer decision. A list across tables should be corrected across them. Parent-child's elimination decisions stay within each type, and the reported `p_adj` is global. |
+| 2026-11-02 | `go_enrichment` defaults to `p_adjust = "BH"` and `adjust_scope = "global"`; `per_ontology` and `none` are selectable. | Maintainer asked for correction by default unless a compelling reason opposed it. topGO's authors do not oppose it. The family is one across ontologies, as for InterPro: lower error (9.5% against 20.5% under `strata`), and tables can be pooled. |
+| 2026-11-02 | No term-specific or length/dS adjustment for GO's excess under `strata`. Reported instead. | Maintainer: no inadequately validated correction; confounding analysis stays on the v1.0.0 roadmap. |
 | 2026-11-01 | No correction for length or dS in v0.3.0. | Maintainer decision: stays on the v1.0.0 roadmap until validated. |
 
 ## Open questions

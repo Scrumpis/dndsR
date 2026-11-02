@@ -1,5 +1,8 @@
 # Runs the real go_enrichment() with its defaults on null assignments of dN/dS to genes.
 #   Rscript enrichment-go-null.R <dnds_annot.tsv> <task> <runs per null> <outdir>
+# GO_ALGORITHM sets another topGO algorithm than the default. n_padj05 counts terms at
+# p_adj <= 0.05 as written (the function's default correction), and n_bh05 is BH on that
+# ontology's raw_p alone.
 # Each run reassigns the dN/dS column, by the same three nulls as enrichment-calibration.R,
 # so the only thing separating a positive gene from another is the null.
 suppressMessages(library(dndsR))
@@ -36,7 +39,9 @@ for (nm in names(draw)) {
     x <- d; x$dNdS <- draw[[nm]](d$dNdS)
     f <- file.path(w, "N_dnds_annot.tsv")
     write.table(x, f, sep = "\t", quote = FALSE, row.names = FALSE)
-    files <- suppressMessages(go_enrichment(dnds_annot_file = f, sides = "query", make_plots = FALSE, threads = 1))
+    args <- list(dnds_annot_file = f, sides = "query", make_plots = FALSE, threads = 1)
+    if (nzchar(Sys.getenv("GO_ALGORITHM"))) args$algorithm <- Sys.getenv("GO_ALGORITHM")
+    files <- suppressMessages(do.call(go_enrichment, args))
     for (p in unlist(files)) {
       r <- read.table(p, sep = "\t", header = TRUE, quote = "", comment.char = "", stringsAsFactors = FALSE)
       pv <- suppressWarnings(as.numeric(r$raw_p))
@@ -45,10 +50,13 @@ for (nm in names(draw)) {
         null = nm, run = i, task = task, ontology = ont, tested = sum(!is.na(pv)),
         n_p05 = sum(pv < 0.05, na.rm = TRUE), n_p01 = sum(pv < 0.01, na.rm = TRUE),
         n_p001 = sum(pv < 0.001, na.rm = TRUE), min_p = min(pv, na.rm = TRUE),
-        n_bh05 = sum(p.adjust(pv, "BH") <= 0.05, na.rm = TRUE))
+        n_bh05 = sum(p.adjust(pv, "BH") <= 0.05, na.rm = TRUE),
+        n_padj05 = if ("p_adj" %in% names(r)) sum(r$p_adj <= 0.05, na.rm = TRUE) else NA_integer_,
+        n_tested = if ("n_tested" %in% names(r)) r$n_tested[1] else NA_integer_,
+        method = if ("p_adjust_method" %in% names(r)) r$p_adjust_method[1] else NA_character_)
       low <- which(pv < 0.05)
       if (length(low)) term_rows[[length(term_rows) + 1L]] <- data.frame(
-        null = nm, run = i, task = task, ontology = ont, term = r$GO_ID[low], p = pv[low],
+        null = nm, run = i, task = task, ontology = ont, term = r$GO_ID[low], p = pv[low], p_adj = r$p_adj[low],
         annotated = r$annotated[low], significant = r$significant[low])
     }
     unlink(w, recursive = TRUE)

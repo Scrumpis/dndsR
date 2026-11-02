@@ -43,9 +43,9 @@ Each command also writes a plot, and a log for each side.
 
 The tested groups: positive genes have `dNdS > pos_threshold` (default 1), and the rest are other genes passing the filter (`dNdS` not NA and below `max_dnds`, default 10).
 
-- `ipr_enrichment` and `term_enrichment`: `pos_count`, `nonpos_count`, `pos_total`, `nonpos_total`, `total_count`, `odds_ratio`, `ci_lower`, `ci_upper`, `p_value` (one-sided Fisher's exact test, not corrected for multiple testing), `p_adj` (corrected by `p_adjust_method`), `p_adjust_method`, `n_tested`, `enrichment`.
+- `ipr_enrichment` and `term_enrichment`: `pos_count`, `nonpos_count`, `pos_total`, `nonpos_total`, `total_count`, `odds_ratio`, `ci_lower`, `ci_upper`, `p_value` (one-sided Fisher's exact test, not corrected for multiple testing), `p_adj` (corrected by `p_adjust_method`), `p_adjust_method`, `n_tested`, `enrichment`, and in `ipr_enrichment` `adjust_scope`: `global` (one family across all eligible entry types, the default), `per_type`, `pooled` (with `stratify_by_type = FALSE`), or `none`.
 - Correction spans every term meeting `min_total` and, for `ipr_enrichment`, `max_prop`. `n_tested` is that number. `min_pos` then chooses which rows are written, so a table usually has fewer rows than `n_tested`, and `p_adj` cannot be recalculated from the rows alone.
-- `go_enrichment`: `annotated`, `significant`, `raw_p`, `p_adj`, `p_adjust_method`, `enrichment`. With the default `p_adjust_method` of `none`, **`p_adj` equals `raw_p`: it is not corrected for multiple testing**, despite its name.
+- `go_enrichment`: `annotated`, `significant`, `raw_p` (topGO's p-value for the chosen `algorithm`, not corrected for multiple testing), `p_adj`, `p_adjust_method`, `adjust_scope`, `n_tested`, `enrichment`. By default `p_adj` is BH across every tested term in all requested ontologies, for one comparison and side, and `n_tested` counts them, so it exceeds a table's rows. With `adjust_scope` `per_ontology`, each ontology has its own family. With `p_adjust_method` `none`, **`p_adj` equals `raw_p`**, `adjust_scope` is `none`, and `n_tested` is still the family's size.
 - `enrichment` everywhere is the proportion of positive genes with the term divided by the proportion of other genes with it.
 
 ## dnds_ideogram

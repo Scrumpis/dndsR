@@ -2,13 +2,15 @@
 #   Rscript enrichment-real-null.R <dnds_annot.tsv> <runs per null> <seed> <outdir> [InterPro tree]
 # Reassigns dN/dS by each of three nulls, so every significant term in a run is a false
 # positive, and counts those at the functions' defaults. With a tree, tests only the
-# parent-child method. Set IPR_ADJUST_SCOPE=global to test only ipr_enrichment with that
-# scope, so that one BH family spans all InterPro entry types. Results are written after each run, in case a job is stopped.
+# parent-child method. IPR_ADJUST_SCOPE sets adjust_scope for ipr_enrichment; when set,
+# term_enrichment is left out. Results are written after each run, in case a job is stopped.
 suppressMessages(library(dndsR))
 a <- commandArgs(TRUE)
 annot <- a[1]; runs <- as.integer(a[2]); seed <- as.integer(a[3]); out <- a[4]
 tree <- if (length(a) > 4L) a[5] else NULL
-global_scope <- identical(Sys.getenv("IPR_ADJUST_SCOPE"), "global")
+scope <- Sys.getenv("IPR_ADJUST_SCOPE")
+scope_args <- if (nzchar(scope)) list(adjust_scope = scope) else list()
+fun_suffix <- if (nzchar(scope)) paste0("_", scope) else ""
 dir.create(out, showWarnings = FALSE, recursive = TRUE)
 set.seed(seed)
 d <- read.table(annot, sep = "\t", header = TRUE, quote = "", comment.char = "", stringsAsFactors = FALSE)
@@ -44,26 +46,24 @@ for (null in names(draw)) for (i in seq_len(runs)) {
   x <- d; x$dNdS <- draw[[null]](d$dNdS)
   f <- file.path(w, "N_dnds_annot.tsv")
   write.table(x, f, sep = "\t", quote = FALSE, row.names = FALSE)
-  if (global_scope) {
-    count(ipr_enrichment(dnds_annot_file = f, sides = "query", make_plots = FALSE, threads = 1, auto_detect_release = FALSE,
-                         adjust_scope = "global", entries_source = "local", entries_path = entries, tree_source = "none"),
-          "ipr_enrichment_global", null, i)
-  } else if (is.null(tree)) {
-    count(term_enrichment(dnds_annot_file = f, terms = "ipr", exclude_terms = NULL, sides = "query",
-                          make_plots = FALSE, threads = 1, verbose = FALSE), "term_enrichment", null, i)
-    count(ipr_enrichment(dnds_annot_file = f, sides = "query", make_plots = FALSE, threads = 1, auto_detect_release = FALSE,
-                         entries_source = "local", entries_path = entries, tree_source = "none"), "ipr_enrichment", null, i)
+  ipr_args <- c(list(dnds_annot_file = f, sides = "query", make_plots = FALSE, threads = 1, auto_detect_release = FALSE,
+                     entries_source = "local", entries_path = entries), scope_args)
+  if (is.null(tree)) {
+    if (!nzchar(scope)) {
+      count(term_enrichment(dnds_annot_file = f, terms = "ipr", exclude_terms = NULL, sides = "query",
+                            make_plots = FALSE, threads = 1, verbose = FALSE), "term_enrichment", null, i)
+    }
+    count(do.call(ipr_enrichment, c(ipr_args, list(tree_source = "none"))), paste0("ipr_enrichment", fun_suffix), null, i)
   } else {
-    r <- tryCatch(ipr_enrichment(dnds_annot_file = f, sides = "query", make_plots = FALSE, threads = 1, method = "parent_child", auto_detect_release = FALSE,
-                                 entries_source = "local", entries_path = entries, tree_source = "local", tree_path = tree),
+    r <- tryCatch(do.call(ipr_enrichment, c(ipr_args, list(method = "parent_child", tree_source = "local", tree_path = tree))),
                   error = function(e) e)
     # An error must not count as a run with no significant term, so it is recorded, and such
     # runs are left out when rates are computed.
     if (inherits(r, "error")) {
-      rows[[length(rows) + 1L]] <- data.frame(fun = "ipr_parent_child", null = null, run = i, file = "(error)",
+      rows[[length(rows) + 1L]] <- data.frame(fun = paste0("ipr_parent_child", fun_suffix), null = null, run = i, file = "(error)",
                                               reported = 0L, n_tested = NA_integer_, n_sig = 0L)
       message(conditionMessage(r))
-    } else count(r, "ipr_parent_child", null, i)
+    } else count(r, paste0("ipr_parent_child", fun_suffix), null, i)
   }
   unlink(w, recursive = TRUE)
   write.table(do.call(rbind, rows), results, sep = "\t", quote = FALSE, row.names = FALSE)

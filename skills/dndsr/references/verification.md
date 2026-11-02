@@ -19,7 +19,8 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b
 | Rendered plots | Run on the example with the bundled Liberation Sans font | See `docs/validation/` |
 | Public real-genome pair, *A. thaliana* and *A. lyrata* | `docs/validation/public-genome.md` | CDS match gffread for all compared genes; dN/dS agree with PAML and KaKs_Calculator; byte-identical across thread counts |
 | Enrichment on real public annotations | `docs/validation/enrichment.md`, three null models | Empirical false-positive rates recorded; `p_adj` agrees with an independent Python recalculation |
-| `dndsr ipr_enrichment --adjust-scope global` | Run on the real public table, 4 threads | One `n_tested` across all tables; exit 0 |
+| `dndsr ipr_enrichment`, default and `--adjust-scope per_type`; with `--fdr-method none`; with `--method parent_child`, both scopes | Run on the real public table, 8 threads; recalculated independently except parent-child | One `n_tested` across all tables by default, per type with the option, and `p_adj` = `p_value` with `none`; exit 0 |
+| `dndsr go_enrichment`, default, `--adjust-scope per_ontology`, `--p-adjust none`, `--algorithm classic`, `--include_definition false` | Run on the real public table, 8 threads; BH recalculated independently, as are `classic` raw p-values | One `n_tested` across ontologies by default; `p_adj` = `raw_p` with `none`; exit 0 |
 | GFF lines with `#` in attributes | `docs/validation/enrichment.md`, against source annotation files | 73 pairs recovered; no term lost; no other field changed |
 | Apptainer, conda, candidate image | `docs/validation/installation.md` | Pass |
 | Skill discovery | Claude Code 2.1.316 and Codex CLI 0.165.0 in a clone | Found |
