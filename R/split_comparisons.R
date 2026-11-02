@@ -72,7 +72,8 @@ split_comparisons <- function(comparison_file,
   .split_fasta <- function(fa_path) {
     if (!file.exists(fa_path)) stop("FASTA not found: ", fa_path)
     x <- Biostrings::readDNAStringSet(fa_path)
-    nms <- names(x)
+    # Sequence names end at the first space; the rest of a FASTA header is a description.
+    nms <- sub("\\s.*$", "", names(x))
     labs <- .label_from(nms)
     lab_set <- unique(labs[!is.na(labs) & nzchar(labs)])
     if (!length(lab_set)) return(list(labels = character(0), files = character(0)))

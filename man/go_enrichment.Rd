@@ -18,7 +18,7 @@ go_enrichment(
   drop_rows_without_go = TRUE,
   node_min = 10,
   node_max = Inf,
-  p_adjust = c("none", "BH"),
+  p_adjust = c("BH", "none"),
   make_plots = TRUE,
   top_n = 20,
   exclude_gos = NULL,
@@ -29,6 +29,7 @@ go_enrichment(
   alpha = 0.05,
   verbose = FALSE,
   threads = 4,
+  adjust_scope = c("global", "per_ontology"),
   ...
 )
 }
@@ -48,7 +49,9 @@ columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{statistic}{topGO statistic: usually "fisher" (default) or "ks".}
 
-\item{pos_threshold}{Numeric; dNdS > pos_threshold defines "positive" (default 1).}
+\item{pos_threshold}{Numeric OR character quantile spec. If numeric, dNdS > pos_threshold defines "positive".
+If character, use "q\if{html}{\out{<prob>}}" or "quantile:\if{html}{\out{<prob>}}" (e.g., "q0.95") to set the threshold to that quantile
+of dNdS \emph{after filtering} (and after drop_rows_without_go if enabled).}
 
 \item{max_dnds}{Drop rows with dNdS >= max_dnds or NA (default 10).}
 
@@ -61,7 +64,10 @@ columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.}
 
 \item{node_max}{Maximum term size (filtered after test; default Inf).}
 
-\item{p_adjust}{"none"|"BH" for multiple-testing correction across tested nodes (default "none").}
+\item{p_adjust}{"BH" (default) or "none". "BH" is Benjamini-Hochberg across the family set by
+\code{adjust_scope}, applied to whatever p-values \code{algorithm} gives. "none" copies
+\code{raw_p} to \code{p_adj} unchanged. topGO's topology-aware algorithms test each term
+conditional on others, so their p-values are not independent; see the interpretation guide.}
 
 \item{make_plots}{If TRUE, writes a top-N bubble plot per result.}
 
@@ -87,6 +93,10 @@ run to avoid accidentally nuking huge swaths (default 5000).}
 \item{threads}{Integer; maximum number of parallel workers (forked processes; default 4).
 In batch mode, workers are applied across (comparison, side) jobs.
 On Windows, runs sequentially (no forking).}
+
+\item{adjust_scope}{"global" (default) corrects once across every tested term in all requested
+\code{ontologies}, separately for each comparison and side. "per_ontology" corrects each
+ontology alone. Output records it as \code{adjust_scope}, with the family size in \code{n_tested}.}
 
 \item{...}{Additional arguments passed on to 'topGO::runTest()', e.g. \code{score},
 \code{ties.method}, etc. Core arguments \code{object}, \code{algorithm}, and \code{statistic}

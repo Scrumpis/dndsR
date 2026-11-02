@@ -24,7 +24,7 @@ ipr_enrichment(
   include_types = NULL,
   stratify_by_type = TRUE,
   types = NULL,
-  adjust_scope = c("per_type", "global"),
+  adjust_scope = c("global", "per_type"),
   entries_source = c("auto", "local", "remote", "none"),
   entries_path = NULL,
   entries_url = NULL,
@@ -77,9 +77,9 @@ with columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gf
 positives and background) for that side. When stratify_by_type=TRUE, this filtering
 is applied independently within each ENTRY_TYPE analysis.}
 
-\item{min_total}{Minimum total occurrences (pos+nonpos) required for a term (default 2).}
+\item{min_total}{Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).}
 
-\item{min_pos}{Minimum positive occurrences required for a term (default 2).}
+\item{min_pos}{Minimum positive occurrences for a term to be reported (default 2).}
 
 \item{max_prop}{Maximum allowed proportion of the background annotated set
 that may be assigned to a term (default 0.20). Terms with
@@ -102,10 +102,10 @@ Note: method="parent_child" is currently implemented only when stratify_by_type=
 \item{types}{Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 = infer from data present in q_ipr/s_ipr (after exclusions).}
 
-\item{adjust_scope}{When stratified, "per_type" (adjust within each ENTRY_TYPE; default)
-or "global" (adjust once across all ENTRY_TYPE results for a given comparison+side).
-Note: method="parent_child" always uses per-type adjustment because the elim/claim
-procedure depends on within-type adjusted p-values.}
+\item{adjust_scope}{When stratified, "global" (default; correct once across every eligible
+term of all ENTRY_TYPEs, for a given comparison and side) or "per_type" (correct within
+each ENTRY_TYPE). With method="parent_child", which terms claim genes from their parents
+is decided within each type either way; this sets how the reported \code{p_adj} is corrected.}
 
 \item{entries_source}{Where to load InterPro entries from:
 "auto" (bundled static; default), "local" (use entries_path),
@@ -209,7 +209,10 @@ Default InterPro resources (EMBL-EBI):
 \section{Term frequency and multiple-testing filters}{
 
 \itemize{
-\item Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
+\item Rare and overly broad terms are removed before testing, using \code{min_total} and \code{max_prop}.
+These do not depend on the outcome, so they define the family of tests that is corrected.
+\item Terms with few positive genes are removed after correction, using \code{min_pos}. It changes
+which rows are written, not their p-values.
 }
 }
 

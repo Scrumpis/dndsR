@@ -1,0 +1,3 @@
+comparison	version	pairs	ratio_na	ds_zero	dn_zero	both_zero	dn_na	ds_na	ratio_infinite	ratio_above_1	ratio_at_least_10	ds_above_2	ds_below_0.01	median_ds	median_ratio
+AtAl	old	20104	671	39	146	1	0	632	0	1503	8	214	46	0.1487	0.3187
+AtAl	cur	22146	55	9	226	1	0	46	0	206	0	30	1	0.1413	0.187

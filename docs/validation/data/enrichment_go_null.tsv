@@ -1,0 +1,9 @@
+label	null	runs	mean_raw_p05	default_any	default_pct	default_ci_low	default_ci_high	default_mean_terms	per_ontology_any	per_ontology_pct	per_ontology_ci_low	per_ontology_ci_high	per_ontology_mean_terms	default_without_GO:0005576_any	without_pct	without_ci_low	without_ci_high	runs_with_left_out_term_significant	most_frequent_terms
+weight01	observed	1	31.0	1	100.0	20.7	100.0	4.000	1	100.0	20.7	100.0	3.000	1	100.0	20.7	100.0	1	GO:0007267:1;GO:0019722:1;GO:0005179:1;GO:0005576:1
+weight01	permute	400	21.0	4	1.0	0.4	2.5	0.010	11	2.8	1.5	4.9	0.028	4	1.0	0.4	2.5	0	GO:0000049:1;GO:0034765:1;GO:0015386:1;GO:0009624:1
+weight01	rotate	400	21.1	3	0.8	0.3	2.2	0.007	9	2.2	1.2	4.2	0.022	3	0.8	0.3	2.2	0	GO:0045229:1;GO:0006892:1;GO:0006573:1
+weight01	strata	400	11.6	38	9.5	7.0	12.8	0.100	82	20.5	16.8	24.7	0.217	12	3.0	1.7	5.2	28	GO:0005576:28;GO:0061631:4;GO:0045271:3;GO:0010098:2
+classic	observed	1	65.0	1	100.0	20.7	100.0	9.000	1	100.0	20.7	100.0	9.000	1	100.0	20.7	100.0	1	GO:0007267:1;GO:0019722:1;GO:0005102:1;GO:0030545:1
+classic	permute	200	55.7	2	1.0	0.3	3.6	0.010	10	5.0	2.7	9.0	0.110	2	1.0	0.3	3.6	0	GO:0000049:1;GO:0009698:1
+classic	rotate	200	59.5	0	0.0	0.0	1.9	0.000	7	3.5	1.7	7.0	0.125	0	0.0	0.0	1.9	0	
+classic	strata	200	25.9	21	10.5	7.0	15.5	0.175	41	20.5	15.5	26.6	0.405	8	4.0	2.0	7.7	14	GO:0005576:14;GO:0061631:2;GO:0061650:2;GO:0030964:2

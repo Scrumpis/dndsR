@@ -1,7 +1,7 @@
 Package: dndsR
 Type: Package
-Title: dN/dS Pipeline Utilities for Comparative Genomics
-Version: 0.2.0.000
+Title: dN/dS Pipeline for Comparative Genomics
+Version: 0.3.0
 Authors@R: 
     person(given = "Nick", family = "Johnson", 
            email = "john7932@msu.edu", role = c("aut","cre"))
@@ -9,6 +9,8 @@ Description: Utilities to extract CDS and proteins from FASTA/GFF,
     orchestrate ortholog discovery, and run dN/dS analyses at scale. 
     Includes helpers for batch comparisons, annotation joins, and QC.
 License: MIT + file LICENSE
+Copyright: inst/fonts/LiberationSans-Bold.ttf is under the SIL Open Font
+    License 1.1; see inst/fonts/LICENSE.LiberationSans.
 URL: https://github.com/Scrumpis/dndsR
 BugReports: https://github.com/Scrumpis/dndsR/issues
 Encoding: UTF-8
@@ -16,6 +18,7 @@ Depends:
     R (>= 4.1)
 Imports:
     AnnotationDbi,
+    BiocGenerics,
     Biostrings,
     cli,
     data.table,
@@ -24,13 +27,16 @@ Imports:
     ggplot2,
     jsonlite,
     methods,
-    orthologr,
+    parallel,
     Rsamtools,
+    S4Vectors,
     scales,
     showtext,
     stats,
     svglite,
     sysfonts,
+    tools,
+    txdbmaker,
     utils,
     xml2
 Remotes:
@@ -38,29 +44,21 @@ Remotes:
     drostlab/rdiamond,
     drostlab/metablastr
 Suggests:
-    dplyr,
-    knitr,
     GO.db,
     IHW,
-    IRanges,
     lme4,
     metablastr,
-    optparse,
+    orthologr,
     pwalign,
     qvalue,
     rdiamond,
-    readr,
     RIdeogram,
-    S4Vectors,
-    systemfonts,
-    rmarkdown,
     testthat,
-    topGO,
-    txdbmaker
+    withr,
+    topGO
 SystemRequirements:
-    DIAMOND (>= 2.1.8), OrthoFinder (>= 2.5.4)
-VignetteBuilder: knitr
+    DIAMOND (>= 2.1.8)
 Config/testthat/edition: 3
 ByteCompile: true
-RoxygenNote: 7.3.3
 Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.1

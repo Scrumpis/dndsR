@@ -1,0 +1,38 @@
+#!/bin/sh
+# dndsR hook, the last line of defense. Sees every ref update, including those no
+# commit-time hook sees: fast-forwards, resets, branch moves, update-ref, and tag changes.
+[ "$1" = prepared ] || exit 0
+. "$(dirname "$0")/_common.sh"
+status=0
+deny() { printf 'dndsR policy: BLOCKED: %s\n' "$1" >&2; status=1; }
+contains() { git merge-base --is-ancestor "$1" "$2" 2>/dev/null; }
+# git pack-refs prunes loose refs as deletions, though their values stay in packed-refs.
+packing=false
+case "$(ps -o args= -p "$PPID" 2>/dev/null)" in *pack-refs*) packing=true ;; esac
+
+while read -r old new ref; do
+  current=$(git rev-parse -q --verify "$ref" 2>/dev/null || echo "$ZERO")
+  [ "$current" != "$new" ] || continue
+  if [ "$new" = "$ZERO" ] && $packing; then continue; fi
+  case "$ref" in
+    "$PROTECTED_BRANCH")
+      deny "updating or deleting local main"
+      ;;
+    refs/tags/*)
+      [ "$current" = "$ZERO" ] || deny "moving or deleting existing tag $ref"
+      ;;
+    "$DEV_BRANCH")
+      [ "$new" != "$ZERO" ] || continue
+      # Following origin/dev is fine: only the maintainer can put a merge there.
+      [ "$new" != "$(git rev-parse -q --verify refs/remotes/origin/dev)" ] || continue
+      for m in refs/heads/main refs/remotes/origin/main; do
+        tip=$(git rev-parse -q --verify "$m") || continue
+        if contains "$tip" "$new" && ! contains "$tip" "$current"; then
+          deny "bringing $m into dev"
+        fi
+      done
+      ;;
+  esac
+done
+[ "$status" -eq 0 ] || printf 'See docs/dev/RUNBOOK.md. Changes to main or to tags need explicit authorization from the maintainer.\n' >&2
+exit "$status"

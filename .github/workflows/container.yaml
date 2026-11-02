@@ -1,0 +1,84 @@
+# Builds the image from a clean checkout and tests it under Docker and Apptainer.
+# Nothing is published here. See publish.yaml.
+name: container
+
+on:
+  push:
+    branches: [dev]
+    paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/container-checks.sh", "tools/dev/run-package-tests.R", "tests/**", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build
+        run: docker build --pull --no-cache -f tools/Dockerfile -t dndsr:test .
+
+      - name: Test the image with Docker
+        run: |
+          version=$(awk -F': *' '$1=="Version"{print $2}' DESCRIPTION)
+          mkdir -p work
+          chmod 777 work
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work:/work" -w /work \
+            -v "$PWD/tools/dev/container-checks.sh:/checks.sh:ro" dndsr:test bash /checks.sh "$version"
+
+      - name: Run the R tutorial in the image
+        run: |
+          mkdir -p work-r
+          chmod 777 work-r
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work-r:/work" -v "$PWD:/repo:ro" -w /work dndsr:test \
+            Rscript /repo/tools/dev/test-r-tutorial.R /repo/docs/tutorials/using-r.md
+
+      - name: Record the packages in the image
+        run: docker run --rm dndsr:test cat /opt/dndsr-package-versions.tsv >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the package tests in the image
+        run: |
+          mkdir -p work-tests
+          chmod 777 work-tests
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work-tests:/work" -v "$PWD:/repo:ro" -w /work dndsr:test \
+            Rscript /repo/tools/dev/run-package-tests.R /repo/tests/testthat
+
+      # The same rootless Apptainer route an HPC user can have, from conda-forge.
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: apptainer
+          create-args: -c conda-forge apptainer=1.5.4
+
+      - name: Allow user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Test the image with Apptainer, as on HPC
+        shell: bash -el {0}
+        run: |
+          version=$(awk -F': *' '$1=="Version"{print $2}' DESCRIPTION)
+          apptainer --version
+          docker save dndsr:test -o image.tar
+          apptainer build dndsr.sif docker-archive://image.tar
+          rm -f image.tar
+          mkdir -p work-apptainer
+          cd work-apptainer
+          apptainer exec --cleanenv --bind "$PWD" --bind "$GITHUB_WORKSPACE" --pwd "$PWD" ../dndsr.sif bash "$GITHUB_WORKSPACE/tools/dev/container-checks.sh" "$version"
+
+      - name: Test the documented installer with Apptainer
+        shell: bash -el {0}
+        run: |
+          export HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/home/.local/bin:$PATH"
+          mkdir -p "$HOME"
+          tools/dndsr-install install --engine apptainer --sif dndsr.sif
+          tools/dndsr-install doctor
+          dndsr doctor
+          mkdir -p "$RUNNER_TEMP/shim" && cd "$RUNNER_TEMP/shim"
+          dndsr example
+          cd dndsr_example
+          dndsr extract_cds -c comparison_file.txt
+          dndsr calculate_dnds -c comparison_file.txt -t 2
+          dndsr verify_example

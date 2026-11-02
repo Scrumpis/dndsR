@@ -1,0 +1,87 @@
+# Publishes one immutable, versioned image to Docker Hub from an approved release tag.
+#
+# Disabled until the maintainer sets the repository variable DOCKERHUB_PUBLISH_ENABLED to
+# true. Runs in the dockerhub-release environment, whose required reviewer approves each
+# publish and which holds the credentials. It never moves or creates "latest", and it
+# refuses to overwrite an existing tag. See docs/dev/GITHUB-SETUP.md.
+name: publish
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: scrumpis/dndsr
+
+jobs:
+  publish:
+    if: ${{ vars.DOCKERHUB_PUBLISH_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: dockerhub-release
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Refuse anything but a new release of reviewed code
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version=$(awk -F': *' '$1=="Version"{print $2}' DESCRIPTION)
+          [ "v$version" = "$tag" ] || { echo "::error::Tag $tag does not match DESCRIPTION version $version"; exit 1; }
+          grep -q "software-version: \"$version\"" skills/dndsr/SKILL.md || { echo "::error::The skill is not at version $version"; exit 1; }
+          grep -q "^# dndsR $version" NEWS.md || { echo "::error::NEWS.md has no entry for $version"; exit 1; }
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$tag is not on main"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://hub.docker.com/v2/repositories/$IMAGE/tags/$tag")
+          [ "$code" = 404 ] || { echo "::error::$IMAGE:$tag already exists or Docker Hub gave $code; refusing to overwrite"; exit 1; }
+
+      - name: Build
+        run: |
+          docker build --pull --no-cache -f tools/Dockerfile \
+            --label "org.opencontainers.image.version=$GITHUB_REF_NAME" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t "$IMAGE:$GITHUB_REF_NAME" .
+
+      - name: Test before publishing
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir -p work
+          chmod 777 work
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work:/work" -w /work \
+            -v "$PWD/tools/dev/container-checks.sh:/checks.sh:ro" "$IMAGE:$GITHUB_REF_NAME" bash /checks.sh "$version"
+
+      - name: Push the versioned tag only
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          docker push "$IMAGE:$GITHUB_REF_NAME"
+          docker logout
+
+      - name: Record the digest and the versioned skill
+        run: |
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_REF_NAME")
+          tar -czf "dndsr-skill-$GITHUB_REF_NAME.tar.gz" -C skills dndsr
+          skill=$(sha256sum "dndsr-skill-$GITHUB_REF_NAME.tar.gz" | cut -d' ' -f1)
+          printf '{"tag":"%s","commit":"%s","image":"%s","skill_sha256":"%s"}\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" "$digest" "$skill" > release-manifest.json
+          {
+            echo "### Published"
+            echo "- Tag: $GITHUB_REF_NAME"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Image: \`$digest\`"
+            echo "- Skill SHA-256: \`$skill\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Published image::$digest"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: |
+            release-manifest.json
+            dndsr-skill-${{ github.ref_name }}.tar.gz
+          retention-days: 90

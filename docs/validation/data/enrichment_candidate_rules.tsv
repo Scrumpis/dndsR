@@ -1,0 +1,10 @@
+rule	genes	positive	annotated_positive	significant	shared_with_default	jaccard
+dNdS>1 (default)	22091	206	134	48	48	1
+dNdS>0.5	22091	2076	1626	139	37	0.246666666666667
+dNdS>0.75	22091	602	434	86	42	0.456521739130435
+dNdS>1.5	22091	42	14	3	3	0.0625
+top N by ratio, same N	22091	206	134	48	48	1
+dNdS>1, length>=150 aa	19537	91	80	40	35	0.660377358490566
+dNdS>1, dS>=0.05	21955	166	116	45	43	0.86
+dNdS>1, dS<=1	21931	206	134	48	48	1
+dN>=0.05 and dNdS>1	22091	189	121	45	43	0.86

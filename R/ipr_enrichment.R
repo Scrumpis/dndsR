@@ -32,10 +32,13 @@
 #'   is applied independently within each ENTRY_TYPE analysis.
 #'
 #' @section Term frequency and multiple-testing filters:
-#' - Rare terms, overly broad terms, and low-support terms may be filtered prior to testing.
+#' - Rare and overly broad terms are removed before testing, using `min_total` and `max_prop`.
+#'   These do not depend on the outcome, so they define the family of tests that is corrected.
+#' - Terms with few positive genes are removed after correction, using `min_pos`. It changes
+#'   which rows are written, not their p-values.
 #'
-#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 2).
-#' @param min_pos   Minimum positive occurrences required for a term (default 2).
+#' @param min_total Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).
+#' @param min_pos   Minimum positive occurrences for a term to be reported (default 2).
 #' @param max_prop Maximum allowed proportion of the background annotated set
 #'   that may be assigned to a term (default 0.20). Terms with
 #'   (pos_count + nonpos_count) / (pos_total + nonpos_total) > max_prop
@@ -59,10 +62,10 @@
 #'   Note: method="parent_child" is currently implemented only when stratify_by_type=TRUE.
 #' @param types Character vector of ENTRY_TYPEs to analyze when stratified; default NULL
 #'   = infer from data present in q_ipr/s_ipr (after exclusions).
-#' @param adjust_scope When stratified, "per_type" (adjust within each ENTRY_TYPE; default)
-#'   or "global" (adjust once across all ENTRY_TYPE results for a given comparison+side).
-#'   Note: method="parent_child" always uses per-type adjustment because the elim/claim
-#'   procedure depends on within-type adjusted p-values.
+#' @param adjust_scope When stratified, "global" (default; correct once across every eligible
+#'   term of all ENTRY_TYPEs, for a given comparison and side) or "per_type" (correct within
+#'   each ENTRY_TYPE). With method="parent_child", which terms claim genes from their parents
+#'   is decided within each type either way; this sets how the reported \code{p_adj} is corrected.
 #'
 #' @section InterPro metadata and release handling:
 #' Options for attaching InterPro names/types from entry.list and (optionally) selecting
@@ -157,7 +160,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            include_types = NULL,
                            stratify_by_type = TRUE,
                            types = NULL,
-                           adjust_scope = c("per_type","global"),
+                           adjust_scope = c("global","per_type"),
                            entries_source = c("auto","local","remote","none"),
                            entries_path   = NULL,
                            entries_url    = NULL,
@@ -541,6 +544,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   # as qvalue and other tests are NA intolerant
   .adjust_pvals <- function(res, method, alpha) {
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
+    res$p_adjust_method <- method
+    res$n_tested <- nrow(res)
+    res$adjust_scope <- if (identical(method, "none")) "none" else if (isTRUE(stratify_by_type)) adjust_scope else "pooled"
 
     p <- res$p_value
 
@@ -620,6 +626,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       } else {
         warning("IHW not installed; falling back to BH.", call. = FALSE)
         res$p_adj[ok] <- stats::p.adjust(p[ok], method = "BH")
+        res$p_adjust_method <- "BH"
       }
 
     } else { # "none"
@@ -644,33 +651,33 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
 
   # ---------- font & plotting helpers (MATCH go_enrichment) ----------
-  .bundled_arial_path <- function() {
-    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
+  .bundled_font_path <- function() {
+    ttf <- system.file("fonts", "LiberationSans-Bold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
 
-  # use a single family name ("Arial") and explicitly map bold to the bundled TTF
+  # use a single family name and explicitly map bold to the bundled TTF
   .setup_showtext <- function() {
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
     if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
     ok <- try({
-      sysfonts::font_add(family = "Arial", regular = ttf, bold = ttf)
+      sysfonts::font_add(family = "Liberation Sans", regular = ttf, bold = ttf)
       showtext::showtext_auto(TRUE)
       TRUE
     }, silent = TRUE)
-    if (isTRUE(ok)) "Arial" else NULL
+    if (isTRUE(ok)) "Liberation Sans" else NULL
   }
 
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
     function(file, ...) svglite::svglite(
       file,
-      user_fonts = list(`Arial` = ttf),
+      user_fonts = list(`Liberation Sans` = ttf),
       ...
     )
   }
@@ -901,7 +908,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     vec_all <- as.character(vec_all)
     vec_pos <- as.character(vec_pos)
     n_pos <- length(vec_pos); n_all <- length(vec_all); n_bg <- n_all - n_pos
-    if (n_pos == 0L || n_all == 0L || n_bg < 0L) return(NULL)
+    # A type with no positive genes is still tested: it counts toward global correction.
+    if (n_all == 0L || n_bg < 0L) return(NULL)
     all_tab <- .count_terms_from_vec(vec_all)
     pos_tab <- .count_terms_from_vec(vec_pos)
     if (length(all_tab) == 0) return(NULL)
@@ -958,14 +966,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
     lapply(term2rows, unique)
   }
-  .filter_terms_by_thresholds <- function(term2rows, pos_ids, all_ids, min_total, min_pos, max_prop) {
+  .filter_terms_by_thresholds <- function(term2rows, all_ids, min_total, max_prop) {
     keep <- list(); n_all <- length(all_ids)
     for (t in names(term2rows)) {
       members <- intersect(term2rows[[t]], all_ids)
       tot <- length(members)
-      pos <- length(intersect(members, pos_ids))
       prop <- if (n_all > 0) tot / n_all else 0
-      if (tot >= min_total && pos >= min_pos && prop <= max_prop) keep[[t]] <- members
+      if (tot >= min_total && prop <= max_prop) keep[[t]] <- members
     }
     keep
   }
@@ -1010,7 +1017,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     n_all <- nrow(df); if (!n_all) return(NULL)
     pos_id <- which(df$dNdS > pos_threshold); all_id <- seq_len(n_all)
     term2rows_all <- .build_term2rows(df, term_col); if (!length(term2rows_all)) return(NULL)
-    term2rows <- .filter_terms_by_thresholds(term2rows_all, pos_id, all_id, min_total, min_pos, max_prop)
+    term2rows <- .filter_terms_by_thresholds(term2rows_all, all_id, min_total, max_prop)
     if (!length(term2rows)) return(NULL)
     type_terms <- names(term2rows)
 
@@ -1031,9 +1038,11 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       return(NULL)
     }
 
+    # Terms with no retained relationship are still tested, with their full gene sets.
     order_terms <- .topo_specific_first(children_map)
+    order_terms <- c(order_terms, setdiff(names(term2rows), order_terms))
 
-    nodes <- unique(c(names(children_map), unlist(children_map, use.names = FALSE)))
+    nodes <- unique(c(order_terms, names(children_map), unlist(children_map, use.names = FALSE)))
     parents_map <- stats::setNames(vector("list", length(nodes)), nodes)
     for (p in names(children_map)) for (c in children_map[[p]]) parents_map[[c]] <- c(parents_map[[c]], p)
 
@@ -1048,21 +1057,17 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
       for (t in order_terms) {
         members <- intersect(term2rows[[t]], all_id)
-        if (!length(members)) next
 
         kids <- children_map[[t]]
         if (!is.null(kids) && length(kids)) {
-          kids_sig <- intersect(kids, sig_terms)
-          if (length(kids_sig)) {
-            kids_claimed <- unique(unlist(claimed[kids_sig], use.names = FALSE))
-            members <- setdiff(members, kids_claimed)
-          }
+          members <- setdiff(members, claimed[[t]])
         }
 
-        tot <- length(members); if (tot < min_total) next
+        # Every eligible term stays in the corrected family, even if little of it remains
+        # after its children claim genes. Rows too small to report are dropped afterwards.
+        tot <- length(members)
         a <- length(intersect(members, pos_id)); c <- tot - a
         b <- n_pos - a; d <- n_bg - c
-        if (a < min_pos) next
 
         ft <- try(stats::fisher.test(matrix(c(a,c,b,d), nrow = 2), alternative = "greater"), silent = TRUE)
         ci <- c(NA_real_, NA_real_); or <- NA_real_; p <- NA_real_
@@ -1095,21 +1100,12 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     .pc_sig_terms <- function(res) {
       if (is.null(res) || !nrow(res)) return(character(0))
-      res$IPR[is.finite(res$p_adj) & !is.na(res$p_adj) & res$p_adj <= parent_child_alpha]
+      res$IPR[is.finite(res$p_adj) & !is.na(res$p_adj) & res$p_adj <= parent_child_alpha &
+                res$total_count >= min_total & res$pos_count >= min_pos]
     }
 
     .pc_claimed_from_sig <- function(sig_terms) {
-      claimed <- stats::setNames(vector("list", length(nodes)), nodes)
-      for (k in seq_along(claimed)) claimed[[k]] <- integer(0)
-      if (!length(sig_terms)) return(claimed)
-
-      for (t in order_terms) {
-        if (!(t %in% sig_terms)) next
-        members <- term2rows[[t]]
-        an <- parents_map[[t]]
-        if (length(an)) for (a_name in an) claimed[[a_name]] <- unique(c(claimed[[a_name]], members))
-      }
-      claimed
+      .propagate_claims(order_terms, sig_terms, term2rows, parents_map, nodes)
     }
 
     res1 <- .pc_pass(order_terms, term2rows, all_id, pos_id, children_map)
@@ -1135,10 +1131,14 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         frac <- length(setdiff(members, kids_union)) / max(length(members), 1)
         if (frac < ancestor_novel_frac) novelty_ok[[t]] <- FALSE
       }
-      res2 <- res2[novelty_ok[res2$IPR], , drop = FALSE]
+    } else {
+      novelty_ok <- rep(TRUE, nrow(res2)); names(novelty_ok) <- res2$IPR
     }
 
-    res2[order(res2$p_adj, -res2$enrichment, res2$IPR), , drop = FALSE]
+    # Every term tested stays in the family. These rules only choose what is reported, once
+    # correction is done, which for global scope happens after all types have run.
+    res2$.report <- unname(novelty_ok[res2$IPR]) & res2$total_count >= min_total & res2$pos_count >= min_pos
+    res2
   }
 
   # ---------- Decide release & load InterPro resources ----------
@@ -1184,40 +1184,45 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     }
 
     cur_rel <- .detect_current_release(timeout_s = max(entries_timeout_s, tree_timeout_s))
-    if (!nzchar(cur_rel) || !is.finite(.num(cur_rel))) {
-      stop("[ipr_enrichment] Auto-detection of current InterPro release failed. ",
-           "Please specify 'interpro_release' manually or provide local copies of ",
-           "'entry.list' and 'ParentChildTreeFile.txt'.")
-    }
-
-    cur_cov <- .coverage_for_current(iprs_all, timeout_s = max(entries_timeout_s, tree_timeout_s))
-
-    step_sz <- 2.0
-    max_back <- 12L
-    bt <- .backtrack_release_until_full(iprs_all, cur_rel, step = step_sz, max_backtrack = max_back,
-                                        timeout_s = max(entries_timeout_s, tree_timeout_s))
-
-    chosen_release <- bt$release
-    best_cov       <- bt$coverage
-    backtrack_meta <- list(
-      current_release_detected = cur_rel,
-      current_coverage_estimate = cur_cov,
-      attempted_releases = bt$tried,
-      attempted_coverages = bt$coverages,
-      autodetect_caps = list(
-        max_files_scanned = .MAX_FILES_FOR_AUTODETECT,
-        max_iprs_collected = .MAX_IPRS_FOR_AUTODETECT
-      )
-    )
-
-    if (is.na(best_cov)) {
-      message("[ipr_enrichment] Could not estimate coverage across releases; using current_release endpoints.")
-      chosen_release <- NULL
+    if (!isTRUE(!is.na(cur_rel) && nzchar(cur_rel) && is.finite(.num(cur_rel)))) {
+      # Compute nodes often have no internet, and the bundled list covers this case.
+      if (!identical(entries_source, "auto")) {
+        stop("[ipr_enrichment] Could not detect the current InterPro release. ",
+             "Specify 'interpro_release', or provide local copies of ",
+             "'entry.list' and 'ParentChildTreeFile.txt'.", call. = FALSE)
+      }
+      message("[ipr_enrichment] Could not reach InterPro, so the InterPro entry list bundled with dndsR ",
+              "is used. To use a specific release, give --entries-path.")
     } else {
-      message(sprintf("[ipr_enrichment] Selected InterPro release %s (coverage %.3f)", chosen_release, best_cov))
-      if (is.finite(strict_coverage) && best_cov < strict_coverage) {
-        stop(sprintf("Coverage %.3f < strict_coverage=%.2f for selected release %s.",
-                     best_cov, strict_coverage, chosen_release))
+      cur_cov <- .coverage_for_current(iprs_all, timeout_s = max(entries_timeout_s, tree_timeout_s))
+
+      step_sz <- 2.0
+      max_back <- 12L
+      bt <- .backtrack_release_until_full(iprs_all, cur_rel, step = step_sz, max_backtrack = max_back,
+                                          timeout_s = max(entries_timeout_s, tree_timeout_s))
+
+      chosen_release <- bt$release
+      best_cov       <- bt$coverage
+      backtrack_meta <- list(
+        current_release_detected = cur_rel,
+        current_coverage_estimate = cur_cov,
+        attempted_releases = bt$tried,
+        attempted_coverages = bt$coverages,
+        autodetect_caps = list(
+          max_files_scanned = .MAX_FILES_FOR_AUTODETECT,
+          max_iprs_collected = .MAX_IPRS_FOR_AUTODETECT
+        )
+      )
+
+      if (is.na(best_cov)) {
+        message("[ipr_enrichment] Could not estimate coverage across releases; using current_release endpoints.")
+        chosen_release <- NULL
+      } else {
+        message(sprintf("[ipr_enrichment] Selected InterPro release %s (coverage %.3f)", chosen_release, best_cov))
+        if (is.finite(strict_coverage) && best_cov < strict_coverage) {
+          stop(sprintf("Coverage %.3f < strict_coverage=%.2f for selected release %s.",
+                       best_cov, strict_coverage, chosen_release))
+        }
       }
     }
   }
@@ -1283,6 +1288,9 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   }
   exclude_set <- .build_exclude_set(exclude_seeds)
 
+  # min_pos chooses the rows to report, after correction.
+  .report_only <- function(res) res[res$pos_count >= min_pos, , drop = FALSE]
+
   # ---------- pooled helper ----------
   .pooled_enrichment <- function(df, side, allowed_types = NULL, do_adjust = TRUE) {
     prefix <- if (side == "query") "q_" else "s_"
@@ -1316,14 +1324,15 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
 
     n_all <- length(vec_all)
     prop  <- res$total_count / max(n_all, 1)
-    keep  <- (res$total_count >= min_total) & (res$pos_count >= min_pos) & (prop <= max_prop)
+    # The tested family must not depend on the outcome, and pos_count is the outcome.
+    keep  <- (res$total_count >= min_total) & (prop <= max_prop)
     res <- res[keep, , drop = FALSE]
     if (!nrow(res)) return(NULL)
 
     res <- .attach_metadata_to_res(res, type_by_ipr, name_by_ipr)
 
     if (isTRUE(do_adjust)) {
-      res <- .adjust_pvals(res, fdr_method, alpha)
+      res <- .report_only(.adjust_pvals(res, fdr_method, alpha))
     } else {
       res$p_adj <- NA_real_
     }
@@ -1341,7 +1350,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     df <- .apply_filter(d, filter_expr)
     if (!nrow(df)) return(list())
 
-    filter_fun <- function(v, keep_types = NULL) {
+    filter_fun <- function(v, keep_types = NULL, unmatched = keep_unmatched) {
       vapply(
         v,
         .filter_terms_string,
@@ -1349,17 +1358,13 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         allowed_types = keep_types,
         type_by_ipr = type_by_ipr,
         exclude_set = exclude_set,
-        keep_unmatched = keep_unmatched
+        keep_unmatched = unmatched
       )
     }
 
     results <- list()
 
     if (!is.null(stratified_types)) {
-      if (identical(method, "parent_child") && identical(adjust_scope, "global")) {
-        warning("[ipr_enrichment] adjust_scope='global' is not supported for method='parent_child'; using per_type.", call. = FALSE)
-      }
-
       skipped_types <- character(0)
       ran_types <- character(0)
 
@@ -1367,7 +1372,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         tp_use <- c(tp)
 
         df2 <- df
-        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp_use)
+        # A term with no known type belongs to no stratum, so it is not tested in any.
+        df2[[term_col]] <- filter_fun(df[[term_col]], keep_types = tp_use, unmatched = FALSE)
 
         if (identical(method, "fisher")) {
           res <- .pooled_enrichment(df2, side, allowed_types = NULL, do_adjust = FALSE)
@@ -1417,19 +1423,25 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
         )
       }
 
-      if (identical(method, "fisher") && length(results)) {
+      if (length(results)) {
         allres <- do.call(rbind, Filter(function(x) is.data.frame(x) && nrow(x) > 0, results))
 
         if (!is.null(allres) && nrow(allres)) {
           if (identical(adjust_scope, "global")) {
             allres <- .adjust_pvals(allres, fdr_method, alpha)
             results <- split(allres, allres$ENTRY_TYPE)
-          } else {
+          } else if (identical(method, "fisher")) {
             results <- lapply(results, function(x) {
               if (is.null(x) || !nrow(x)) return(x)
               .adjust_pvals(x, fdr_method, alpha)
             })
           }
+          results <- Filter(nrow, lapply(results, function(x) {
+            if (!(".report" %in% names(x))) return(.report_only(x))
+            x <- x[x$.report, , drop = FALSE]
+            x$.report <- NULL
+            x
+          }))
         }
       }
 
@@ -1488,8 +1500,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   .run_comp_side <- function(comp_name, comp_dir, side) {
     in_file <- file.path(comp_dir, paste0(comp_name, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) {
-      warning("Annotated dN/dS file not found: ", in_file, call. = FALSE)
-      return(character(0))
+      stop("Annotated dN/dS file not found: ", in_file, ". Run append_annotations first.", call. = FALSE)
     }
 
     d <- utils::read.table(in_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "", comment.char = "")
@@ -1630,19 +1641,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
       out_k
     }
 
-    if (threads > 1L && .Platform$OS.type != "windows") {
-      outs_list <- parallel::mclapply(
-        seq_len(nrow(jobs)),
-        run_one_job,
-        mc.cores = threads,
-        mc.preschedule = FALSE
-      )
-    } else {
-      if (threads > 1L && .Platform$OS.type == "windows") {
-        warning("[ipr_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-      }
-      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
-    }
+    outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "ipr_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
     message("All IPR enrichments complete.")
@@ -1677,19 +1676,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     out_sd
   }
 
-  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
-    outs_list <- parallel::mclapply(
-      sides,
-      run_one_side,
-      mc.cores = min(threads, length(sides)),
-      mc.preschedule = FALSE
-    )
-  } else {
-    if (threads > 1L && .Platform$OS.type == "windows") {
-      warning("[ipr_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-    }
-    outs_list <- lapply(sides, run_one_side)
-  }
+  outs_list <- .parallel_lapply(sides, run_one_side, threads, "ipr_enrichment")
 
   outs <- unlist(outs_list, use.names = FALSE)
   message("IPR enrichment complete for: ", dnds_annot_file)

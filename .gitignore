@@ -3,3 +3,11 @@
 .RData
 .Ruserdata
 dndsR.Rproj
+
+# Local agent audit record, runtime files, and machine-specific settings
+.audit
+.audit.moved.*
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
+*.sif

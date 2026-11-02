@@ -1,6 +1,5 @@
 #' @keywords internal
 .dnds_cli_internal <- c(
-  "bootstrap_path",
   "cast",
   "list_commands",
   "lookup_command",
@@ -33,10 +32,11 @@ cli_lookup_command <- function(cmd) {
 #' @keywords internal
 .dndsr_global_flags <- list(
   # name = c("syntax", "description")
-  comparison_file = c("-c, -C, --comparison-file <int>", "Comparison file for batch mode."),
-  threads         = c("-t, -T, --threads <int>",         "Workers to assign to a job."),
+  comparison_file = c("-c, -C, --comparison-file <path>", "Comparison file for batch mode."),
+  output_dir      = c("-o, -O, --output-dir <path>",     "Output directory (default: current directory)."),
+  threads         = c("-t, -T, --threads <int>",         "Workers to assign to a job, where the command supports it."),
   verbose         = c("-v, -V, --verbose",               "Verbose logging."),
-  warnings        = c("-w, -W, --warnings <mode>",       "Prints R warnings: off|summary|all (default: off).")
+  warnings        = c("-w, -W, --warnings <mode>",       "Prints R warnings: off|summary|all (default: summary).")
 )
 
 #' @keywords internal
@@ -57,6 +57,29 @@ cli_print_global_flags <- function() {
 
 #-----------------------
 
+#' Stop with a suggestion for a mistyped command
+#' @keywords internal
+.cli_unknown_command <- function(cmd) {
+  known <- cli_list_commands()
+  near <- known[utils::adist(sub("s$", "", cmd), known) <= 3L]
+  hint <- if (length(near)) paste0(" Did you mean: ", paste(near, collapse = ", "), "?") else ""
+  stop("Unknown command: ", cmd, ".", hint, " Run 'dndsr --help' to list commands.", call. = FALSE)
+}
+
+#' Stop if an option does not exist for a command
+#' @keywords internal
+.cli_check_options <- function(cmd, given, accepted) {
+  global <- c("threads", "verbose", "warnings", "warnings_max", "output_dir", "comp_cores")
+  unknown <- setdiff(given, c(accepted, global))
+  if (!length(unknown)) return(invisible(NULL))
+  stop(
+    "Unknown option(s) for '", cmd, "': ",
+    paste0("--", gsub("_", "-", unknown), collapse = ", "),
+    ". Run 'dndsr ", cmd, " --help' to list options.",
+    call. = FALSE
+  )
+}
+
 #' @keywords internal
 cli_print_usage <- function() {
   cmds <- cli_list_commands()
@@ -72,9 +95,7 @@ cli_print_usage <- function() {
 cli_print_command_help <- function(cmd) {
   fn <- cli_lookup_command(cmd)
   if (is.null(fn)) {
-    cat("Unknown command:", cmd, "\n\n")
-    cli_print_usage()
-    return(invisible(NULL))
+    .cli_unknown_command(cmd)
   }
 
   topic <- attr(fn, "target", exact = TRUE)
@@ -105,9 +126,8 @@ cli_print_command_help <- function(cmd) {
 #' dndsR command-line entrypoint
 #'
 #' Dispatches the `dndsr` command-line interface (CLI). This function is intended
-#' to be called by the `dndsr` executable installed with the package (e.g.,
-#' `inst/exec/dndsr`) or by the `dndsR-launcher`, rather than being used
-#' interactively.
+#' to be called by the `dndsr` executable (`inst/scripts/dndsr`), rather than being
+#' used interactively. Use the analysis functions, such as [calculate_dnds()], from R.
 #'
 #' The CLI discovers available commands by looking for functions named
 #' `cli_<command>` in the `dndsR` namespace.
@@ -130,10 +150,6 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   loadNamespace("dndsR")
   ns <- asNamespace("dndsR")
 
-  if (exists("cli_bootstrap_path", envir = ns, inherits = FALSE)) {
-    get("cli_bootstrap_path", envir = ns, inherits = FALSE)()
-  }
-
   if (length(argv) > 0 && identical(argv[1], "--")) {
     argv <- argv[-1]
   }
@@ -148,31 +164,26 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
     return(invisible(NULL))
   }
 
-  cmd  <- argv[1]
+  # Accept hyphens as well as underscores, as for options.
+  cmd  <- gsub("-", "_", argv[1], fixed = TRUE)
   args <- argv[-1]
 
-  if (length(args) == 0) {
+  # These commands are complete with no options. Others print their help.
+  if (length(args) == 0 && !(cmd %in% c("example", "verify_example"))) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
   }
 
-  if (any(args %in% c("-h", "--help", "--usage", "help"))) {
+  if (any(args %in% c("-h", "--help", "--usage"))) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
-  }
-
-  if (identical(cmd, "doctor")) {
-    if (exists("cli_doctor", envir = ns, inherits = FALSE)) {
-      get("cli_doctor", envir = ns, inherits = FALSE)()
-      return(invisible(NULL))
-    }
   }
 
   fn <- cli_lookup_command(cmd)
-  if (is.null(fn)) {
-    cli::cli_alert_danger("Unknown command: {.val {cmd}}")
-    cli_print_usage()
-    stop(sprintf("Unknown command: %s", cmd), call. = FALSE)
+  if (is.null(fn)) .cli_unknown_command(cmd)
+
+  if (cmd == "example" && !any(grepl("^(-o|-O|--output[-_]dir)", args))) {
+    args <- c(args, "-o", "dndsr_example")
   }
 
   if (!exists("parse_dnds_opts", envir = ns, inherits = FALSE)) {
@@ -187,6 +198,7 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
 
   fmls <- names(formals(target_fn))
   has_dots <- "..." %in% fmls
+  if (!has_dots) .cli_check_options(cmd, names(parsed), fmls)
 
   # Special-case: map CLI --threads to calculate_dnds(comp_cores)
   if (identical(target, "calculate_dnds")) {
@@ -218,7 +230,10 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
 
   # Forward --threads to targets that accept it (or have ...)
   if (!is.null(parsed$threads)) {
-    if (!("threads" %in% fmls) && !has_dots) {
+    if (identical(target, "calculate_dnds")) {
+      parsed$threads <- NULL # already mapped to comp_cores
+    } else if (!("threads" %in% fmls) && !has_dots) {
+      message("Note: '", cmd, "' runs on one thread; --threads has no effect.")
       parsed$threads <- NULL
     }
   }
@@ -236,9 +251,9 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   }
 
   # ---- global warnings handling (-w off|summary|all) ----
-  w_mode <- getOption("dndsR.warnings", "off")
+  w_mode <- getOption("dndsR.warnings", "summary")
   w_mode <- tolower(as.character(w_mode))[1L]
-  if (!(w_mode %in% c("off", "summary", "all"))) w_mode <- "off"
+  if (!(w_mode %in% c("off", "summary", "all"))) w_mode <- "summary"
 
   w_max <- getOption("dndsR.warnings_max", NULL)
   if (!is.null(w_max)) {

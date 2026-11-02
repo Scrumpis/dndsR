@@ -17,6 +17,11 @@ dnds_ideogram(
   make_png = TRUE,
   overwrite = FALSE,
   keep_intermediate = FALSE,
+  dS_dN = FALSE,
+  min_dS = 0,
+  max_dS = Inf,
+  min_dN = 0,
+  max_dN = Inf,
   chr_strip_leading_chr0 = FALSE,
   chr_strip_leading = NULL,
   chr_strip_trailing = NULL,
@@ -63,6 +68,17 @@ the augmented table (e.g. \code{"q_gff_seqname == s_gff_seqname"}). Rows failing
 
 \item{keep_intermediate}{Logical; keep the generated
 \code{<comp>_ideogram_input.tsv} (default \code{FALSE}).}
+
+\item{dS_dN}{Logical; if \code{TRUE}, plot \code{dS} as the red heatmap and \code{dN}
+as the blue heatmap (per window). Output files will be named
+\code{<comp>_{query|subject}_ideogram_dS_dN.{svg,png}} so users can also generate
+the default dN/dS selection-pressure ideograms.}
+
+\item{min_dS, max_dS}{Numeric thresholds applied to \code{dS} when \code{dS_dN=TRUE}.
+Rows outside the range are dropped before windowing. Defaults: \code{min_dS=0}, \code{max_dS=Inf}.}
+
+\item{min_dN, max_dN}{Numeric thresholds applied to \code{dN} when \code{dS_dN=TRUE}.
+Rows outside the range are dropped before windowing. Defaults: \code{min_dN=0}, \code{max_dN=Inf}.}
 
 \item{chr_strip_leading_chr0}{Logical; optionally strip leading "chr" and optional "0"
 (e.g., \code{chr01}->\code{1}). Case-insensitive by default. Default \code{FALSE}.}

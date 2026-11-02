@@ -70,7 +70,10 @@ append_annotations <- function(dnds_file = NULL,
   plapply <- function(X, FUN, threads = 1L, ...) {
     threads <- max(1L, as.integer(threads))
     if (.Platform$OS.type != "windows" && threads > 1L) {
-      return(parallel::mclapply(X, FUN, mc.cores = threads, mc.preschedule = TRUE, ...))
+      # Prescheduled, because there can be one job per gene ID.
+      res <- suppressWarnings(parallel::mclapply(X, FUN, mc.cores = threads, mc.preschedule = TRUE, ...))
+      .check_workers(res, "append_annotations", lost = any(vapply(res, is.null, logical(1))))
+      return(res)
     } else {
       return(lapply(X, FUN, ...))
     }
@@ -94,84 +97,23 @@ append_annotations <- function(dnds_file = NULL,
     df2[, req, drop = FALSE]
   }
 
-  # ---- Fast GFF reader with pure-R fallbacks (no shell) ----
-  .read_gff <- function(path) {
-    start_time <- proc.time()[["elapsed"]]
-    ok9 <- function(x) is.data.frame(x) && ncol(x) >= 9L
-
-    use_fread <- requireNamespace("data.table", quietly = TRUE)
-
-    if (use_fread) {
-      modes <- list(
-        list(sep = "\t", tag = "fread(tab,comment)"),
-        list(sep = "auto", tag = "fread(auto,comment)"),
-        list(sep = " ", tag = "fread(space,comment)")
-      )
-      for (mode in modes) {
-        g <- try(data.table::fread(
-          file = path,
-          sep = mode$sep,
-          header = FALSE,
-          quote = "",
-          data.table = FALSE,
-          showProgress = FALSE,
-          fill = TRUE,
-          comment = "#",
-          skipEmptyLines = TRUE,
-          select = 1:9,
-          col.names = paste0("V", 1:9),
-          colClasses = c("character","character","character",
-                         "integer","integer","character",
-                         "character","character","character"),
-          na.strings = c("", "NA", ".")
-        ), silent = TRUE)
-        if (!inherits(g, "try-error") && ok9(g)) {
-          names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-          et <- proc.time()[["elapsed"]] - start_time
-          vmsg(sprintf("GFF read via %s in %.3fs; rows=%s: %s",
-                       mode$tag, et, format(nrow(g), big.mark=","), basename(path)))
-          return(g)
-        }
-      }
-    }
-
-    for (sep in c("\t", "")) {
-      g <- try(utils::read.table(path, sep = sep, header = FALSE, quote = "",
-                                 stringsAsFactors = FALSE, comment.char = "#", fill = TRUE,
-                                 colClasses = c("character","character","character",
-                                                "integer","integer","character",
-                                                "character","character","character")),
-               silent = TRUE)
-      if (!inherits(g, "try-error") && ok9(g)) {
-        names(g)[1:9] <- c("seqid","source","type","start","end","score","strand","phase","attributes")
-        et <- proc.time()[["elapsed"]] - start_time
-        vmsg(sprintf("GFF read via base (sep='%s') in %.3fs; rows=%s: %s",
-                     if (sep=="") "any whitespace" else "\\t",
-                     et, format(nrow(g), big.mark=","), basename(path)))
-        if (sep == "") {
-          vmsg("Warning: parsed with sep=''; if attribute values contain unescaped spaces, they may be split.")
-        }
-        return(g)
-      }
-    }
-
-    stop("GFF appears malformed or unreadable: ", path)
-  }
-
   ## ---------- term patterns & normalizers ----------
   .default_term_patterns <- function() {
     list(
-      GO      = "GO:\\d{7}",
-      IPR     = "(?:InterPro:)?IPR\\d{6}",
-      KEGG    = "(?:KEGG:)?K\\d{5}|map\\d{5}",
-      PANTHER = "PTHR\\d{5,6}(?:\\:SF\\d+)?",
-      PFAM    = "PF\\d{5}",
-      TIGRFAM = "TIGR\\d{5}",
-      COG     = "COG\\d{4}"
+      GO      = "(?<![A-Za-z0-9])GO:\\d{7}(?![A-Za-z0-9])",
+      IPR     = "(?<![A-Za-z0-9])(?:InterPro:)?IPR\\d{6}(?![A-Za-z0-9])",
+      KEGG    = "(?<![A-Za-z0-9])(?:KEGG:)?(?:K\\d{5}|map\\d{5})(?![A-Za-z0-9])",
+      PANTHER = "(?<![A-Za-z0-9])PTHR\\d{5,6}(?:\\:SF\\d+)?(?![A-Za-z0-9])",
+      PFAM    = "(?<![A-Za-z0-9])PF\\d{5}(?![A-Za-z0-9])",
+      TIGRFAM = "(?<![A-Za-z0-9])TIGR\\d{5}(?![A-Za-z0-9])",
+      COG     = "(?<![A-Za-z0-9])COG\\d{4}(?![A-Za-z0-9])"
     )
   }
   .default_normalizers <- function() {
-    list(IPR = function(x) sub("^InterPro:", "", x, ignore.case = TRUE))
+    list(
+      IPR = function(x) sub("^InterPro:", "", x, ignore.case = TRUE),
+      KEGG = function(x) sub("^KEGG:", "", x, ignore.case = TRUE)
+    )
   }
 
   .parse_custom <- function(custom) {
@@ -196,7 +138,11 @@ append_annotations <- function(dnds_file = NULL,
   .extract_terms_from_string <- function(attr_string, patterns, normalizers, case_insensitive = TRUE) {
     out <- structure(vector("list", length(patterns)), names = names(patterns))
     if (isTRUE(is.na(attr_string)) || !nzchar(attr_string)) return(out)
-    s <- attr_string
+    # Identifiers such as ID=K12345.1 name the feature; they are not functional terms.
+    s <- gsub("(^|;)\\s*(ID|Parent)=[^;]*", "\\1", attr_string, perl = TRUE)
+    # GFF3 encodes separators inside values, as in GO:0000001%2CGO:0000002. Decode them so
+    # that each term stands alone. Decoding follows removal of IDs, which are not terms.
+    s <- .decode_gff3(s)
     for (lab in names(patterns)) {
       rx <- patterns[[lab]]
       hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE,
@@ -251,13 +197,14 @@ append_annotations <- function(dnds_file = NULL,
       key <- vapply(kv, `[`, "", 1L)
       val <- vapply(kv, function(x) if (length(x) > 1) x[2] else "", "")
       names(val) <- key
-      id  <- unname(val["ID"])
+      # extract_cds names sequences as Bioconductor does, without prefixes such as gene-.
+      id  <- .normalize_gff_id(unname(val["ID"]))
       par <- unname(val["Parent"])
 
       if (!is.na(id) && nzchar(id)) {
         # children edges
         if (!is.na(par) && nzchar(par)) {
-          for (p in strsplit(par, ",", fixed = TRUE)[[1]]) {
+          for (p in .normalize_gff_id(strsplit(par, ",", fixed = TRUE)[[1]])) {
             if (identical(p, id)) next
             cur <- if (exists(p, envir = children, inherits = FALSE)) get(p, envir = children) else character(0)
             assign(p, unique(c(cur, id)), envir = children)
@@ -314,9 +261,19 @@ append_annotations <- function(dnds_file = NULL,
     out
   }
 
-  ## Memoized subtree unions WITH CYCLE GUARDS
+  ## Memoized subtree unions WITH CYCLE GUARDS.
+  ## An ID is only unique within one GFF, and annotation tools often reuse names such as
+  ## g1 across genomes, so these caches must be emptied before each GFF.
+  subtree_caches <- list(
+    terms = new.env(hash = TRUE, parent = emptyenv()),
+    attrs = new.env(hash = TRUE, parent = emptyenv()),
+    coords = new.env(hash = TRUE, parent = emptyenv())
+  )
+  .reset_subtree_caches <- function() {
+    for (e in subtree_caches) rm(list = ls(e, all.names = TRUE), envir = e)
+  }
   .subtree_terms <- local({
-    cache <- new.env(hash = TRUE, parent = emptyenv())
+    cache <- subtree_caches$terms
     INPROG <- new.env(hash = TRUE, parent = emptyenv())
 
     function(id, children_env, own_terms_env) {
@@ -336,7 +293,7 @@ append_annotations <- function(dnds_file = NULL,
   })
 
   .subtree_attrs <- local({
-    cache <- new.env(hash = TRUE, parent = emptyenv())
+    cache <- subtree_caches$attrs
     INPROG <- new.env(hash = TRUE, parent = emptyenv())
 
     function(id, children_env, own_attrs_env) {
@@ -356,7 +313,7 @@ append_annotations <- function(dnds_file = NULL,
   })
 
   .subtree_coords <- local({
-    cache <- new.env(hash = TRUE, parent = emptyenv())
+    cache <- subtree_caches$coords
     INPROG <- new.env(hash = TRUE, parent = emptyenv())
 
     function(id, children_env, own_coords_env) {
@@ -408,6 +365,7 @@ append_annotations <- function(dnds_file = NULL,
   ## Annotate a set of IDs -> data.frame(ID, GFF_SEQID, GFF_START, GFF_END, ATTR, <terms...>)
   .annotate_id_set <- function(ids, children_env, own_terms_env, own_attrs_env, own_coords_env,
                                labs, collapse_sep = ";", threads = 1L) {
+    .reset_subtree_caches()
     to_row <- function(id) {
       terms  <- .subtree_terms(id, children_env, own_terms_env)
       attrs  <- .subtree_attrs(id, children_env, own_attrs_env)
@@ -462,9 +420,9 @@ append_annotations <- function(dnds_file = NULL,
               setdiff(names(patterns), std_order))
 
     vmsg("Precomputing query-side maps...")
-    q_maps <- .precompute_maps_and_terms(.read_gff(q_gff), patterns, normalizers)
+    q_maps <- .precompute_maps_and_terms(.read_gff_features(q_gff), patterns, normalizers)
     vmsg("Precomputing subject-side maps...")
-    s_maps <- .precompute_maps_and_terms(.read_gff(s_gff), patterns, normalizers)
+    s_maps <- .precompute_maps_and_terms(.read_gff_features(s_gff), patterns, normalizers)
 
     q_ids <- unique(dnds$query_id)
     s_ids <- unique(dnds$subject_id)
@@ -483,11 +441,15 @@ append_annotations <- function(dnds_file = NULL,
         silent = TRUE
       )
       res <- parallel::mccollect(list(j1, j2), wait = TRUE)
+      .check_workers(res, "append_annotations", lost = length(res) < 2L || any(vapply(res, is.null, logical(1))))
       q_ann <- res[[1]]; s_ann <- res[[2]]
     } else {
       q_ann <- .annotate_id_set(q_ids, q_maps$children, q_maps$own_terms, q_maps$own_attrs, q_maps$own_coords, labs, threads = tq)
       s_ann <- .annotate_id_set(s_ids, s_maps$children, s_maps$own_terms, s_maps$own_attrs, s_maps$own_coords, labs, threads = ts)
     }
+
+    .check_id_match(q_ann$GFF_SEQID, "query")
+    .check_id_match(s_ann$GFF_SEQID, "subject")
 
     present_labs <- labs[vapply(labs, function(L) {
       qa <- q_ann[[L]]; sa <- s_ann[[L]]

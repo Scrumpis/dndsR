@@ -1,0 +1,5 @@
+#!/bin/sh
+# dndsR hook: logs commits to the untracked audit record.
+. "$(dirname "$0")/_common.sh"
+log_git_event commit "$(git rev-parse HEAD)" "$(git log -1 --format=%s)"
+exit 0

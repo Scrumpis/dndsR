@@ -1,0 +1,118 @@
+function	table	term	name	pos	total	p_value	p_adj_old	p_adj_new	sig_old	sig_new	wy_permute	wy_strata	wy_rotate
+ipr_enrichment	Domain	IPR001810	F-box domain	16	484	1.15e-08	2.42e-07	2.99e-05	1	1			
+ipr_enrichment	Domain	IPR017451	F-box associated interaction domain	9	167	4.46e-07	4.7e-06	0.00058	1	1			
+ipr_enrichment	Domain	IPR006527	F-box associated domain, type 1	6	87	1.01e-05	7.1e-05	0.00659	1	1			
+ipr_enrichment	Domain	IPR016140	Bifunctional inhibitor/plant lipid transfer protein/seed storage helical domain	6	99	2.13e-05	0.000112	0.00923	1	1			
+ipr_enrichment	Domain	IPR006501	Pectinesterase inhibitor domain	5	107	0.000364	0.00153	0.0947	1	0			
+ipr_enrichment	Domain	IPR003614	Knottin, scorpion toxin-like	3	29	0.000592	0.002	0.145	1	0			
+ipr_enrichment	Domain	IPR013171	Cytidine/deoxycytidylate deaminase, zinc-binding domain	2	7	0.000667	0.002	0.151	1	0			
+ipr_enrichment	Domain	IPR041608	Embryo surrounding factor 1, brassicaceae	2	8	0.000886	0.00207	0.185	1	0			
+ipr_enrichment	Domain	IPR005174	Domain unknown function DUF295	4	75	0.000888	0.00207	0.185	1	0			
+ipr_enrichment	Domain	IPR017884	SANT domain	3	44	0.00202	0.00424	0.389	1	0			
+ipr_enrichment	Domain	IPR002125	Cytidine and deoxycytidylate deaminase domain	2	13	0.00242	0.00455	0.434	1	0			
+ipr_enrichment	Domain	IPR003340	B3 DNA binding domain	4	101	0.00267	0.00455	0.447	1	0			
+ipr_enrichment	Domain	IPR033872	Non-specific lipid-transfer protein type 2	2	14	0.00281	0.00455	0.458	1	0			
+ipr_enrichment	Domain	IPR013187	F-box associated domain, type 3	3	78	0.0101	0.0143	1	1	0			
+ipr_enrichment	Domain	IPR000626	Ubiquitin-like domain	2	70	0.0608	0.0752	1	0	0			
+ipr_enrichment	Domain	IPR006447	Myb domain, plants	2	81	0.0785	0.0916	1	0	0			
+ipr_enrichment	Domain	IPR017930	Myb domain	5	230	0.0102	0.0143	1	1	0			
+ipr_enrichment	Domain	IPR001005	SANT/Myb domain	5	293	0.0262	0.0345	1	1	0			
+ipr_enrichment	Domain	IPR006566	FBD domain	2	129	0.169	0.177	1	0	0			
+ipr_enrichment	Domain	IPR018957	Zinc finger, C3HC4 RING-type	4	299	0.0922	0.102	1	0	0			
+ipr_enrichment	Domain	IPR001841	Zinc finger, RING-type	4	461	0.271	0.271	1	0	0			
+ipr_enrichment	Family	IPR034086	Pectinesterase inhibitor, plant	4	18	2.37e-06	2.39e-05	0.00236	1	1			
+ipr_enrichment	Family	IPR010851	Defensin-like protein	5	49	6.67e-06	3.36e-05	0.00496	1	1			
+ipr_enrichment	Family	IPR022618	Defensin-like protein 20-27	3	10	1.84e-05	5.09e-05	0.00923	1	1			
+ipr_enrichment	Family	IPR008801	Rapid ALkalinization Factor	4	30	2.02e-05	5.09e-05	0.00923	1	1			
+ipr_enrichment	Family	IPR005508	Protein of unknown function DUF313	3	14	5.49e-05	0.00011	0.019	1	1			
+ipr_enrichment	Family	IPR008551	Transport and Golgi organisation protein 2	2	4	0.000177	0.000253	0.0541	1	0			
+ipr_enrichment	Family	IPR010264	Plant self-incompatibility S1	4	51	0.000169	0.000253	0.0541	1	0			
+ipr_enrichment	Family	IPR006263	Cytidine deaminase, homodimeric	2	7	0.000612	0.000767	0.145	1	0			
+ipr_enrichment	Family	IPR008176	Defensin, plant	2	15	0.00298	0.00332	0.469	1	0			
+ipr_enrichment	Family	IPR010682	Plant self-incompatibility response	2	21	0.00583	0.00584	0.892	1	0			
+ipr_enrichment	Homologous_superfamily	IPR011043	Galactose oxidase/kelch, beta-propeller	13	160	3.45e-12	5.33e-11	1.8e-08	1	1			
+ipr_enrichment	Homologous_superfamily	IPR036047	F-box-like domain superfamily	15	478	4.12e-08	3.19e-07	7.15e-05	1	1			
+ipr_enrichment	Homologous_superfamily	IPR036312	Bifunctional inhibitor/plant lipid transfer protein/seed storage helical domain superfamily	6	99	1.71e-05	8.67e-05	0.00923	1	1			
+ipr_enrichment	Homologous_superfamily	IPR015915	Kelch-type beta propeller	6	110	3.12e-05	0.000118	0.0125	1	1			
+ipr_enrichment	Homologous_superfamily	IPR036574	Knottin, scorpion toxin-like superfamily	3	24	0.000299	0.000771	0.0835	1	0			
+ipr_enrichment	Homologous_superfamily	IPR035513	Invertase/pectin methylesterase inhibitor domain superfamily	5	107	0.000305	0.000771	0.0835	1	0			
+ipr_enrichment	Homologous_superfamily	IPR015300	DNA-binding pseudobarrel domain superfamily	4	99	0.00216	0.00449	0.401	1	0			
+ipr_enrichment	Homologous_superfamily	IPR016193	Cytidine deaminase-like	2	14	0.00261	0.00492	0.447	1	0			
+ipr_enrichment	Homologous_superfamily	IPR011011	Zinc finger, FYVE/PHD-type	2	89	0.0863	0.13	1	0	0			
+ipr_enrichment	Homologous_superfamily	IPR029071	Ubiquitin-like domain superfamily	2	107	0.118	0.161	1	0	0			
+ipr_enrichment	Homologous_superfamily	IPR009057	Homeobox-like domain superfamily	6	382	0.0186	0.0314	1	1	0			
+ipr_enrichment	Homologous_superfamily	IPR011989	Armadillo-like helical	3	246	0.154	0.178	1	0	0			
+ipr_enrichment	Homologous_superfamily	IPR013083	Zinc finger, RING/FYVE/PHD-type	6	630	0.133	0.165	1	0	0			
+ipr_enrichment	Homologous_superfamily	IPR016024	Armadillo-type fold	3	325	0.266	0.286	1	0	0			
+ipr_enrichment	Homologous_superfamily	IPR029058	Alpha/Beta hydrolase fold	2	301	0.496	0.498	1	0	0			
+ipr_enrichment	Repeat	IPR011498	Kelch repeat type 2	4	21	2.72e-06	1.09e-05	0.00236	1	1			
+ipr_enrichment	Repeat	IPR006652	Kelch repeat type 1	5	86	4.57e-05	9.13e-05	0.017	1	1			
+ipr_enrichment	Repeat	IPR032413	Atypical Arm repeat	2	9	0.000975	0.0013	0.195	1	0			
+ipr_enrichment	Repeat	IPR000225	Armadillo	2	75	0.0618	0.0618	1	0	0			
+term_enrichment	all	IPR011043	Galactose oxidase/kelch, beta-propeller	13	160	4.85e-11	3.26e-09	3.5e-07	1	1	0.0002	0.0002	0.0002
+term_enrichment	all	IPR001810	F-box domain	16	484	1.32e-07	4.44e-06	0.000476	1	1	0.0006	0.0006	0.001
+term_enrichment	all	IPR036047	F-box-like domain superfamily	15	478	6.47e-07	1.45e-05	0.00155	1	1	0.0006	0.006	0.0012
+term_enrichment	all	IPR050354		6	51	1.05e-06	1.76e-05	0.00189	1	1	0.0018	0.0068	0.0016
+term_enrichment	all	IPR057499		6	53	1.32e-06	1.77e-05	0.0019	1	1	0.0018	0.0104	0.0018
+term_enrichment	all	IPR017451	F-box associated interaction domain	9	167	1.69e-06	1.9e-05	0.00203	1	1	0.0018	0.0108	0.002
+term_enrichment	all	IPR050796		7	95	3.19e-06	3.06e-05	0.00329	1	1	0.0032	0.018	0.0036
+term_enrichment	all	IPR034086	Pectinesterase inhibitor, plant	4	18	5.18e-06	4.35e-05	0.00467	1	1	0.005	0.0244	0.0058
+term_enrichment	all	IPR011498	Kelch repeat type 2	4	21	9.98e-06	7.44e-05	0.008	1	1	0.0102	0.0448	0.014
+term_enrichment	all	IPR052421		4	24	1.75e-05	0.000107	0.0115	1	1	0.015	0.0624	0.0206
+term_enrichment	all	IPR010851	Defensin-like protein	5	49	1.76e-05	0.000107	0.0115	1	1	0.015	0.0652	0.0206
+term_enrichment	all	IPR006527	F-box associated domain, type 1	6	87	2.42e-05	0.000135	0.0145	1	1	0.017	0.0748	0.0218
+term_enrichment	all	IPR022618	Defensin-like protein 20-27	3	10	3.27e-05	0.000169	0.0181	1	1	0.025	0.0824	0.0282
+term_enrichment	all	IPR008801	Rapid ALkalinization Factor	4	30	4.37e-05	0.000209	0.0225	1	1	0.0302	0.189	0.0368
+term_enrichment	all	IPR016140	Bifunctional inhibitor/plant lipid transfer protein/seed storage helical domain	6	99	5.03e-05	0.000211	0.0227	1	1	0.0358	0.196	0.0436
+term_enrichment	all	IPR036312	Bifunctional inhibitor/plant lipid transfer protein/seed storage helical domain superfamily	6	99	5.03e-05	0.000211	0.0227	1	1	0.0358	0.196	0.0436
+term_enrichment	all	IPR015915	Kelch-type beta propeller	6	110	9.06e-05	0.000358	0.0384	1	1	0.135	0.234	0.161
+term_enrichment	all	IPR005508	Protein of unknown function DUF313	3	14	9.73e-05	0.000362	0.0389	1	1	0.152	0.246	0.18
+term_enrichment	all	IPR008551	Transport and Golgi organisation protein 2	2	4	0.000258	0.000888	0.0954	1	0	0.266	0.5	0.305
+term_enrichment	all	IPR006652	Kelch repeat type 1	5	86	0.000265	0.000888	0.0954	1	0	0.294	0.501	0.332
+term_enrichment	all	IPR010264	Plant self-incompatibility S1	4	51	0.000358	0.00114	0.123	1	0	0.35	0.531	0.399
+term_enrichment	all	IPR022364		9	342	0.000456	0.00139	0.149	1	0	0.368	0.643	0.419
+term_enrichment	all	IPR036574	Knottin, scorpion toxin-like superfamily	3	24	0.000515	0.0015	0.161	1	0	0.441	0.656	0.493
+term_enrichment	all	IPR006501	Pectinesterase inhibitor domain	5	107	0.000724	0.00194	0.209	1	0	0.517	0.736	0.573
+term_enrichment	all	IPR035513	Invertase/pectin methylesterase inhibitor domain superfamily	5	107	0.000724	0.00194	0.209	1	0	0.517	0.736	0.573
+term_enrichment	all	IPR006263	Cytidine deaminase, homodimeric	2	7	0.00089	0.0021	0.226	1	0	0.622	0.81	0.671
+term_enrichment	all	IPR013171	Cytidine/deoxycytidylate deaminase, zinc-binding domain	2	7	0.00089	0.0021	0.226	1	0	0.622	0.81	0.671
+term_enrichment	all	IPR050202		2	7	0.00089	0.0021	0.226	1	0	0.622	0.81	0.671
+term_enrichment	all	IPR003614	Knottin, scorpion toxin-like	3	29	0.000908	0.0021	0.226	1	0	0.633	0.825	0.68
+term_enrichment	all	IPR041608	Embryo surrounding factor 1, brassicaceae	2	8	0.00118	0.00264	0.284	1	0	0.66	0.87	0.707
+term_enrichment	all	IPR032413	Atypical Arm repeat	2	9	0.00151	0.00323	0.347	1	0	0.749	0.9	0.791
+term_enrichment	all	IPR005174	Domain unknown function DUF295	4	75	0.00154	0.00323	0.347	1	0	0.75	0.9	0.792
+term_enrichment	all	IPR050942		3	38	0.00201	0.00408	0.439	1	0	0.827	0.917	0.86
+term_enrichment	all	IPR003612		4	88	0.00277	0.00545	0.586	1	0	0.892	0.95	0.914
+term_enrichment	all	IPR017884	SANT domain	3	44	0.00306	0.00587	0.631	1	0	0.914	0.95	0.935
+term_enrichment	all	IPR002125	Cytidine and deoxycytidylate deaminase domain	2	13	0.00322	0.006	0.645	1	0	0.922	0.963	0.943
+term_enrichment	all	IPR016193	Cytidine deaminase-like	2	14	0.00374	0.0066	0.71	1	0	0.936	0.973	0.954
+term_enrichment	all	IPR033872	Non-specific lipid-transfer protein type 2	2	14	0.00374	0.0066	0.71	1	0	0.936	0.973	0.954
+term_enrichment	all	IPR008176	Defensin, plant	2	15	0.0043	0.0072	0.775	1	0	0.948	0.983	0.965
+term_enrichment	all	IPR015300	DNA-binding pseudobarrel domain superfamily	4	99	0.00422	0.007	0.775	1	0	0.946	0.976	0.964
+term_enrichment	all	IPR003340	B3 DNA binding domain	4	101	0.00453	0.00742	0.797	1	0	0.955	0.983	0.968
+term_enrichment	all	IPR013089		4	102	0.00469	0.0075	0.806	1	0	0.961	0.984	0.972
+term_enrichment	all	IPR010682	Plant self-incompatibility response	2	21	0.00838	0.0128	1	1	0	0.99	0.995	0.995
+term_enrichment	all	IPR050560		2	26	0.0127	0.0189	1	1	0	0.997	0.999	0.999
+term_enrichment	all	IPR050804		2	31	0.0178	0.0253	1	1	0	0.999	1	1
+term_enrichment	all	IPR013770		3	58	0.00667	0.0104	1	1	0	0.985	0.992	0.989
+term_enrichment	all	IPR013187	F-box associated domain, type 3	3	78	0.015	0.0218	1	1	0	0.999	1	1
+term_enrichment	all	IPR019955		2	67	0.0725	0.0953	1	0	0			
+term_enrichment	all	IPR000626	Ubiquitin-like domain	2	70	0.0782	0.101	1	0	0			
+term_enrichment	all	IPR000225	Armadillo	2	75	0.088	0.109	1	0	0			
+term_enrichment	all	IPR006447	Myb domain, plants	2	81	0.1	0.122	1	0	0			
+term_enrichment	all	IPR013596		2	83	0.104	0.125	1	0	0			
+term_enrichment	all	IPR011011	Zinc finger, FYVE/PHD-type	2	89	0.117	0.138	1	0	0			
+term_enrichment	all	IPR017930	Myb domain	5	230	0.0184	0.0257	1	1	0	0.999	1	1
+term_enrichment	all	IPR029071	Ubiquitin-like domain superfamily	2	107	0.158	0.179	1	0	0			
+term_enrichment	all	IPR001005	SANT/Myb domain	5	293	0.0452	0.0606	1	0	0			
+term_enrichment	all	IPR014778		4	245	0.0795	0.101	1	0	0			
+term_enrichment	all	IPR009057	Homeobox-like domain superfamily	6	382	0.0414	0.0567	1	0	0			
+term_enrichment	all	IPR006566	FBD domain	2	129	0.21	0.234	1	0	0			
+term_enrichment	all	IPR015495		2	142	0.241	0.257	1	0	0			
+term_enrichment	all	IPR018957	Zinc finger, C3HC4 RING-type	4	299	0.136	0.158	1	0	0			
+term_enrichment	all	IPR011989	Armadillo-like helical	3	246	0.222	0.244	1	0	0			
+term_enrichment	all	IPR012287		3	303	0.324	0.339	1	0	0			
+term_enrichment	all	IPR013083	Zinc finger, RING/FYVE/PHD-type	6	630	0.238	0.254	1	0	0			
+term_enrichment	all	IPR016024	Armadillo-type fold	3	325	0.363	0.369	1	0	0			
+term_enrichment	all	IPR001841	Zinc finger, RING-type	4	461	0.363	0.369	1	0	0			
+term_enrichment	all	IPR029058	Alpha/Beta hydrolase fold	2	301	0.594	0.594	1	0	0			

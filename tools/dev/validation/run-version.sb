@@ -1,0 +1,27 @@
+#!/bin/bash --login
+# Runs one dndsR version on real genomes, with the data read-only.
+#   sbatch --export=ALL,LIB=<R library>,TAG=<name>,RG=<work dir>,SIF=<image>,DATA=<data dir> run-version.sb
+#SBATCH --time=3:59:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
+#SBATCH --job-name=dndsR-val
+set -euo pipefail
+OUT="$RG/$TAG"
+mkdir -p "$OUT"
+cd "$OUT"
+ln -sfn "$RG/inputs" inputs
+cp "$RG/comparison.txt" comparison.txt
+run() {
+  singularity exec --cleanenv --bind "$RG" --bind "$LIB" --bind "$DATA:$DATA:ro" --env R_LIBS_USER="$LIB" "$SIF" \
+    Rscript -e 'dndsR::cli_main()' -- "$@"
+}
+date
+run extract_cds -c comparison.txt -t 4
+date
+run calculate_dnds -c comparison.txt -t "$SLURM_CPUS_PER_TASK"
+date
+run append_annotations -c comparison.txt -t 8
+date
+echo "Done $TAG with $(cat "$LIB/COMMIT")"

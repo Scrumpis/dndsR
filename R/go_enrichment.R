@@ -12,14 +12,19 @@
 #' @param ontologies c("BP","MF","CC") which GO branches.
 #' @param algorithm topGO algorithm: one of "weight01","elim","classic","weight".
 #' @param statistic topGO statistic: usually "fisher" (default) or "ks".
-#' @param pos_threshold Numeric; dNdS > pos_threshold defines "positive" (default 1).
+#' @param pos_threshold Numeric OR character quantile spec. If numeric, dNdS > pos_threshold defines "positive".
+#'   If character, use "q<prob>" or "quantile:<prob>" (e.g., "q0.95") to set the threshold to that quantile
+#'   of dNdS *after filtering* (and after drop_rows_without_go if enabled).
 #' @param max_dnds Drop rows with dNdS >= max_dnds or NA (default 10).
 #' @param filter_expr Optional character filter evaluated in the data
 #'   (e.g., "q_gff_seqname == s_gff_seqname").
 #' @param drop_rows_without_go If TRUE (default), universe is genes with >=1 GO for that side.
 #' @param node_min Minimum term size (topGO nodeSize) to keep (default 10).
 #' @param node_max Maximum term size (filtered after test; default Inf).
-#' @param p_adjust "none"|"BH" for multiple-testing correction across tested nodes (default "none").
+#' @param p_adjust "BH" (default) or "none". "BH" is Benjamini-Hochberg across the family set by
+#'   \code{adjust_scope}, applied to whatever p-values \code{algorithm} gives. "none" copies
+#'   \code{raw_p} to \code{p_adj} unchanged. topGO's topology-aware algorithms test each term
+#'   conditional on others, so their p-values are not independent; see the interpretation guide.
 #' @param make_plots If TRUE, writes a top-N bubble plot per result.
 #' @param top_n Number of rows to plot.
 #' @param exclude_gos Character vector of GO IDs to exclude globally
@@ -35,6 +40,9 @@
 #' @param threads Integer; maximum number of parallel workers (forked processes; default 4). 
 #'   In batch mode, workers are applied across (comparison, side) jobs. 
 #'   On Windows, runs sequentially (no forking).
+#' @param adjust_scope "global" (default) corrects once across every tested term in all requested
+#'   \code{ontologies}, separately for each comparison and side. "per_ontology" corrects each
+#'   ontology alone. Output records it as \code{adjust_scope}, with the family size in \code{n_tested}.
 #' @param ... Additional arguments passed on to 'topGO::runTest()', e.g. `score`,
 #'   `ties.method`, etc. Core arguments `object`, `algorithm`, and `statistic`
 #'   are always set by dndsR and cannot be overridden.
@@ -55,7 +63,7 @@ go_enrichment <- function(
   drop_rows_without_go = TRUE,
   node_min = 10,
   node_max = Inf,
-  p_adjust = c("none", "BH"),
+  p_adjust = c("BH", "none"),
   make_plots = TRUE,
   top_n = 20,
   exclude_gos = NULL,
@@ -66,6 +74,7 @@ go_enrichment <- function(
   alpha = 0.05,
   verbose = FALSE,
   threads = 4,
+  adjust_scope = c("global", "per_ontology"),
   ...
 ) {
 
@@ -107,7 +116,8 @@ go_enrichment <- function(
   ontologies <- match.arg(ontologies, choices = c("BP", "MF", "CC"), several.ok = TRUE)
   algorithm  <- match.arg(algorithm, choices = c("weight01", "elim", "classic", "weight"))
   statistic  <- match.arg(statistic, choices = c("fisher", "ks"))
-  p_adjust   <- match.arg(p_adjust, choices = c("none", "BH"))
+  p_adjust   <- match.arg(p_adjust, choices = c("BH", "none"))
+  adjust_scope <- match.arg(adjust_scope, choices = c("global", "per_ontology"))
   threads <- suppressWarnings(as.integer(threads))
   if (is.na(threads) || threads < 1L) threads <- 1L
   message(sprintf("[go_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))
@@ -151,30 +161,46 @@ go_enrichment <- function(
   }
 
   .apply_filter <- function(d) {
-    keep <- !is.na(d$dNdS) & d$dNdS < max_dnds
-
-    if (!is.null(filter_expr) && nzchar(filter_expr)) {
-      ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-
-      if (inherits(ok, "try-error")) {
-        warning("[go_enrichment] filter_expr failed: ", filter_expr, call. = FALSE)
-      } else {
-        ok <- as.logical(ok)
-
-        if (length(ok) == 1L) ok <- rep(ok, nrow(d))
-
-        if (length(ok) != nrow(d)) {
-          warning("[go_enrichment] filter_expr returned length ", length(ok),
-                  " but expected ", nrow(d), "; ignoring filter.", call. = FALSE)
-        } else {
-          keep <- keep & ok
-        }
-      }
-    }
-
-    d[keep, , drop = FALSE]
+    .filter_dnds(d, filter_expr = filter_expr, max_dnds = max_dnds)
   }
 
+  .resolve_pos_threshold <- function(dnds_vals, pos_threshold, verbose = FALSE) {
+    # numeric threshold: keep existing behavior
+    if (is.numeric(pos_threshold) && length(pos_threshold) == 1L && is.finite(pos_threshold)) {
+      return(as.numeric(pos_threshold))
+    }
+
+    # character quantile spec: "q0.95" or "quantile:0.95"
+    if (is.character(pos_threshold) && length(pos_threshold) == 1L && nzchar(pos_threshold)) {
+      s <- trimws(pos_threshold)
+
+      q <- NA_real_
+      if (grepl("^q\\s*\\d*\\.?\\d+$", s, ignore.case = TRUE)) {
+        q <- suppressWarnings(as.numeric(sub("^q\\s*", "", s, ignore.case = TRUE)))
+      } else if (grepl("^quantile\\s*:\\s*\\d*\\.?\\d+$", s, ignore.case = TRUE)) {
+        q <- suppressWarnings(as.numeric(sub("^quantile\\s*:\\s*", "", s, ignore.case = TRUE)))
+      }
+
+      if (!is.na(q) && is.finite(q) && q > 0 && q < 1) {
+        thr <- as.numeric(stats::quantile(dnds_vals, probs = q, na.rm = TRUE, names = FALSE, type = 7))
+        if (isTRUE(verbose)) {
+          message(sprintf("  [go_enrichment] pos_threshold=%s -> quantile %.3f threshold=%.6g", s, q, thr))
+        }
+        return(thr)
+      }
+
+      stop(
+        "[go_enrichment] Invalid pos_threshold character spec: '", pos_threshold,
+        "'. Use e.g. 'q0.95' or 'quantile:0.95'.",
+        call. = FALSE
+      )
+    }
+
+    stop(
+      "[go_enrichment] pos_threshold must be a single numeric value or a character quantile spec (e.g., 'q0.95').",
+      call. = FALSE
+    )
+  }
   # Named logical vector (GOID = TRUE) for fast membership checks
   .build_exclude_set <- function(excl) {
     if (is.null(excl) || !length(excl)) return(NULL)
@@ -264,36 +290,36 @@ go_enrichment <- function(
   }
 
   # ---------- font & plotting helpers (match ipr_enrichment) ----------
-  .bundled_arial_path <- function() {
-    ttf <- system.file("fonts", "ArialBold.ttf", package = "dndsR")
+  .bundled_font_path <- function() {
+    ttf <- system.file("fonts", "LiberationSans-Bold.ttf", package = "dndsR")
     if (!nzchar(ttf) || !file.exists(ttf)) return(NULL)
     ttf
   }
 
   .setup_showtext <- function() {
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
 
     if (!requireNamespace("showtext", quietly = TRUE)) return(NULL)
     if (!requireNamespace("sysfonts", quietly = TRUE)) return(NULL)
 
     ok <- try({
-      sysfonts::font_add(family = "Arial Bold", regular = ttf)
+      sysfonts::font_add(family = "Liberation Sans Bold", regular = ttf)
       showtext::showtext_auto(TRUE)
       TRUE
     }, silent = TRUE)
 
-    if (isTRUE(ok)) "Arial Bold" else NULL
+    if (isTRUE(ok)) "Liberation Sans Bold" else NULL
   }
 
   .register_svglite_mapping <- function() {
     if (!requireNamespace("svglite", quietly = TRUE)) return(NULL)
-    ttf <- .bundled_arial_path()
+    ttf <- .bundled_font_path()
     if (is.null(ttf)) return(NULL)
 
     function(file, ...) svglite::svglite(
       file,
-      user_fonts = list(`Arial Bold` = ttf),
+      user_fonts = list(`Liberation Sans Bold` = ttf),
       ...
     )
   }
@@ -411,7 +437,8 @@ go_enrichment <- function(
                                                             
   base_exclude_set <- .build_exclude_set(exclude_gos)
 
-  .run_one <- function(d, side, ont, comp, comp_dir, runTest_args = NULL) {
+  # Tests one ontology, without correcting or writing, so a family can span ontologies.
+  .test_one <- function(d, side, ont, comp, comp_dir, runTest_args = NULL) {
     ont <- as.character(ont)
     if (length(ont) != 1L) ont <- ont[[1L]]
 
@@ -428,7 +455,8 @@ go_enrichment <- function(
     }
     if (!nrow(d)) return(NULL)
 
-    pos_ids <- d[[id_col]][d$dNdS > pos_threshold]
+    pos_thr <- .resolve_pos_threshold(d$dNdS, pos_threshold, verbose = verbose)
+    pos_ids <- d[[id_col]][d$dNdS > pos_thr]
 
     exclude_set_run <- base_exclude_set
     if (isTRUE(exclude_descendants) &&
@@ -457,7 +485,7 @@ go_enrichment <- function(
     universe <- unique(names(gene2GO))
     pos_ids <- intersect(pos_ids, universe)
 
-    geneList <- factor(as.integer(universe %in% pos_ids))
+    geneList <- factor(as.integer(universe %in% pos_ids), levels = c(0L, 1L))
     names(geneList) <- universe
 
     tgd <- methods::new(
@@ -497,7 +525,8 @@ go_enrichment <- function(
     }
     if (!length(all_terms)) return(NULL)
 
-    term_genes <- topGO::genesInTerm(tgd, all_terms)
+    # Index by name: counts below are matched to all_terms by position.
+    term_genes <- topGO::genesInTerm(tgd, all_terms)[all_terms]
     annotated <- vapply(term_genes, length, integer(1))
     sig_counts <- vapply(
       term_genes,
@@ -553,33 +582,25 @@ go_enrichment <- function(
       }
     }
 
-    # Adjust across all tested nodes with valid p-values
-    p_adj <- rep(1, length(raw_p))
-    ok <- is.finite(raw_p) & !is.na(raw_p) & raw_p >= 0 & raw_p <= 1
-    
-    if (any(ok)) {
-      if (p_adjust == "BH") {
-        p_adj[ok] <- stats::p.adjust(raw_p[ok], method = "BH")
-      } else {
-        p_adj[ok] <- raw_p[ok]
-      }
-    } else {
-      warning("[go_enrichment] No valid p-values from topGO; setting all p_adj=1.", call. = FALSE)
-    }
-
     n_pos <- sum(as.integer(as.character(geneList)) == 1L)
-    if (n_pos == 0L) return(NULL)
-    n_all <- length(geneList)
-    enrichment <- (sig_counts / n_pos) / (annotated / n_all)
+    n_nonpos <- length(geneList) - n_pos
+    # Same definition as ipr_enrichment and term_enrichment: rate in positives / rate in the rest.
+    pos_rate <- if (n_pos > 0L) sig_counts / n_pos else rep(0, length(sig_counts))
+    nonpos_rate <- if (n_nonpos > 0L) (annotated - sig_counts) / n_nonpos else rep(NA_real_, length(sig_counts))
+    enrichment <- ifelse(nonpos_rate == 0 & pos_rate > 0, Inf,
+                         ifelse(nonpos_rate == 0 & pos_rate == 0, 1, pos_rate / nonpos_rate))
 
     out <- data.frame(
       GO_ID = all_terms,
       term_name = term_name,
-      term_def = if (isTRUE(include_definition)) term_def else NULL,
+      term_def = term_def,
       annotated = annotated,
       significant = sig_counts,
       raw_p = raw_p,
-      p_adj = p_adj,
+      p_adj = 1,
+      p_adjust_method = p_adjust,
+      adjust_scope = if (p_adjust == "none") "none" else adjust_scope,
+      n_tested = 0L,
       enrichment = enrichment,
       label = ifelse(
         is.na(term_name) | !nzchar(term_name),
@@ -591,6 +612,7 @@ go_enrichment <- function(
       comparison = comp,
       stringsAsFactors = FALSE
     )
+    if (!isTRUE(include_definition)) out$term_def <- NULL
 
     out_file <- file.path(
       comp_dir,
@@ -604,8 +626,27 @@ go_enrichment <- function(
       )
     )
 
+    # An ontology with no positive genes writes nothing, but its terms were tested, so they
+    # stay in a global family: whether to count them must not depend on the outcome.
+    list(out = out, out_file = out_file, ont = ont, side = side, n_pos = n_pos)
+  }
+
+  .adjust_family <- function(p) {
+    ok <- is.finite(p) & !is.na(p) & p >= 0 & p <= 1
+    adj <- rep(1, length(p))
+    if (!any(ok)) {
+      warning("[go_enrichment] No valid p-values from topGO; setting all p_adj=1.", call. = FALSE)
+      return(list(p_adj = adj, n_tested = 0L))
+    }
+    adj[ok] <- if (p_adjust == "BH") stats::p.adjust(p[ok], method = "BH") else p[ok]
+    list(p_adj = adj, n_tested = sum(ok))
+  }
+
+  .write_one <- function(res) {
+    out <- res$out; out_file <- res$out_file; ont <- res$ont; side <- res$side
+    sorted <- order(out$p_adj, out$raw_p, -out$enrichment, out$GO_ID)
     utils::write.table(
-      out[order(out$p_adj, -out$enrichment, out$GO_ID), ],
+      out[sorted, ],
       file = out_file,
       sep = "\t",
       quote = FALSE,
@@ -619,7 +660,7 @@ go_enrichment <- function(
         call. = FALSE
       )
     } else {
-        plt <- out[order(out$p_adj, -out$enrichment, out$GO_ID), , drop = FALSE]
+        plt <- out[sorted, , drop = FALSE]
         plt <- utils::head(plt, top_n)
 
         # What are we actually plotting?
@@ -700,11 +741,38 @@ go_enrichment <- function(
     out_file
   }
 
+  # All requested ontologies for one comparison and side: test, correct, then write.
+  .run_side <- function(d, side, comp, comp_dir) {
+    tested <- list()
+    for (ont in ontologies) {
+      r <- .test_one(d, side, ont, comp, comp_dir, runTest_args = topgo_dots)
+      if (!is.null(r)) tested[[ont]] <- r
+    }
+    if (!length(tested)) return(character(0))
+    if (identical(adjust_scope, "global")) {
+      fam <- .adjust_family(unlist(lapply(tested, function(r) r$out$raw_p), use.names = FALSE))
+      ends <- cumsum(vapply(tested, function(r) nrow(r$out), integer(1)))
+      starts <- c(1L, utils::head(ends, -1L) + 1L)
+      for (i in seq_along(tested)) {
+        tested[[i]]$out$p_adj <- fam$p_adj[starts[i]:ends[i]]
+        tested[[i]]$out$n_tested <- fam$n_tested
+      }
+    } else {
+      for (i in seq_along(tested)) {
+        fam <- .adjust_family(tested[[i]]$out$raw_p)
+        tested[[i]]$out$p_adj <- fam$p_adj
+        tested[[i]]$out$n_tested <- fam$n_tested
+      }
+    }
+    paths <- character(0)
+    for (r in tested) if (r$n_pos > 0L) paths <- c(paths, .write_one(r))
+    paths
+  }
+
   .run_comp_side <- function(comp, comp_dir, side) {
     in_file <- file.path(comp_dir, paste0(comp, "_dnds_annot.tsv"))
     if (!file.exists(in_file)) {
-      warning("Missing annotated file: ", in_file, call. = FALSE)
-      return(character(0))
+      stop("Missing annotated file: ", in_file, ". Run append_annotations first.", call. = FALSE)
     }
     d <- utils::read.table(
       in_file,
@@ -715,11 +783,7 @@ go_enrichment <- function(
       comment.char = ""
     )
 
-    paths <- character(0)
-    for (ont in ontologies) {
-      p <- .run_one(d, side, ont, comp, comp_dir, runTest_args = topgo_dots)
-      if (!is.null(p)) paths <- c(paths, p)
-    }
+    paths <- .run_side(d, side, comp, comp_dir)
     if (!length(paths)) message("No GO enrichments produced for ", comp, " side=", side)
     paths
   }
@@ -759,19 +823,7 @@ go_enrichment <- function(
       )
     }
 
-    if (threads > 1L && .Platform$OS.type != "windows") {
-      outs_list <- parallel::mclapply(
-        seq_len(nrow(jobs)),
-        run_one_job,
-        mc.cores = threads,
-        mc.preschedule = FALSE
-      )
-    } else {
-      if (threads > 1L && .Platform$OS.type == "windows") {
-        warning("[go_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-      }
-      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
-    }
+    outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "go_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
     message("All topGO enrichments complete.")
@@ -811,30 +863,13 @@ go_enrichment <- function(
         sprintf("[go_enrichment] comp=%s side=%s", comp_name, sd)
       ),
       expr = {
-        paths <- character(0)
-        for (ont in ontologies) {
-          p <- .run_one(d, sd, ont, comp_name, comp_dir, runTest_args = topgo_dots)
-          if (!is.null(p)) paths <- c(paths, p)
-        }
-        paths
+        .run_side(d, sd, comp_name, comp_dir)
       }
     )
 
   }
 
-  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
-    outs_list <- parallel::mclapply(
-      sides,
-      run_one_side,
-      mc.cores = min(threads, length(sides)),
-      mc.preschedule = FALSE
-    )
-  } else {
-    if (threads > 1L && .Platform$OS.type == "windows") {
-      warning("[go_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-    }
-    outs_list <- lapply(sides, run_one_side)
-  }
+  outs_list <- .parallel_lapply(sides, run_one_side, threads, "go_enrichment")
                                                                                                                     
   outs <- unlist(outs_list, use.names = FALSE)
   message("topGO enrichment complete for: ", dnds_annot_file)

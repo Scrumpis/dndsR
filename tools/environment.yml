@@ -1,0 +1,38 @@
+# Native dndsR environment with prebuilt packages. Create it with:
+#   conda env create -f tools/environment.yml   (or mamba, or micromamba)
+name: dndsr
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.5
+  - diamond=2.1
+  - r-cli
+  - r-data.table
+  - r-ggplot2
+  - r-jsonlite
+  - r-biocmanager
+  - r-remotes
+  - r-rideogram
+  - r-scales
+  - r-seqinr
+  - r-showtext
+  - r-svglite
+  - r-sysfonts
+  - r-testthat
+  - r-withr
+  - r-xml2
+  - bioconductor-annotationdbi
+  - bioconductor-biocgenerics
+  - bioconductor-biostrings
+  - bioconductor-genomeinfodb
+  - bioconductor-genomicfeatures
+  - bioconductor-go.db
+  - bioconductor-ihw
+  - bioconductor-pwalign
+  - bioconductor-qvalue
+  - bioconductor-rsamtools
+  - bioconductor-rtracklayer
+  - bioconductor-s4vectors
+  - bioconductor-topgo
+  - bioconductor-txdbmaker

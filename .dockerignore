@@ -63,3 +63,10 @@ build/
 node_modules/
 venv/
 .env
+
+# Local agent audit record
+.audit
+.audit.moved.*
+
+# The bundled example is part of the package
+!inst/extdata/example/**

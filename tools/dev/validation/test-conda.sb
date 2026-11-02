@@ -1,0 +1,29 @@
+#!/bin/bash --login
+# Clean conda install following INSTALL.md, in a new HOME and environment, on this checkout.
+#   sbatch --export=ALL,REPO=<clone>,WORK=<empty dir>,MM=<micromamba> test-conda.sb
+#SBATCH --time=3:59:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --job-name=dndsR-conda
+set -euo pipefail
+module purge
+export HOME="$WORK/home" MAMBA_ROOT_PREFIX="$WORK/mamba"
+mkdir -p "$HOME" "$WORK/run"
+"$MM" create -y -q -f "$REPO/tools/environment.yml"
+eval "$("$MM" shell hook -s bash)"
+micromamba activate dndsr
+R --version | head -1
+diamond version
+cd "$WORK/run"
+Rscript -e "options(repos = c(CRAN = 'https://cloud.r-project.org', BiocManager::repositories())); remotes::install_github('drostlab/orthologr@06c3098adfba1e32135d904f72ea81a76902c664', upgrade = 'never')" || true
+Rscript -e 'stopifnot(requireNamespace("orthologr", quietly = TRUE))'
+R CMD INSTALL "$REPO"
+install -m 0755 "$REPO/inst/scripts/dndsr" "$CONDA_PREFIX/bin/dndsr"
+dndsr --help
+dndsr example
+cd dndsr_example
+dndsr extract_cds -c comparison_file.txt
+dndsr calculate_dnds -c comparison_file.txt -t 2
+dndsr verify_example
+Rscript -e 'library(dndsR); print(verify_example()$passed); sessionInfo()'
+echo CONDA_OK

@@ -6,3 +6,13 @@
 ^\.Rhistory$
 ^LICENSE\.md$
 ^\.github$
+^\.audit
+^\.claude$
+^\.agents$
+^CLAUDE\.md$
+^AGENTS\.md$
+^skills$
+^docs$
+^tools/dev$
+^CITATION\.cff$
+^\.zenodo\.json$

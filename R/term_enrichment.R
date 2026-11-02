@@ -34,8 +34,11 @@
 #' @param top_n Integer; number of rows to include in the plot (default 20).
 #' @param drop_rows_without_term Logical; if TRUE (default), rows with no term in the
 #'   tested column are removed from BOTH positives and background before counting.
-#' @param min_total Minimum total occurrences (pos+nonpos) required for a term (default 0).
-#' @param min_pos Minimum positive occurrences required for a term (default 0).
+#' @param min_total Minimum total occurrences (pos+nonpos) for a term to be tested (default 2).
+#'   This does not depend on the outcome, so it defines the family of tests that is corrected.
+#' @param min_pos Minimum positive occurrences for a term to be reported (default 2). It is applied
+#'   after correction, because filtering on the outcome first makes adjusted p-values invalid. It
+#'   changes which rows are written, not their p-values.
 #' @param fdr_method One of `"BH"`, `"IHW"`, `"qvalue"`, `"none"`. Default `"BH"`.
 #' @param alpha FDR level for IHW weighting (default 0.05).
 #' @param term_seps Candidate separators to auto-detect per column
@@ -153,30 +156,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
   }
 
   .apply_filter <- function(d) {
-    keep <- !is.na(d$dNdS) & (d$dNdS < max_dnds)
-
-    if (!is.null(filter_expr) && nzchar(filter_expr)) {
-      ok <- try(eval(parse(text = filter_expr), envir = d, enclos = parent.frame()), silent = TRUE)
-
-      if (inherits(ok, "try-error")) {
-        warning("[term_enrichment] filter_expr failed to evaluate; ignoring it.", call. = FALSE)
-      } else {
-        ok <- as.logical(ok)
-
-        # allow scalar TRUE/FALSE to apply to all rows
-        if (length(ok) == 1L) {
-          ok <- rep(ok, nrow(d))
-        }
-
-        if (length(ok) != nrow(d)) {
-          warning("[term_enrichment] filter_expr did not return length 1 or nrow(d); ignoring it.", call. = FALSE)
-        } else {
-          keep <- keep & ok
-        }
-      }
-    }
-
-    d[keep, , drop = FALSE]
+    .filter_dnds(d, filter_expr = filter_expr, max_dnds = max_dnds)
   }
 
   .best_sep <- function(x, seps) {
@@ -323,6 +303,8 @@ term_enrichment <- function(dnds_annot_file = NULL,
 
   .adjust_pvals <- function(res) {
     if (!nrow(res)) { res$p_adj <- numeric(0); return(res) }
+    res$p_adjust_method <- fdr_method
+    res$n_tested <- nrow(res)
 
     if (fdr_method == "BH") {
       res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
@@ -332,6 +314,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       } else {
         warning("qvalue not installed; falling back to BH.", call. = FALSE)
         res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+        res$p_adjust_method <- "BH"
       }
     } else if (fdr_method == "IHW") {
       if (requireNamespace("IHW", quietly = TRUE)) {
@@ -340,6 +323,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       } else {
         warning("IHW not installed; falling back to BH.", call. = FALSE)
         res$p_adj <- stats::p.adjust(res$p_value, method = "BH")
+        res$p_adjust_method <- "BH"
       }
     } else {
       res$p_adj <- res$p_value
@@ -475,7 +459,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       )
     ) +
       ggplot2::geom_point() +
-      .padj_scale(upper = upper, legend_name = "adj p") +
+      .padj_scale(upper = upper, legend_name = if (fdr_method == "none") "p" else "adj p") +
       ggplot2::labs(
         x = "Enrichment (pos/bg)",
         y = ylab,
@@ -584,11 +568,14 @@ term_enrichment <- function(dnds_annot_file = NULL,
     res <- .fisher_enrichment(vec_all, vec_pos, sep = sep_here, drop_empty = drop_rows_without_term)
     if (is.null(res) || !nrow(res)) return(NULL)
 
-    keep <- (res$total_count >= min_total) & (res$pos_count >= min_pos)
-    res <- res[keep, , drop = FALSE]
+    # The tested family must not depend on the outcome, and pos_count is the outcome.
+    res <- res[res$total_count >= min_total, , drop = FALSE]
     if (!nrow(res)) return(NULL)
 
     res <- .adjust_pvals(res)
+
+    res <- res[res$pos_count >= min_pos, , drop = FALSE]
+    if (!nrow(res)) return(NULL)
 
     res$side <- side
     res$term_type <- term_type
@@ -674,19 +661,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
       )
     }
 
-    if (threads > 1L && .Platform$OS.type != "windows") {
-      outs_list <- parallel::mclapply(
-        seq_len(nrow(jobs)),
-        run_one_job,
-        mc.cores = threads,
-        mc.preschedule = FALSE
-      )
-    } else {
-      if (threads > 1L && .Platform$OS.type == "windows") {
-        warning("[term_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-      }
-      outs_list <- lapply(seq_len(nrow(jobs)), run_one_job)
-    }
+    outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "term_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
     .msg("All term enrichments complete.")
@@ -735,19 +710,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
     )
   }
 
-  if (threads > 1L && length(sides) > 1L && .Platform$OS.type != "windows") {
-    outs_list <- parallel::mclapply(
-      sides,
-      run_one_side,
-      mc.cores = min(threads, length(sides)),
-      mc.preschedule = FALSE
-    )
-  } else {
-    if (threads > 1L && .Platform$OS.type == "windows") {
-      warning("[term_enrichment] threads>1 requested on Windows; running sequentially.", call. = FALSE)
-    }
-    outs_list <- lapply(sides, run_one_side)
-  }
+  outs_list <- .parallel_lapply(sides, run_one_side, threads, "term_enrichment")
 
   outs <- unlist(outs_list, use.names = FALSE)
   .msg("Term enrichment complete for: ", dnds_annot_file)

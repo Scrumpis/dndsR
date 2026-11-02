@@ -15,9 +15,8 @@ Invisibly returns \code{NULL}. Errors are signaled with \code{stop()}.
 }
 \description{
 Dispatches the \code{dndsr} command-line interface (CLI). This function is intended
-to be called by the \code{dndsr} executable installed with the package (e.g.,
-\code{inst/exec/dndsr}) or by the \code{dndsR-launcher}, rather than being used
-interactively.
+to be called by the \code{dndsr} executable (\code{inst/scripts/dndsr}), rather than being
+used interactively. Use the analysis functions, such as \code{\link[=calculate_dnds]{calculate_dnds()}}, from R.
 }
 \details{
 The CLI discovers available commands by looking for functions named

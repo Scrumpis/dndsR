@@ -77,8 +77,15 @@
 #' were moved into \pkg{pwalign}; ensure \pkg{pwalign} is installed if your \pkg{orthologr} version uses it.
 #' We provide a patched orthologr version in the Docker image.
 #'
+#' \strong{Provenance:} each result has a \code{<comparison_name>_dnds_provenance.json} file
+#' recording software versions, parameters, and MD5 hashes of the sequence inputs. If a
+#' result already exists and \code{overwrite = FALSE}, it is kept, but dndsR says so if the
+#' hashes no longer match or if the result predates this record.
+#'
+#' Any orthologr output files about discarded sequences are written in the comparison folder.
+#'
 #' @return (Invisibly) a character vector of output TSV paths (batch mode), or a single output TSV path
-#'   (single mode). Comparisons skipped due to missing inputs are omitted from batch outputs.
+#'   (single mode). Missing inputs are an error.
 #' @export
 calculate_dnds <- function(comparison_file = NULL,
                            seq_list_file = NULL,
@@ -102,6 +109,9 @@ calculate_dnds <- function(comparison_file = NULL,
   if (!is.null(comparison_file) && !is.null(seq_list_file)) {
     stop("Supply only one of comparison_file (batch mode) or seq_list_file (FASTA-only list mode).", call. = FALSE)
   }
+
+  dots <- list(...)
+  dots[c("threads", "verbose")] <- NULL
 
   # ---- dependency guards ----
   .need_pkg <- function(pkg, msg = NULL) {
@@ -336,24 +346,31 @@ calculate_dnds <- function(comparison_file = NULL,
     dir.create(comp_dir, showWarnings = FALSE, recursive = TRUE)
 
     out_tsv <- file.path(comp_dir, paste0(comparison_basename, "_dnds.tsv"))
-
-    if (!isTRUE(overwrite) && file.exists(out_tsv) && file.info(out_tsv)$size > 0) {
-      message("Skipping ", comparison_basename, " (exists).")
-      return(out_tsv)
-    }
+    prov_json <- file.path(comp_dir, paste0(comparison_basename, "_dnds_provenance.json"))
 
     inp <- .resolve_inputs(comparison_basename, comp_dir, row)
     q_in <- inp$query_file
     s_in <- inp$subject_file
 
+    if (!isTRUE(overwrite) && file.exists(out_tsv) && file.info(out_tsv)$size > 0) {
+      why <- .provenance_mismatch(prov_json, q_in, s_in)
+      if (is.null(why)) {
+        message("Skipping ", comparison_basename, " (exists; inputs unchanged).")
+      } else {
+        message("Keeping existing result for ", comparison_basename, ", but ", why,
+                ". It may not reflect current inputs or fixes. Use --overwrite to recalculate.")
+      }
+      return(out_tsv)
+    }
+
     if (!nzchar(q_in) || !nzchar(s_in) || !file.exists(q_in) || !file.exists(s_in)) {
-      warning(
+      stop(
         "Sequence files not found for ", comparison_basename, " (mode=", inp$mode, ").\n",
         "* query_file:   ", q_in, "\n",
         "* subject_file: ", s_in, "\n",
-        "Skipping."
+        "Run extract_cds first, and check that output_dir matches.",
+        call. = FALSE
       )
-      return(NULL)
     }
 
     # defaults you provide
@@ -378,7 +395,7 @@ calculate_dnds <- function(comparison_file = NULL,
     )
 
     # user-supplied overrides / additions
-    user <- list(...)
+    user <- dots
     if (length(user)) {
       nms <- names(user)
 
@@ -412,7 +429,10 @@ calculate_dnds <- function(comparison_file = NULL,
         # Only forward arguments orthologr::dNdS knows
         dnds_formals <- names(formals(orthologr::dNdS))
         nms <- names(user)
-        user <- user[nms %in% dnds_formals]
+        if (!all(nms %in% dnds_formals)) {
+          stop("Not an option of calculate_dnds or orthologr::dNdS: ",
+               paste(setdiff(nms, dnds_formals), collapse = ", "), call. = FALSE)
+        }
 
         overlap <- intersect(names(user), names(args))
         if (length(overlap)) {
@@ -432,7 +452,9 @@ calculate_dnds <- function(comparison_file = NULL,
       " (seq_type=", seq_type, ", mode=", inp$mode, ")"
     )
 
-    res <- do.call(orthologr::dNdS, args)
+    # orthologr writes files about discarded sequences to the working directory.
+    previous_wd <- setwd(comp_dir)
+    res <- tryCatch(do.call(orthologr::dNdS, args), finally = setwd(previous_wd))
 
     utils::write.table(
       res,
@@ -440,6 +462,11 @@ calculate_dnds <- function(comparison_file = NULL,
       sep = "\t",
       quote = FALSE,
       row.names = FALSE
+    )
+
+    jsonlite::write_json(
+      .dnds_provenance(q_in, s_in, args),
+      prov_json, auto_unbox = TRUE, pretty = TRUE, null = "null"
     )
 
     message("[calculate_dnds] Finished: ", comparison_basename)

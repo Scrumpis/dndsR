@@ -1,0 +1,16 @@
+Bootstrap: docker
+From: rocker/r2u@sha256:b51f03901dd738476588240f0c37f359062c755b509213d4273b994e4923faea
+
+%files
+    {{ REPO }} /opt/dndsR
+    {{ STEPS }} /opt/dockerfile-steps.sh
+
+%post
+    # Same steps as tools/Dockerfile, for building where Docker is unavailable.
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive MAMBA_ROOT_PREFIX=/opt/conda
+    bash /opt/dockerfile-steps.sh
+
+%environment
+    export LC_ALL=C.UTF-8 LANG=C.UTF-8 BSPM_DISABLE=1 MAMBA_ROOT_PREFIX=/opt/conda
+    export PATH=/usr/local/bin:/opt/conda/envs/tools/bin:$PATH

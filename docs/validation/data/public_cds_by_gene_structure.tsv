@@ -1,0 +1,9 @@
+comparison	side	class	genes	cur_written	cur_matches_gffread	cur_differs_from_gffread	cur_not_compared	old_matches_gffread	old_differs_from_gffread	cur_internal_stop	cur_length_not_3n	old_with_internal_stop_or_changed
+AtAl	q	multi_exon_minus	5655	5645	5645	0	0	0	5655	4	6	5645
+AtAl	q	multi_exon_plus	5659	5644	5644	0	0	5659	0	1	14	0
+AtAl	q	multi_isoform	10695	10695	10695	0	0	0	10695	0	0	10695
+AtAl	q	single_exon	5435	5433	5433	0	0	5435	0	0	2	0
+AtAl	s	multi_exon_minus	9135	8848	8839	0	9	0	9125	271	16	8848
+AtAl	s	multi_exon_plus	8923	8667	8663	0	4	8918	1	247	9	0
+AtAl	s	multi_isoform	5868	5868	5868	0	0	0	5868	0	0	5868
+AtAl	s	single_exon	5891	5820	5750	0	70	5819	2	62	9	0

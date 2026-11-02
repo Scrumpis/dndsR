@@ -1,0 +1,12 @@
+#!/bin/sh
+# dndsR hook: allows rebasing only commits not yet on origin/dev. $1=upstream, $2=branch (optional).
+. "$(dirname "$0")/_common.sh"
+[ -n "${1:-}" ] || block "git rebase --root rewrites shared history"
+target=${2:-HEAD}
+base=$(git merge-base "$1" "$target") || block "rebase with no common ancestor"
+if git rev-parse -q --verify refs/remotes/origin/dev >/dev/null &&
+  git merge-base --is-ancestor refs/remotes/origin/dev "$target" &&
+  ! git merge-base --is-ancestor refs/remotes/origin/dev "$base"; then
+  block "this rebase would rewrite commits already on origin/dev"
+fi
+[ "$(git symbolic-ref -q HEAD)" != "$PROTECTED_BRANCH" ] || block "rebasing main"

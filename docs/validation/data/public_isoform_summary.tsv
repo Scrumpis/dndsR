@@ -1,0 +1,2 @@
+pairs_total	pairs_with_isoform_choice	sampled_with_two_or_more_defined	median_ratio_range	p90_ratio_range	frac_range_over_0.1	frac_twofold	frac_crossing_1	reported_above_1
+22146	10576	996	0.01837	0.18015	0.218875502008032	0.141566265060241	0.00301204819277108	5

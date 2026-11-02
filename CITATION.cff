@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use dndsR, please cite it using this information, along with orthologr and DIAMOND."
+title: "dndsR: dN/dS Pipeline for Comparative Genomics"
+type: software
+authors:
+  - family-names: Johnson
+    given-names: Nick
+repository-code: "https://github.com/Scrumpis/dndsR"
+license: MIT
+version: 0.3.0
