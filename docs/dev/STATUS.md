@@ -2,7 +2,7 @@
 
 Update this at the end of each substantive session. Identify things by commit and hash, not by date.
 
-**Phase:** v0.3.0 is public: tag `d5f4b21`, image `sha256:feb5e4b1`, DOI 10.5281/zenodo.23879469. `main` is `5ef6fa7`. `dev` holds the v0.4.0 candidate, which needs the maintainer's push, a green CI run, a merge, and a tag. Checkpoints are in [PROGRESS.md](PROGRESS.md).
+**Phase:** v0.3.0 is public: tag `d5f4b21`, image `sha256:feb5e4b1`, DOI 10.5281/zenodo.23879469. `main` is `5ef6fa7`. `dev` holds the v0.4.0 candidate, software at `5983405`, which needs a merge and a tag. Checkpoints are in [PROGRESS.md](PROGRESS.md).
 
 ## Identity
 
@@ -19,7 +19,7 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 
 ## Next
 
-1. The maintainer pushes `dev`. CI runs on the candidate: `container` has not run on it. Only then is it release-ready.
+1. All workflows passed at `5983405`: see [RELEASE-READINESS.md](RELEASE-READINESS.md). The maintainer pushes the records commit after it.
 2. The maintainer opens the pull request to `main`, merges, and tags `v0.4.0`. Then `publish.yaml` asks for approval. Follow `docs/dev/RELEASE.md`; notes are in `docs/dev/release-notes-0.4.0.md`.
 3. After that, this software is frozen for the Chenopodium analysis. Its work and results live outside this repository, and nothing from them comes here.
 4. For v1.0.0: `docs/dev/ROADMAP-1.0.md`. Do not start it for the current manuscript.

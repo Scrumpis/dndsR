@@ -8,7 +8,8 @@ Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 - **Done:** refs and rulesets read; audit archive moved and hash-checked; v0.4.0 candidate with `covariate_enrichment` accepted, warnings on `go_enrichment` and `term_enrichment`; independent reproduction with a Python refit; image stack comparison.
 - **Found:** a quantile `pos_threshold` was compared as text in `covariate_enrichment`, `term_enrichment`, and `ipr_enrichment`, silently giving no positive genes; fixed. The two published images choose slightly different pairs, because tiny E-values are read differently: `docs/validation/stack-comparison.md`. `q0.95` exceeds the calibration rule in one setting.
 - **Errors of the checks:** the first refit diverged and reported up to 100% false terms; R was right, and it was fixed and rerun. A git crash from a module built for another CPU left a core dump that the public-safety check caught. Three safeguard tests failed because `dev` now contains `main`, and a version mismatch in the fixture; the test fixture was corrected, and no hook changed.
-- **Failed or not done:** the public-genome tutorial stops at UniProt's stream endpoint, which returned HTTP 500 for hours; its commands ran on the same genomes in the regression. Nothing was pushed, merged, tagged, or published.
+- **Then:** the maintainer pushed `5983405`, and all four workflows passed. The public-genome tutorial passed at that commit on its third try, after a UniProt outage stopped the first two.
+- **Failed or not done:** nothing was merged, tagged, or published by agents. Chenopodium work is outside this repository.
 
 ## 2026-11-02: v1.0.0 validation, overnight
 

@@ -1,4 +1,30 @@
-# Release readiness: v0.3.0 candidate
+# Release readiness
+
+## v0.4.0 candidate
+
+**Software `5983405`. All four workflows passed there.** Later commits change records only.
+
+| Check | Run | Result |
+|---|---|---|
+| `R-CMD-check`: macOS, Windows, Ubuntu release, oldrel, devel | CI at `5983405` | Pass |
+| `install`, `skill` | CI at `5983405` | Pass |
+| `container`: `docker build --no-cache` and container checks | CI at `5983405` | Pass |
+| `R CMD check` on the tarball, v0.3.0 image | Local at `5983405` | `Status: OK`, no warnings or notes |
+| `tools/dev/check.sh`: 102 tests, 468 expectations, safeguards, skill, tutorial | Local at `5983405`, v0.3.0 image | Pass, 0 skipped |
+| Tutorial with Apptainer | Local at `4e2161d`, same software but for notice wording | Pass |
+| `tools/dev/test-agent.sh claude`, fresh agent | Local at `4e2161d` | 7 of 7 |
+| Public-pair pipeline, `tools/dev/validation` | v0.3.0 image | Thread counts identical; differences from the older stack explained: `docs/validation/stack-comparison.md` |
+| Independent reproduction of `covariate_enrichment` | 1,200 tables, 2 thresholds | 4,800 of 4,800 comparisons agree: `docs/validation/enrichment-confounding.md` |
+| Real genomes, 9 comparisons, private | At `5983405` | All steps ran; CDS identical to gffread; thread counts and reruns byte-identical. Results are outside this repository |
+| `tools/dev/test-public-tutorial.sb`, public genomes, clean HOME | Local at `5983405` | Pass, on the third try: UniProt's stream endpoint returned HTTP 500 for about four hours before that, which the first two tries stopped on |
+
+**Scientific correctness:** no known material defect is open. Limits accepted and documented: `covariate_enrichment` is calibrated in simulation at `dNdS > 1` on 4 plant pairs, and is not validated for detecting real selection; `q0.95` exceeded 5% in one setting; `go_enrichment` and `term_enrichment` keep their defaults and warn; Comeron stays the default with its known bias; reciprocal best hits can mispair paralogs.
+
+**Not tested:** Docker on a user's machine, beyond CI; macOS beyond CI.
+
+**Maintainer steps:** `RELEASE.md`. Before merging, this commit's CI must pass.
+
+## v0.3.0 candidate
 
 **Candidate passed CI at `f2da1f1`, with software at `eed1096`.** Later commits change records and documentation only, and need their own green CI before the pull request. Final approval is still needed to merge, tag, and publish. Unpublished real-genome results stay outside Git.
 
