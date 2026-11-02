@@ -1,38 +1,39 @@
 # Release readiness: v0.3.0 candidate
 
-**Local candidate, with one statistical result for the maintainer to accept or reject before it is called ready.** Software is at `eed1096`. It has not been through CI: the CI table below is from `f84521f`, before the enrichment changes. The maintainer's earlier GO at `f84521f` predates these changes, and final approval is still needed to merge, tag, and publish. Unpublished real-genome results stay outside Git.
+**Candidate passed CI at `f2da1f1`, with software at `eed1096`.** Later commits change records and documentation only, and need their own green CI before the pull request. Final approval is still needed to merge, tag, and publish. Unpublished real-genome results stay outside Git.
 
 **Corrected since `f84521f`, with maintainer approval.** Multiple-testing correction in `term_enrichment` and `ipr_enrichment`; `#` in GFF attributes; the `go_enrichment(include_definition = FALSE)` crash. **Defaults changed at `eed1096`, as the maintainer directed:** `ipr_enrichment` corrects across all entry types, and `go_enrichment` applies BH across all requested ontologies. See [enrichment calibration](../validation/enrichment.md).
 
-**The open result.** Default `go_enrichment`, with no true association, has a false term in 1.0% and 0.8% of runs under `permute` and `rotate`, and in **9.5% (7.0–12.8) under `strata`**, above nominal. GO:0005576, extracellular region, is in 28 of those 38 runs; without it the rate is 3.0% (1.7–5.2). The cause is confounding with length and dS, not the correction. No correction was added, as directed. Recommended: accept as a documented limitation, with modeling on the v1.0.0 roadmap.
+**Accepted limitation.** Default `go_enrichment`, with no true association, has a false term in 1.0% and 0.8% of runs under `permute` and `rotate`, and in **9.5% (7.0–12.8) under `strata`**, above nominal. GO:0005576, extracellular region, is in 28 of those 38 runs; without it the rate is 3.0% (1.7–5.2). The cause is confounding with length and dS, not the correction. The maintainer accepted this as a documented limitation for v0.3.0: no terms removed, no thresholds changed, no further correction. BH does not guarantee nominal error control under all conditions, and significant terms remain exploratory.
 
 **Other limitations.** Enrichment is corrected for multiple testing, not for gene length, dS, or annotation completeness. False discovery with real associations has not been measured. `term_enrichment` corrects each term type separately. No enrichment result has been compared with independent biological evidence.
 
 ## Blocking the release
 
-Only the maintainer can do these:
+Only the maintainer can do these. As read from the public API at `f2da1f1`:
 
-1. **Rulesets and Docker Hub setup:** `GITHUB-SETUP.md`. As read from the public API at `f84521f`, `protect_main` still requires 1 approval, and no `dev` or tag ruleset is visible.
-2. **Authorization** for the one "Update branch" merge of `main` into `dev`.
-3. **Final approval** to merge, tag, and publish.
+1. **`protect_main`** still requires 1 approval, which an author cannot give, and only the `R-CMD-check` check. No `protect_tags` or `protect_dev` ruleset exists. See `GITHUB-SETUP.md`.
+2. **Authorization** for the one "Update branch" merge of `main` into `dev`, which strict status checks require: `main` is 2 commits ahead.
+3. **Docker Hub setup.** No `dockerhub-release` environment exists. Whether `DOCKERHUB_PUBLISH_ENABLED` is set cannot be read without a login. `scrumpis/dndsr:v0.3.0` does not exist yet, as the workflow requires.
+4. **Final approval** to merge, tag, and publish.
 
-## CI at `f84521f`
+## CI at `f2da1f1`
+
+Run on push to `dev`; `main` unchanged at `bbd8384`.
 
 | Workflow | Result |
 |---|---|
 | `R-CMD-check`: macOS, Windows, Ubuntu release, oldrel, devel, and the `R-CMD-check` rollup job | **Pass.** DIAMOND is absent there, so dN/dS tests skip |
 | `install`: clean conda, CLI, and example | **Pass** |
 | `skill` | **Pass** |
-| `container`: real `docker build` from a clean checkout | **Pass** |
+| `container`: real `docker build --no-cache` from a clean checkout | **Pass** |
 | `container`: full container checks in the Docker image | **Pass** |
 | `container`: R tutorial in the Docker image | **Pass** |
-| `container`: package tests in the Docker image | **Pass** |
-| `container`: Apptainer 1.5.4 from conda, checks on the image | **Pass** |
+| `container`: package tests in the Docker image, which include the scientific regression tests with DIAMOND | **Pass** |
+| `container`: Apptainer from conda, checks on the image | **Pass** |
 | `container`: documented installer with Apptainer | **Pass** |
 
-Step and job results are from the public API. Job logs need a login and were not read.
-
-`R/`, `inst/`, `skills/`, `tools/Dockerfile`, `tools/dndsr-install`, `DESCRIPTION`, and `NAMESPACE` have no differences between `c1eda04` and `f84521f`, so the agent test and the local checks below still describe this code. `R/`, `inst/`, `tools/Dockerfile`, `DESCRIPTION`, and `NAMESPACE` also have no differences from `59faf30`, the commit used for the public-genome comparison.
+Step and job results are from the public API. Job logs need a login and were not read, so test counts in CI are not confirmed. There is no separate scientific-regression workflow. The null models and real-genome comparisons are not in CI: they ran locally, as recorded below. `container` failed on its build step at `5d53ced`, about 90 seconds in, and its logs were not read, so the cause is unknown. That build passed here with the same Dockerfile: `tools/Dockerfile` has no differences between those commits.
 
 ## Local evidence at `eed1096`, the final defaults
 

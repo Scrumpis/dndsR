@@ -28,6 +28,7 @@
 | 2026-11-02 | `ipr_enrichment` defaults to `adjust_scope = "global"`, for Fisher and parent-child; `per_type` stays selectable. | Maintainer decision. A list across tables should be corrected across them. Parent-child's elimination decisions stay within each type, and the reported `p_adj` is global. |
 | 2026-11-02 | `go_enrichment` defaults to `p_adjust = "BH"` and `adjust_scope = "global"`; `per_ontology` and `none` are selectable. | Maintainer asked for correction by default unless a compelling reason opposed it. topGO's authors do not oppose it. The family is one across ontologies, as for InterPro: lower error (9.5% against 20.5% under `strata`), and tables can be pooled. |
 | 2026-11-02 | No term-specific or length/dS adjustment for GO's excess under `strata`. Reported instead. | Maintainer: no inadequately validated correction; confounding analysis stays on the v1.0.0 roadmap. |
+| 2026-11-02 | GO at 9.5% under `strata` accepted as a documented limitation for v0.3.0. No terms removed, no thresholds changed, defaults kept. | Maintainer decision: quantified, and a correction needs confounder modeling and biological validation for v1.0.0. After v0.3.0, priorities are length and dS confounding, independent estimator benchmarking, and empirical calibration of enrichment. |
 | 2026-11-01 | No correction for length or dS in v0.3.0. | Maintainer decision: stays on the v1.0.0 roadmap until validated. |
 
 ## Open questions

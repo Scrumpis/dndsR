@@ -2,7 +2,7 @@
 
 Update this at the end of each substantive session. Identify things by commit and hash, not by date.
 
-**Phase:** v0.3.0 candidate on `dev`, locally validated. Software is at `eed1096`, starting from `5d53ced`. One statistical result awaits the maintainer: default GO enrichment is at 9.5% of runs under the `strata` null. CI last passed at `f84521f` and has not run on the enrichment changes. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
+**Phase:** v0.3.0 candidate on `dev`. Software is at `eed1096`. All CI workflows passed at `f2da1f1`. The maintainer accepted GO at 9.5% under the `strata` null as a documented limitation. Not merged, tagged, or published. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
 
 ## Identity
 
@@ -20,6 +20,5 @@ A read-only trial merge of the original `dev` into `main` had no conflicts. `mai
 
 ## Next
 
-1. The maintainer decides on the GO result under `strata`, pushes `dev`, and checks CI.
-2. The maintainer completes `GITHUB-SETUP.md`, reviews `docs/validation/enrichment.md`, then follows `RELEASE.md`. Agents do not push; this machine has no GitHub credentials.
-3. Continue `ROADMAP-1.0.md`: enrichment confounders and biological benchmarking, then Priority 2. Threading comes after v0.3.0: [performance.md](../validation/performance.md).
+1. The maintainer completes `GITHUB-SETUP.md`, then opens the pull request and follows `RELEASE.md`. Agents do not push; this machine has no GitHub credentials.
+2. After v0.3.0, continue `ROADMAP-1.0.md`, starting with gene-length and dS confounding, independent estimator benchmarking, and empirical calibration of enrichment statistics. Threading comes after that: [performance.md](../validation/performance.md).

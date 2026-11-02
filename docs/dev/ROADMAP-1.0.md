@@ -4,6 +4,8 @@ v0.3.0 establishes a corrected, working foundation. v1.0.0 establishes a scienti
 
 Scientific validity comes before new functionality. Existing behavior that is correct, tested, and documented is left alone. Items are dropped if the evidence shows they are unnecessary. The publication must state what dndsR can reliably estimate, and what biological conclusions cannot be established from those estimates alone.
 
+**Maintainer's order after v0.3.0:** gene-length and dS confounding, independent estimator benchmarking, and empirical calibration of enrichment statistics come first.
+
 ## Priority 1: functional enrichment validation
 
 Is the enrichment workflow statistically defensible on real annotated data, and what are the smallest corrections needed?

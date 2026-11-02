@@ -23,7 +23,7 @@ Done: audit, core fixes, statistical fixes, CLI and failure handling, example an
 Public GO and InterPro on *A. thaliana* against *A. lyrata*: `docs/validation/enrichment.md`. The default `term_enrichment` and `ipr_enrichment` are not calibrated. No package code changed.
 
 ### Final enrichment defaults
-At `eed1096`: `ipr_enrichment` corrects across entry types and `go_enrichment` applies BH across ontologies, by default. Null models, recalculation, thread determinism, R CMD check, candidate image, and a fresh agent all recorded in `RELEASE-READINESS.md`. Open for the maintainer: GO at 9.5% under `strata`.
+At `eed1096`: `ipr_enrichment` corrects across entry types and `go_enrichment` applies BH across ontologies, by default. Null models, recalculation, thread determinism, R CMD check, candidate image, and a fresh agent all recorded in `RELEASE-READINESS.md`. GO at 9.5% under `strata` accepted by the maintainer as a documented limitation. All CI workflows pass at `f2da1f1`.
 
 ### CI green on every workflow
 At `f84521f`: `R-CMD-check` on all platforms, `install`, `skill`, and `container`, including package tests in the Docker image, Apptainer, and the documented installer. The third-party Apptainer action was replaced with conda-forge Apptainer. No code-side blocker remains for v0.3.0.
