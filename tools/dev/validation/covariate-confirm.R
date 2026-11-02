@@ -2,6 +2,7 @@
 # calibration with the shipped code and seeds not used to choose the method.
 #   Rscript covariate-confirm.R <dnds_annot.tsv> <labels> <out.tsv>
 # <labels> is a sim-genome.R table, or permute:S, rotate:S, strata5:S, strata10:S.
+# With DNDSR_FILTER set, passes it as filter_expr, to measure a sensitivity filter.
 # Writes the format enrichment-methods-summary.py reads. "fisher" is BH on the table's fisher_p.
 suppressMessages(library(dndsR))
 args <- commandArgs(TRUE)
@@ -35,7 +36,8 @@ if (grepl("\\.gz$", labels)) {
 }
 w <- tempfile("cov"); dir.create(w); f <- file.path(w, "N_dnds_annot.tsv")
 write.table(d, f, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
-files <- suppressMessages(covariate_enrichment(dnds_annot_file = f, sides = "query", min_pos = 0, verbose = FALSE))
+filter <- Sys.getenv("DNDSR_FILTER")
+files <- suppressMessages(covariate_enrichment(dnds_annot_file = f, sides = "query", min_pos = 0, verbose = FALSE, filter_expr = if (nzchar(filter)) filter))
 rows <- list()
 for (path in files) {
   t <- read.delim(path, quote = "", stringsAsFactors = FALSE)

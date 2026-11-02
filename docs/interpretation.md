@@ -60,7 +60,7 @@ Treat dN/dS above 1 as a candidate list. To support a claim about particular gen
 
 `go_enrichment`, `ipr_enrichment`, and `term_enrichment` do not correct for length, dS, or annotation, and passing correction does not remove these effects: multiple-testing correction limits false positives when there is no association, and says nothing about why an association exists. See [enrichment calibration](validation/enrichment.md). **This is larger than the 9.5% above suggests.** When sequences were simulated with omega independent of annotation, and a real estimator produced the labels, 43% of `go_enrichment` runs had a false term between *A. thaliana* and *A. lyrata*, and 70% with Fisher's test on all GO ancestors.
 
-`covariate_enrichment` adjusts for length and dS, keeping false-term rates near or below nominal in all those tests, with power close to Fisher's test at known signals ([evidence](validation/enrichment-confounding.md)). It does not adjust for annotation completeness or dependence between genes, and it doesn't make a term evidence of selection. Terms remain leads.
+`covariate_enrichment` adjusts for length and dS, keeping false-term rates at or below nominal in all those tests, including new seeds and a held-out pair from another plant family, with power close to Fisher's test at known signals ([evidence](validation/enrichment-confounding.md)). Terms near the threshold change with the annotation release, so check that a term is stable before you rely on it. It does not adjust for annotation completeness or dependence between genes, and it doesn't make a term evidence of selection. Terms remain leads.
 
 **Also:**
 

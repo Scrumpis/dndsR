@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-02: v1.0.0 validation, overnight
+
+- **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`
+- **Done:** estimator benchmark, RBH against OMA, enrichment methods compared by simulated evolution under a prespecified rule, `covariate_enrichment`, confirmation on new seeds and a held-out tomato and potato pair, `calculate_dnds` notices, faster `append_annotations` and `ipr_enrichment` with identical output, public-genome tutorial run from a commit, publication checklist.
+- **Found:** `go_enrichment` defaults report false terms in 43% of simulated runs at AtAl, against the 9.5% documented; `extract_cds` stopped on trans-spliced plastid *rps12*, now with a clear error; short lists move with annotation release.
+- **Disclosed:** OMA's API returned 403 to Python's default user agent, so requests used an identifying user agent with pacing. PMC's reCAPTCHA was not circumvented; Europe PMC served that text. See `docs/validation/orthology.md`.
+- **Failed or not done:** the first filter calibration array failed: `singularity --env` splits on the comma in the expression, and every task exited 1. It was fixed and rerun; 1,400 tasks completed. Nothing pushed, merged, tagged, or published. CI has not run on these commits. Chenopodium was not run.
+
 ## 2026-11-02: final enrichment defaults
 
 - **Session:** `61d9f4da-7419-4c58-bb02-9ebdad0c13e6`

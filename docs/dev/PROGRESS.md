@@ -4,6 +4,9 @@ Durable checkpoints for resuming autonomous work. Newest first. Evidence is in `
 
 ## Checkpoints since the last release candidate
 
+### Enrichment adjusted for length and dS, confirmed
+`covariate_enrichment`, opt-in. Evidence: `docs/validation/enrichment-confounding.md`. Tutorial: `docs/tutorials/public-genomes.md`. Checklist: `docs/publication-protocol.md`.
+
 ### Correct enrichment multiple testing, GFF comments, and a GO crash
 Software at `1a363fb`. Evidence: `docs/validation/enrichment.md`.
 

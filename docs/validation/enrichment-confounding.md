@@ -2,7 +2,7 @@
 
 Short genes and genes with small dS pass dN/dS > 1 far more often. Can that alone make a term look enriched, and can a simple adjustment remove it without losing real signals?
 
-**Answer.** Yes to both, on this evidence. dndsR's existing tests report false terms in up to 70% of simulated genomes where omega has no link to annotation. One candidate met a rule fixed before the results, and is now `covariate_enrichment`. It does not replace the defaults, which are the maintainer's decision.
+**Answer.** Yes to both, on this evidence. dndsR's existing tests report false terms in up to 70% of simulated genomes where omega has no link to annotation. One candidate met a rule fixed before the results, and is now `covariate_enrichment`. It held on new seeds and on a held-out pair from another family. It does not replace the defaults, which are the maintainer's decision.
 
 ## Design
 
@@ -90,6 +90,78 @@ All 9 Fisher GO terms drop, including extracellular region, GO:0005576. Of the 2
 
 **One outside comparison, chosen after seeing the result, so it supports rather than validates.** Mondragón-Palomino, Stam, John-Arputharaj, and Dresselhaus (2017, *BMC Evolutionary Biology*, doi:10.1186/s12862-017-1099-4) tested the defensin-like family in *Arabidopsis* species with codeml and FUBAR, and report that "neutral evolution prevails throughout the DEFL family". That fits defensin-like not surviving adjustment. It is one family, and we did not test the families that stay against any independent evidence.
 
+## Confirmation
+
+The method was selected on the runs above, so its rates there may flatter it. These runs use the shipped `covariate_enrichment`, seeds from 900,000 up, and the same pairs: 100 runs per null family, 150 for `bylen`, and 50 per spike setting. Tables: `enrichment_confirm_*.tsv`, in [data/](data/).
+
+| Pair | Method | Worst false-term rate, of 12 null cells | Where | Cells above 5% | All null runs |
+|---|---|---:|---|---:|---:|
+| AtAl | `covariate_enrichment` | **5.0%** (2.2–11.2) | IPR `strata5` | 0 | 1.3% of 1,300 |
+| AtAl | `fisher` | 65.3% (57.4–72.5) | GO `bylen` | 7 | 24.7% |
+| AtCr | `covariate_enrichment` | 2.0% (0.6–7.0) | IPR `long` | 0 | 0.5% |
+| AtCr | `fisher` | 6.0% (3.2–11.0) | IPR `bylen` | 1 | 2.1% |
+| AtBr | `covariate_enrichment` | 1.0% (0.2–5.4) | IPR `permute` | 0 | 0.1% |
+| AtBr | `fisher` | 3.3% (1.4–7.6) | GO `bylen` | 0 | 1.3% |
+
+**It meets the rule again, with no margin.** The worst cell equals 5.0% with an upper limit of 11.2%, and is above the selection runs' 2.7% in the same cell. Upper limits above 5% occur in 9 of 36 cells, as expected with 100 runs per cell, so these runs do not rule out a true rate somewhat above 5% in a single setting. Across the 3,900 null runs, the rate is 0.6%.
+
+Share of spiked InterPro terms found, and false discovery on GO:
+
+| Spike (share, omega) | Pair | Power, `covariate_enrichment` | Power, `fisher` | GO false discovery, `covariate_enrichment` | GO false discovery, `fisher` |
+|---|---|---:|---:|---:|---:|
+| 0.1, 1.5 | AtAl | 82.8% | 67.2% | 2.0% | 49.0% |
+| 0.1, 1.5 | AtCr | 89.2% | 85.6% | 0.5% | 1.8% |
+| 0.1, 1.5 | AtBr | 87.2% | 90.0% | 1.4% | 1.9% |
+| 0.2, 3 | AtAl | 100% | 100% | 0.4% | 15.8% |
+| 0.2, 3 | AtCr | 100% | 100% | 0.7% | 1.6% |
+| 0.2, 3 | AtBr | 99.2% | 100% | 1.4% | 1.5% |
+
+## Held-out pair
+
+Tomato against potato (`SlSt`, GCF_036512215.1 and GCF_000226075.1, median dS 0.09), with terms from UniProt proteome UP000004994. This is another family, another query genome, and another annotation source, and it played no part in the choice. Twice as many runs per cell: 200 per null family, 300 for `bylen`, 100 per spike setting.
+
+| Method | Worst false-term rate, of 12 null cells | Where | Cells above 5% | All 2,600 null runs |
+|---|---:|---|---:|---:|
+| `covariate_enrichment` | **2.5%** (1.1–5.7) | IPR `long` | 0 | 0.8% |
+| `fisher` | 7.5% (4.6–12.0) | GO `long` | 2 | 2.3% |
+
+| Spike (share, omega) | Power, `covariate_enrichment` | Power, `fisher` | GO false discovery, `covariate_enrichment` | GO false discovery, `fisher` |
+|---|---:|---:|---:|---:|
+| 0.05, 3 | 17.2% | 9.6% | 3.7% | 5.3% |
+| 0.1, 1.5 | 61.4% | 47.2% | 0.7% | 3.3% |
+| 0.1, 3 | 67.4% | 50.6% | 0.6% | 2.7% |
+| 0.2, 3 | 100% | 99.2% | 0.5% | 1.7% |
+
+So the method holds on the held-out pair. Fisher's excess is much smaller here than in AtAl, which shows the size of that excess depends on the pair. Runs here have more positive genes than the real table: a median of 114 under `bylen` in the InterPro universe, against 43 real. Small signals are hard to find whatever the method, and half of the signals tested at low spike shares are missed.
+
+**Real terms.** Of 19,811 pairs, 96 have dN/dS above 1. `covariate_enrichment` finds 0 of 1,734 GO and 0 of 745 InterPro terms. Fisher's test finds 4 GO terms and IPR034751 (Yippee domain, 3 of 11 genes, `p_adj` 0.0061 against 0.21 adjusted). `covariate-verify.py` recalculated both tables with no differences, and tables are identical at 1 and 2 threads. This is low power as well as adjustment, so it says nothing about those terms' biology.
+
+**A finding on input.** The first tomato run stopped in `extract_cds`, because plastid *rps12* is trans-spliced across strands. `extract_cds` now says so and points to removing organelles. Numbers here come from nuclear annotations.
+
+## The dS filter in the checklist
+
+The [checklist](../publication-protocol.md) repeats the test without pairs above 3 times median dS. Is that repeat itself calibrated? `DNDSR_FILTER` runs `covariate-confirm.R` with that filter on the same labels and seeds as the confirmation, at AtAl and AtBr. Tables: `enrichment_filter_*.tsv`, in [data/](data/).
+
+| Pair | Worst false-term rate with the filter, of 12 null cells | Where | Cells above 5% | All 1,300 null runs | Without the filter |
+|---:|---:|---|---:|---:|---:|
+| AtAl | 5.0% (2.2–11.2) | IPR `strata5` | 0 | 1.3% | 1.3% |
+| AtBr | 1.0% (0.2–5.4) | IPR `permute` | 0 | 0.1% | 0.1% |
+
+Spiked InterPro power at share 0.1, omega 1.5: 80.0% against 82.8% at AtAl, 87.2% against 87.2% at AtBr. Of the 700 runs compared directly, 2 changed their significant terms, so the filter does not add false terms in these simulations. The simulations do not contain mispaired genes, so they cannot show that it removes the false pairs it targets.
+
+## How stable a term list is
+
+On AtAl, the same test on the same pairs gives different lists when the input changes slightly. None of this was used to choose the method.
+
+| Change, `covariate_enrichment` | GO | InterPro |
+|---|---:|---:|
+| Baseline, terms from a GAF file and InterProScan-style GFF attributes | 0 | 16 |
+| Terms from the UniProt download in [the tutorial](../tutorials/public-genomes.md), with organelles removed: 22,145 of 22,146 pairs, one dN/dS changed | 1 | 19, with all 16 kept |
+| Without pairs that OMA does not support (517) | not run | 13 |
+| Without pairs above 3 times median dS (792, none of them positive) | 4 | 18, with all 16 kept |
+
+Terms that come and go have `p_adj` just under or over 0.05, and many rest on 2 to 5 positive genes. The 4 GO terms gained under the filter, for example, each hold 2 positive genes among 11 or 12, with `p_adj` 0.049, against 0.056 without the filter. The filter is calibrated, as above, yet removing 792 genes changes the fit and the number of tests, which moves terms across the line with no new positive gene. **Stable terms are the ones to take seriously. Report the term database version, and check each term under the sensitivity runs in the [checklist](../publication-protocol.md).**
+
 ## Checks
 
 - `covariate_enrichment` gives the same terms, and p-values within rounding, as the prototype, for 3 pairs.
@@ -98,8 +170,8 @@ All 9 Fisher GO terms drop, including extracellular region, GO:0005576. Of the 2
 
 ## Limits
 
-- **The method was chosen on the runs above.** See the confirmation, on new seeds and a new pair, below.
-- All pairs share one query genome, one family, and one annotation. See the held-out pair below.
+- **Confirmed at 4 plant pairs in 2 families, with 2 sources of terms.** Other clades, polyploids, and other annotation pipelines are untested. For those, run the simulation on your own table.
+- Only 100 to 300 runs per cell, so the interval on any one rate is wide.
 - It treats genes as independent, and the fitted probabilities as known. Tandem families share history, and `rotate` tests that only in part.
 - The floor is one setting, with no sensitivity analysis. It is why the test stays valid with few positive genes, and it can make tests conservative for terms of genes the model rules out.
 - It does not adjust for annotation completeness.
@@ -116,4 +188,4 @@ Rscript tools/dev/validation/covariate-confirm.R <dnds_annot.tsv> <sim.tsv.gz or
 python3 tools/dev/validation/covariate-verify.py <dnds_annot.tsv> <table.tsv> <go_ancestors.tsv> q
 ```
 
-Image `dndsr_v0.2.0_sha256-726657e9`, library at v0.3.0's code, seeds in the scripts' manifests: 100,000 and up for selection, 900,000 and up for confirmation. Input hashes for AtCr and AtBr: Crubella `947fda8f49900a8a` (FASTA), `322af545d18743bf` (GFF); Brapa `afd6ca07cea49c74` (FASTA), `1520fb8661ae3dbd` (GFF).
+Image `dndsr_v0.2.0_sha256-726657e9`, library at v0.3.0's code, seeds in the scripts' manifests: 100,000 and up for selection, 900,000 and up for confirmation. Input hashes for AtCr and AtBr: Crubella `947fda8f49900a8a` (FASTA), `322af545d18743bf` (GFF); Brapa `afd6ca07cea49c74` (FASTA), `1520fb8661ae3dbd` (GFF). For SlSt: tomato `2f7700e8342b2505` (FASTA), `98bedc4bfcb95c9d` (nuclear GFF), potato `578bbfb7e0362d8e` (FASTA), `21b1814de8924c0f` (nuclear GFF), UniProt table `2ffc67471b743fb1`.

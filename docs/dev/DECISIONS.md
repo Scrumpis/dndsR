@@ -30,6 +30,11 @@
 | 2026-11-02 | No term-specific or length/dS adjustment for GO's excess under `strata`. Reported instead. | Maintainer: no inadequately validated correction; confounding analysis stays on the v1.0.0 roadmap. |
 | 2026-11-02 | GO at 9.5% under `strata` accepted as a documented limitation for v0.3.0. No terms removed, no thresholds changed, defaults kept. | Maintainer decision: quantified, and a correction needs confounder modeling and biological validation for v1.0.0. After v0.3.0, priorities are length and dS confounding, independent estimator benchmarking, and empirical calibration of enrichment. |
 | 2026-11-01 | No correction for length or dS in v0.3.0. | Maintainer decision: stays on the v1.0.0 roadmap until validated. |
+| 2026-11-02 | `covariate_enrichment` (Poisson-binomial tail, logistic on `ns(log length, 3) + ns(log dS, 3)`, floor a tenth of the positive rate) added as an opt-in command. **Awaits maintainer approval as a new public interface.** No default changes. | Selected by a rule fixed before results, confirmed on new seeds and a held-out pair: `docs/validation/enrichment-confounding.md`. |
+| 2026-11-02 | No degrees-of-freedom or floor argument on `covariate_enrichment`. | Other settings were the ones that failed calibration; an argument would invite tuning after results. |
+| 2026-11-02 | No bootstrap interval feature. | Coverage measured and not established: `docs/validation/estimators.md`. Roadmap condition not met. |
+| 2026-11-02 | `go_enrichment`, `ipr_enrichment`, and `term_enrichment` keep their defaults and are not removed. | Changing them is the maintainer's decision. The excess of false terms is documented. |
+| 2026-11-02 | Candidate selection and enrichment thresholds stay as they are. No terms removed. | Standing maintainer instruction. |
 
 ## Open questions
 
@@ -37,6 +42,12 @@ Decisions for release are in `RELEASE-READINESS.md`.
 
 | Question | Why it matters | Owner |
 |---|---|---|
+| Approve `covariate_enrichment`, and name it the primary list for publication? | Public interface, and it is the list the checklist tells people to report. | Maintainer |
+| Should `go_enrichment` and `term_enrichment` warn, or change defaults, now that their excess is measured? | Up to 65–70% false-term rates at one pair. | Maintainer |
+| Tag a release containing `covariate_enrichment` before a publication analysis? | v0.3.0 lacks it. Recommended: tag, so that the analysis names one version. A commit and digest would also pin it. | Maintainer |
+| `publish` run at `d5f4b21` is waiting for approval, and `scrumpis/dndsr:v0.3.0` does not exist yet. | The digest follow-up in `RELEASE.md` is blocked until it runs. | Maintainer |
+| v0.3.0's release page has no assets and does not use `release-notes-0.3.0.md`. | Those notes carry the correctness notice. | Maintainer |
+| Merge `main` back into `dev`? | `dev` lacks the merge commit and PR #3's badge. | Maintainer |
 | Can the `main` ruleset be satisfied? It requires 1 approving review and a check named `R-CMD-check`, but the workflow's jobs are named like `ubuntu-latest (release)`. | May block the v0.3.0 merge. Not yet tested against a pull request. A sole maintainer also cannot approve their own pull request without a bypass. | Maintainer |
 | Should v0.3.0 get a new image? The only image predates this code and was built for v0.2.0. | The skill must link a release to one digest. | Maintainer |
 | Where should `.audit` live for the long term? | Scratch is purged after 45 days unless touched. Hashes in `.audit/manifest.sha256` detect loss of content but cannot restore it. | Maintainer |

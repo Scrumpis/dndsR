@@ -2,7 +2,7 @@
 
 Update this at the end of each substantive session. Identify things by commit and hash, not by date.
 
-**Phase:** v0.3.0 candidate on `dev`. Software is at `eed1096`. All CI workflows passed at `f2da1f1`. The maintainer accepted GO at 9.5% under the `strata` null as a documented limitation. Not merged, tagged, or published. Read [RELEASE-READINESS.md](RELEASE-READINESS.md) first. Checkpoints are in [PROGRESS.md](PROGRESS.md).
+**Phase:** v0.3.0 is public: tag and `main` at `d5f4b21`. `dev` holds v1.0.0 validation work, unpushed until the maintainer pushes it. `covariate_enrichment` awaits approval. Checkpoints are in [PROGRESS.md](PROGRESS.md).
 
 ## Identity
 
@@ -20,5 +20,9 @@ A read-only trial merge of the original `dev` into `main` had no conflicts. `mai
 
 ## Next
 
-1. The maintainer completes `GITHUB-SETUP.md`, then opens the pull request and follows `RELEASE.md`. Agents do not push; this machine has no GitHub credentials.
-2. After v0.3.0, continue `ROADMAP-1.0.md`, starting with gene-length and dS confounding, independent estimator benchmarking, and empirical calibration of enrichment statistics. Threading comes after that: [performance.md](../validation/performance.md).
+Open maintainer decisions are in [DECISIONS.md](DECISIONS.md).
+
+1. The maintainer pushes `dev`, and CI runs on these commits. It has not run on them yet.
+2. The maintainer decides on `covariate_enrichment` and on a tagged release. `docs/dev/release-notes-next.md` is a draft.
+3. A publication analysis follows `docs/publication-protocol.md`, from that tag. Do not put unpublished findings in this repository.
+4. For v1.0.0: tests chosen in advance against independent evidence, isoform effects on pairing, removing gene-level `dnds_state_contrast`, and threading in `performance.md`.

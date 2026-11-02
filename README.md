@@ -44,6 +44,8 @@ The last command checks your results against independently established values an
 - [Getting started](docs/tutorials/getting-started.md): install, run the example, and read the results
 - [Using dndsR from R](docs/tutorials/using-r.md)
 - [Analyzing your own genomes](docs/tutorials/your-own-data.md)
+- [A full analysis of public genomes](docs/tutorials/public-genomes.md), from downloads to a term list
+- [Running dndsR for a publication](docs/publication-protocol.md): a checklist
 - [Output files](docs/output-files.md)
 - [Interpreting results](docs/interpretation.md): read this before drawing conclusions
 - [Installation options](INSTALL.md): containers, conda, and R
