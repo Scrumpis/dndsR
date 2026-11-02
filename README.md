@@ -14,6 +14,7 @@
 | Calculate dN/dS | `dndsr calculate_dnds` | `calculate_dnds()` |
 | Add annotations | `dndsr append_annotations` | `append_annotations()` |
 | InterPro, GO, or other term enrichment | `dndsr ipr_enrichment`, `go_enrichment`, `term_enrichment` | `ipr_enrichment()`, `go_enrichment()`, `term_enrichment()` |
+| Enrichment adjusted for gene length and dS | `dndsr covariate_enrichment` | `covariate_enrichment()` |
 | Genome ideogram | `dndsr dnds_ideogram` | `dnds_ideogram()` |
 | Summaries, optionally by region | `dndsr dnds_summary` | `dnds_summary()` |
 | Contrast comparisons | `dndsr dnds_contrast`, `dnds_state_contrast` | `dnds_contrast()`, `dnds_state_contrast()` |

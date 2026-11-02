@@ -221,3 +221,43 @@
   for (code in names(codes)) x <- gsub(code, codes[[code]], x, ignore.case = TRUE)
   x
 }
+
+#' Report how many dN/dS estimates fall where they are least reliable
+#'
+#' Thresholds come from simulations with known truth and from a comparison with OMA's orthologs, in
+#' `docs/validation/estimators.md` and `docs/validation/orthology.md`. Below a dS of 0.02 the ratio
+#' is noisy, and often undefined in short genes. Above a dS of 0.8 it is compressed, and genes with
+#' a true ratio above 1 increasingly read below it. A dS over 3 times this table's median marks
+#' pairs that are often not orthologs at all. Reports only: it changes no value and removes no gene.
+#'
+#' @param dS,dNdS Columns of a dN/dS table. Values that are not numbers count as undefined.
+#' @return Named numeric vector: `pairs`, `undefined`, `low_ds`, `high_ds`, `median_ds`, and `outlier_ds`.
+#' @keywords internal
+.dnds_reliability <- function(dS, dNdS) {
+  ds <- suppressWarnings(as.numeric(dS))
+  ratio <- suppressWarnings(as.numeric(dNdS))
+  known <- ds[is.finite(ds)]
+  middle <- if (length(known)) stats::median(known) else NA_real_
+  c(pairs = length(ds), undefined = sum(!is.finite(ratio)), low_ds = sum(known < 0.02), high_ds = sum(known > 0.8),
+    median_ds = middle, outlier_ds = sum(known > 3 * middle), positive = sum(is.finite(ratio) & ratio > 1))
+}
+
+#' Write the reliability counts as a message
+#'
+#' @param counts Result of `.dnds_reliability()`.
+#' @param label Comparison name for the message.
+#' @return `counts`, invisibly.
+#' @keywords internal
+.report_dnds_reliability <- function(counts, label) {
+  message(sprintf(
+    paste0("[calculate_dnds] %s: %d pairs, median dS %.3f. dN/dS undefined in %d. dS < 0.02 (noisy ratio) in %d. ",
+           "dS > 0.8 (ratios compressed; true ratios above 1 may read below 1) in %d. ",
+           "dS over 3 times the median (often not orthologs) in %d. dN/dS > 1 in %d."),
+    label, counts[["pairs"]], counts[["median_ds"]], counts[["undefined"]], counts[["low_ds"]], counts[["high_ds"]],
+    counts[["outlier_ds"]], counts[["positive"]]))
+  if (counts[["positive"]] < 30) {
+    message("[calculate_dnds] ", label, ": few genes have dN/dS > 1, so enrichment tests on that threshold have little power. ",
+            "See docs/interpretation.md.")
+  }
+  invisible(counts)
+}

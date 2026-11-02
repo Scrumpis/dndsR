@@ -38,6 +38,7 @@ QC columns: `id`, `transcript` (the isoform used), `n_isoforms`, `length_nt`, `m
 | `ipr_enrichment` | `<comparison>_<q or s>_IPR_<ENTRY_TYPE>_enrichment.tsv`, one per entry type |
 | `term_enrichment` | `<comparison>_<q or s>_<TERM>_enrichment.tsv` |
 | `go_enrichment` | `<comparison>_<q or s>_GO_<ontology>_topGO_<algorithm>_<statistic>.tsv` |
+| `covariate_enrichment` | `<comparison>_<q or s>_<GO or IPR>_covariate_enrichment.tsv` |
 
 Each command also writes a plot, and a log for each side.
 
@@ -45,6 +46,7 @@ The tested groups: positive genes have `dNdS > pos_threshold` (default 1), and t
 
 - `ipr_enrichment` and `term_enrichment`: `pos_count`, `nonpos_count`, `pos_total`, `nonpos_total`, `total_count`, `odds_ratio`, `ci_lower`, `ci_upper`, `p_value` (one-sided Fisher's exact test, not corrected for multiple testing), `p_adj` (corrected by `p_adjust_method`), `p_adjust_method`, `n_tested`, `enrichment`, and in `ipr_enrichment` `adjust_scope`: `global` (one family across all eligible entry types, the default), `per_type`, `pooled` (with `stratify_by_type = FALSE`), or `none`.
 - Correction spans every term meeting `min_total` and, for `ipr_enrichment`, `max_prop`. `n_tested` is that number. `min_pos` then chooses which rows are written, so a table usually has fewer rows than `n_tested`, and `p_adj` cannot be recalculated from the rows alone.
+- `covariate_enrichment`: `term`, `term_type`, `ontology`, `term_name`, `universe` and `pos_total` (annotated and positive genes in that universe), `total_count`, `pos_count`, `expected` (positive genes predicted from length and dS), `obs_over_expected`, `fisher_p` (without adjustment, for comparison, and not corrected), `p_value` (adjusted, not corrected), `p_adj` (BH across `n_tested` terms, in all ontologies of that table), `n_tested`, and `model`. `min_pos` chooses which rows are written, after correction.
 - `go_enrichment`: `annotated`, `significant`, `raw_p` (topGO's p-value for the chosen `algorithm`, not corrected for multiple testing), `p_adj`, `p_adjust_method`, `adjust_scope`, `n_tested`, `enrichment`. By default `p_adj` is BH across every tested term in all requested ontologies, for one comparison and side, and `n_tested` counts them, so it exceeds a table's rows. With `adjust_scope` `per_ontology`, each ontology has its own family. With `p_adjust_method` `none`, **`p_adj` equals `raw_p`**, `adjust_scope` is `none`, and `n_tested` is still the family's size.
 - `enrichment` everywhere is the proportion of positive genes with the term divided by the proportion of other genes with it.
 

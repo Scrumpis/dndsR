@@ -1,3 +1,14 @@
+# dndsR (development)
+
+Nothing here changes an existing default, algorithm, or output value.
+
+- New `covariate_enrichment()` and `dndsr covariate_enrichment`: GO and InterPro enrichment adjusted for gene length and dS. It is opt-in, and adds output files only. Evidence: `docs/validation/enrichment-confounding.md`.
+- `calculate_dnds` reports undefined, low-dS, high-dS, and outlier pairs, and says when fewer than 30 genes exceed 1. This is a message only.
+- `extract_cds` explains a failure from a trans-spliced gene, such as plastid rps12 in a RefSeq GFF3, and suggests removing organelles.
+- `split_comparisons --mode haplotype` warns above 8 labels, which may be scaffold numbers.
+- `ipr_enrichment` no longer looks up the InterPro release when entries and tree are local or not used, so it works offline. It runs about 25 times faster, and `append_annotations` about 2.5 times, with byte-identical tables on the public pair.
+- New evidence: estimator benchmark, ortholog comparison with OMA, and enrichment calibration by simulation. `go_enrichment`'s excess of false terms is larger than 0.3.0's documents said.
+
 # dndsR 0.3.0
 
 ## Rerun earlier analyses

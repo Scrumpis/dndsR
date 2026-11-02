@@ -16,19 +16,22 @@ These are readings, not proofs. A whole-gene ratio averages over all sites and t
 
 dndsR's `dNdS > 1` is a threshold on a point estimate with no uncertainty attached. In simulations with realistic codon usage, **about half of truly neutral genes exceed 1** at ordinary divergence, as any roughly unbiased estimate would ([evidence](validation/estimators.md)). In a genome with many thousands of nearly neutral genes, this can be a large number of genes. Established methods can also disagree about which side of 1 a gene falls on.
 
+A bootstrap interval would not fix this. A 95% interval from resampling codons covered the true ratio about 90% of the time for lower ratios at moderate dS, and almost never where it matters most: at a true ratio of 3 and dS 0.4 or above, or a true ratio of 1 or above at dS 0.8 when rates vary among sites. So dndsR does not offer one ([evidence](validation/estimators.md#benchmark-against-independent-estimators)).
+
 Treat dN/dS above 1 as a candidate list. To support a claim about particular genes, use methods that model selection, such as likelihood-ratio tests with more than two sequences, and look at the alignments.
 
 ## Before you trust a value
 
 - **Small dS.** With few synonymous changes, the ratio is unstable: one substitution can change it greatly. Look at dN and dS, not just the ratio. dndsR does not filter on dS by default. You can add one, for example `--filter-expr "dS > 0.01"` in the enrichment commands.
-- **Large dS.** Above roughly 1 to 2, synonymous sites are close to saturation and dS is unreliable. High dS can also make a ratio look conserved.
+- **Large dS.** In simulations, a true ratio of 1 read 0.89 at dS 0.8 and 0.74 at dS 1.5, and a true ratio of 3 read 0.38 of itself at dS 0.8. Genes with a true ratio of 1.5 passed 1 in 62–94% of replicates at dS 0.8, and 9.5% or fewer above 400 codons at dS 1.5. So high divergence can hide a ratio above 1 ([evidence](validation/estimators.md)). Pairs at high dS are also often the wrong genes: over half of A. thaliana and A. lyrata pairs with OMA evidence at dS 0.3–0.8 disagreed with OMA, and 92% at 0.8–1.5 ([evidence](validation/orthology.md)).
+- **Too few genes above 1.** Between A. thaliana and increasingly distant relatives, 206 genes passed 1 at median dS 0.14, 17 at 0.27, and 3 at 0.44. Enrichment on `dNdS > 1` loses power with divergence, so a short list says little.
 - **dS = 0.** The ratio is reported as NA and left out of enrichment tests, even if dN is greater than 0. Such genes are not reported as positive.
 - **The method.** The default Comeron method compresses ratios: in simulations with realistic codon usage, it was accurate near a ratio of 0.5 to 1, read high at very low ratios, and read low at high ones (a true ratio of 2 gave about 1.6 to 1.9), and more so at high divergence. Related methods do the same. It does not account for codon usage.
 - **The site model.** The Comeron method assigns sites to degeneracy classes. A gene designed with only amino-acid changes can therefore still get a small nonzero dS.
 
 ## Pipeline assumptions
 
-- **Orthologs.** Pairs are reciprocal best protein hits, a heuristic. Paralogs, gene losses, and whole-genome duplications can pair the wrong genes. A wrong pairing can look like fast evolution.
+- **Orthologs.** Pairs are reciprocal best protein hits, a heuristic. Paralogs, gene losses, and whole-genome duplications can pair the wrong genes. A wrong pairing can look like fast evolution. Compared with OMA, 3.6% of pairs with evidence disagreed within *Arabidopsis*, and 15% against triplicated *B. rapa*. A pair above 3 times the median dS disagreed 85% and 64% of the time ([evidence](validation/orthology.md)).
 - **One isoform.** Each gene uses its longest valid isoform by default. That may not be the isoform under selection, and differences between genomes in which isoform is annotated can inflate divergence.
 - **Annotation errors.** Frame errors, gene-model errors, and undetected pseudogenes can inflate dN. CDS with in-frame stops or invalid lengths are excluded and recorded in the QC table, but other errors cannot be detected.
 - **Alignment.** Each pair is aligned alone by global protein alignment and converted back to codons.
@@ -55,7 +58,9 @@ Treat dN/dS above 1 as a candidate list. To support a claim about particular gen
 - **Dependence.** Tandem duplicates and genes sharing a term are not independent, although Fisher's test assumes they are.
 - **The candidate rule.** Results change with `pos_threshold`, `max_dnds`, and filters. Check whether a conclusion survives other reasonable choices.
 
-dndsR does not correct for length, dS, or annotation, and passing correction does not remove these effects: multiple-testing correction limits false positives when there is no association, and says nothing about why an association exists. This is a limitation: see [enrichment calibration](validation/enrichment.md).
+`go_enrichment`, `ipr_enrichment`, and `term_enrichment` do not correct for length, dS, or annotation, and passing correction does not remove these effects: multiple-testing correction limits false positives when there is no association, and says nothing about why an association exists. See [enrichment calibration](validation/enrichment.md). **This is larger than the 9.5% above suggests.** When sequences were simulated with omega independent of annotation, and a real estimator produced the labels, 43% of `go_enrichment` runs had a false term between *A. thaliana* and *A. lyrata*, and 70% with Fisher's test on all GO ancestors.
+
+`covariate_enrichment` adjusts for length and dS, keeping false-term rates near or below nominal in all those tests, with power close to Fisher's test at known signals ([evidence](validation/enrichment-confounding.md)). It does not adjust for annotation completeness or dependence between genes, and it doesn't make a term evidence of selection. Terms remain leads.
 
 **Also:**
 

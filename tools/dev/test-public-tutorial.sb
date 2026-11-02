@@ -1,0 +1,29 @@
+#!/bin/bash --login
+#SBATCH --time=3:50:00
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=64G
+#SBATCH --partition=general-short
+#SBATCH --job-name=dndsr-public-tutorial
+# Runs every command block of docs/tutorials/public-genomes.md, in order, in a clean HOME, from HEAD.
+# It installs dndsR as a user would, and downloads public genomes, so it is not part of check.sh.
+#   DNDSR_SIF=/path/image.sif DNDSR_REPO=/path/clone sbatch --output=<log> tools/dev/test-public-tutorial.sb <empty work dir>
+# Times each step and keeps the outputs in <work dir>. Exits nonzero if a command fails.
+set -eu
+: "${DNDSR_SIF:?}"; : "${DNDSR_REPO:?}"
+work=$1; mkdir -p "$work"; cd "$work"
+export HOME=$work/home; mkdir -p "$HOME"
+git -C "$DNDSR_REPO" archive --format=tar HEAD | { mkdir -p dndsR && tar -x -C dndsR; }
+git -C dndsR init -q
+git -C "$DNDSR_REPO" rev-parse HEAD > commit.txt
+cp "$DNDSR_SIF" dndsr.sif
+(cd dndsR && tools/dndsr-install install --engine singularity --sif "$work/dndsr.sif" --bind "$work")
+export PATH="$HOME/.local/bin:$PATH"
+awk '/^```$/ { inside = !inside; next } inside' dndsR/docs/tutorials/public-genomes.md > tutorial.cmds
+bash -c 'set -euo pipefail
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    s=$(date +%s); echo "+ $line"
+    eval "$line" < /dev/null
+    echo "TIME $(( $(date +%s) - s )) s: $line"
+  done < tutorial.cmds'
+echo "Public tutorial OK at $(cat "$work/commit.txt")"
