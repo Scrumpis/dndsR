@@ -7,7 +7,7 @@ You need bash, git, Singularity, and network access. The image is a 1.3 GB downl
 ## 1. Get the code
 
 ```
-git clone --branch v0.3.0 https://github.com/Scrumpis/dndsR
+git clone --branch v0.4.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 ```
 
@@ -16,7 +16,7 @@ cd dndsR
 This digest always identifies the same image.
 
 ```
-singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831
+singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11
 ```
 
 ## 3. Install the `dndsr` command

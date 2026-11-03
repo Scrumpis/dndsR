@@ -135,14 +135,19 @@ append_annotations <- function(dnds_file = NULL,
     if (!length(out)) NULL else out
   }
 
-  .extract_terms_from_string <- function(attr_string, patterns, normalizers, case_insensitive = TRUE) {
+  # Works on many lines at once. Identifiers such as ID=K12345.1 name the feature, and are not functional
+  # terms. GFF3 encodes separators inside values, as in GO:0000001%2CGO:0000002, so these are decoded so
+  # that each term stands alone. Decoding follows removal of IDs.
+  .term_text <- function(attributes) {
+    s <- gsub("(^|;)\\s*(ID|Parent)=[^;]*", "\\1", attributes, perl = TRUE)
+    encoded <- !is.na(s) & grepl("%", s, fixed = TRUE)
+    s[encoded] <- .decode_gff3(s[encoded])
+    s
+  }
+
+  .extract_terms_from_text <- function(s, patterns, normalizers, case_insensitive = TRUE) {
     out <- structure(vector("list", length(patterns)), names = names(patterns))
-    if (isTRUE(is.na(attr_string)) || !nzchar(attr_string)) return(out)
-    # Identifiers such as ID=K12345.1 name the feature; they are not functional terms.
-    s <- gsub("(^|;)\\s*(ID|Parent)=[^;]*", "\\1", attr_string, perl = TRUE)
-    # GFF3 encodes separators inside values, as in GO:0000001%2CGO:0000002. Decode them so
-    # that each term stands alone. Decoding follows removal of IDs, which are not terms.
-    s <- .decode_gff3(s)
+    if (isTRUE(is.na(s)) || !nzchar(s)) return(out)
     for (lab in names(patterns)) {
       rx <- patterns[[lab]]
       hits <- unlist(regmatches(s, gregexpr(rx, s, perl = TRUE,
@@ -190,60 +195,70 @@ append_annotations <- function(dnds_file = NULL,
       )
     }
 
-    for (i in seq_len(nrow(gff_df))) {
-      attr <- gff_df$attributes[i]
-      pieces <- strsplit(attr, ";", fixed = TRUE)[[1]]
-      kv <- strsplit(pieces, "=", fixed = TRUE)
-      key <- vapply(kv, `[`, "", 1L)
-      val <- vapply(kv, function(x) if (length(x) > 1) x[2] else "", "")
-      names(val) <- key
-      # extract_cds names sequences as Bioconductor does, without prefixes such as gene-.
-      id  <- .normalize_gff_id(unname(val["ID"]))
-      par <- unname(val["Parent"])
+    # Each key's first value, up to the next = or ;, once for all lines. Most lines have no term,
+    # so term patterns run only on text where one matches.
+    attributes <- gff_df$attributes
+    first_value <- function(key) {
+      value <- rep(NA_character_, length(attributes))
+      present <- grepl(paste0("(?:^|;)", key, "="), attributes, perl = TRUE)
+      value[present] <- sub(paste0("^(?:[^;]*;)*?", key, "=([^;=]*).*$"), "\\1", attributes[present], perl = TRUE)
+      value
+    }
+    ids <- first_value("ID")
+    # extract_cds names sequences as Bioconductor does, without prefixes such as gene-.
+    ids <- .normalize_gff_id(ids)
+    parents <- first_value("Parent")
+    matches_term <- grepl(any_rx, attributes, perl = TRUE, ignore.case = TRUE)
+    text <- .term_text(attributes)
+    may_have_terms <- grepl(any_rx, text, perl = TRUE, ignore.case = TRUE)
+    no_terms <- structure(vector("list", length(patterns)), names = names(patterns))
 
-      if (!is.na(id) && nzchar(id)) {
-        # children edges
-        if (!is.na(par) && nzchar(par)) {
-          for (p in .normalize_gff_id(strsplit(par, ",", fixed = TRUE)[[1]])) {
-            if (identical(p, id)) next
-            cur <- if (exists(p, envir = children, inherits = FALSE)) get(p, envir = children) else character(0)
-            assign(p, unique(c(cur, id)), envir = children)
-          }
+    for (i in which(!is.na(ids) & nzchar(ids))) {
+      attr <- attributes[i]
+      id <- ids[i]
+      par <- parents[i]
+
+      # children edges
+      if (!is.na(par) && nzchar(par)) {
+        for (p in .normalize_gff_id(strsplit(par, ",", fixed = TRUE)[[1]])) {
+          if (identical(p, id)) next
+          cur <- if (exists(p, envir = children, inherits = FALSE)) get(p, envir = children) else character(0)
+          assign(p, unique(c(cur, id)), envir = children)
         }
+      }
 
-        # own terms
-        new_terms <- .extract_terms_from_string(attr, patterns, normalizers)
-        if (exists(id, envir = own_terms, inherits = FALSE)) {
-          old <- get(id, envir = own_terms)
-          assign(id, .union_term_lists(old, new_terms), envir = own_terms)
+      # own terms
+      new_terms <- if (may_have_terms[i]) .extract_terms_from_text(text[i], patterns, normalizers) else no_terms
+      if (exists(id, envir = own_terms, inherits = FALSE)) {
+        old <- get(id, envir = own_terms)
+        assign(id, .union_term_lists(old, new_terms), envir = own_terms)
+      } else {
+        assign(id, new_terms, envir = own_terms)
+      }
+
+      # own attrs: keep only rows with terms
+      if (matches_term[i]) {
+        if (exists(id, envir = own_attrs, inherits = FALSE)) {
+          assign(id, unique(c(get(id, envir = own_attrs), attr)), envir = own_attrs)
         } else {
-          assign(id, new_terms, envir = own_terms)
+          assign(id, attr, envir = own_attrs)
         }
+      } else if (!exists(id, envir = own_attrs, inherits = FALSE)) {
+        assign(id, character(0), envir = own_attrs)
+      }
 
-        # own attrs: keep only rows with terms
-        if (grepl(any_rx, attr, perl = TRUE, ignore.case = TRUE)) {
-          if (exists(id, envir = own_attrs, inherits = FALSE)) {
-            assign(id, unique(c(get(id, envir = own_attrs), attr)), envir = own_attrs)
-          } else {
-            assign(id, attr, envir = own_attrs)
-          }
-        } else if (!exists(id, envir = own_attrs, inherits = FALSE)) {
-          assign(id, character(0), envir = own_attrs)
-        }
-
-        # own coords (union across duplicate IDs)
-        new_coord <- list(
-          seqid = as.character(gff_df$seqid[i]),
-          start = suppressWarnings(as.numeric(gff_df$start[i])),
-          end   = suppressWarnings(as.numeric(gff_df$end[i])),
-          type  = as.character(gff_df$type[i])
-        )
-        if (exists(id, envir = own_coords, inherits = FALSE)) {
-          oldc <- get(id, envir = own_coords)
-          assign(id, .union_coords(oldc, new_coord), envir = own_coords)
-        } else {
-          assign(id, new_coord, envir = own_coords)
-        }
+      # own coords (union across duplicate IDs)
+      new_coord <- list(
+        seqid = as.character(gff_df$seqid[i]),
+        start = suppressWarnings(as.numeric(gff_df$start[i])),
+        end   = suppressWarnings(as.numeric(gff_df$end[i])),
+        type  = as.character(gff_df$type[i])
+      )
+      if (exists(id, envir = own_coords, inherits = FALSE)) {
+        oldc <- get(id, envir = own_coords)
+        assign(id, .union_coords(oldc, new_coord), envir = own_coords)
+      } else {
+        assign(id, new_coord, envir = own_coords)
       }
     }
 

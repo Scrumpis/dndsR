@@ -1,0 +1,33 @@
+scenario	family	method	runs	mean_raw_p05	runs_with_term	pct	ci_low	ci_high	mean_false_terms	fdr_pct	power_pct	most_frequent_terms
+bylen	GO	covariate	150	7.9	0	0.0	0.0	2.5	0.000			
+bylen	GO	fisher	150	18.6	5	3.3	1.4	7.6	0.173			GO:0005102:2;GO:0033612:1;GO:0010088:1
+bylen	IPR	covariate	150	1.7	0	0.0	0.0	2.5	0.000			
+bylen	IPR	fisher	150	2.8	5	3.3	1.4	7.6	0.033			IPR012552:5
+long	GO	covariate	100	3.7	0	0.0	0.0	3.7	0.000			
+long	GO	fisher	100	9.3	2	2.0	0.6	7.0	0.020			GO:0008285:2
+long	IPR	covariate	100	0.8	0	0.0	0.0	3.7	0.000			
+long	IPR	fisher	100	1.4	2	2.0	0.6	7.0	0.020			IPR012552:2
+permute	GO	covariate	100	17.1	0	0.0	0.0	3.7	0.000			
+permute	GO	fisher	100	18.2	0	0.0	0.0	3.7	0.000			
+permute	IPR	covariate	100	6.3	1	1.0	0.2	5.4	0.020			IPR004843:1;IPR029052:1
+permute	IPR	fisher	100	6.9	1	1.0	0.2	5.4	0.020			IPR004843:1;IPR029052:1
+rotate	GO	covariate	100	21.3	0	0.0	0.0	3.7	0.000			
+rotate	GO	fisher	100	22.2	0	0.0	0.0	3.7	0.000			
+rotate	IPR	covariate	100	6.5	0	0.0	0.0	3.7	0.000			
+rotate	IPR	fisher	100	7.0	0	0.0	0.0	3.7	0.000			
+spike_0.1_1.5	GO	covariate	50	72.3	34	68.0	54.2	79.2	0.540	1.4		GO:0140110:4;GO:0004364:4;GO:0016765:4
+spike_0.1_1.5	GO	fisher	50	78.0	37	74.0	60.4	84.1	0.840	1.9		GO:0003700:7;GO:0140110:7;GO:0003677:6
+spike_0.1_1.5	IPR	covariate	50	32.0	50	100.0	92.9	100.0	0.100	0.3	87.2	IPR012335:6;IPR012336:6;IPR036249:6
+spike_0.1_1.5	IPR	fisher	50	32.9	50	100.0	92.9	100.0	0.180	0.5	90.0	IPR012335:6;IPR012336:6;IPR036249:6
+spike_0.2_3	GO	covariate	50	96.9	50	100.0	92.9	100.0	0.500	1.4		GO:0046872:9;GO:0071554:8;GO:0043169:8
+spike_0.2_3	GO	fisher	50	103.2	50	100.0	92.9	100.0	0.780	1.5		GO:0043167:12;GO:0036094:12;GO:1901363:11
+spike_0.2_3	IPR	covariate	50	37.5	50	100.0	92.9	100.0	0.360	1.2	99.2	IPR001810:7;IPR012335:7;IPR012336:7
+spike_0.2_3	IPR	fisher	50	38.3	50	100.0	92.9	100.0	0.080	0.2	100.0	IPR027417:12;IPR032675:8;IPR036047:7
+strata10	GO	covariate	100	4.4	0	0.0	0.0	3.7	0.000			
+strata10	GO	fisher	100	7.4	0	0.0	0.0	3.7	0.000			
+strata10	IPR	covariate	100	2.8	0	0.0	0.0	3.7	0.000			
+strata10	IPR	fisher	100	3.5	1	1.0	0.2	5.4	0.010			IPR003676:1
+strata5	GO	covariate	100	4.0	0	0.0	0.0	3.7	0.000			
+strata5	GO	fisher	100	7.6	0	0.0	0.0	3.7	0.000			
+strata5	IPR	covariate	100	3.9	0	0.0	0.0	3.7	0.000			
+strata5	IPR	fisher	100	4.3	1	1.0	0.2	5.4	0.030			IPR003612:1;IPR016140:1;IPR036312:1

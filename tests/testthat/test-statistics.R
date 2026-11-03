@@ -113,6 +113,40 @@ test_that("split_comparisons separates subgenomes and ignores FASTA descriptions
   expect_equal(length(readLines("c_split.txt")), 2L)
 })
 
+test_that("extract_cds explains a trans-spliced gene that the gene model reader rejects", {
+  skip_if_not_installed("txdbmaker")
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  # The shape of plastid rps12 in RefSeq: one gene ID on two strands, a transcript with strand "?".
+  gff <- rbind(
+    c("c", "x", "gene", 100, 160, ".", "-", ".", "ID=g1;gene_biotype=protein_coding"),
+    c("c", "x", "gene", 500, 600, ".", "+", ".", "ID=g1;gene_biotype=protein_coding"),
+    c("c", "x", "mRNA", 100, 600, ".", "?", ".", "ID=r1;Parent=g1"),
+    c("c", "x", "exon", 100, 160, ".", "-", ".", "ID=e1;Parent=r1"),
+    c("c", "x", "exon", 500, 600, ".", "+", ".", "ID=e2;Parent=r1"),
+    c("c", "x", "exon", 500, 600, ".", "+", ".", "ID=e3;Parent=g1"),
+    c("c", "x", "CDS", 100, 160, ".", "-", "0", "ID=c1;Parent=r1"),
+    c("c", "x", "CDS", 500, 600, ".", "+", "2", "ID=c1;Parent=r1")
+  )
+  writeLines(c("##gff-version 3", apply(gff, 1, paste, collapse = "\t")), "q.gff3")
+  writeLines(c(">c", paste(rep("ACGT", 200), collapse = "")), "q.fasta")
+  writeLines("c1 q.fasta q.gff3 q.fasta q.gff3", "c.txt")
+  expect_error(suppressWarnings(suppressMessages(extract_cds(comparison_file = "c.txt", threads = 1))), "organelle")
+})
+
+test_that("split_comparisons warns when haplotype labels look like scaffold numbers", {
+  skip_if_not_installed("Biostrings")
+  dir <- withr::local_tempdir()
+  withr::local_dir(dir)
+  names <- sprintf("scaffold_%d", 1:9)
+  fasta <- as.vector(rbind(paste0(">", names), "ACGTACGTACGT"))
+  gff <- c("##gff-version 3", paste(names, "x", "gene", 1, 12, ".", "+", ".", paste0("ID=g", 1:9), sep = "\t"))
+  writeLines(fasta, "q.fasta"); writeLines(fasta, "s.fasta")
+  writeLines(gff, "q.gff3"); writeLines(gff, "s.gff3")
+  writeLines("c1 q.fasta q.gff3 s.fasta s.gff3", "c.txt")
+  expect_warning(suppressMessages(split_comparisons("c.txt", mode = "haplotype")), "scaffold numbers")
+})
+
 test_that("pairwise state contrasts match a directly fitted logistic model", {
   dir <- withr::local_tempdir()
   withr::local_dir(dir)
@@ -219,4 +253,17 @@ test_that("extraction works when only some transcripts have transcript_id", {
   same <- !grepl("g30$", names(got))
   expect_identical(as.character(got[same]), as.character(want[names(got)[same]]))
   expect_length(got, 34L)
+})
+
+test_that("the reliability report counts each class and changes nothing", {
+  got <- dndsR:::.dnds_reliability(c(0.01, 0.5, 1, 2, NA, 0), c(1.5, 0.5, NA, 0.2, NA, NA))
+  expect_equal(got[["pairs"]], 6)
+  expect_equal(got[["undefined"]], 3)
+  expect_equal(got[["low_ds"]], 2) # 0.01 and 0
+  expect_equal(got[["high_ds"]], 2) # 1 and 2
+  expect_equal(got[["median_ds"]], 0.5) # of 0, 0.01, 0.5, 1, 2
+  expect_equal(got[["outlier_ds"]], 1) # 2 > 1.5
+  expect_equal(got[["positive"]], 1)
+  expect_message(dndsR:::.report_dnds_reliability(got, "x"), "x: 6 pairs, median dS 0.500. dN/dS undefined in 3")
+  expect_message(dndsR:::.report_dnds_reliability(got, "x"), "little power")
 })

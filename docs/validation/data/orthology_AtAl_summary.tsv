@@ -1,0 +1,4 @@
+status	pairs	percent	median_dS	dS_above_1_pct	median_dNdS	pos_gt1	pos_pct	oma_pairs	oma_pairs_mapped	oma_query_genes
+agree	13840	62.5	0.138	0.0	0.162	85	0.61	24814	16366	15372
+disagree	517	2.3	0.538	14.3	0.176	3	0.60	24814	16366	15372
+unscored	7789	35.2	0.145	1.1	0.245	118	1.52	24814	16366	15372

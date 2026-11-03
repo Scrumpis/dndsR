@@ -469,6 +469,7 @@ calculate_dnds <- function(comparison_file = NULL,
       prov_json, auto_unbox = TRUE, pretty = TRUE, null = "null"
     )
 
+    .report_dnds_reliability(.dnds_reliability(res$dS, res$dNdS), comparison_basename)
     message("[calculate_dnds] Finished: ", comparison_basename)
     out_tsv
   }

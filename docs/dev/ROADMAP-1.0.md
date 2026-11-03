@@ -13,18 +13,18 @@ Is the enrichment workflow statistically defensible on real annotated data, and 
 | Item | Approach | Status |
 |---|---|---|
 | Real annotations | Public GO or InterPro annotations for *A. thaliana*, through the whole workflow | **Done:** [enrichment.md](../validation/enrichment.md) |
-| Null calibration | Empirical false-positive rates. Not only unrestricted label permutation, which assumes genes are exchangeable | **Done for one pair. Filter-then-BH failed and is corrected at `1a363fb`.** Other divergences are open |
+| Null calibration | Empirical false-positive rates. Not only unrestricted label permutation, which assumes genes are exchangeable | **Done, at 3 divergences and a held-out pair, with labels from simulated evolution:** [enrichment-confounding.md](../validation/enrichment-confounding.md) |
 | Candidate selection | How the threshold on a point estimate, `min_pos`, and `max_dnds` affect results | **Measured,** except `max_dnds` |
-| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | **Measured** for coverage, length, and dS. Expression and conservation are open. **GO's default stays above nominal under `strata` (9.5%), mostly from GO:0005576,** whose excess is largely reproduced by length and dS: modeling this is the priority here |
+| Confounders | Annotation coverage, gene length, expression or conservation proxies, and dS. Selection on dN/dS may favor certain genes regardless of function | **Length and dS modeled:** opt-in `covariate_enrichment`. Defaults are unchanged, pending the maintainer's decision. The excess in defaults is larger than the 9.5% recorded earlier. Annotation coverage, expression, and conservation are open |
 | Dependence | Tandem clusters and shared terms, which Fisher's test assumes away | **Measured:** collapse and genomic rotation |
 
 ## Priority 2: orthology accuracy
 
 | Item | Approach | Status |
 |---|---|---|
-| Accuracy of reciprocal best hits | Benchmark against independent, established orthology resources for the public pair | Open |
-| Failure modes | Paralogs, gene duplication, isoform effects | Partly: isoform effect on dN/dS is measured, not its effect on pairing |
-| Downstream effect | Whether errors materially change dN/dS conclusions | Open |
+| Accuracy of reciprocal best hits | Benchmark against independent, established orthology resources for the public pair | **Done, 2 pairs against OMA:** [orthology.md](../validation/orthology.md) |
+| Failure modes | Paralogs, gene duplication, isoform effects | Measured for dS and for a triplicated genome. Isoform effect on pairing is open |
+| Downstream effect | Whether errors materially change dN/dS conclusions | **Measured** on term lists: most terms stay, a few do not |
 
 ## Priority 3: independent estimator validation
 
@@ -32,9 +32,9 @@ Existing comparisons with PAML and KaKs_Calculator stay, and are expanded only w
 
 | Item | Approach | Status |
 |---|---|---|
-| Bias and variance | Across biologically meaningful simulation regimes | Partly: `docs/validation/estimators.md` |
-| Saturation and failure conditions | Where estimates stop being reliable, using dS and gene length | Open |
-| Confidence intervals | First investigate whether intervals are useful and calibrated. **No bootstrap feature unless that is established** | Open, investigation only |
+| Bias and variance | Across biologically meaningful simulation regimes | **Done:** 540 settings, 6 estimators, with site variation: `docs/validation/estimators.md` |
+| Saturation and failure conditions | Where estimates stop being reliable, using dS and gene length | **Done** |
+| Confidence intervals | First investigate whether intervals are useful and calibrated. **No bootstrap feature unless that is established** | **Investigated. Not established, so no feature** |
 | Estimation against testing | State clearly that dN/dS is a descriptive estimate, not a test of selection | Started: `docs/interpretation.md` |
 
 A neutral gene's point estimate falling above 1 about half the time is expected behavior, not an estimator defect. The issue to manage is users reading dN/dS above 1 as statistically significant evidence of positive selection.
@@ -43,16 +43,16 @@ A neutral gene's point estimate falling above 1 about half the time is expected 
 
 | Item | Status |
 |---|---|
-| One fully reproducible public-genome workflow, including annotation and enrichment | Done through dN/dS: `docs/validation/public-genome.md`. Annotation and enrichment are open |
-| Biological plausibility against independent published evidence, citing only what is confirmed | Open |
-| The whole analysis as a simple, executable tutorial | Open |
+| One fully reproducible public-genome workflow, including annotation and enrichment | **Done:** [public-genomes.md](../tutorials/public-genomes.md), run by `tools/dev/test-public-tutorial.sb` |
+| Biological plausibility against independent published evidence, citing only what is confirmed | **Started, one family, chosen post hoc:** supporting, not validation. Needs a list chosen in advance |
+| The whole analysis as a simple, executable tutorial | **Done** |
 
 ## Priority 5: interface cleanup and QC
 
 | Item | Status |
 |---|---|
 | Remove gene-level `dnds_state_contrast` from the supported interface, unless a statistically valid design is demonstrated | Open. See `state-contrast-design.md` |
-| dS saturation, unreliable-estimate, and other QC warnings where evidence supports them | Open. `Comeron95` truncates undefined terms silently |
+| dS saturation, unreliable-estimate, and other QC warnings where evidence supports them | **Done as notices** from `calculate_dnds`. `Comeron95` still truncates undefined terms silently |
 
 No unnecessary statistical machinery or dependencies.
 
@@ -71,9 +71,9 @@ No unnecessary statistical machinery or dependencies.
 
 | Item | Status |
 |---|---|
-| Methods description | Draft: `docs/methods.md` |
+| Methods description | Draft: `docs/methods.md`. Protocol for a publication: `docs/publication-protocol.md` |
 | Results evidence | `docs/validation/`, growing with the priorities above |
-| Benchmark of time and memory | Open. Slurm accounting for the public pair is a start |
+| Benchmark of time and memory | Measured for the public pair, in [the tutorial](../tutorials/public-genomes.md) and [performance](../validation/performance.md) |
 | Zenodo DOI, CITATION | Prepared. Needs approval |
 
 ## Deferred, only if users need them

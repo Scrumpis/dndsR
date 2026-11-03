@@ -34,8 +34,11 @@ Genes are called positive if `dNdS > pos_threshold` (default 1), among rows wher
 | `term_enrichment` | One-sided Fisher's exact test per term, positive against other genes | BH by default |
 | `ipr_enrichment` | The same, separately for each InterPro entry type; optionally a parent-child method that removes genes explained by significant child terms | BH by default, once across all eligible types |
 | `go_enrichment` | topGO `weight01` with Fisher's test, on genes with GO terms in that ontology | BH by default, once across all requested ontologies |
+| `covariate_enrichment` | Poisson-binomial upper tail per term, with each gene's probability of being positive from logistic regression on natural splines of log length and log dS (3 degrees of freedom each), no lower than a tenth of the positive rate. GO terms reach all ancestors | BH once across a term type, in all requested ontologies |
 
 `enrichment` is the proportion of positive genes with a term divided by the proportion of other genes with it.
+
+The first three commands do not account for gene length or dS, and `go_enrichment` and `term_enrichment` warn about it on every run. `covariate_enrichment` does, and was chosen among candidates by a rule fixed before results: [evidence](validation/enrichment-confounding.md). The approach is related to GOseq's weighting for length bias (Young et al. 2010, *Genome Biology* 11:R14, doi:10.1186/gb-2010-11-2-r14), and is not the same test: it uses an exact Poisson-binomial tail rather than a Wallenius approximation, and adds dS.
 
 ## Summaries, contrasts, and ideograms
 

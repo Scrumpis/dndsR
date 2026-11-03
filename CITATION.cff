@@ -7,4 +7,5 @@ authors:
     given-names: Nick
 repository-code: "https://github.com/Scrumpis/dndsR"
 license: MIT
-version: 0.3.0
+version: 0.4.0
+doi: 10.5281/zenodo.23879469

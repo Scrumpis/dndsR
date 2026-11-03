@@ -4,7 +4,7 @@ Actions only a repository owner can do. Nothing here is done by agents, and no c
 
 ## Branch and tag protection
 
-Current `protect_main` ruleset, read from the public API: no deletion or force-push, pull request with 1 approval, and a required `R-CMD-check` check with strict up-to-date branches. Bypass actors are not visible publicly.
+Current `protect_main` ruleset, read from the public API at `3f86d42`: no deletion or force-push, pull request with 0 approvals, and required checks `R-CMD-check`, `validate`, `conda`, and `build-and-test`, with strict up-to-date branches. All four names match real check runs. `protect_dev` is active: no deletion or force-push. The two stalls below were resolved by the maintainer, and are kept for a future fresh setup. Bypass actors are not visible publicly.
 
 Two rules would stall the merge from `dev`:
 

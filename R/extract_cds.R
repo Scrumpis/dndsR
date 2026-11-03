@@ -100,16 +100,27 @@ extract_cds <- function(comparison_name = NULL,
 
     meta_pat <- "genome version information is not available for this TxDb object"
 
-    txdb <- withCallingHandlers(
-      txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character()),
-      warning = function(w) {
-        msg <- conditionMessage(w)
-        is_meta <- grepl(meta_pat, msg, fixed = TRUE)
+    txdb <- tryCatch(
+      withCallingHandlers(
+        txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character()),
+        warning = function(w) {
+          msg <- conditionMessage(w)
+          is_meta <- grepl(meta_pat, msg, fixed = TRUE)
 
-        if (is_meta) {
-          if (isTRUE(verbose)) vmsg("  [TxDb note] ", msg)
-          invokeRestart("muffleWarning")
+          if (is_meta) {
+            if (isTRUE(verbose)) vmsg("  [TxDb note] ", msg)
+            invokeRestart("muffleWarning")
+          }
         }
+      ),
+      error = function(e) {
+        hint <- if (grepl("exons linked to transcripts not found", conditionMessage(e), fixed = TRUE)) {
+          paste0(" This can come from a trans-spliced gene with parts on both strands, such as plastid rps12. ",
+                 "Remove organelle sequences from the GFF3, which also use other genetic codes.")
+        } else {
+          ""
+        }
+        stop("Could not read gene models from ", gff, ": ", conditionMessage(e), hint, call. = FALSE)
       }
     )
 

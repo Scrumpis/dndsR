@@ -4,7 +4,7 @@ Only checks actually run are listed. Update these when the relevant software cha
 
 ## Environment
 
-Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b0a026dc5b81fc3576c56e6cee98d30ec4e6f94992fa2a11c55831`: R 4.5.2, DIAMOND 2.1.14, OrthoFinder 2.5.4, orthologr 0.4.2, pwalign 1.6.0, topGO 2.62.0, IHW 1.38.0, qvalue 2.42.0, RIdeogram 0.2.2. dndsR itself is not in this image.
+Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11` (v0.3.0): R 4.6.2, DIAMOND 2.1.14, orthologr 0.4.3, pwalign 1.8.0, topGO 2.64.0, GO.db 3.23.1, IHW 1.40.0, qvalue 2.44.0, RIdeogram 0.2.2. It contains dndsR 0.3.0, and dndsr-install puts the clone's code ahead of it. Evidence from before v0.4.0 used the v0.2.0 image, which has older versions: `docs/validation/stack-comparison.md`.
 
 ## Tested
 
@@ -22,6 +22,15 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:726657e929b
 | `dndsr ipr_enrichment`, default and `--adjust-scope per_type`; with `--fdr-method none`; with `--method parent_child`, both scopes | Run on the real public table, 8 threads; recalculated independently except parent-child | One `n_tested` across all tables by default, per type with the option, and `p_adj` = `p_value` with `none`; exit 0 |
 | `dndsr go_enrichment`, default, `--adjust-scope per_ontology`, `--p-adjust none`, `--algorithm classic`, `--include_definition false` | Run on the real public table, 8 threads; BH recalculated independently, as are `classic` raw p-values | One `n_tested` across ontologies by default; `p_adj` = `raw_p` with `none`; exit 0 |
 | GFF lines with `#` in attributes | `docs/validation/enrichment.md`, against source annotation files | 73 pairs recovered; no term lost; no other field changed |
+| `dndsr covariate_enrichment`, GO and InterPro, at 1 and 2 threads | `tests/testthat/test-covariate-enrichment.R` with `pbinom`, `phyper`, and hand arithmetic; `covariate-verify.py` recalculates counts, Fisher's p-values, and BH without dndsR, on AtAl and SlSt tables; calibration at `docs/validation/enrichment-confounding.md` | Pass, no differences, identical across threads. Splines are not independently refit |
+| Independent reproduction of `covariate_enrichment`, spline fit included | `covariate-refit.py`, no R, on 1,200 labeled tables at 2 thresholds | The same significant terms in 4,800 of 4,800 comparisons. `docs/validation/enrichment-confounding.md` |
+| Warnings from `go_enrichment` and `term_enrichment`, and their `_notice.json` | `tests/testthat/test-enrichment-notice.R`; public pair on the v0.3.0 image | Pass |
+| v0.4.0 candidate on the v0.3.0 image: `tools/dev/test-public-tutorial.sb`, every block of `docs/tutorials/public-genomes.md` | Clean HOME, at `5983405` | Pass |
+| v0.4.0 candidate on the v0.3.0 image: tutorial, Singularity and Apptainer; `test-agent.sh claude` | `tools/dev/test-tutorial.sh`, `tools/dev/test-agent.sh` | Pass; the agent test passed 7 of 7 |
+| `dndsr covariate_enrichment --dnds-annot-file ... --sides query --filter-expr "dS <= 3 * median(dS, na.rm = TRUE)"` | Run on the AtAl table | Runs, and calibrated on 2 pairs: worst null cell 5.0%. `docs/validation/enrichment-confounding.md` |
+| Every command in `docs/tutorials/public-genomes.md`, in order, in a clean `HOME`, from commit `eb92852` | `tools/dev/test-public-tutorial.sb` | Pass: 30 min, 26 GB, results in the tutorial |
+| `tools/check-first-exon-phase.py`, `tools/annotate-from-uniprot.py` | The same tutorial run | Pass |
+| `extract_cds` stopping on a trans-spliced gene, with a hint to remove organelles | `tests/testthat/test-statistics.R`, and tomato's plastid *rps12* | Pass |
 | Apptainer, conda, candidate image | `docs/validation/installation.md` | Pass |
 | Skill discovery | Claude Code 2.1.316 and Codex CLI 0.165.0 in a clone | Found |
 

@@ -140,3 +140,13 @@ term presence/absence counts and reports odds ratio, p-value, and adjusted p-val
 Optionally joins metadata (NAME/DEFINITION) and supports term-ID exclusion and
 descendant exclusion using a parent-child tree.
 }
+\section{Calibration}{
+
+This test does not adjust for gene length or dS, and short genes or genes with small dS pass a dN/dS
+threshold far more often. In simulated evolution with annotation unrelated to omega, Fisher's test
+reported at least one false GO term in up to about 70\% of runs at one plant pair, and much less at
+others: \code{docs/validation/enrichment-confounding.md}. Treat terms as exploratory. Defaults are unchanged.
+Each run gives a warning, and writes it with its settings to \verb{<comparison>_term_enrichment_notice.json}.
+\code{covariate_enrichment()} adjusts for length and dS, for GO and InterPro terms, and has its own limits.
+}
+

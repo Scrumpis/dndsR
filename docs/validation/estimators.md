@@ -72,6 +72,49 @@ So:
 - **Most genes with ω = 2 cross 1,** so the threshold has power. These simulations use one ω for the whole gene, which real genes rarely have: most positive selection acts on few sites, and would not raise a whole-gene ratio this much.
 - **Short genes at low divergence often have undefined ratios** (up to 30% with 150 codons and dS below 0.01), because dS is 0.
 
+## Benchmark against independent estimators
+
+`tools/dev/validation/estimator-benchmark.R` simulates pairs at 540 settings: 100 to 1,600 codons; dS of 0.005 to 3; ω of 0.1 to 3; and either one ω per gene (`uniform`) or ω varying among sites, a gamma with shape 0.5 (`sites`). Each has 200 replicates, κ = 2, and *A. thaliana* codon usage. Estimators are Comeron (dndsR's default), PAML yn00 (YN00 and NG86), PAML codeml (pairwise ML), and KaKs_Calculator (MLWL and LPB). Results: [data/estimator_benchmark_cells.tsv](data/estimator_benchmark_cells.tsv). Summary: `estimator-benchmark-summary.py`.
+
+Median estimated ratio over the true ratio, 400 codons, `uniform`:
+
+| True ω | Estimator | dS 0.02 | 0.1 | 0.4 | 0.8 | 1.5 | 3 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 0.1 | Comeron | 0.98 | 1.03 | 1.13 | 1.13 | 1.22 | 1.48 |
+| | YN00 | 1.01 | 1.05 | 1.05 | 0.99 | 1.00 | 1.47 |
+| | ML | 0.96 | 1.00 | 1.07 | 1.04 | 1.03 | 1.07 |
+| 1 | Comeron | 1.03 | 1.01 | 0.95 | 0.88 | 0.74 | 0.73 |
+| | YN00 | 1.09 | 1.07 | 1.02 | 1.01 | 1.01 | 1.36 |
+| | ML | 1.05 | 1.06 | 1.04 | 1.01 | 1.05 | 0.86 |
+| 3 | Comeron | 0.91 | 0.78 | 0.55 | 0.39 | 0.28 | 0.26 |
+| | YN00 | 1.05 | 0.91 | 0.74 | 0.65 | 0.59 | 0.48 |
+| | ML | 1.06 | 1.05 | 0.97 | 0.95 | 0.88 | 0.33 |
+
+Comeron is close at ordinary divergence for low ω, and falls increasingly short at high ω and dS. ML is closest, and yn00 next. **When ω varies among sites, all of them fall far short at high ω:** at a mean ω of 3, 400 codons, and dS 0.1, Comeron reads 0.55, yn00 0.63, and ML 0.68 of the truth. At a mean ω of 1 and dS 0.8, they read 0.50, 0.47, and 0.50. So a better pairwise estimator would not remove this.
+
+**Failure conditions, Comeron.**
+
+| Measure | Result |
+|---|---|
+| Undefined ratios, ω = 0.6 | At dS 0.005: 70% at 100 codons, 23% at 400, 0% at 1,600. At dS 0.02: 20.5% at 100 codons, none at 400. At dS 3: 58–70% |
+| Replicates above 1, true ω = 1.5, 100 / 400 / 1,600 codons | dS 0.8: 62 / 70.5 / 94.5%. dS 1.5: 41 / 9.5 / 1%. Longer genes lose more, as the estimate tightens around a biased value |
+| Replicates above 1, true ω = 1, 100 / 400 / 1,600 codons | dS 0.4: 45 / 37 / 25.5%. dS 0.8: 27 / 19.5 / 4%. About half at dS 0.2 or below |
+
+So calls above 1 stop meaning the same thing around dS 0.4 to 0.8, and dndsR now reports pairs above 0.8. This threshold comes from these simulations, and from wrong pairings above: see [orthology](orthology.md).
+
+**A bootstrap interval is not offered.** A 95% percentile bootstrap, with 100 resamples of codons on 50 replicates per setting, gives a median coverage of the true ratio, across lengths, of:
+
+| Regime, true ω | dS 0.02 | 0.1 | 0.2 | 0.4 | 0.8 | 1.5 |
+|---|---:|---:|---:|---:|---:|---:|
+| `uniform`, 0.6 | 92 | 90 | 90 | 88 | 90 | 98 |
+| `uniform`, 1 | 96 | 92 | 94 | 92 | 84 | 84 |
+| `uniform`, 1.5 | 94 | 92 | 90 | 82 | 22 | 34 |
+| `uniform`, 3 | 96 | 76 | 36 | 2 | 2 | 0 |
+| `sites`, 1 | 94 | 90 | 56 | 16 | 0 | 0 |
+| `sites`, 3 | 90 | 14 | 0 | 0 | 0 | 0 |
+
+Resampling measures noise, not bias, so coverage fails in the cases that matter most for dN/dS above 1. Under the roadmap's rule, this is not established as useful, so no feature was added.
+
 ## Exact cases on the designed example
 
 - Identical sequences: all methods give dN = dS = 0.
@@ -84,7 +127,7 @@ The model has one ω per gene, no recombination, no site variation in rate, and 
 
 ## Saturation behavior in the source
 
-`Comeron95` sets a term to 0 if its logarithm is undefined, and sets negative components to 0. Near saturation, or with very few differences, values are therefore truncated instead of flagged. Treat high dS with caution. This is noted for a possible warning before v1.0.0.
+`Comeron95` sets a term to 0 if its logarithm is undefined, and sets negative components to 0. Near saturation, or with very few differences, values are therefore truncated instead of flagged. `calculate_dnds` reports how many pairs have dS above 0.8, from the benchmark above.
 
 ## Pinned orthologr
 

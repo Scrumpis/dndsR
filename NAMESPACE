@@ -3,6 +3,7 @@
 export(append_annotations)
 export(calculate_dnds)
 export(cli_main)
+export(covariate_enrichment)
 export(dnds_contrast)
 export(dnds_ideogram)
 export(dnds_state_contrast)

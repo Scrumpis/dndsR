@@ -13,6 +13,14 @@
 #' Optionally joins metadata (NAME/DEFINITION) and supports term-ID exclusion and
 #' descendant exclusion using a parent-child tree.
 #'
+#' @section Calibration:
+#' This test does not adjust for gene length or dS, and short genes or genes with small dS pass a dN/dS
+#' threshold far more often. In simulated evolution with annotation unrelated to omega, Fisher's test
+#' reported at least one false GO term in up to about 70% of runs at one plant pair, and much less at
+#' others: `docs/validation/enrichment-confounding.md`. Treat terms as exploratory. Defaults are unchanged.
+#' Each run gives a warning, and writes it with its settings to `<comparison>_term_enrichment_notice.json`.
+#' `covariate_enrichment()` adjusts for length and dS, for GO and InterPro terms, and has its own limits.
+#'
 #' @param dnds_annot_file Path to a single `<comp>_dnds_annot.tsv` file (single mode).
 #'   If provided, `comparison_file` must be NULL.
 #' @param comparison_file Path to whitespace-delimited file (tabs/spaces; header or not)
@@ -114,6 +122,10 @@ term_enrichment <- function(dnds_annot_file = NULL,
   threads <- suppressWarnings(as.integer(threads))
   if (is.na(threads) || threads < 1L) threads <- 1L
   message(sprintf("[term_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))
+  .require_numeric_threshold(pos_threshold, "term_enrichment")
+  warning(.enrichment_notice("term_enrichment"), call. = FALSE)
+  notice_settings <- list(terms = terms, exclude_terms = exclude_terms, sides = sides, pos_threshold = pos_threshold, max_dnds = max_dnds,
+                          filter_expr = filter_expr, min_total = min_total, min_pos = min_pos, fdr_method = fdr_method)
   if (isTRUE(make_plots) && threads > 8L && !is.null(comparison_file)) {
     warning(
       "[term_enrichment] make_plots=TRUE with threads>8 may be I/O-heavy (many SVG writes). ",
@@ -664,6 +676,9 @@ term_enrichment <- function(dnds_annot_file = NULL,
     outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "term_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
+    for (comp in df$comparison_name) {
+      .write_enrichment_notice(file.path(output_dir, comp), comp, "term_enrichment", notice_settings)
+    }
     .msg("All term enrichments complete.")
     return(invisible(outs))
   }
@@ -713,6 +728,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
   outs_list <- .parallel_lapply(sides, run_one_side, threads, "term_enrichment")
 
   outs <- unlist(outs_list, use.names = FALSE)
+  .write_enrichment_notice(comp_dir, comp_name, "term_enrichment", notice_settings)
   .msg("Term enrichment complete for: ", dnds_annot_file)
   invisible(outs)
 }

@@ -4,6 +4,14 @@
 #' among positively selected pairs (dNdS > pos_threshold) vs background, with an
 #' annotation-aware universe (drop rows with no GO for that side) by default.
 #'
+#' @section Calibration:
+#' This test does not adjust for gene length or dS, and short genes or genes with small dS pass a dN/dS
+#' threshold far more often. In simulated evolution with annotation unrelated to omega, default settings
+#' reported at least one false term in up to 43% of runs at one plant pair, and much less at others:
+#' `docs/validation/enrichment-confounding.md`. Treat terms as exploratory. Defaults are unchanged.
+#' Each run gives a warning, and writes it with its settings to `<comparison>_go_enrichment_notice.json`.
+#' `covariate_enrichment()` adjusts for length and dS, and has its own limits.
+#'
 #' @param dnds_annot_file Path to single <comp>_dnds_annot.tsv (single mode).
 #' @param comparison_file Batch mode: whitespace-delimited file with
 #'   columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
@@ -121,6 +129,10 @@ go_enrichment <- function(
   threads <- suppressWarnings(as.integer(threads))
   if (is.na(threads) || threads < 1L) threads <- 1L
   message(sprintf("[go_enrichment] threads=%d (pid=%d)", threads, Sys.getpid()))
+  warning(.enrichment_notice("go_enrichment"), call. = FALSE)
+  notice_settings <- list(algorithm = algorithm, statistic = statistic, pos_threshold = pos_threshold, max_dnds = max_dnds,
+                          filter_expr = filter_expr, node_min = node_min, p_adjust = p_adjust, adjust_scope = adjust_scope,
+                          ontologies = ontologies, sides = sides)
   if (isTRUE(make_plots) && threads > 8L && !is.null(comparison_file)) {
     warning(
       "[go_enrichment] make_plots=TRUE with threads>8 may be I/O-heavy (many SVG writes). ",
@@ -826,6 +838,9 @@ go_enrichment <- function(
     outs_list <- .parallel_lapply(seq_len(nrow(jobs)), run_one_job, threads, "go_enrichment")
 
     outs <- unlist(outs_list, use.names = FALSE)
+    for (comp in df$comparison_name) {
+      .write_enrichment_notice(file.path(output_dir, comp), comp, "go_enrichment", notice_settings)
+    }
     message("All topGO enrichments complete.")
     return(invisible(outs))
   }
@@ -872,6 +887,7 @@ go_enrichment <- function(
   outs_list <- .parallel_lapply(sides, run_one_side, threads, "go_enrichment")
                                                                                                                     
   outs <- unlist(outs_list, use.names = FALSE)
+  .write_enrichment_notice(comp_dir, comp_name, "go_enrichment", notice_settings)
   message("topGO enrichment complete for: ", dnds_annot_file)
   invisible(outs)                                                            
 }

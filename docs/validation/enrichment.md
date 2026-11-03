@@ -4,6 +4,8 @@ Do the enrichment tests give false positives at the rate they claim? This page t
 
 **Result.** Before v0.3.0, the defaults of `term_enrichment` and `ipr_enrichment` were badly miscalibrated: with dN/dS assigned to genes at random, where any significant term is false, they reported one in 59–74% and 95–100% of runs. The cause, a filter applied before multiple-testing correction, is corrected. `ipr_enrichment` and `go_enrichment` now also apply BH across one family by default. `term_enrichment` and `ipr_enrichment` then report a significant term in 1–3% of null runs. `go_enrichment` does in 1.0% and 0.8% under `permute` and `rotate`, **but in 9.5% (7.0–12.8) under `strata`, above nominal.** Most of that excess is one term, extracellular region. See [GO enrichment](#go-enrichment) for what this means. BH correction does not guarantee nominal error control under all conditions: it assumes p-values that are valid under the null, and enrichment p-values do not account for gene length or dS. Significant enrichment terms remain exploratory, not independently validated evidence of selection.
 
+**Later evidence revises this page's rates upward** where labels come from simulated evolution: [enrichment-confounding.md](enrichment-confounding.md).
+
 These results concern false positives under no association. They do not show that the remaining terms reflect selection: see [what selects the candidates](#what-selects-the-candidates).
 
 ## Data

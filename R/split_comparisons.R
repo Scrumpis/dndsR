@@ -134,6 +134,13 @@ split_comparisons <- function(comparison_file,
     sfa_res  <- .split_fasta(sfa)
     sgff_res <- .split_gff(sgff)
 
+    # Any trailing _<number> counts as a haplotype, so scaffold_12 becomes haplotype 12. Many labels
+    # suggest scaffold numbers instead.
+    if (identical(mode, "haplotype") && max(length(qfa_res$labels), length(sfa_res$labels)) > 8L) {
+      warning("split_comparisons found ", max(length(qfa_res$labels), length(sfa_res$labels)), " haplotype labels in ", comp,
+              ". Mode 'haplotype' takes any trailing _<number> as a haplotype, so these may be scaffold numbers. ",
+              "Check them, or use mode = 'custom'.", call. = FALSE)
+    }
     q_labels <- intersect(qfa_res$labels, qgff_res$labels)
     s_labels <- intersect(sfa_res$labels, sgff_res$labels)
     both <- intersect(q_labels, s_labels)
