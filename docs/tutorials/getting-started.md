@@ -16,7 +16,7 @@ cd dndsR
 This digest always identifies the same image.
 
 ```
-singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11
+singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:f1b42d9d338b406ec23daca1bb146ed0329db29d21a24a6871158996aa0572da
 ```
 
 ## 3. Install the `dndsr` command

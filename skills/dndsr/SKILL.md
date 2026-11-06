@@ -30,7 +30,7 @@ Tell the user first: this downloads 1.3 GB, and writes to `~/.config/dndsr`, `~/
 ```
 git clone --branch v0.4.0 https://github.com/Scrumpis/dndsR
 cd dndsR
-singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11
+singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:f1b42d9d338b406ec23daca1bb146ed0329db29d21a24a6871158996aa0572da
 tools/dndsr-install install --engine singularity --sif dndsr.sif
 export PATH="$HOME/.local/bin:$PATH"
 ```

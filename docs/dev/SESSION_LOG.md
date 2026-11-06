@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-06: after the v0.4.0 release
+
+- **Session:** `a897d1b6-0934-4e10-b07a-c791f9d940eb`
+- **Read:** the maintainer merged PR #4 (`957cfe1`), tagged and released v0.4.0, and `publish` pushed `sha256:f1b42d9d`, whose revision label is `957cfe1`. Zenodo version DOI 10.5281/zenodo.23903253.
+- **Done:** RELEASE.md step 3: the published digest replaces v0.3.0's in user documents and the skill. The tutorial passed with Singularity 4.1.2 and Apptainer 1.5.4, and the package tests passed in the image (102 tests, 0 failed, 0 skipped). The image's R packages match the v0.3.0 image's except dndsR. The Chenopodium equivalence check found its software identical to `v0.4.0`.
+- **Failed or not done:** the release has no attached assets. Nothing was pushed, merged, tagged, or published by agents.
+
 ## 2026-11-02: v0.4.0 candidate
 
 - **Session:** `765c203d-5ba8-48a9-ad70-6681331d05db`

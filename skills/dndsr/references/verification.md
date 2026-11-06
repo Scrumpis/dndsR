@@ -4,7 +4,7 @@ Only checks actually run are listed. Update these when the relevant software cha
 
 ## Environment
 
-Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11` (v0.3.0): R 4.6.2, DIAMOND 2.1.14, orthologr 0.4.3, pwalign 1.8.0, topGO 2.64.0, GO.db 3.23.1, IHW 1.40.0, qvalue 2.44.0, RIdeogram 0.2.2. It contains dndsR 0.3.0, and dndsr-install puts the clone's code ahead of it. Evidence from before v0.4.0 used the v0.2.0 image, which has older versions: `docs/validation/stack-comparison.md`.
+Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:f1b42d9d338b406ec23daca1bb146ed0329db29d21a24a6871158996aa0572da` (v0.4.0, built from `957cfe1`): R 4.6.2, DIAMOND 2.1.14, orthologr 0.4.3, pwalign 1.8.0, topGO 2.64.0, GO.db 3.23.1, IHW 1.40.0, qvalue 2.44.0, RIdeogram 0.2.2. It contains dndsR 0.4.0, and dndsr-install puts the clone's code ahead of it. Its installed R packages are the same versions as the v0.3.0 image's (digest in `docs/validation/stack-comparison.md`), except dndsR itself, so evidence gathered on the v0.3.0 image below applies to the same dependency stack. Evidence from before v0.4.0 used the v0.2.0 image, which has older versions: `docs/validation/stack-comparison.md`.
 
 ## Tested
 
@@ -27,6 +27,7 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:feb5e4b1ceb
 | Warnings from `go_enrichment` and `term_enrichment`, and their `_notice.json` | `tests/testthat/test-enrichment-notice.R`; public pair on the v0.3.0 image | Pass |
 | v0.4.0 candidate on the v0.3.0 image: `tools/dev/test-public-tutorial.sb`, every block of `docs/tutorials/public-genomes.md` | Clean HOME, at `5983405` | Pass |
 | v0.4.0 candidate on the v0.3.0 image: tutorial, Singularity and Apptainer; `test-agent.sh claude` | `tools/dev/test-tutorial.sh`, `tools/dev/test-agent.sh` | Pass; the agent test passed 7 of 7 |
+| Published v0.4.0 image, at `dev` after the tag: tutorial with Singularity 4.1.2 and Apptainer 1.5.4; package tests in the image | `tools/dev/test-tutorial.sh`, `tools/dev/run-tests.sh` | Pass; 14 of 14 example checks; 102 tests, 0 failed, 0 skipped |
 | `dndsr covariate_enrichment --dnds-annot-file ... --sides query --filter-expr "dS <= 3 * median(dS, na.rm = TRUE)"` | Run on the AtAl table | Runs, and calibrated on 2 pairs: worst null cell 5.0%. `docs/validation/enrichment-confounding.md` |
 | Every command in `docs/tutorials/public-genomes.md`, in order, in a clean `HOME`, from commit `eb92852` | `tools/dev/test-public-tutorial.sb` | Pass: 30 min, 26 GB, results in the tutorial |
 | `tools/check-first-exon-phase.py`, `tools/annotate-from-uniprot.py` | The same tutorial run | Pass |
