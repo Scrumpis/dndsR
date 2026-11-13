@@ -9,13 +9,21 @@
 # null genes (N0, L50), fit them with phylo_busted, and compare only the median fitted tree
 # length with the empirical median. p-values are not read. Up to 4 rounds; stops within 5%.
 #   DNDSR_SIF=<image> DNDSR_DEV_LIB=<lib> sbatch phylo-calibration-scale.sb <params.json in> <params.json out>
+# If the input is the real-genome results folder, parameters are first derived from it with
+# phylo-calibration-params.R.
 set -euo pipefail
 in=$(realpath "$1"); final=$(realpath -m "$2")
 repo=${SLURM_SUBMIT_DIR:-$PWD}
 work=${TMPDIR:-/tmp}/phylo-scale-${SLURM_JOB_ID:-$$}
 mkdir -p "$work"; trap 'rm -rf "$work"' EXIT
-cd "$work"; cp "$in" params.json
-run() { singularity exec --cleanenv --bind "$repo" --bind "$work" --bind "$DNDSR_DEV_LIB" --pwd "$PWD" --env "R_LIBS_USER=$DNDSR_DEV_LIB" "$DNDSR_SIF" "$@"; }
+cd "$work"
+run() { singularity exec --cleanenv --bind "$repo" --bind "$work" --bind "$DNDSR_DEV_LIB" --bind "$(dirname "$in")" --pwd "$PWD" --env "R_LIBS_USER=$DNDSR_DEV_LIB" "$DNDSR_SIF" "$@"; }
+if [ -d "$in" ]; then
+  run Rscript --vanilla "$repo/tools/dev/validation/phylo-calibration-params.R" "$in" params.json 1
+  cp params.json "$(dirname "$final")/params_before_scale.json"
+else
+  cp "$in" params.json
+fi
 for round in 1 2 3 4; do
   rm -rf sim
   run Rscript --vanilla "$repo/tools/dev/validation/phylo-sim.R" params.json N0_L50 50 $((9000 + round)) sim
