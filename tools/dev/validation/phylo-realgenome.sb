@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=phylo-realgenome
+#SBATCH --constraint=skl
+#SBATCH --cpus-per-task=40
+#SBATCH --mem=150G
+#SBATCH --tmp=120G
+#SBATCH --time=16:00:00
+# Phylogenetic workflow on five public Brassicaceae RefSeq genomes, from downloads to
+# BUSTED: CDS and proteins with dndsR, OrthoFinder, phylo_prepare, phylo_busted. Each stage
+# is timed with /usr/bin/time -v (wall time, CPU, peak memory).
+#   DNDSR_SIF=<image with HyPhy, MAFFT, OrthoFinder> DNDSR_DEV_LIB=<lib> \
+#   sbatch tools/dev/validation/phylo-realgenome.sb <results dir>
+# Work happens on node-local storage, because OrthoFinder and per-gene outputs create far
+# more files than a scratch file quota may allow. Tables, provenance, and timings are
+# copied to <results dir>; bulky folders are kept there as .tar.gz archives.
+# The skl constraint avoids nodes where the host's git crashes (tools/dev/in-container.sh
+# uses git), and keeps one processor class for HyPhy.
+set -euo pipefail
+persist=$(realpath -m "$1")
+repo=${SLURM_SUBMIT_DIR:-$PWD}
+threads=${SLURM_CPUS_PER_TASK:-8}
+work=${TMPDIR:-/tmp}/phylo-realgenome-${SLURM_JOB_ID:-$$}
+mkdir -p "$persist" "$work"/{inputs,timing}
+trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf "$work"' EXIT
+cd "$work"
+ic="$repo/tools/dev/in-container.sh"
+timed() { local name=$1; shift; /usr/bin/time -v -o "timing/$name.txt" "$@"; }
+keep() { cp -r "$@" "$persist/"; }
+pack() { tar -czf "$persist/$1.tar.gz" "${@:2}"; }
+"$ic" true          # installs this checkout into DNDSR_DEV_LIB once
+export DNDSR_NO_INSTALL=1
+dndsr=("$ic" bash "$repo/inst/scripts/dndsr")
+{ grep -m1 "model name" /proc/cpuinfo; hostname; } > timing/host.txt
+git -C "$repo" rev-parse HEAD > timing/commit.txt
+sha256sum "$DNDSR_SIF" | cut -c1-64 > timing/image.txt
+"$ic" sh -c 'hyphy --version; mafft --version 2>&1; orthofinder -h | head -2; diamond version' > timing/tools.txt 2>&1 || true
+
+# taxon accession assembly
+genomes="At GCF_000001735.4 TAIR10.1
+Al GCF_000004255.2 v.1.0
+Cr GCF_000375325.1 Caprub1_0
+Es GCF_000478725.1 Eutsalg1_0
+Br GCF_000309985.2 CAAS_Brap_v3.01"
+
+echo "== download $(date -u +%FT%TZ)"
+while read -r tx acc asm; do
+  p=$(echo "$acc" | sed -E 's/GCF_([0-9]{3})([0-9]{3})([0-9]{3}).*/\1\/\2\/\3/')
+  base="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/$p/${acc}_${asm}/${acc}_${asm}"
+  curl -sSf -o "inputs/$tx.fasta.gz" "${base}_genomic.fna.gz"
+  curl -sSf -o "inputs/$tx.gff.gz" "${base}_genomic.gff.gz"
+  gunzip -f "inputs/$tx.fasta.gz" "inputs/$tx.gff.gz"
+  # Organelles use other genetic codes, and trans-spliced genes stop extract_cds.
+  awk -F'\t' '$3=="region" && /genome=(chloroplast|mitochondrion)/{drop[$1]=1} !($1 in drop)' "inputs/$tx.gff" > "inputs/${tx}_nuclear.gff"
+  printf '%s\t%s\t%s\n' "$tx" "$acc" "$asm" >> inputs/accessions.tsv
+done <<<"$genomes"
+(cd inputs && sha256sum *.fasta *.gff > SHA256SUMS)
+printf 'taxon\tfasta\tgff\n' > genomes.tsv
+while read -r tx _; do printf '%s\tinputs/%s.fasta\tinputs/%s_nuclear.gff\n' "$tx" "$tx" "$tx" >> genomes.tsv; done <<<"$genomes"
+# Rooted between Brassicaceae lineages I (Arabidopsis, Capsella) and II (Eutrema, Brassica).
+echo "(((At,Al),Cr),(Es,Br));" > species_tree.nwk
+printf 'scope\ttaxa\nclade\tAt,Al\n' > foreground.tsv
+keep inputs/SHA256SUMS inputs/accessions.tsv genomes.tsv species_tree.nwk foreground.tsv
+
+echo "== extract $(date -u +%FT%TZ)"
+mkdir -p orthofinder_in
+for tx in $(cut -f1 genomes.tsv | tail -n +2); do
+  timed "extract_$tx" "${dndsr[@]}" extract_cds --comparison-name proteins --query-fasta "inputs/$tx.fasta" \
+    --query-gff "inputs/${tx}_nuclear.gff" --export-proteins
+  cp "proteins/${tx}_AA.fasta" "orthofinder_in/$tx.fa"
+done
+keep proteins/*_CDS_qc.tsv
+
+echo "== orthofinder $(date -u +%FT%TZ)"
+timed orthofinder "$ic" orthofinder -f orthofinder_in -t "$threads" -a 8 -S diamond -n run
+of=$(ls -d orthofinder_in/OrthoFinder/Results_run*)
+ln -sfn "$of" orthofinder
+mkdir -p "$persist/orthofinder"
+cp -r "$of"/Orthogroups "$of"/Comparative_Genomics_Statistics "$of"/Species_Tree "$of"/Log.txt "$persist/orthofinder/"
+cp "$of"/Phylogenetic_Hierarchical_Orthogroups/N0.tsv "$persist/orthofinder/"
+pack orthofinder_gene_trees -C "$of" Resolved_Gene_Trees
+
+echo "== prepare $(date -u +%FT%TZ)"
+timed prepare "${dndsr[@]}" phylo_prepare --genome-file genomes.tsv --orthogroup-file orthofinder/Orthogroups/Orthogroups.tsv \
+  --species-tree-file species_tree.nwk --foreground-file foreground.tsv --gene-tree-dir orthofinder/Resolved_Gene_Trees \
+  --gene-tree-mode report --run-name prepared -t "$threads"
+timed prepare_n0 "${dndsr[@]}" phylo_prepare --genome-file genomes.tsv --orthogroup-file orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv \
+  --species-tree-file species_tree.nwk --foreground-file foreground.tsv --run-name prepared_n0 -t "$threads"
+mkdir -p "$persist/prepared" "$persist/prepared_n0"
+cp prepared/*.tsv prepared/*.json prepared/species_tree.nwk prepared/foreground.tsv "$persist/prepared/"
+cp prepared_n0/*.tsv prepared_n0/*.json "$persist/prepared_n0/"
+pack prepared --exclude=prepared/cds prepared
+
+echo "== busted $(date -u +%FT%TZ)"
+timed busted "${dndsr[@]}" phylo_busted --prepared-dir prepared --run-name busted -t "$threads"
+mkdir -p "$persist/busted"
+cp busted/*.tsv busted/*.json "$persist/busted/"
+pack busted_hyphy busted/hyphy
+keep timing
+echo "== done $(date -u +%FT%TZ)"
