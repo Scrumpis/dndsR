@@ -121,4 +121,4 @@ With `extra_seeds = 2:3` on the phase 1 example's OG0001: three starts ran in se
 - MAFFT's accuracy on difficult alignments is not tested; one designed indel case is. No alignment filtering is applied, and none is validated.
 - Agreement with direct HyPhy shows inputs reach HyPhy as intended. It does not show that BUSTED's p-values are calibrated here, or that QC thresholds are appropriate.
 - Gene-tree discordance is reported, not modelled. Its effect on false positives is a phase 3 question.
-- The development image was built from the phase 1 commit; `tools/Dockerfile` is unchanged since. A rebuild from the phase 2 commit is recorded in `docs/dev/SESSION_LOG.md`. CI has not run.
+- A development image built locally from `tools/Dockerfile` at `d24d183` (`sha256:7acf9ba81542bb15ae2311de6c8bd8ff20e611c6bc3f022ed8df97b18139f862`, not published) passed all 41 checks of `tools/dev/container-checks.sh`, including both phylogenetic workflows with HyPhy and MAFFT inside it, and the pairwise workflows. CI has not run.
