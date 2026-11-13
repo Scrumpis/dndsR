@@ -20,6 +20,7 @@ phylo_busted(
   error_sink = "No",
   grid_size = 250L,
   starting_points = 1L,
+  kill_zero_lengths = "Yes",
   genetic_code = "Universal",
   seed = 1L,
   extra_seeds = NULL,
@@ -61,6 +62,11 @@ choice, or "topology".}
 sink as an advanced experimental setting, and so does dndsR.}
 
 \item{grid_size, starting_points}{HyPhy's optimisation settings (defaults 250 and 1).}
+
+\item{kill_zero_lengths}{"Yes" (HyPhy's default) deletes internal branches estimated at
+zero length before fitting codon models. If that deletes a requested foreground branch,
+the orthogroup is excluded as \code{foreground_branch_zero_length} (policy), because
+only a narrower hypothesis would be tested. "No" keeps every branch.}
 
 \item{genetic_code}{Only "Universal" is supported.}
 

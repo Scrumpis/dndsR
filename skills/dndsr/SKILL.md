@@ -91,6 +91,7 @@ Success ends with `All 11 phylogenetic example checks passed.` On real data the 
 
 - A significant BUSTED result means some site on some foreground branch had ω above 1 under the model. It is not the same as, and does not confirm, a pairwise dN/dS above 1. Never mix the two in one table or claim.
 - Report `p_adj` and `family_size`: only orthogroups with status `tested` are corrected together. Report counts of `excluded` (by `reason` and `exclusion_basis`) and `failed` orthogroups, which limit what the results can say. `failed` means a step errored: investigate, do not ignore.
+- `foreground_branch_zero_length` (policy) means HyPhy deleted a requested branch as zero-length; it is not a failure.
 - `foreground_unidentifiable` (mathematical) means the requested branches cannot be separated from other history with the taxa present; `foreground_partly_unidentifiable` and `foreground_incomplete` are conservative policy. dndsR never relabels a branch.
 - Gene-tree discordance is reported (`gt_*` columns, `gene_tree_discordant_near_foreground`), not corrected.
 - Results depend on `--seed`, `--hyphy-cpu`, and slightly on the processor (with or without AVX-512); the first two are recorded in `busted/busted_provenance.json`, so record the processor too. `--extra-seeds` shows the spread; it never changes `p_value`. Genes near the threshold can change call with the seed.

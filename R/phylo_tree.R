@@ -190,7 +190,7 @@
   map <- c(
     foreground_unidentifiable = "mathematical", foreground_not_in_gene_tree = "mathematical",
     foreground_absent = "no_data",
-    foreground_partly_unidentifiable = "policy", foreground_incomplete = "policy",
+    foreground_partly_unidentifiable = "policy", foreground_incomplete = "policy", foreground_branch_zero_length = "policy",
     multi_copy = "policy", too_few_taxa = "policy",
     cds_invalid = "data_quality", internal_stop = "data_quality", split_codon_gap = "data_quality",
     empty_sequence = "data_quality", terminal_stop = "data_quality", length_not_multiple_of_3 = "data_quality",

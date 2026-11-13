@@ -100,15 +100,16 @@
     hyphy_name = "busted",
     unit = "gene",
     defaults = list(srv = "Yes", multiple_hits = "None", rates = 3L, syn_rates = 3L, error_sink = "No",
-                    grid_size = 250L, starting_points = 1L, genetic_code = "Universal"),
+                    grid_size = 250L, starting_points = 1L, kill_zero_lengths = "Yes", genetic_code = "Universal"),
     choices = list(srv = c("Yes", "No", "Branch-site"), multiple_hits = c("None", "Double", "Double+Triple"),
-                   error_sink = c("No", "Yes"), genetic_code = "Universal"),
+                   error_sink = c("No", "Yes"), kill_zero_lengths = c("Yes", "No"), genetic_code = "Universal"),
     args = function(s, alignment, tree, output) {
       a <- c("--alignment", shQuote(alignment), "--tree", shQuote(tree), "--branches", "FG",
              "--code", s$genetic_code, "--srv", s$srv, "--rates", s$rates)
       if (s$srv != "No") a <- c(a, "--syn-rates", s$syn_rates)
       c(a, "--multiple-hits", shQuote(s$multiple_hits), "--error-sink", s$error_sink,
-        "--grid-size", s$grid_size, "--starting-points", s$starting_points, "--output", shQuote(output))
+        "--grid-size", s$grid_size, "--starting-points", s$starting_points,
+        "--kill-zero-lengths", s$kill_zero_lengths, "--output", shQuote(output))
     },
     required = c("test results", "fits", "tested", "branch attributes", "input"),
     parse = function(j) {

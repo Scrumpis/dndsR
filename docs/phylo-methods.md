@@ -72,7 +72,7 @@ Every orthogroup ends with one status, and the reason and its basis:
 |---|---|---|
 | `mathematical` | The requested branches cannot be separated from background history, or do not exist, in this orthogroup's topology | `foreground_unidentifiable`, `foreground_not_in_gene_tree` |
 | `no_data` | No foreground taxon is present | `foreground_absent` |
-| `policy` | Testable in principle, but excluded by a conservative rule | `multi_copy`, `too_few_taxa`, `foreground_partly_unidentifiable`, `foreground_incomplete` |
+| `policy` | Testable in principle, but excluded by a conservative rule | `multi_copy`, `too_few_taxa`, `foreground_partly_unidentifiable`, `foreground_incomplete`, `foreground_branch_zero_length` |
 | `data_quality` | The sequences fail checks | `cds_invalid`, `internal_stop`, `length_not_multiple_of_3`, `invalid_character`, `split_codon_gap`, `empty_sequence`, `terminal_stop` |
 | `input` | The inputs do not match | `gene_not_found`, `unknown_taxon`, `not_aligned`, `empty_alignment`, `gene_tree_missing`, `gene_tree_unreadable`, `gene_tree_taxa_mismatch` |
 | `software` | (failed) | `alignment_failed`, `backtranslation_mismatch`, `hyphy_error`, `hyphy_output_invalid`, `label_mismatch`, `prepared_tree_mismatch` |
@@ -86,6 +86,8 @@ Branches are identified by the split of taxa they make, never by name. The speci
 - **Mathematical.** If every requested branch present has joined a background branch, the requested history cannot be separated from background history: `foreground_unidentifiable`. HyPhy treats trees as unrooted, so the stem of a clade beside the root is always unidentifiable.
 - **Policy.** If some requested branches remain separable and others have joined background branches, testing only the separable ones would test a narrower hypothesis: `foreground_partly_unidentifiable`. If a hypothesis row has no taxon present, or a terminal row lacks a listed taxon: `foreground_incomplete`.
 - **Allowed and counted.** Missing members of a clade-scope row: the clade's remaining branches carry the hypothesis, and `fg_absent_branches` and the flag `foreground_branches_absent:<n>` count what is missing.
+
+**Zero-length branches.** By default (`--kill-zero-lengths Yes`, HyPhy's default), HyPhy deletes internal branches it estimates at zero length under its nucleotide model before fitting codon models. If it deletes a requested foreground branch, it would test a narrower hypothesis, so dndsR excludes the orthogroup as `foreground_branch_zero_length` (policy). Deleted background branches are flagged (`hyphy_deleted_zero_length_branches:<n>`) and the gene is tested. This was found in calibration, on short genes with short internal branches. `--kill-zero-lengths No` keeps every branch; its effect has not been evaluated.
 
 In practice: `stem` needs every member of the clade and at least one taxon of its sister lineage; `clade` tolerates missing members but needs the sister lineage; `terminal` needs the taxon's sister lineage. Taxa missing elsewhere do not matter.
 
@@ -127,6 +129,7 @@ These are reported in `qc_flags` and the sequences tables, but change nothing. T
 | `foreground_branches_absent:<n>` | n requested branches have no taxa present (clade scope) |
 | `gene_tree_discordant`, `gene_tree_discordant_near_foreground` | See above |
 | `hyphy_refit_after_negative_lrt` | HyPhy reported a convergence problem and refitted |
+| `hyphy_deleted_zero_length_branches:<n>` | HyPhy deleted n background internal branches as zero-length |
 
 Look at flagged alignments before interpreting their results. Alignment errors are a known cause of false positives in selection tests (for example, Markova-Raina and Petrov 2011, *Genome Res* 21:863; Jordan and Goldman 2012, *Mol Biol Evol* 29:1125).
 

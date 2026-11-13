@@ -88,6 +88,10 @@
 #' @param error_sink "No" (HyPhy's default) or "Yes" (BUSTED-E). HyPhy describes the error
 #'   sink as an advanced experimental setting, and so does dndsR.
 #' @param grid_size,starting_points HyPhy's optimisation settings (defaults 250 and 1).
+#' @param kill_zero_lengths "Yes" (HyPhy's default) deletes internal branches estimated at
+#'   zero length before fitting codon models. If that deletes a requested foreground branch,
+#'   the orthogroup is excluded as \code{foreground_branch_zero_length} (policy), because
+#'   only a narrower hypothesis would be tested. "No" keeps every branch.
 #' @param genetic_code Only "Universal" is supported.
 #' @param seed Random seed for HyPhy (default 1). Determines the reported result.
 #' @param extra_seeds Further seeds for independent starts, reported as diagnostics.
@@ -123,6 +127,7 @@ phylo_busted <- function(prepared_dir = NULL,
                          error_sink = "No",
                          grid_size = 250L,
                          starting_points = 1L,
+                         kill_zero_lengths = "Yes",
                          genetic_code = "Universal",
                          seed = 1L,
                          extra_seeds = NULL,
@@ -135,7 +140,7 @@ phylo_busted <- function(prepared_dir = NULL,
   terminal_stops <- match.arg(terminal_stops)
   settings <- .hyphy_settings("busted", list(
     srv = srv, multiple_hits = multiple_hits, rates = rates, syn_rates = syn_rates, error_sink = error_sink,
-    grid_size = grid_size, starting_points = starting_points, genetic_code = genetic_code
+    grid_size = grid_size, starting_points = starting_points, kill_zero_lengths = kill_zero_lengths, genetic_code = genetic_code
   ))
   if (identical(settings$error_sink, "Yes")) message("Note: error_sink = 'Yes' (BUSTED-E) is experimental in HyPhy and not validated in dndsR.")
   .phylo_run("busted", alignment_dir, species_tree_file, foreground_file, gene_tree_dir, output_dir, run_name,

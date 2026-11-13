@@ -58,6 +58,7 @@
 | 2026-11-13 | With gene trees, an orthogroup without one is excluded (`gene_tree_missing`) rather than run on the species tree. | Mixing topologies within one run would make the family heterogeneous without saying so. |
 | 2026-11-13 | Outcomes renamed: `skipped` becomes `excluded`; every outcome has `stage` and, unless tested, `exclusion_basis`. | Distinguishes failures from exclusions, and mathematical from policy exclusions. The module is unreleased. |
 | 2026-11-13 | `verify_phylo_example` and the tests compare dndsR with HyPhy run directly on the same machine, with a command written out independently of the runner; stored values for AVX-512 and AVX2 processors are reported, not checked. | HyPhy's results differ slightly between those processor classes; a stored-value check failed on correct software. |
+| 2026-11-13 | Pass HyPhy's `--kill-zero-lengths` explicitly (default Yes, as HyPhy). If HyPhy deletes a requested foreground branch as zero-length, exclude the orthogroup as `foreground_branch_zero_length` (policy); flag deleted background branches. | Found in the P3 pilot's smoke test: HyPhy silently tested a narrower foreground, which dndsR's label check reported as a software failure. Upstream default kept; whether to keep such genes or use `No` is a P3 question. |
 | 2026-11-13 | Development images are built on node-local storage. | A build on scratch exceeded the file quota and failed. |
 
 ## Open questions

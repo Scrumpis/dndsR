@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=phylo-realgenome
-#SBATCH --constraint=skl
-#SBATCH --cpus-per-task=40
-#SBATCH --mem=150G
+#SBATCH --constraint=skl|agg
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=120G
 #SBATCH --tmp=120G
 #SBATCH --time=16:00:00
 # Phylogenetic workflow on five public Brassicaceae RefSeq genomes, from downloads to
@@ -13,7 +13,7 @@
 # Work happens on node-local storage, because OrthoFinder and per-gene outputs create far
 # more files than a scratch file quota may allow. Tables, provenance, and timings are
 # copied to <results dir>; bulky folders are kept there as .tar.gz archives.
-# The skl constraint avoids nodes where the host's git crashes (tools/dev/in-container.sh
+# The skl|agg constraint (both AVX-512) avoids nodes where the host's git crashes (tools/dev/in-container.sh
 # uses git), and keeps one processor class for HyPhy.
 set -euo pipefail
 persist=$(realpath -m "$1")

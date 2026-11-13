@@ -32,7 +32,7 @@ No default changes on the strength of the pilot. Recommendations go to the maint
 ### Verification of the simulator, before the pilot
 
 1. Each transition matrix is stochastic, reversible, and stationary at the codon frequencies (to 1e-10).
-2. Two-taxon alignments of 20,000 codons, at ω 0.1, 0.5, 1, 2 and κ 2, give PAML codeml (M0, F3x4) estimates of ω and κ within 5% of the truth, and a branch length within 5%.
+2. Two-taxon alignments of 20,000 codons, at ω 0.1, 0.5, 1, 2 and κ 2: the mean of 10 replicates' PAML codeml (pairwise ML, F3x4) estimates of ω and κ within 5% of the truth, and of the branch length within 5%. (Amended; see the change log.)
 3. With δ > 0, the fraction of differences at two codon positions over a short branch (0.005 per codon, 100,000 codons) is within its 95% binomial interval of the fraction predicted by the rate matrix.
 4. Indel bookkeeping: the true alignment, with gaps removed, equals each simulated CDS.
 
@@ -120,4 +120,7 @@ Sized from the pilot's runtimes and variances, and presented to the maintainer b
 
 ## Changes after this design was fixed
 
-(none yet)
+| Change | Reason | Effect on results |
+|---|---|---|
+| Rates are computed over genes with status `tested`; exclusions and failures are reported per cell | A smoke test of the pilot script (4 genes per cell, results not used) found HyPhy deleting a zero-length foreground stem (`kill-zero-lengths`), which dndsR then reported as `label_mismatch`. dndsR now passes the setting explicitly and excludes such genes as `foreground_branch_zero_length` (policy). Their frequency per cell is reported, since it can bias which genes are tested | Before the pilot |
+| Simulator check 2 uses the mean of 10 replicate alignments, not one alignment | As first written (one alignment each), ω = 0.5 was estimated at 0.469, outside 5%. Ten replicates gave means of 0.1012, 0.4963, 1.0054, and 2.0288 for ω 0.1, 0.5, 1, 2, with a single-alignment SD of 3.6% at ω = 0.5: the single check was too strict for sampling noise, not a simulator bias. Branch lengths read 1-2% high at every ω, a small systematic difference, recorded | Verification only; no calibration result existed yet |

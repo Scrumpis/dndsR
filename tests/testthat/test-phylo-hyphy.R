@@ -53,7 +53,8 @@ test_that("every BUSTED setting is passed to HyPhy explicitly", {
   a <- .hyphy_methods$busted$args(.hyphy_settings("busted", list()), "a.fas", "t.nwk", "o.json")
   expect_identical(a, c("--alignment", "'a.fas'", "--tree", "'t.nwk'", "--branches", "FG", "--code", "Universal",
                         "--srv", "Yes", "--rates", "3", "--syn-rates", "3", "--multiple-hits", "'None'",
-                        "--error-sink", "No", "--grid-size", "250", "--starting-points", "1", "--output", "'o.json'"))
+                        "--error-sink", "No", "--grid-size", "250", "--starting-points", "1", "--kill-zero-lengths", "Yes",
+                        "--output", "'o.json'"))
   no_srv <- .hyphy_methods$busted$args(.hyphy_settings("busted", list(srv = "No")), "a.fas", "t.nwk", "o.json")
   expect_false("--syn-rates" %in% no_srv)
 })
@@ -71,7 +72,13 @@ fake_hyphy <- function(dir, mode, version = "2.5.103") {
       truncated = c('printf "{\\"test results\\": {" > "$out"', "exit 0"),
       mismatch = c(sprintf('sed "s/\\"spB\\":\\"test\\"/\\"spB\\":\\"background\\"/" "%s" > "$out"',
                            normalizePath(fixture("busted_2.5.103_OG0001.json"))), "exit 0"),
-      copy = c(sprintf('cp "%s" "$out"', normalizePath(fixture("busted_2.5.103_OG0001.json"))), "exit 0")
+      copy = c(sprintf('cp "%s" "$out"', normalizePath(fixture("busted_2.5.103_OG0001.json"))), "exit 0"),
+      # HyPhy deleted the clade's stem (dndsR's Node3) as zero-length, and tested the rest.
+      zerolen = c("echo '### Deleted 1 zero-length internal branches: `Node3`'",
+                  sprintf('sed "s/\\"Node2\\":\\"test\\"/\\"Node2\\":\\"background\\"/" "%s" > "$out"', normalizePath(fixture("busted_2.5.103_OG0001.json"))), "exit 0"),
+      # HyPhy deleted a background branch; the tested branches are the requested ones.
+      bgzero = c("echo '### Deleted 1 zero-length internal branches: `Node4`'",
+                 sprintf('sed "s/\\"Node2\\":\\"test\\"/\\"Node3\\":\\"test\\"/" "%s" > "$out"', normalizePath(fixture("busted_2.5.103_OG0001.json"))), "exit 0")
     )
   ), path)
   Sys.chmod(path, "0755")
@@ -79,21 +86,21 @@ fake_hyphy <- function(dir, mode, version = "2.5.103") {
 }
 
 # One orthogroup whose labelled branches are spA, spB, and Node2, as in the fixture.
-fake_inputs <- function(dir) {
+fake_inputs <- function(dir, scope = "terminal") {
   ex <- system.file("extdata", "phylo_example", package = "dndsR", mustWork = TRUE)
   dir.create(file.path(dir, "aln"))
   file.copy(file.path(ex, "alignments", "OG0001.fasta"), file.path(dir, "aln"))
   # The fixture's tree named the internal node Node2; this one-row hypothesis keeps the
   # stem of spA and spB as dndsR's Node3, so "copy" mode reports a label mismatch too.
   writeLines("((((spA,spB),(spC,spD)),(spE,spF)),(spG,spH));", file.path(dir, "tree.nwk"))
-  writeLines(c("scope\ttaxa", "terminal\tspA,spB"), file.path(dir, "fg.tsv"))
+  writeLines(c("scope\ttaxa", paste0(scope, "\tspA,spB")), file.path(dir, "fg.tsv"))
 }
 
-run_fake <- function(mode, version = "2.5.103", ...) {
+run_fake <- function(mode, version = "2.5.103", ..., scope = "terminal") {
   skip_on_os("windows")
   skip_if_not_installed("ape")
   dir <- withr::local_tempdir(.local_envir = parent.frame())
-  fake_inputs(dir)
+  fake_inputs(dir, scope)
   res <- phylo_busted(alignment_dir = file.path(dir, "aln"), species_tree_file = file.path(dir, "tree.nwk"),
                       foreground_file = file.path(dir, "fg.tsv"), output_dir = dir, hyphy = fake_hyphy(dir, mode, version), ...)
   list(res = res, dir = dir)
@@ -158,6 +165,21 @@ test_that("diagnostics across starts use each model's best likelihood, and never
   expect_equal(d2$lrt_best_fits, 2 * (-100 - -100.7))
   expect_true(d2$primary_unconstrained_is_best)
   expect_false(d2$primary_null_is_best)
+})
+
+test_that("a requested branch HyPhy deletes as zero-length excludes the orthogroup, by policy", {
+  r <- run_fake("zerolen", scope = "clade")
+  expect_identical(r$res$status, "excluded")
+  expect_identical(r$res$reason, "foreground_branch_zero_length")
+  expect_identical(r$res$exclusion_basis, "policy")
+  expect_match(r$res$detail, "deleted requested branch\\(es\\) Node3")
+  expect_identical(r$res$family_size, 0L)
+})
+
+test_that("a background branch HyPhy deletes as zero-length is flagged, and the gene tested", {
+  r <- run_fake("bgzero", scope = "clade")
+  expect_identical(r$res$status, "tested")
+  expect_match(r$res$qc_flags, "hyphy_deleted_zero_length_branches:1")
 })
 
 test_that("an unvalidated HyPhy version is announced", {

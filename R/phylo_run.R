@@ -70,7 +70,11 @@
   if (is.character(parsed)) return(list(ok = FALSE, reason = "hyphy_output_invalid", detail = parsed))
   log <- file.path(dir, "hyphy.log")
   log_text <- if (file.exists(log)) readLines(log, warn = FALSE) else character()
-  c(list(ok = TRUE, json = json_path, refit = any(grepl("Negative test LRT", log_text, fixed = TRUE))), parsed)
+  # With kill-zero-lengths (HyPhy's default), internal branches estimated at zero length
+  # under the nucleotide model are deleted before the codon models are fitted.
+  del <- grep("Deleted [0-9]+ zero-length internal branches:", log_text, value = TRUE)
+  deleted <- if (length(del)) trimws(strsplit(gsub(".*: *`|`.*", "", del[1]), ",")[[1]]) else character()
+  c(list(ok = TRUE, json = json_path, refit = any(grepl("Negative test LRT", log_text, fixed = TRUE)), deleted = deleted), parsed)
 }
 
 #' Diagnostics across independent starts. They never replace the primary result.
@@ -164,6 +168,12 @@
                   info, branches, seq_qc))
     }
     if (!identical(s$tested, fg)) {
+      gone <- intersect(s$deleted, fg)
+      if (length(gone) && all(s$tested %in% fg) && setequal(c(s$tested, gone), fg)) {
+        return(done("excluded", "foreground_branch_zero_length", paste0(
+          "HyPhy deleted requested branch(es) ", paste(gone, collapse = ","), " as zero-length (kill_zero_lengths = Yes), ",
+          "so it would test only ", paste(s$tested, collapse = ","), ", a narrower hypothesis"), info, branches, seq_qc))
+      }
       return(done("failed", "label_mismatch", paste0("HyPhy tested ", paste(s$tested, collapse = ","), "; dndsR labelled ", paste(fg, collapse = ",")),
                   info, branches, seq_qc))
     }
@@ -171,6 +181,7 @@
   }
   if (!reuse) writeLines(record_json, record_path)
   if (starts[[1]]$refit) flags <- c(flags, "hyphy_refit_after_negative_lrt")
+  if (length(starts[[1]]$deleted)) flags <- c(flags, sprintf("hyphy_deleted_zero_length_branches:%d", length(starts[[1]]$deleted)))
   info$qc_flags <- paste(flags, collapse = ";")
   diag <- if (length(seeds) > 1L) .phylo_start_diagnostics(starts, seeds) else list(n_starts = 1L)
   row <- .phylo_outcome(base, "tested", NA_character_, NA_character_,

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=phylo-pilot
+#SBATCH --constraint=skl|agg
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=64G
+#SBATCH --tmp=60G
+#SBATCH --time=24:00:00
+# Bounded calibration pilot (docs/dev/phylo-calibration-design.md): simulate each cell with
+# phylo-sim.R, run it through phylo_busted (and phylo_prepare for indels) as users do, and
+# keep the results tables. Comparisons (optimizer, model settings, processor) reuse the same
+# simulated alignments, so they are paired gene by gene.
+#   DNDSR_SIF=<image> DNDSR_DEV_LIB=<lib with this checkout installed> \
+#   sbatch tools/dev/validation/phylo-calibration-pilot.sb <params.json> <results dir> [block...]
+# Blocks: null power misspec optimizer settings genomewide processor (processor needs an
+# AVX2 node: submit it separately with --constraint=amr and block "processor").
+# Calls Singularity directly, without git, so it runs on any node.
+set -euo pipefail
+params=$(realpath "$1"); persist=$(realpath -m "$2"); shift 2
+blocks=${*:-null power misspec optimizer settings genomewide}
+repo=${SLURM_SUBMIT_DIR:-$PWD}
+threads=${SLURM_CPUS_PER_TASK:-8}
+work=${TMPDIR:-/tmp}/phylo-pilot-${SLURM_JOB_ID:-$$}
+mkdir -p "$persist" "$work"
+trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf "$work"' EXIT
+cd "$work"
+run() { singularity exec --cleanenv --bind "$repo" --bind "$work" --bind "$DNDSR_DEV_LIB" --pwd "$PWD" \
+          --env "R_LIBS_USER=$DNDSR_DEV_LIB" "$DNDSR_SIF" "$@"; }
+dndsr() { run Rscript --vanilla -e 'dndsR::cli_main()' -- "$@"; }
+{ grep -m1 "model name" /proc/cpuinfo; grep -o -w 'avx512f' /proc/cpuinfo | head -1; hostname; } > "$persist/host_$(hostname).txt"
+git -C "$repo" rev-parse HEAD > "$persist/commit.txt" 2>/dev/null || true
+cp "$params" "$persist/params.json"
+
+simulate() { # cell n seed dir. PILOT_N overrides n, for smoke tests of this script only.
+  [ -d "$4" ] || run Rscript --vanilla "$repo/tools/dev/validation/phylo-sim.R" "$params" "$1" "${PILOT_N:-$2}" "$3" "$4"
+}
+analyse() { # name dir [phylo_busted options...]
+  local name=$1 dir=$2; shift 2
+  local start=$SECONDS
+  if [ -f "$dir/cds_table.tsv" ]; then
+    [ -d "$dir/prepared" ] || dndsr phylo_prepare --cds-file "$dir/cds_table.tsv" --orthogroup-file "$dir/orthogroup_table.tsv" \
+      --species-tree-file "$dir/species_tree.nwk" --foreground-file "$dir/foreground.tsv" -o "$dir" -t "$threads" > "$dir/prepare.log" 2>&1
+    dndsr phylo_busted --prepared-dir "$dir/prepared" -o "$dir" --run-name "$name" -t "$threads" "$@" > "$dir/$name.log" 2>&1 || true
+  else
+    dndsr phylo_busted --alignment-dir "$dir/alignments" --species-tree-file "$dir/species_tree.nwk" \
+      --foreground-file "$dir/foreground.tsv" -o "$dir" --run-name "$name" -t "$threads" "$@" > "$dir/$name.log" 2>&1 || true
+  fi
+  mkdir -p "$persist/$name"
+  cp "$dir/$name/${name}_results.tsv" "$dir/$name/${name}_provenance.json" "$dir/truth.tsv" "$persist/$name/" 2>/dev/null || true
+  cp "$dir/$name.log" "$persist/$name/run.log"
+  echo -e "$name\t$((SECONDS - start))\t$threads\t$(hostname)" >> "$persist/timing.tsv"
+}
+
+for block in $blocks; do
+  echo "== $block $(date -u +%FT%TZ)"
+  case $block in
+  null)
+    i=0; for cell in N0_L25 N0_L50 N0_L75 N0_L50_div05 N0_L50_div2 N1_L50; do
+      i=$((i + 1)); simulate "$cell" 200 $((1000 + i)) "$cell"; analyse "S0_$cell" "$cell"; done ;;
+  power)
+    i=0; for cell in A3_p05 A3_p20 A10_p05 A10_p20; do
+      i=$((i + 1)); simulate "$cell" 100 $((2000 + i)) "$cell"; analyse "S0_$cell" "$cell"; done ;;
+  misspec)
+    i=0; for cell in M1_mnp M2_srv M3_misalign M4_indel M5_discordant; do
+      i=$((i + 1)); simulate "$cell" 200 $((3000 + i)) "$cell"; analyse "S0_$cell" "$cell"; done ;;
+  optimizer)
+    simulate N0_L50 200 1002 N0_L50; simulate A10_p05 100 2003 A10_p05
+    for cell in N0_L50 A10_p05; do
+      analyse "S1_$cell" "$cell" --starting-points 5
+      analyse "S2_$cell" "$cell" --extra-seeds 2,3
+    done ;;
+  settings)
+    simulate N0_L50 200 1002 N0_L50; simulate M1_mnp 200 3001 M1_mnp; simulate M3_misalign 200 3003 M3_misalign
+    analyse MH_N0_L50 N0_L50 --multiple-hits Double
+    analyse MH_M1_mnp M1_mnp --multiple-hits Double
+    analyse E_N0_L50 N0_L50 --error-sink Yes
+    analyse E_M3_misalign M3_misalign --error-sink Yes ;;
+  processor)
+    simulate N0_L50 200 1002 N0_L50
+    analyse "AVX2_N0_L50" N0_L50 ;;
+  genomewide)
+    mkdir -p gw/alignments
+    i=0; for spec in N0_L25:150 N0_L50:150 N0_L75:150 A10_p10:25 A3_p20:25; do
+      i=$((i + 1)); cell=${spec%%:*}; n=${spec##*:}
+      simulate "$cell" "$n" $((5000 + i)) "gw_$cell"
+      cp gw_"$cell"/alignments/*.fasta gw/alignments/
+      tail -n +2 "gw_$cell/truth.tsv" >> gw/truth.body
+      cp "gw_$cell/species_tree.nwk" "gw_$cell/foreground.tsv" gw/
+    done
+    { echo -e "gene\tcell\talternative\tcodons"; cat gw/truth.body; } > gw/truth.tsv
+    analyse S0_genomewide gw ;;
+  esac
+done
+echo "== done $(date -u +%FT%TZ)"
