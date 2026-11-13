@@ -169,7 +169,7 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
   args <- argv[-1]
 
   # These commands are complete with no options. Others print their help.
-  if (length(args) == 0 && !(cmd %in% c("example", "verify_example"))) {
+  if (length(args) == 0 && !(cmd %in% c("example", "verify_example", "phylo_example", "verify_phylo_example"))) {
     cli_print_command_help(cmd)
     return(invisible(NULL))
   }
@@ -184,6 +184,9 @@ cli_main <- function(argv = commandArgs(trailingOnly = TRUE)) {
 
   if (cmd == "example" && !any(grepl("^(-o|-O|--output[-_]dir)", args))) {
     args <- c(args, "-o", "dndsr_example")
+  }
+  if (cmd == "phylo_example" && !any(grepl("^(-o|-O|--output[-_]dir)", args))) {
+    args <- c(args, "-o", "dndsr_phylo_example")
   }
 
   if (!exists("parse_dnds_opts", envir = ns, inherits = FALSE)) {

@@ -18,7 +18,7 @@ dndsR's `dNdS > 1` is a threshold on a point estimate with no uncertainty attach
 
 A bootstrap interval would not fix this. A 95% interval from resampling codons covered the true ratio about 90% of the time for lower ratios at moderate dS, and almost never where it matters most: at a true ratio of 3 and dS 0.4 or above, or a true ratio of 1 or above at dS 0.8 when rates vary among sites. So dndsR does not offer one ([evidence](validation/estimators.md#benchmark-against-independent-estimators)).
 
-Treat dN/dS above 1 as a candidate list. To support a claim about particular genes, use methods that model selection, such as likelihood-ratio tests with more than two sequences, and look at the alignments.
+Treat dN/dS above 1 as a candidate list. To support a claim about particular genes, use methods that model selection, such as likelihood-ratio tests with more than two sequences, and look at the alignments. dndsR runs one such test, HyPhy's BUSTED, with `phylo_busted`: see [phylo-methods.md](phylo-methods.md). Its results are a separate analysis, not a check on pairwise values.
 
 ## Before you trust a value
 

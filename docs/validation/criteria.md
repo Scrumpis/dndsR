@@ -14,6 +14,7 @@ What must hold before a dndsR release, based on what can reasonably be demonstra
 | Failure behavior | Failed steps exit nonzero; unknown options and missing inputs stop |
 | Documented commands | Tutorials and container checks run as written |
 | Disabled analyses | Stay disabled, with a test |
+| `phylo_busted` against HyPhy run directly | The bundled example agrees with `truth/direct_hyphy.tsv` within 1e-6 at the reference settings, and HyPhy tests exactly the labelled branches |
 
 ## Agreement: a miss is investigated, and blocks a release until explained
 

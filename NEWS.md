@@ -1,3 +1,10 @@
+# dndsR (development)
+
+Nothing here changes pairwise results, defaults, or existing tables.
+
+- New `phylo_busted()` and `dndsr phylo_busted`: HyPhy BUSTED tests for episodic positive selection on chosen branches, across orthogroups of several species, with Benjamini-Hochberg correction across orthogroups. It takes codon alignments, a rooted species tree, and a foreground file (terminal, stem, or clade), with optional gene trees. Foregrounds that cannot be identified after missing taxa are pruned are skipped, never relabelled. Alignments are checked, not repaired, except that terminal stop codons are masked and counted. HyPhy's defaults are kept; the seed and HyPhy threads are always set and recorded, because results depend on both. Needs HyPhy (validated with 2.5.103) and the R package ape; published images up to v0.4.0 do not include HyPhy. Methods: `docs/phylo-methods.md`.
+- New `phylo_example()` and `verify_phylo_example()`, with `dndsr phylo_example` and `dndsr verify_phylo_example`: a synthetic example, and a check that dndsR reproduces HyPhy run directly. This shows the wrapper is faithful, not that the pipeline is calibrated: `docs/validation/phylo-busted-wrapper.md`.
+
 # dndsR 0.4.0
 
 Nothing here changes an existing default, algorithm, or the content of an existing table.

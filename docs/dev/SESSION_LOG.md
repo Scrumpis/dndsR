@@ -2,6 +2,15 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-13: phylogenetic module, P0 and P1
+
+- **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`
+- **Done:** proposal approved by the maintainer (HyPhy engine, BUSTED first). P0 decisions in `DECISIONS.md` and `phylo-design.md`. P1: `phylo_busted`, `phylo_example`, `verify_phylo_example`, method-agnostic tree, alignment, engine, and runner layers; synthetic example; tests; container and conda definitions with HyPhy 2.5.103 (not built or published); user methods, tutorial, outputs, skill.
+- **Verified:** `phylo_busted` equals HyPhy run directly on independently prepared inputs, to every digit, for all 4 testable example orthogroups. Tutorial commands ran in a clean `HOME` on the v0.4.0 image with micromamba HyPhy. `tools/dev/check.sh`: package tests 136, 0 failed, 0 skipped; tutorial and skill pass.
+- **Found by running HyPhy:** unseeded runs differ; thread count changes results; given branch lengths are starting values; rooted trees are unrooted; stop codons fail a run. Over 20 seeds one gene's LRT ranged 7.0 to 8.8. HyPhy 2.5 is in maintenance mode, and HyPhy 3 is too new to use.
+- **Errors along the way:** the first gene-tree rule rejected discordance inside a clade-scope foreground, which the design allows; caught by a test and fixed. A Slurm job pointed at node-local `/tmp`; resubmitted with the example in the repository. The safeguard test failed before commit because its fixture combines committed code with the uncommitted skill.
+- **Failed or not done:** P2 onward not started. No image built; nothing pushed, merged, tagged, or published.
+
 ## 2026-11-06: after the v0.4.0 release
 
 - **Session:** `a897d1b6-0934-4e10-b07a-c791f9d940eb`

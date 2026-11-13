@@ -14,6 +14,7 @@ What has actually been checked, and how. Commit SHAs are in `git log` and the pr
 | Image stacks | The same code on two published images: pairs, values, and why they differ | [stack-comparison.md](stack-comparison.md) |
 | Orthologs | Reciprocal best hits against OMA, by dS, and the effect on term lists | [orthology.md](orthology.md) |
 | Enrichment calibration | False-positive rates before and after the correction and default changes, on real public annotations, under three nulls; GFF recovery | [enrichment.md](enrichment.md). Earlier evidence: [59faf30](enrichment-59faf30.md), [1a363fb](enrichment-1a363fb.md) |
+| Phylogenetic wrapper (`phylo_busted`) | Exact agreement with HyPhy run directly on independently prepared inputs; HyPhy behaviors the design relies on; seed, thread, and version effects. Wrapper correctness only, not calibration | [phylo-busted-wrapper.md](phylo-busted-wrapper.md) |
 | Thread scaling | Time and memory per step, and identical results across thread counts | [performance.md](performance.md) |
 | Fisher tests | p-values equal an independent hypergeometric calculation | `test-example-pipeline.R` |
 | Region summaries and contrasts | Counts, means, deltas, and Wilcoxon p-values recalculated in base R | `test-example-pipeline.R` |

@@ -7,10 +7,12 @@ channels:
 dependencies:
   - r-base=4.5
   - diamond=2.1
+  - hyphy=2.5.103
   - r-cli
   - r-data.table
   - r-ggplot2
   - r-jsonlite
+  - r-ape
   - r-biocmanager
   - r-remotes
   - r-rideogram

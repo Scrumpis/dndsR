@@ -1,0 +1,8 @@
+orthogroup	model	note	expected_status
+OG0001	episodic	all taxa; terminal TAA in every sequence	tested
+OG0002	null	all taxa	tested
+OG0003	episodic	spH missing; foreground clade intact	tested
+OG0004	null	spB missing; clade hypothesis still identifiable, stem would not be	tested
+OG0005	null	spA and spB missing	skipped:foreground_absent
+OG0006	null	internal TGA in spC at codon 51	skipped:internal_stop
+OG0007	null	two spD sequences	skipped:multi_copy

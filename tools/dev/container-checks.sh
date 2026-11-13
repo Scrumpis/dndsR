@@ -32,6 +32,8 @@ echo "== Tools and dependencies"
 pass "dndsr is on PATH" command -v dndsr
 pass "DIAMOND runs" diamond version
 pass "OrthoFinder runs" orthofinder -h
+pass "HyPhy 2.5.103 runs" sh -c 'hyphy --version | grep -q "2.5.103"'
+pass "ape loads" Rscript -e 'stopifnot(requireNamespace("ape", quietly = TRUE))'
 pass "required R packages load" Rscript -e 'for (p in c("dndsR","orthologr","Biostrings","GenomicFeatures","txdbmaker","pwalign","topGO","GO.db","IHW","qvalue","RIdeogram","lme4","testthat")) stopifnot(requireNamespace(p, quietly = TRUE))'
 if [ -n "$expected_version" ]; then
   pass "dndsR version is $expected_version" Rscript -e "stopifnot(as.character(packageVersion('dndsR')) == '$expected_version')"
@@ -61,10 +63,18 @@ pass "dnds_contrast" dndsr dnds_contrast -c two_comparisons.txt --contrast-file 
 pass "contrast output" test -s contrast/AvB_vs_AvC_global_q_vs_q_dnds_contrast.tsv
 cd .. || exit 1
 
+echo "== Documented phylogenetic workflow"
+pass "copy the phylogenetic example" dndsr phylo_example -o phylo
+cd phylo || exit 1
+pass "phylo_busted" dndsr phylo_busted --alignment-dir alignments --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
+pass "verify_phylo_example: 9 checks" sh -c 'dndsr verify_phylo_example 2>&1 | grep -q "All 9 phylogenetic example checks passed"'
+cd .. || exit 1
+
 echo "== Failure behavior"
 fail_expected "unknown command fails" dndsr nonsense
 fail_expected "unknown option fails" dndsr extract_cds -c x --overwite
 fail_expected "missing input fails" dndsr calculate_dnds -c does-not-exist.txt
+fail_expected "phylo_busted without a foreground file fails" dndsr phylo_busted --alignment-dir phylo/alignments --species-tree-file phylo/species_tree.nwk --foreground-file missing.tsv
 fail_expected "gene-level state contrast fails" dndsr dnds_state_contrast --level gene --dnds-annot-files cli/example_AvB/example_AvB_dnds_annot.tsv
 
 echo "== Documented R workflow"

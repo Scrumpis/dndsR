@@ -47,6 +47,10 @@ The first three commands do not account for gene length or dS, and `go_enrichmen
 - `dnds_state_contrast`, pairwise level: logistic regression of a selection state on a group column. The gene level is disabled.
 - `dnds_ideogram`: mean of log(dN/dS + 1) in genome windows, by the window containing a gene's start, with default windows of 300 kb.
 
+## Phylogenetic selection tests
+
+`phylo_busted` runs HyPhy's BUSTED on codon alignments of several species, with foreground branches labelled from a species tree, and applies Benjamini-Hochberg across orthogroups. It is separate from the pairwise estimates above: [phylo-methods.md](phylo-methods.md).
+
 ## Reporting a dndsR analysis
 
 Report the dndsR version and commit, image digest, and the provenance file `*_dnds_provenance.json`, which records software versions, parameters, and input hashes. Also cite orthologr, DIAMOND, and the estimator.

@@ -1,6 +1,6 @@
 ---
 name: dndsr
-description: Installs and runs dndsR, an R package and CLI for pairwise dN/dS analysis of orthologous genes from genome FASTA and GFF3 files, with annotation, term enrichment, ideograms, and regional or contrast summaries. Use when a user wants to calculate, summarize, or interpret dN/dS ratios with dndsR, or set it up with Singularity, Apptainer, Docker, or R.
+description: Installs and runs dndsR, an R package and CLI for pairwise dN/dS analysis of orthologous genes from genome FASTA and GFF3 files, with annotation, term enrichment, ideograms, and regional or contrast summaries; development code adds HyPhy BUSTED selection tests across species. Use when a user wants to calculate, summarize, or interpret dN/dS ratios or BUSTED tests with dndsR, or set it up with Singularity, Apptainer, Docker, or R.
 license: MIT
 compatibility: Needs bash and git, plus Singularity, Apptainer, or Docker, or an R installation with dndsR's dependencies. Only Linux amd64 with Singularity has been tested. Cloning and pulling the image need network access unless both are already present.
 metadata:
@@ -74,6 +74,25 @@ Check `<comparison>/<genome>_CDS_qc.tsv` for exclusions, and the number of pairs
 `covariate_enrichment` needs v0.4.0 or later, so check that `dndsr --help` lists it. `go_enrichment` and `term_enrichment` give a calibration warning on every run, and record it in `<comparison>_go_enrichment_notice.json` or `<comparison>_term_enrichment_notice.json`: pass it on to the user. Their defaults and tables are unchanged.
 
 A complete run on public genomes, with measured time and memory: [docs/tutorials/public-genomes.md](../../docs/tutorials/public-genomes.md). For a publication, follow [docs/publication-protocol.md](../../docs/publication-protocol.md).
+
+## 4b. Selection tests across species (development code only)
+
+`phylo_busted` runs HyPhy's BUSTED on single-copy orthogroups of several species: does any site show dN/dS above 1 on chosen foreground branches? It is not in v0.4.0. Use it only if `dndsr --help` lists `phylo_busted`, and tell the user it is unreleased and not yet calibrated as a selection pipeline. It needs HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs it with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
+
+```
+dndsr phylo_example
+cd dndsr_phylo_example
+dndsr phylo_busted --alignment-dir alignments --species-tree-file species_tree.nwk --foreground-file foreground.tsv --hyphy "$HOME/.dndsr/hyphy/bin/hyphy" -t 4
+dndsr verify_phylo_example
+```
+
+Success ends with `All 9 phylogenetic example checks passed.` On real data the user supplies codon alignments, a rooted species tree, and a foreground file (`terminal`, `stem`, or `clade`), decided before seeing results. When reporting:
+
+- A significant BUSTED result means some site on some foreground branch had ω above 1 under the model. It is not the same as, and does not confirm, a pairwise dN/dS above 1. Never mix the two in one table or claim.
+- Report `p_adj`, and its `family_size`: only orthogroups with status `tested` are in the correction. Pass on the counts of skipped orthogroups by reason, which limit what the results can say.
+- `foreground_not_identifiable` means missing taxa made the hypothesis untestable for that orthogroup; dndsR never relabels it.
+- Results depend on `--seed` and `--hyphy-cpu`, which are recorded in `busted/busted_provenance.json`. Genes near the threshold can change call with the seed.
+- Methods and limits: [docs/phylo-methods.md](../../docs/phylo-methods.md).
 
 ## 5. Interpret honestly
 

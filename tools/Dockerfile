@@ -86,7 +86,7 @@ RUN set -eux; \
 ENV BSPM_DISABLE=1
 
 # ============================================================
-# Micromamba environment (python + OrthoFinder toolchain)
+# Micromamba environment (python, OrthoFinder toolchain, HyPhy)
 # ============================================================
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 ARG MAMBA_VER=2.5.0
@@ -95,11 +95,15 @@ RUN set -eux; \
   tar -xvjf /tmp/micromamba.tar.bz2 -C /usr/local/bin --strip-components=1 bin/micromamba; \
   rm -f /tmp/micromamba.tar.bz2
 
+# HyPhy is the engine for the phylogenetic commands (phylo_busted). Pinned to the release
+# dndsR was validated against: docs/validation/phylo-busted-wrapper.md.
 RUN micromamba create -y -n tools -c conda-forge -c bioconda \
       python=3.10.19 \
       orthofinder=2.5.4 \
       mafft=7.526 mcl=22.282 fasttree=2.2.0 \
-  && micromamba clean -a -y
+      hyphy=2.5.103 \
+  && micromamba clean -a -y \
+  && $MAMBA_ROOT_PREFIX/envs/tools/bin/hyphy --version
 
 # ============================================================
 # DIAMOND binary

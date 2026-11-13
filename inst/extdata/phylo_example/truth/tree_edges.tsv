@@ -1,0 +1,15 @@
+parent	child	length
+root	nAF	0.05
+root	nGH	0.1
+nAF	nABCD	0.04
+nAF	nEF	0.08
+nABCD	nAB	0.06
+nABCD	nCD	0.05
+nAB	spA	0.1
+nAB	spB	0.12
+nCD	spC	0.09
+nCD	spD	0.11
+nEF	spE	0.1
+nEF	spF	0.09
+nGH	spG	0.08
+nGH	spH	0.1

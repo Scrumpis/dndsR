@@ -45,6 +45,7 @@ Remotes:
     drostlab/rdiamond,
     drostlab/metablastr
 Suggests:
+    ape,
     GO.db,
     IHW,
     lme4,
@@ -58,7 +59,7 @@ Suggests:
     withr,
     topGO
 SystemRequirements:
-    DIAMOND (>= 2.1.8)
+    DIAMOND (>= 2.1.8); HyPhy (2.5.103, optional, for phylo_busted)
 Config/testthat/edition: 3
 ByteCompile: true
 Roxygen: list(markdown = TRUE)

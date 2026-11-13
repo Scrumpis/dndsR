@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=phylo-seed-spread
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=16G
+#SBATCH --time=01:00:00
+# How much BUSTED's result on the example moves with HyPhy's random seed, thread count,
+# and version. Uses only direct HyPhy runs (phylo-direct-hyphy.sh), never dndsR.
+#   sbatch tools/dev/validation/phylo-seed-spread.sb <hyphy 2.5.103> <hyphy 2.5.104> <example dir> <work dir>
+set -euo pipefail
+h103=$1; h104=$2; example=$3; work=$4
+here=$(cd "$(dirname "$0")" && pwd)
+[ -f "$here/phylo-direct-hyphy.sh" ] || here=${SLURM_SUBMIT_DIR:-.}/tools/dev/validation
+mkdir -p "$work"
+run() { "$here/phylo-direct-hyphy.sh" "$@" > /dev/null; }
+# 20 seeds at one thread, 8 at a time (4 orthogroups each).
+for batch in "1 2 3 4 5 6 7 8" "9 10 11 12 13 14 15 16" "17 18 19 20"; do
+  for s in $batch; do run "$h103" "$example" "$work/v103_seed${s}_cpu1" "$s" 1 & done
+  wait
+done
+run "$h103" "$example" "$work/v103_seed1_cpu1_repeat" 1 1 &
+run "$h103" "$example" "$work/v103_seed1_cpu2" 1 2 &
+run "$h104" "$example" "$work/v104_seed1_cpu1" 1 1 &
+wait
+python3 - "$work" <<'EOF'
+import csv, glob, os, statistics, sys
+work = sys.argv[1]
+rows = []
+for f in sorted(glob.glob(os.path.join(work, "*", "direct_hyphy.tsv"))):
+    run = os.path.basename(os.path.dirname(f))
+    for r in csv.DictReader(open(f), delimiter="\t"):
+        r["run"] = run; rows.append(r)
+with open(os.path.join(work, "seed_spread_runs.tsv"), "w") as out:
+    cols = ["run", "orthogroup", "hyphy_version", "seed", "cpu", "lrt", "p_value", "lnl_unconstrained", "lnl_constrained"]
+    out.write("\t".join(cols) + "\n")
+    for r in rows: out.write("\t".join(r[c] for c in cols) + "\n")
+print("orthogroup\tseeds\tlrt_min\tlrt_median\tlrt_max\tp_min\tp_max\tbest_lnl_unc_spread\tp_below_0.05")
+for og in ["OG0001", "OG0002", "OG0003", "OG0004"]:
+    rs = [r for r in rows if r["orthogroup"] == og and r["run"].startswith("v103_seed") and r["run"].endswith("_cpu1")]
+    lrt = [float(r["lrt"]) for r in rs]; p = [float(r["p_value"]) for r in rs]; lnl = [float(r["lnl_unconstrained"]) for r in rs]
+    print(f"{og}\t{len(rs)}\t{min(lrt):.4f}\t{statistics.median(lrt):.4f}\t{max(lrt):.4f}\t{min(p):.4g}\t{max(p):.4g}\t{max(lnl)-min(lnl):.4f}\t{sum(x < 0.05 for x in p)}")
+def get(run, og):
+    return next(r for r in rows if r["run"] == run and r["orthogroup"] == og)
+for og in ["OG0001", "OG0002", "OG0003", "OG0004"]:
+    a = get("v103_seed1_cpu1", og)
+    for other in ["v103_seed1_cpu1_repeat", "v103_seed1_cpu2", "v104_seed1_cpu1"]:
+        b = get(other, og)
+        print(f"{og}\tseed1 cpu1 vs {other}: identical LRT={a['lrt'] == b['lrt']} ({a['lrt']} vs {b['lrt']})")
+EOF

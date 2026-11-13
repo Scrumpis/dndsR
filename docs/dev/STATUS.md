@@ -24,3 +24,4 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 2. The v0.4.0 GitHub release has no assets. RELEASE.md step 4 expects the workflow's `release-manifest.json` and skill tarball attached; the maintainer can attach them from the `publish` run, 41565720097.
 3. This software is frozen for the Chenopodium analysis, which needs no rerun: `verify_release_equivalence.sh` reports the analysis's software identical to `v0.4.0`. Its work and results live outside this repository, and nothing from them comes here.
 4. For v1.0.0: `docs/dev/ROADMAP-1.0.md`. Do not start it for the current manuscript.
+5. Phylogenetic module (`phylo_busted`, HyPhy BUSTED): P0 and P1 are on `dev`, stopped before P2 as instructed. Design and phases: [phylo-design.md](phylo-design.md); open decisions are in `DECISIONS.md`. It is not in any release, and no published image has HyPhy. It does not change the v1.0.0 roadmap.

@@ -1,5 +1,5 @@
-# Runs every R code block in docs/tutorials/using-r.md, in order, and stops on any error.
-#   Rscript tools/dev/test-r-tutorial.R <path to using-r.md>
+# Runs every R code block in an R tutorial, such as docs/tutorials/using-r.md, in order, and stops on any error.
+#   Rscript tools/dev/test-r-tutorial.R <path to a tutorial>
 lines <- readLines(commandArgs(TRUE)[1])
 blocks <- list(); inside <- FALSE; current <- character()
 for (line in lines) {

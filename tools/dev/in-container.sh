@@ -8,8 +8,13 @@ root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 : "${DNDSR_DEV_LIB:?Set DNDSR_DEV_LIB to a writable R library outside the clone}"
 mkdir -p "$DNDSR_DEV_LIB"
 engine=$(command -v apptainer || command -v singularity) || { echo "Needs Apptainer or Singularity" >&2; exit 1; }
+# Optional HyPhy outside the image, such as a conda environment: DNDSR_HYPHY=<env>/bin/hyphy
+extra=()
+if [ -n "${DNDSR_HYPHY:-}" ]; then
+  extra=(--bind "$(dirname "$(dirname "$DNDSR_HYPHY")")" --env "DNDSR_HYPHY=$DNDSR_HYPHY")
+fi
 run() {
-  "$engine" exec --cleanenv --bind "$root" --bind "$DNDSR_DEV_LIB" --bind "$PWD" \
+  "$engine" exec --cleanenv --bind "$root" --bind "$DNDSR_DEV_LIB" --bind "$PWD" "${extra[@]}" \
     --env "R_LIBS_USER=$DNDSR_DEV_LIB" --env "DNDSR_REPO=$root" "$DNDSR_SIF" "$@"
 }
 if [ "${DNDSR_NO_INSTALL:-0}" != 1 ]; then

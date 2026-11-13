@@ -42,6 +42,16 @@
 | 2026-11-02 | Correctness notice and DOI badge stay in the README for v0.4.0. | Maintainer added them after v0.3.0, and asked that neither be lost. |
 | 2026-11-02 | The audit archive moved to `~/.local/share/dndsr-audit`, mode 700. The original stays as `.audit.moved.*`. | Maintainer instruction. 27 files hash-identical in both copies. |
 | 2026-11-02 | v0.4.0's documents point at the v0.3.0 image's digest. | A tag's documents cannot name an image built from it. dndsr-install puts this code ahead of the copy in the image. |
+| 2026-11-13 | Phylogenetic module approved: HyPhy as the external engine, BUSTED first; P0 and P1 now, stop before P2. Shared layers are method-agnostic, for aBSREL and RELAX later. Pairwise code and the v1.0.0 roadmap are unchanged. | Maintainer approval of the proposal, with refinements. Design: `docs/dev/phylo-design.md`. |
+| 2026-11-13 | Pin HyPhy 2.5.103. | Newest GitHub release (2026-10-06), on Bioconda since 2026-10-09. 2.5.104 (tag only, no notes) was bit-identical on the example. HyPhy 2.5 is in maintenance mode; HyPhy 3 had only v0.0.1 (2026-11-09) and no Bioconda package. |
+| 2026-11-13 | Keep every HyPhy BUSTED default, pass each explicitly, and expose the alternatives. No new default for multiple hits. | Maintainer: preserve upstream defaults initially; investigate multiple hits by validation. Defaults read from `BUSTED.bf` in 2.5.103. |
+| 2026-11-13 | Always set HyPhy's random seed (default 1) and threads per run (default 1), and record both. | Unseeded identical runs differed; same seed and threads were bit-identical; threads changed results. `docs/validation/phylo-busted-wrapper.md`. A reproducibility setting, not a model change. |
+| 2026-11-13 | Give HyPhy the topology only. | HyPhy uses given branch lengths as starting values, which changed results at a fixed seed, and species-tree lengths are not in its units. |
+| 2026-11-13 | Branches are identified by splits of the taxa present. A pruned branch combining foreground and background history is not identifiable, and the orthogroup is skipped, never relabelled. | Maintainer: never silently reinterpret an ancestral branch. Rules and tests: `docs/dev/phylo-design.md`, `test-phylo-tree.R`. |
+| 2026-11-13 | Single-copy orthogroups only; the sequence table allows several per taxon for later duplication-aware work. Exclusions are reported by reason, with tested orthogroups per taxon. | Maintainer instruction. |
+| 2026-11-13 | Alignments are checked, not repaired. Only a stop codon ending a sequence is masked, and counted; heuristic QC flags never change data. | Maintainer: no repair or masking without a documented, validated policy. HyPhy refuses any stop codon. |
+| 2026-11-13 | Benjamini-Hochberg across all orthogroups tested in one run, one hypothesis, one set of settings. Raw p kept; skipped and failed orthogroups listed outside the family. | Maintainer: a clearly defined family of gene-level tests. |
+| 2026-11-13 | `ape` in `Suggests`; HyPhy in `SystemRequirements`, the Dockerfile's micromamba environment, and `tools/environment.yml`. No image published. | Optional module; both environments solve (dry run). Building and publishing an image needs authorization. |
 
 ## Open questions
 
@@ -52,3 +62,7 @@ Decisions for release are in `RELEASE-READINESS.md`.
 | Should `go_enrichment` and `term_enrichment` change defaults, now that they warn? | Up to 65-70% false-term rates at one pair. | Maintainer |
 | v0.3.0's release page shows `<from the publish workflow>` for its digest. | It is `sha256:feb5e4b1cebe574bb0a1962d0589a3325ddf5d12fa599def72d2b2ddd24d7e11`. | Maintainer |
 | The Docker Hub `latest` tag still points at the v0.2.0 image, and `publish.yaml` never moves it. | Someone who pulls `latest` gets older dependencies. | Maintainer |
+| How should HyPhy's optimizer variability be handled: report only, several seeds per gene keeping the best likelihood, or more starting points? | One simulated gene's LRT ranged 7.0 to 8.8 over 20 seeds; calls near a threshold can change. Phase 3. | Maintainer |
+| Should `--multiple-hits Double` or BUSTED-E be recommended, or run as sensitivity analyses? | Both affect false positives; HyPhy calls BUSTED-E experimental. Needs phase 3 simulation. | Maintainer |
+| Is strict identifiability right when sister lineages are often missing, and should gene-tree discordance near the foreground exclude, flag, or be handled otherwise? | Strictness can exclude many orthogroups in patchy data. | Maintainer |
+| Should `DESCRIPTION` move to a development version such as 0.4.0.9000 on `dev`, and which release carries the phylogenetic module and an image with HyPhy? | Provenance from this code currently says 0.4.0. Changing it also changes the skill's `software-version`. | Maintainer |

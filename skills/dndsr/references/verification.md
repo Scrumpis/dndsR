@@ -33,8 +33,11 @@ Linux amd64 HPC node, singularity-ce 4.1.2, no Docker. Image `sha256:f1b42d9d338
 | `tools/check-first-exon-phase.py`, `tools/annotate-from-uniprot.py` | The same tutorial run | Pass |
 | `extract_cds` stopping on a trans-spliced gene, with a hint to remove organelles | `tests/testthat/test-statistics.R`, and tomato's plastid *rps12* | Pass |
 | Apptainer, conda, candidate image | `docs/validation/installation.md` | Pass |
+| `phylo_busted` on the phylogenetic example, against HyPhy run directly on independently prepared inputs (`phylo-direct-hyphy.sh`) | HyPhy 2.5.103 from Bioconda in the v0.4.0 image, dev code after `6e21e46`; R function, CLI, and `tests/testthat/test-phylo-busted.R` | LRT, p-value, and log-likelihoods identical for all 4 tested orthogroups; 3 designed failures skipped with their reasons; `verify_phylo_example` 9 of 9. `docs/validation/phylo-busted-wrapper.md` |
+| Every command in `docs/tutorials/phylogenetic-selection.md`, in a clean `HOME`: micromamba install of HyPhy 2.5.103 to `$HOME/.dndsr/hyphy`, `dndsr-install --bind`, `phylo_example`, `phylo_busted --hyphy`, `verify_phylo_example`; and its R blocks with `tools/dev/test-r-tutorial.R` | Singularity 4.1.2, v0.4.0 image, micromamba 2.x | Pass; 9 of 9; 3 R blocks ran |
+| HyPhy 2.5.104 against 2.5.103 on the example | Direct runs, seed 1, 1 thread | Bit-identical |
 | Skill discovery | Claude Code 2.1.316 and Codex CLI 0.165.0 in a clone | Found |
 
 ## Not verified
 
-Docker; macOS; Windows; R from CRAN and Bioconductor on a working system; GitHub Actions; gene-level `dnds_state_contrast`; an agent completing the full workflow, unless recorded in `docs/dev/PROGRESS.md`.
+`phylo_busted` with conda or mamba instead of micromamba, with gene trees against direct HyPhy, in an image built with HyPhy, and on real data; its calibration as a selection test; Docker; macOS; Windows; R from CRAN and Bioconductor on a working system; GitHub Actions; gene-level `dnds_state_contrast`; an agent completing the full workflow, unless recorded in `docs/dev/PROGRESS.md`.
