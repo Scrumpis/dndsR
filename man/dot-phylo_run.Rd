@@ -19,7 +19,10 @@
   min_taxa,
   terminal_stops,
   overwrite,
-  hyphy
+  hyphy,
+  extra_seeds = NULL,
+  gene_tree_mode = NULL,
+  prepared_dir = NULL
 )
 }
 \description{

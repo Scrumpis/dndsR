@@ -1,6 +1,6 @@
 # Phylogenetic selection module: design
 
-Approved by the maintainer on 2026-11-13: HyPhy as an external engine, BUSTED first, phases P0 and P1 now, stop before P2. This records the design and the P0 decisions. User documentation: [phylo-methods.md](../phylo-methods.md). Evidence: [phylo-busted-wrapper.md](../validation/phylo-busted-wrapper.md).
+Approved by the maintainer on 2026-11-13: HyPhy as an external engine, BUSTED first, phases P0 and P1, then P2 after review (decisions below); stop before P3. The module is experimental and unreleased (development version 0.4.0.9000). This records the design and the P0 decisions. User documentation: [phylo-methods.md](../phylo-methods.md). Evidence: [phylo-busted-wrapper.md](../validation/phylo-busted-wrapper.md).
 
 ## Scope and separation
 
@@ -15,6 +15,7 @@ Everything below the method registry is shared, so aBSREL and RELAX add a regist
 
 | Layer | File | Method-specific? |
 |---|---|---|
+| Input preparation: CDS (through `extract_cds`), orthogroup tables (long, OrthoFinder `Orthogroups.tsv` and `N0.tsv`), single-copy filter, MAFFT protein alignment, back-translation, manifest | `R/phylo_prepare.R` | No |
 | Alignment input and QC | `R/phylo_alignment.R` | No |
 | Species tree, foreground hypotheses, pruning, identifiability, gene trees, Newick | `R/phylo_tree.R` | No |
 | HyPhy discovery, version, isolated runs with seed and threads, JSON reading | `R/phylo_hyphy.R` | No |
@@ -25,10 +26,11 @@ Everything below the method registry is shared, so aBSREL and RELAX add a regist
 
 ## Data structures
 
-- **Sequences.** One row per sequence: `seq_name`, `taxon`, `gene_id`, `sequence`. Names are `taxon` or `taxon|gene_id`. Several sequences per taxon are representable, so duplication-aware analyses can use the same structure later; P1 skips them as `multi_copy`.
+- **Members.** One row per gene of every orthogroup, with the number of copies its taxon has, its CDS status, and whether it was used. Paralogs are kept here, so duplication-aware analyses can start from this table.
+- **Sequences.** One row per sequence: `seq_name`, `taxon`, `gene_id`, `sequence`. Names are `taxon` or `taxon|gene_id`. Several sequences per taxon are representable, so duplication-aware analyses can use the same structure later; they are excluded as `multi_copy`.
 - **Hypothesis.** The species tree, one row per reference branch with its descendant taxa, whether it is foreground, and whether it must exist in a gene tree (terminal and stem branches); clade sets for clade scope. Resolved once per run.
 - **Branch map.** Per orthogroup, one row per branch given to HyPhy: name, terminal or not, the smaller side of its split, foreground or not, the species-tree branches it combines, and whether the topology came from the species tree or a gene tree.
-- **Results.** One row per orthogroup considered, with `status` (`tested`, `skipped`, `failed`) and `reason`. Per-sequence QC is a separate table. A future branch-level method (aBSREL) adds a branch-level results table keyed by orthogroup and branch, with its own correction.
+- **Results.** One row per orthogroup considered, with `status` (`tested`, `excluded`, `failed`), `stage`, `reason`, and `exclusion_basis`. Per-sequence QC is a separate table. A future branch-level method (aBSREL) adds a branch-level results table keyed by orthogroup and branch, with its own correction.
 
 ## Branch identity and identifiability
 
@@ -36,19 +38,21 @@ A branch is identified by the bipartition of the taxa present, never by a node n
 
 1. The foreground file is resolved on the full, rooted species tree. `terminal`: each listed taxon's branch. `stem`: the branch above the most recent common ancestor of the listed taxa, which must be exactly that clade. `clade`: that stem and every branch below it. Stem and clade need a rooted tree; the root has no stem.
 2. For an orthogroup, each species-tree branch maps to the split it induces on the taxa present. Branches with the same split become one branch once taxa are pruned. This includes the two branches at the root, which HyPhy joins, as it treats trees as unrooted (confirmed by running).
-3. If a joined branch combines foreground and background branches, the hypothesis is **not identifiable** for that orthogroup, and it is skipped (`foreground_not_identifiable`), with the branches named. It is never relabelled. Consequences, all tested:
+3. If a joined branch combines foreground and background branches, that requested branch cannot be separated from background history. If no requested branch present can be separated, the orthogroup is excluded as `foreground_unidentifiable` (basis `mathematical`). If some can, testing only those would test a narrower hypothesis, so it is excluded as `foreground_partly_unidentifiable` (basis `policy`). A hypothesis row with no taxon present, or a terminal row lacking a taxon, is `foreground_incomplete` (policy). Missing members of a clade-scope row are allowed and counted. Nothing is relabelled. Consequences, all tested:
    - A stem hypothesis needs every clade member present, and the clade's sister lineage.
    - A clade hypothesis tolerates missing members, but not a missing sister lineage, because the stem would then include time before the clade.
    - A terminal hypothesis needs the taxon's sister lineage.
    - The stem of a clade beside the root is never identifiable, because it joins the other root branch.
 4. No foreground branch left: `foreground_absent`.
-5. With a gene tree, the foreground is still resolved on the species tree, so missing taxa are judged the same way. Every terminal and stem foreground branch, including each clade's stem, must exist in the gene tree, or the orthogroup is `foreground_discordant`. Branches inside a clade-scope foreground are foreground, even where the gene tree disagrees with the species tree inside the clade.
+5. With a gene tree, the foreground is still resolved on the species tree, so missing taxa are judged the same way. Discordance with the pruned species tree is measured and reported, never used to exclude. In `topology` mode, every terminal and stem foreground branch, including each clade's stem, must exist in the gene tree, or the hypothesis cannot be placed (`foreground_not_in_gene_tree`, mathematical); branches inside a clade-scope foreground are foreground. In `report` mode the species tree is used.
+
+Every outcome has a status (`tested`, `excluded`, `failed`), a stage (`prepare`, `analysis`), and for non-tested ones a basis: `mathematical`, `no_data`, `policy`, `data_quality`, `input`, or `software` (`.phylo_reason_basis`).
 
 ## Alignment policy
 
 | Kind | Cases | Action |
 |---|---|---|
-| Exclusion | empty, unknown taxon, more than one sequence per taxon, unequal lengths, length not a multiple of 3, characters other than nucleotides, IUPAC codes, `-`, or `?`, a codon with one or two gap characters, a stop codon before the end of a sequence, a sequence with no determined codon, fewer than `min_taxa` sequences | Orthogroup skipped with the reason |
+| Exclusion | empty, unknown taxon, more than one sequence per taxon, unequal lengths, length not a multiple of 3, characters other than nucleotides, IUPAC codes, `-`, or `?`, a codon with one or two gap characters, a stop codon before the end of a sequence, a sequence with no determined codon, fewer than `min_taxa` sequences | Orthogroup excluded with the reason |
 | Documented change | A stop codon that is the last non-gap codon of a sequence | Replaced by `---` and counted (`terminal_stops = "mask"`, default), or the orthogroup excluded (`"exclude"`). HyPhy refuses stop codons, so most CDS-derived alignments would otherwise fail |
 | Reported only | Ambiguous codons, gappy sequences and columns, a sequence far more divergent than the rest, a high pairwise p-distance, a window of 10 codons mostly unlike every other sequence | Metrics and flags. Thresholds are heuristics, not validated, and never exclude or change data |
 
@@ -67,7 +71,7 @@ Nothing else is repaired, masked, trimmed, or realigned.
 ## Statistics
 
 - p-values are HyPhy's: `0.5 * (1 - CChi2(LRT, 2))` in `BUSTED.bf`, a 50:50 mixture of chi-square with 0 and 2 degrees of freedom. A likelihood ratio of 0 gives exactly 0.5, so p-values have a point mass at 0.5; QQ plots must allow for it.
-- Benjamini-Hochberg across one family: every orthogroup with status `tested` in one run, under one foreground hypothesis and one set of settings. Raw p-values are kept. Skipped and failed orthogroups are outside the family, counted, and listed.
+- Benjamini-Hochberg across one family: every orthogroup with status `tested` in one run, under one foreground hypothesis and one set of settings. Raw p-values are kept. Excluded and failed orthogroups are outside the family, counted, and listed.
 - Ascertainment: only single-copy orthogroups that pass QC and keep the foreground identifiable are tested. The provenance records counts by reason and, for each taxon, the number of tested orthogroups containing it.
 
 ## Phases
@@ -76,18 +80,26 @@ Nothing else is repaired, masked, trimmed, or realigned.
 |---|---|---|
 | P0 | Decisions, design | Done, this file and `DECISIONS.md` |
 | P1 | `phylo_busted` on user-supplied codon alignments, with optional gene trees; QC; provenance; example; tests; container and conda changes, not published | Done; see the validation page |
-| P2 | Orthogroup preparation from `extract_cds` output: orthogroups, MAFFT protein alignment, back-translation, QC | Not started |
-| P3 | Scientific calibration: simulation, published controls, optimizer variability, multiple-hit settings | Not started |
+| P2 | `phylo_prepare`: genomes or CDS and orthogroups to codon alignments and labelled trees, with QC, member and exclusion records, provenance, and a manifest; gene-tree discordance; multiple starts as diagnostics; outcome bases | Done; [phylo-prepare.md](../validation/phylo-prepare.md) |
+| P3 | Scientific calibration: simulation, published controls, optimizer variability and multistart policy, multiple-hit settings, BUSTED-E, discordance | Not started; awaiting review |
 | P4 | aBSREL: branch-level results and their correction | Not started |
 | P5 | RELAX | Not started |
 | P6 | Enrichment over the tested set, and plots | Not started |
 
-## Open decisions for the maintainer
+## Decided after the P1 review (2026-11-13)
 
-1. **Optimizer variability.** Over 20 seeds, one gene's LRT ranged 7.0 to 8.8, and its best unconstrained log-likelihood by 0.59. A gene near the threshold can change call with the seed. Options for P3: accept and report; several seeds per gene with the best likelihood per model; or more `--starting-points`. Each changes results, so it needs evidence and approval.
-2. **Multiple hits.** HyPhy's default is `None`. Whether dndsR should recommend `Double` is for P3 simulation, not now.
-3. **BUSTED-E (`--error-sink`)** as a standard sensitivity analysis, given HyPhy calls it experimental.
-4. **Strict identifiability.** A missing sister lineage makes stem and clade hypotheses untestable. This is correct, but may exclude many orthogroups in patchy data. The alternative, accepting stems that include earlier time, changes the hypothesis.
-5. **Gene trees.** Whether discordance near the foreground should exclude (as now), be flagged, or be handled otherwise.
-6. **Development version.** `DESCRIPTION` stays 0.4.0, so provenance from this code says 0.4.0. A development version such as 0.4.0.9000 would distinguish it, but also changes the skill's `software-version`.
-7. **Release line.** Whether this ships as 0.5.0 before 1.0.0, and the image that carries HyPhy.
+1. Fixed seed and thread count stay the reproducible default. Multiple independent starts are available (`extra_seeds`) as diagnostics; the largest LRT is never chosen automatically. Optimization of both null and alternative, and multistart policies, are for P3 under rules fixed in advance.
+2. HyPhy's multiple-hit default is kept; alternatives exposed. BUSTED-E stays experimental and optional, and says so when used.
+3. Strict identifiability stays. Exclusions distinguish mathematical from policy (above).
+4. Species-tree and gene-tree workflows are both supported. Discordance is reported, particularly near the foreground, and never excludes an orthogroup.
+5. Development version 0.4.0.9000. v0.4.0 and the v1.0.0 roadmap are unchanged. The module is experimental and unreleased.
+6. The development image is built and tested locally (`tools/dev/validation/image.def`, on node-local storage) and by CI when pushed. No image is published.
+
+## Open questions for P3
+
+1. A prespecified calibration design: simulation regimes (divergence, tree size, length, synonymous rate variation, multinucleotide substitutions, alignment error, discordance), null and alternative proportions, and the pass rule.
+2. Multistart policy: whether reporting the best null and best alternative across starts should replace the single start, judged by calibration, not by the size of the LRT.
+3. Whether `--multiple-hits Double` or BUSTED-E should be recommended, or run as sensitivity analyses.
+4. Whether to filter alignments (and with what validated method), or to drop single bad members instead of excluding whole orthogroups. Both change which data are tested.
+5. Duplication-aware orthology: whether to support tree-based paralog pruning, and how to define foregrounds on gene trees with duplications.
+6. Which release carries the module, and publishing an image with HyPhy.

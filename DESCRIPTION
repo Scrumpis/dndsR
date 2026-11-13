@@ -1,7 +1,7 @@
 Package: dndsR
 Type: Package
 Title: dN/dS Pipeline for Comparative Genomics
-Version: 0.4.0
+Version: 0.4.0.9000
 Authors@R: 
     person(given = "Nick", family = "Johnson", 
            email = "john7932@msu.edu", role = c("aut","cre"))
@@ -59,7 +59,7 @@ Suggests:
     withr,
     topGO
 SystemRequirements:
-    DIAMOND (>= 2.1.8); HyPhy (2.5.103, optional, for phylo_busted)
+    DIAMOND (>= 2.1.8); HyPhy (2.5.103, optional, for phylo_busted); MAFFT (optional, for phylo_prepare)
 Config/testthat/edition: 3
 ByteCompile: true
 Roxygen: list(markdown = TRUE)

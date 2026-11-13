@@ -89,20 +89,22 @@ fake_inputs <- function(dir) {
   writeLines(c("scope\ttaxa", "terminal\tspA,spB"), file.path(dir, "fg.tsv"))
 }
 
-run_fake <- function(mode, version = "2.5.103") {
+run_fake <- function(mode, version = "2.5.103", ...) {
   skip_on_os("windows")
   skip_if_not_installed("ape")
   dir <- withr::local_tempdir(.local_envir = parent.frame())
   fake_inputs(dir)
-  res <- phylo_busted(file.path(dir, "aln"), file.path(dir, "tree.nwk"), file.path(dir, "fg.tsv"),
-                      output_dir = dir, hyphy = fake_hyphy(dir, mode, version))
+  res <- phylo_busted(alignment_dir = file.path(dir, "aln"), species_tree_file = file.path(dir, "tree.nwk"),
+                      foreground_file = file.path(dir, "fg.tsv"), output_dir = dir, hyphy = fake_hyphy(dir, mode, version), ...)
   list(res = res, dir = dir)
 }
 
 test_that("a HyPhy error marks the orthogroup failed, keeps the message, and leaves the family", {
-  expect_warning(r <- run_fake("error"), "failed in HyPhy and are not in the multiple-testing family")
+  expect_warning(r <- run_fake("error"), "failed and are not in the multiple-testing family")
   expect_identical(r$res$status, "failed")
   expect_identical(r$res$reason, "hyphy_error")
+  expect_identical(r$res$exclusion_basis, "software")
+  expect_identical(r$res$stage, "analysis")
   expect_match(r$res$detail, "must not contain stop codons")
   expect_identical(r$res$family_size, 0L)
   expect_true(is.na(r$res$p_adj))
@@ -134,6 +136,30 @@ test_that("HyPhy is called with the seed, thread count, and settings, and they a
                    "(((spA{FG},spB{FG})Node3,(spC,spD)Node4)Node2,(spE,spF)Node5,(spG,spH)Node6);")
 })
 
+test_that("an extra start that fails makes the orthogroup fail, naming the seed", {
+  expect_warning(r <- run_fake("error", extra_seeds = 2:3), "failed")
+  expect_identical(r$res$reason, "hyphy_error")
+  expect_error(suppressWarnings(run_fake("error", extra_seeds = c(1L, 2L))), "different from seed")
+})
+
+test_that("diagnostics across starts use each model's best likelihood, and never replace the primary", {
+  v <- function(lrt, unc, con) list(values = list(lrt = lrt, lnl_unconstrained = unc, lnl_constrained = con))
+  # Primary: LRT 2 (unc -100, con -101). Start 2: better alternative (-99.5), no constrained fit.
+  # Start 3: better null (-100.8). Best alternative -99.5; best null max(-101, -99.5, -100.8) = -99.5.
+  d <- .phylo_start_diagnostics(list(v(2, -100, -101), v(0, -99.5, NA), v(1.6, -100, -100.8)), c(1L, 2L, 3L))
+  expect_identical(d$n_starts, 3L)
+  expect_identical(c(d$lrt_min_starts, d$lrt_max_starts), c(0, 2))
+  expect_identical(d$lnl_unconstrained_best, -99.5)
+  expect_identical(d$lnl_null_best, -99.5)
+  expect_identical(d$lrt_best_fits, 0)
+  expect_identical(d$p_best_fits, 0.5)
+  expect_false(d$primary_unconstrained_is_best)
+  d2 <- .phylo_start_diagnostics(list(v(2, -100, -101), v(1, -100.2, -100.7)), c(1L, 2L))
+  expect_equal(d2$lrt_best_fits, 2 * (-100 - -100.7))
+  expect_true(d2$primary_unconstrained_is_best)
+  expect_false(d2$primary_null_is_best)
+})
+
 test_that("an unvalidated HyPhy version is announced", {
   expect_message(suppressWarnings(run_fake("error", version = "2.5.90")), "HyPhy 2.5.90 has not been checked")
 })
@@ -145,8 +171,11 @@ test_that("a missing HyPhy stops with installation advice", {
 })
 
 test_that("the CLI finds the phylogenetic commands and keeps paths and choices as typed", {
-  expect_true(all(c("phylo_busted", "phylo_example", "verify_phylo_example") %in% cli_list_commands()))
-  p <- parse_dnds_opts(args = c("--species-tree-file", "NA", "--multiple-hits", "Double+Triple", "--srv", "No", "--seed", "7"))
+  expect_true(all(c("phylo_prepare", "phylo_busted", "phylo_example", "verify_phylo_example") %in% cli_list_commands()))
+  p <- parse_dnds_opts(args = c("--species-tree-file", "NA", "--multiple-hits", "Double+Triple", "--srv", "No", "--seed", "7",
+                                "--extra-seeds", "2,3", "--prepared-dir", "prepared"))
+  expect_identical(p$extra_seeds, c("2", "3"))
+  expect_identical(p$prepared_dir, "prepared")
   expect_identical(p$species_tree_file, "NA")
   expect_identical(p$multiple_hits, "Double+Triple")
   expect_identical(p$srv, "No")

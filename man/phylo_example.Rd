@@ -2,21 +2,33 @@
 % Please edit documentation in R/phylo_example.R
 \name{phylo_example}
 \alias{phylo_example}
-\title{Copy the bundled phylogenetic example to a folder}
+\title{Copy a bundled phylogenetic example to a folder}
 \usage{
-phylo_example(output_dir = "dndsr_phylo_example")
+phylo_example(
+  output_dir = "dndsr_phylo_example",
+  type = c("genomes", "alignments")
+)
 }
 \arguments{
 \item{output_dir}{Folder to create. It must not already contain the example.}
+
+\item{type}{"genomes" or "alignments".}
 }
 \value{
 The folder path, invisibly.
 }
 \description{
-Copies seven synthetic codon alignments of up to eight taxa, a species tree, a
-foreground file, and the design and direct HyPhy results used by
-\code{\link[=verify_phylo_example]{verify_phylo_example()}}. The sequences were simulated and have no biological meaning.
-Four orthogroups are testable; three are designed to be skipped.
+Two synthetic examples, simulated with no biological meaning:
+\itemize{
+\item \code{"genomes"} (default): six genome FASTA and GFF3 files, an orthogroup table
+in dndsR's long format and in OrthoFinder's format, a species tree, a foreground,
+three gene trees, and the design. Fourteen orthogroups; eight can be tested, and six
+are designed to be excluded (a paralog, invalid gene models, missing taxa). Run
+\code{\link[=phylo_prepare]{phylo_prepare()}} and then \code{\link[=phylo_busted]{phylo_busted()}}.
+\item \code{"alignments"}: seven codon alignments of up to eight taxa, for
+\code{\link[=phylo_busted]{phylo_busted()}} directly. Four can be tested; three are designed to be excluded.
+}
+Each includes the direct HyPhy results used by \code{\link[=verify_phylo_example]{verify_phylo_example()}}.
 }
 \examples{
 folder <- phylo_example(file.path(tempdir(), "dndsr_phylo_example"))

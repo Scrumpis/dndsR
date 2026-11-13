@@ -1,0 +1,15 @@
+orthogroup	note	expected_prepare	expected_basis	expected_busted
+OG01	episodic on the foreground	prepared		tested
+OG02	episodic on the foreground	prepared		tested
+OG03	episodic on the foreground	prepared		tested
+OG04	no foreground difference; gene trees for 04-06	prepared		tested
+OG05	no foreground difference; gene trees for 04-06	prepared		tested
+OG06	no foreground difference; gene trees for 04-06	prepared		tested
+OG07	two spD copies (a paralog)	excluded:multi_copy	policy	excluded:multi_copy
+OG08	internal TGA in spC's gene model	excluded:cds_invalid	data_quality	excluded:cds_invalid
+OG09	no spB gene; clade hypothesis still testable	prepared		tested
+OG10	codon insertion in spA and deletion in spD and spE; true alignment in truth/	prepared		tested
+OG11	no spA or spB gene	excluded:foreground_absent	no_data	excluded:foreground_absent
+OG12	no spC gene: the clade's stem joins the background branch above it; spA and spB stay separable	excluded:foreground_partly_unidentifiable	policy	excluded:foreground_partly_unidentifiable
+OG14	no spB or spC gene: spA's branch joins the stem and the background branch above; nothing separable	excluded:foreground_unidentifiable	mathematical	excluded:foreground_unidentifiable
+OG13	1-nt deletion in spE's gene model (frameshift)	excluded:cds_invalid	data_quality	excluded:cds_invalid

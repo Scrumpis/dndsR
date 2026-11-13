@@ -1,0 +1,11 @@
+parent	child	length
+root	nAE	0.04
+root	spF	0.18
+nAE	nABC	0.05
+nAE	nDE	0.07
+nABC	nAB	0.06
+nABC	spC	0.12
+nAB	spA	0.1
+nAB	spB	0.12
+nDE	spD	0.1
+nDE	spE	0.09

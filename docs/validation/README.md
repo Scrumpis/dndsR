@@ -15,6 +15,7 @@ What has actually been checked, and how. Commit SHAs are in `git log` and the pr
 | Orthologs | Reciprocal best hits against OMA, by dS, and the effect on term lists | [orthology.md](orthology.md) |
 | Enrichment calibration | False-positive rates before and after the correction and default changes, on real public annotations, under three nulls; GFF recovery | [enrichment.md](enrichment.md). Earlier evidence: [59faf30](enrichment-59faf30.md), [1a363fb](enrichment-1a363fb.md) |
 | Phylogenetic wrapper (`phylo_busted`) | Exact agreement with HyPhy run directly on independently prepared inputs; HyPhy behaviors the design relies on; seed, thread, and version effects. Wrapper correctness only, not calibration | [phylo-busted-wrapper.md](phylo-busted-wrapper.md) |
+| Phylogenetic preparation (`phylo_prepare`), end to end | Synthetic genomes with designed failures: alignments equal designed CDS and a true indel alignment; exclusions and their basis; OrthoFinder formats; gene-tree mode and the whole workflow equal HyPhy run directly; hypothesis guards. Engineering correctness only | [phylo-prepare.md](phylo-prepare.md) |
 | Thread scaling | Time and memory per step, and identical results across thread counts | [performance.md](performance.md) |
 | Fisher tests | p-values equal an independent hypergeometric calculation | `test-example-pipeline.R` |
 | Region summaries and contrasts | Counts, means, deltas, and Wilcoxon p-values recalculated in base R | `test-example-pipeline.R` |

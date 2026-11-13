@@ -1,6 +1,6 @@
 # dndsR commands
 
-Every command is also an R function with the same name and options, except `example`, which is `dndsr_example()`. `phylo_busted` takes `--alignment-dir`, `--species-tree-file`, `--foreground-file`, and optionally `--gene-tree-dir`, `--run-name`, `--seed`, `--hyphy-cpu`, `--hyphy`, and HyPhy's settings (`--srv`, `--multiple-hits`, `--rates`, `--syn-rates`, `--error-sink`); its outputs go in `<output_dir>/<run_name>/`. Use `dndsr <command> --help` for arguments.
+Every command is also an R function with the same name and options, except `example`, which is `dndsr_example()`. `phylo_prepare` takes `--orthogroup-file`, `--species-tree-file`, `--foreground-file`, one of `--genome-file` or `--cds-file`, and optionally `--gene-tree-dir`, `--gene-tree-mode`, `--run-name` (default `prepared`), `--min-taxa`, `--terminal-stops`, `--mafft-strategy`, and `--mafft`. `phylo_busted` takes `--prepared-dir`, or `--alignment-dir`, `--species-tree-file`, and `--foreground-file`; and optionally `--gene-tree-dir`, `--gene-tree-mode`, `--run-name` (default `busted`), `--seed`, `--extra-seeds`, `--hyphy-cpu`, `--hyphy`, and HyPhy's settings (`--srv`, `--multiple-hits`, `--rates`, `--syn-rates`, `--error-sink`). Outputs go in `<output_dir>/<run_name>/`. Use `dndsr <command> --help` for arguments.
 
 | Command | Documented purpose |
 |---|---|
@@ -16,9 +16,10 @@ Every command is also an R function with the same name and options, except `exam
 | `dnds_summary` | dN/dS distributions and statistics, optionally by region |
 | `dnds_contrast` | Contrasts between comparisons |
 | `dnds_state_contrast` | Contrasts of selection states between groups; `--level gene` is disabled |
-| `phylo_busted` | HyPhy BUSTED tests across species on chosen branches, corrected across orthogroups. Development code, not in v0.4.0; needs HyPhy 2.5.103 |
-| `phylo_example` | Copy the bundled phylogenetic example to a folder |
-| `verify_phylo_example` | Check the phylogenetic example against HyPhy run directly |
+| `phylo_prepare` | Codon alignments and labelled trees from genomes or CDS and orthogroups. Experimental, not in v0.4.0; needs MAFFT |
+| `phylo_busted` | HyPhy BUSTED tests across species on chosen branches, corrected across orthogroups. Experimental, not in v0.4.0; needs HyPhy 2.5.103 |
+| `phylo_example` | Copy a bundled phylogenetic example (`--type genomes`, the default, or `alignments`) |
+| `verify_phylo_example` | Check a phylogenetic example against its design and HyPhy run directly |
 | `example` | Copy the bundled example to a folder |
 | `verify_example` | Check example results against independent values |
 

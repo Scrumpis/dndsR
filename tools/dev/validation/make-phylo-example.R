@@ -111,20 +111,20 @@ add("OG0004", "null", "spB missing; clade hypothesis still identifiable, stem wo
 s <- simulate_og(n_codons, null_classes)
 s$spA <- NULL; s$spB <- NULL
 write_fasta(s, file.path(out, "alignments", "OG0005.fasta"), "OG0005")
-add("OG0005", "null", "spA and spB missing", "skipped:foreground_absent")
+add("OG0005", "null", "spA and spB missing", "excluded:foreground_absent")
 
 # 6. An internal stop codon in spC: excluded, not repaired.
 s <- simulate_og(n_codons, null_classes)
 substr(s$spC, 151, 153) <- "TGA"
 write_fasta(s, file.path(out, "alignments", "OG0006.fasta"), "OG0006")
-add("OG0006", "null", "internal TGA in spC at codon 51", "skipped:internal_stop")
+add("OG0006", "null", "internal TGA in spC at codon 51", "excluded:internal_stop")
 
 # 7. Two sequences from spD: not single-copy.
 s <- simulate_og(n_codons, null_classes)
 seqs <- c(s, list(spD = s$spD))
 lines <- unlist(lapply(seq_along(seqs), function(i) c(paste0(">", names(seqs)[i], "|", names(seqs)[i], "_OG0007_", i), seqs[[i]])))
 writeLines(lines, file.path(out, "alignments", "OG0007.fasta"))
-add("OG0007", "null", "two spD sequences", "skipped:multi_copy")
+add("OG0007", "null", "two spD sequences", "excluded:multi_copy")
 
 write.table(do.call(rbind, design), file.path(out, "truth", "design.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 write.table(edges, file.path(out, "truth", "tree_edges.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)

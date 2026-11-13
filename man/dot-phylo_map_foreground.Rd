@@ -4,7 +4,12 @@
 \alias{.phylo_map_foreground}
 \title{Map a foreground hypothesis onto the tree for one orthogroup}
 \usage{
-.phylo_map_foreground(hyp, present, gene_tree = NULL)
+.phylo_map_foreground(
+  hyp,
+  present,
+  gene_tree = NULL,
+  gene_tree_mode = c("topology", "report")
+)
 }
 \arguments{
 \item{hyp}{Result of \code{\link[=.phylo_read_foreground]{.phylo_read_foreground()}}.}
@@ -12,15 +17,28 @@
 \item{present}{Taxa present in the orthogroup.}
 
 \item{gene_tree}{Optional \code{ape} phylo with tips named by taxon.}
+
+\item{gene_tree_mode}{\code{"topology"} or \code{"report"}.}
 }
 \value{
 A list with \code{ok}, \code{reason}, \code{detail}, \code{newick} (labelled, unrooted, no branch
-lengths), and \code{branches} (one row per branch).
+lengths), \code{branches} (one row per branch), and \code{info} (foreground and discordance
+measures).
 }
 \description{
-Branches of the species tree that join after pruning become one branch. If such a join
-combines foreground and background branches, the hypothesis is not identifiable for this
-orthogroup and nothing is tested. With a gene tree, every foreground branch must exist in
-it; branches inside a clade-scope foreground are foreground.
+Branches of the species tree that join after pruning become one branch. A requested
+branch joined to a background branch cannot be separated from it. If no requested branch
+can be separated, the hypothesis is \code{foreground_unidentifiable}; if only some can, testing
+those would narrow the hypothesis, so it is \code{foreground_partly_unidentifiable}. If a
+hypothesis row has no taxa present, or a terminal row lacks a listed taxon, it is
+\code{foreground_incomplete}. Missing members of a clade-scope row are allowed and counted.
+Nothing is relabelled.
+}
+\details{
+With a gene tree, discordance with the pruned species tree is measured in both modes.
+In \code{"topology"} mode the gene tree is given to HyPhy: every terminal and stem foreground
+branch, and each clade's stem, must exist in it (\code{foreground_not_in_gene_tree}
+otherwise), and branches inside a clade-scope foreground are foreground. In \code{"report"}
+mode the species tree is used, and the gene tree is only compared.
 }
 \keyword{internal}

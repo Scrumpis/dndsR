@@ -1,0 +1,7 @@
+taxon	fasta	gff	orthofinder_name
+spA	spA.fasta	spA.gff3	spA_proteins
+spB	spB.fasta	spB.gff3	spB_proteins
+spC	spC.fasta	spC.gff3	spC_proteins
+spD	spD.fasta	spD.gff3	spD_proteins
+spE	spE.fasta	spE.gff3	spE_proteins
+spF	spF.fasta	spF.gff3	spF_proteins

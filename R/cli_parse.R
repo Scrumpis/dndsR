@@ -42,7 +42,7 @@
 #' Options whose values are lists, written with commas (for example `--sides query,subject`)
 #' @keywords internal
 .cli_list_options <- c(
-  "sides", "ontologies", "focal_sides", "dedup_keys", "exclude_terms", "term_blocklist", "term_seps", "terms"
+  "sides", "ontologies", "focal_sides", "dedup_keys", "exclude_terms", "term_blocklist", "term_seps", "terms", "extra_seeds"
 )
 
 #' Options whose values are names or paths and must stay exactly as typed

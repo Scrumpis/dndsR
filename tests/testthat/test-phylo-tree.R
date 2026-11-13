@@ -29,38 +29,51 @@ test_that("stem and terminal hypotheses label only their branches", {
   expect_identical(fg_sets(two), c("spA,spB", "spE"))
 })
 
-test_that("a missing clade member makes a stem hypothesis untestable, but not a clade hypothesis", {
+test_that("a missing clade member makes a stem hypothesis unidentifiable, but not a clade hypothesis", {
   present <- setdiff(all_taxa, "spB")
   stem <- .phylo_map_foreground(hypothesis(c(stem = "spA,spB")), present)
   expect_false(stem$ok)
-  expect_identical(stem$reason, "foreground_not_identifiable")
+  expect_identical(stem$reason, "foreground_unidentifiable")
   expect_match(stem$detail, "mrca(spA,spB)+spA", fixed = TRUE)
   clade <- .phylo_map_foreground(hypothesis(c(clade = "spA,spB")), present)
   expect_true(clade$ok)
   expect_identical(fg_sets(clade), "spA")
   expect_identical(clade$branches$species_tree_branches[clade$branches$foreground], "mrca(spA,spB)+spA")
+  expect_identical(clade$info$fg_absent_branches, 1L)
 })
 
-test_that("a missing sister lineage makes the stem untestable under either scope", {
+test_that("a missing sister lineage: the stem is unidentifiable; a clade is excluded by policy", {
   present <- setdiff(all_taxa, c("spC", "spD"))
-  for (scope in c("stem", "clade")) {
-    m <- .phylo_map_foreground(hypothesis(stats::setNames("spA,spB", scope)), present)
-    expect_false(m$ok)
-    expect_identical(m$reason, "foreground_not_identifiable")
-  }
+  # Stem scope: the only requested branch joins background, so nothing can be separated.
+  stem <- .phylo_map_foreground(hypothesis(c(stem = "spA,spB")), present)
+  expect_identical(stem$reason, "foreground_unidentifiable")
+  # Clade scope: spA and spB stay separable, but testing them alone would narrow the hypothesis.
+  clade <- .phylo_map_foreground(hypothesis(c(clade = "spA,spB")), present)
+  expect_identical(clade$reason, "foreground_partly_unidentifiable")
+  expect_identical(.phylo_reason_basis(c(stem$reason, clade$reason)), c("mathematical", "policy"))
 })
 
-test_that("a terminal branch whose sister is missing is untestable", {
+test_that("a terminal branch whose sister is missing is unidentifiable", {
   m <- .phylo_map_foreground(hypothesis(c(terminal = "spA")), setdiff(all_taxa, "spB"))
   expect_false(m$ok)
-  expect_identical(m$reason, "foreground_not_identifiable")
+  expect_identical(m$reason, "foreground_unidentifiable")
   expect_true(.phylo_map_foreground(hypothesis(c(terminal = "spA")), setdiff(all_taxa, "spH"))$ok)
 })
 
 test_that("the stem of a clade beside the root cannot be told apart from the other root branch", {
   m <- .phylo_map_foreground(hypothesis(c(stem = "spG,spH")), all_taxa)
   expect_false(m$ok)
-  expect_identical(m$reason, "foreground_not_identifiable")
+  expect_identical(m$reason, "foreground_unidentifiable")
+})
+
+test_that("a hypothesis row with no taxa present, or a terminal row lacking a taxon, is incomplete", {
+  m <- .phylo_map_foreground(hypothesis(c(terminal = "spA,spE")), setdiff(all_taxa, "spE"))
+  expect_identical(m$reason, "foreground_incomplete")
+  expect_match(m$detail, "lacks: spE")
+  two <- .phylo_map_foreground(hypothesis(c(clade = "spA,spB", terminal = "spH")), setdiff(all_taxa, "spH"))
+  expect_identical(two$reason, "foreground_incomplete")
+  expect_identical(.phylo_reason_basis("foreground_incomplete"), "policy")
+  expect_true(.phylo_map_foreground(hypothesis(c(clade = "spA,spB", terminal = "spH")), all_taxa)$ok)
 })
 
 test_that("missing taxa elsewhere leave the hypothesis intact", {
@@ -108,11 +121,31 @@ test_that("a concordant gene tree gives the same labels as the species tree", {
   expect_true(all(m$branches$topology_source == "gene_tree"))
 })
 
-test_that("a gene tree without the foreground clade is discordant, not relabelled", {
+test_that("a gene tree without the foreground clade cannot carry the hypothesis, and is not relabelled", {
   gt <- ape::read.tree(text = "((((spA,spC),(spB,spD)),(spE,spF)),(spG,spH));")
   m <- .phylo_map_foreground(hypothesis(c(clade = "spA,spB")), all_taxa, gt)
   expect_false(m$ok)
-  expect_identical(m$reason, "foreground_discordant")
+  expect_identical(m$reason, "foreground_not_in_gene_tree")
+  expect_identical(.phylo_reason_basis(m$reason), "mathematical")
+  # In report mode the species tree is used, and the discordance is reported.
+  r <- .phylo_map_foreground(hypothesis(c(clade = "spA,spB")), all_taxa, gt, "report")
+  expect_true(r$ok)
+  expect_true(all(r$branches$topology_source == "species_tree"))
+  expect_identical(fg_sets(r), c("spA", "spA,spB", "spB"))
+  # Species splits {A,B} and {C,D} are missing from the gene tree; {A,B} is foreground.
+  expect_identical(r$info$gt_missing_species_splits, 2L)
+  expect_true(r$info$gt_discordant_near_foreground)
+})
+
+test_that("discordance away from the foreground is reported as such", {
+  # Swapping spE and spG changes splits {E,F} and {G,H}, far from the stem of spA and spB.
+  gt <- ape::read.tree(text = "((((spA,spB),(spC,spD)),(spG,spF)),(spE,spH));")
+  m <- .phylo_map_foreground(hypothesis(c(clade = "spA,spB")), all_taxa, gt)
+  expect_true(m$ok)
+  expect_identical(m$info$gt_missing_species_splits, 2L)
+  expect_identical(m$info$gt_extra_splits, 2L)
+  expect_false(m$info$gt_discordant_near_foreground)
+  expect_identical(fg_sets(m), c("spA", "spA,spB", "spB"))
 })
 
 test_that("inside a clade-scope foreground, discordant gene-tree branches are foreground", {
@@ -126,10 +159,26 @@ test_that("inside a clade-scope foreground, discordant gene-tree branches are fo
   expect_identical(fg_sets(s), "spE,spF,spG,spH")
 })
 
-test_that("gene tree tips may be sequence names, and must match the alignment", {
+test_that("gene tree tips may be taxa, sequence names, gene IDs, or OrthoFinder names, and must match", {
   dir <- withr::local_tempdir()
-  writeLines("((spA|g1,spB|g2),(spC|g3,spD|g4));", file.path(dir, "g.nwk"))
-  seqs <- c("spA|g1" = "spA", "spB|g2" = "spB", "spC|g3" = "spC", "spD|g4" = "spD")
-  expect_setequal(.phylo_read_gene_tree(file.path(dir, "g.nwk"), seqs)$tip.label, c("spA", "spB", "spC", "spD"))
-  expect_error(.phylo_read_gene_tree(file.path(dir, "g.nwk"), seqs[1:3]), "gene_tree_taxa_mismatch")
+  seqs <- data.frame(seq_name = paste0(c("spA", "spB", "spC", "spD"), "|g", 1:4), taxon = c("spA", "spB", "spC", "spD"),
+                     gene_id = paste0("g", 1:4))
+  read <- function(text, s = seqs, aliases = NULL) {
+    writeLines(text, file.path(dir, "g.nwk"))
+    .phylo_read_gene_tree(file.path(dir, "g.nwk"), s, aliases)$tip.label
+  }
+  expect_identical(read("((spA|g1,spB|g2),(spC|g3,spD|g4));"), c("spA", "spB", "spC", "spD"))
+  expect_identical(read("((g1,g2),(g3,g4));"), c("spA", "spB", "spC", "spD"))
+  expect_identical(read("((spA_g1,spB_g2),(spC_g3,spD_g4));"), c("spA", "spB", "spC", "spD"))
+  expect_identical(read("((A_prot_g1,spB_g2),(spC,spD));", aliases = c(A_prot = "spA")), c("spA", "spB", "spC", "spD"))
+  expect_error(read("((spA,spB),(spC,spD));", seqs[1:3, ]), "gene_tree_taxa_mismatch")
+  expect_error(read("((spA,spB),(spC,spZ));"), "gene_tree_taxa_mismatch")
+})
+
+test_that("every reason has a basis", {
+  reasons <- c("foreground_unidentifiable", "foreground_not_in_gene_tree", "foreground_absent", "foreground_partly_unidentifiable",
+               "foreground_incomplete", "multi_copy", "too_few_taxa", "cds_invalid", "internal_stop", "gene_not_found",
+               "hyphy_error", "backtranslation_mismatch", "prepared_tree_mismatch", "label_mismatch")
+  expect_false(anyNA(.phylo_reason_basis(reasons)))
+  expect_identical(.phylo_reason_basis(c("multi_copy", "hyphy_error", "foreground_absent")), c("policy", "software", "no_data"))
 })

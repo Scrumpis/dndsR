@@ -66,33 +66,57 @@ The tested groups: positive genes have `dNdS > pos_threshold` (default 1), and t
 
 `--level gene` is disabled, because its results were not meaningful. The default, `--level pairwise`, classifies each row as Positive, Neutral, or Purifying and compares groups given by a `group` column in `--dnds-table-file`. `<label>_dnds_state_contrasts.tsv` has `state`, `groupA`, `groupB`, `model`, `log_or`, `se`, `p_value`, `p_adj`, `odds_ratio` (A relative to B), `or_ci_lower`, and `or_ci_upper`.
 
-## phylo_busted
+## phylo_prepare
 
-Phylogenetic results are separate from pairwise ones. They go in `<output_dir>/<run_name>/` (default `run_name` is `busted`), and contain no dN/dS estimates. Methods: [phylo-methods.md](phylo-methods.md).
+Experimental. Outputs go in `<output_dir>/<run_name>/` (default `prepared`). Methods: [phylo-methods.md](phylo-methods.md).
 
 | File | Contents |
 |---|---|
-| `<run>_results.tsv` | One row per orthogroup, tested, skipped, or failed |
+| `alignments/<orthogroup>.fasta` | Codon alignment of each prepared orthogroup, sequences named `taxon|gene_id` |
+| `proteins/<orthogroup>.faa` | The MAFFT protein alignment it was built from |
+| `trees/<orthogroup>.nwk` | The pruned, unrooted topology with `{FG}` labels, as HyPhy will receive it |
+| `gene_trees/<orthogroup>.nwk` | Supplied gene trees, with tips renamed to taxa (when given) |
+| `cds/<taxon>/` | CDS extracted by `extract_cds` (genome input) |
+| `species_tree.nwk`, `foreground.tsv` | Copies of the inputs, which `phylo_busted` checks against the provenance |
+| `<run>_summary.tsv` | One row per orthogroup: `prepared`, `excluded`, or `failed` |
+| `<run>_members.tsv` | One row per gene of every orthogroup: `copies` of its taxon, `cds_status`, and whether it was `used` |
+| `<run>_sequences.tsv` | Per sequence of each orthogroup that passed membership and CDS checks: codons, `terminal_stop_removed`, `starts_with_atg`, `ambiguous_codons` |
+| `<run>_provenance.json` | dndsR, R, ape, Biostrings, and MAFFT versions and arguments; settings; inputs with MD5s; counts by status, reason, and basis; prepared orthogroups per taxon |
+| `prepare_manifest.json` | Where `phylo_busted --prepared-dir` finds everything |
+
+Summary columns: `orthogroup`, `status`, `reason`, `exclusion_basis`, `detail`, `n_taxa`, `taxa`, `taxa_absent`, `n_codons`, `terminal_stops_removed`, `fg_requested_branches` and `fg_absent_branches` (species-tree branches requested, and those with no taxa present), the alignment QC metrics listed below, `n_fg_branches`, `qc_flags`, `alignment_md5`, `tree_md5`; and with gene trees, the `gt_*` columns below.
+
+## phylo_busted
+
+Phylogenetic results are separate from pairwise ones. They go in `<output_dir>/<run_name>/` (default `busted`), and contain no dN/dS estimates.
+
+| File | Contents |
+|---|---|
+| `<run>_results.tsv` | One row per orthogroup, tested, excluded, or failed; with `--prepared-dir`, preparation's exclusions too |
 | `<run>_branches.tsv` | Every branch given to HyPhy, for each orthogroup that reached HyPhy |
 | `<run>_sequences.tsv` | Per-sequence QC |
-| `<run>_provenance.json` | dndsR, R, ape, and HyPhy versions; HyPhy path; settings; seed and HyPhy threads; input paths and MD5s; the foreground hypothesis; the correction family; counts by status and reason; tested orthogroups per taxon |
-| `hyphy/<orthogroup>/` | The exact `alignment.fas` and `tree.nwk` given to HyPhy, `hyphy.log`, `busted.json`, and `record.json` (what a rerun must match to be reused) |
+| `<run>_provenance.json` | dndsR, R, ape, and HyPhy versions; HyPhy path; settings; seed, extra seeds, and HyPhy threads; inputs and MD5s; the prepared folder and its provenance's MD5; the foreground hypothesis; the correction family; counts by status, reason, and basis; tested orthogroups per taxon |
+| `hyphy/<orthogroup>/` | The exact `alignment.fas` and `tree.nwk` given to HyPhy, `hyphy.log`, `busted.json`, and `record.json` (what a rerun must match to be reused); extra starts in `start_seed<k>/` |
 
 Results columns:
 
 | Column | Meaning |
 |---|---|
-| `orthogroup`, `method` | Alignment file name without extension; `busted` |
-| `status`, `reason`, `detail` | `tested`, `skipped`, or `failed`; why; a readable explanation |
+| `orthogroup`, `method` | Orthogroup; `busted` |
+| `status`, `stage`, `reason`, `exclusion_basis`, `detail` | `tested`, `excluded`, or `failed`; in `prepare` or `analysis`; why; `mathematical`, `no_data`, `policy`, `data_quality`, `input`, or `software`; a readable explanation |
 | `n_taxa`, `n_codons`, `taxa_absent` | Size of the alignment, and species-tree taxa not in it |
 | `n_fg_branches`, `fg_branches` | Foreground branches given to HyPhy, by its names |
-| `lrt`, `p_value` | HyPhy's likelihood ratio and p-value. p is 0.5 when the ratio is 0 |
+| `fg_requested_branches`, `fg_absent_branches` | Species-tree branches requested, and those with no taxa present |
+| `lrt`, `p_value` | HyPhy's likelihood ratio and p-value, from `seed`. p is 0.5 when the ratio is 0 |
 | `p_adj`, `p_adj_method`, `family_size` | Benjamini-Hochberg across tested orthogroups in this run |
 | `constrained_fitted`, `lnl_unconstrained`, `lnl_constrained` | Log-likelihoods. HyPhy fits the constrained model only when the unconstrained one shows evidence |
 | `fg_omega_<k>`, `fg_prop_<k>`, `bg_omega_<k>`, `bg_prop_<k>` | ω and weight of HyPhy's rate class k (its class k-1) on foreground and background branches, unconstrained model. Classes are not sorted |
 | `tree_length` | Sum of branch lengths in the unconstrained model |
+| `n_starts` | Starts run: 1, or more with `--extra-seeds` |
+| `start_seeds`, `lrt_min_starts`, `lrt_max_starts`, `lnl_unconstrained_best`, `lnl_null_best`, `lrt_best_fits`, `p_best_fits`, `primary_unconstrained_is_best`, `primary_null_is_best` | Diagnostics across starts, with `--extra-seeds` only. They never change `p_value` or `p_adj` |
+| `gt_missing_species_splits`, `gt_extra_splits`, `gt_missing_splits`, `gt_discordant_near_foreground`, `gene_tree_mode` | With gene trees: species-tree branches absent from the gene tree, gene-tree branches absent from the species tree, which are missing, and whether one is or touches a foreground branch |
 | `terminal_stops_masked`, `max_gap_fraction`, `max_ambiguous_codon_fraction`, `gappy_column_fraction`, `median_p_distance`, `max_p_distance`, `dissimilar_windows` | Alignment QC |
-| `qc_flags` | Flags separated by `;`. See [phylo-methods.md](phylo-methods.md#alignment-checks) |
+| `qc_flags` | Flags separated by `;`. See [phylo-methods.md](phylo-methods.md#alignment-checks-reported) |
 | `alignment_md5`, `json`, `json_md5` | The input alignment's MD5, and HyPhy's JSON with its MD5 |
 
-Branches columns: `orthogroup`, `branch` (HyPhy's name), `terminal`, `taxa_side` (the smaller side of the branch's split of taxa), `foreground`, `species_tree_branches` (species-tree branches joined into this one, `+`-separated; internal ones are named by the tree's node labels or `mrca(x,y)`), `topology_source` (`species_tree` or `gene_tree`).
+Branches columns: `orthogroup`, `branch` (HyPhy's name), `terminal`, `taxa_side` (the smaller side of the branch's split of taxa), `foreground`, `species_tree_branches` (species-tree branches joined into this one, `+`-separated; internal ones are named by the tree's node labels or `mrca(x,y)`), `in_species_tree` (whether the branch exists in the pruned species tree), `topology_source` (`species_tree` or `gene_tree`).

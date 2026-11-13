@@ -5,10 +5,12 @@
 \title{Test for episodic positive selection on foreground branches with HyPhy BUSTED}
 \usage{
 phylo_busted(
-  alignment_dir,
-  species_tree_file,
-  foreground_file,
+  prepared_dir = NULL,
+  alignment_dir = NULL,
+  species_tree_file = NULL,
+  foreground_file = NULL,
   gene_tree_dir = NULL,
+  gene_tree_mode = NULL,
   output_dir = ".",
   run_name = "busted",
   srv = "Yes",
@@ -20,6 +22,7 @@ phylo_busted(
   starting_points = 1L,
   genetic_code = "Universal",
   seed = 1L,
+  extra_seeds = NULL,
   hyphy_cpu = 1L,
   threads = 1L,
   min_taxa = 4L,
@@ -29,6 +32,8 @@ phylo_busted(
 )
 }
 \arguments{
+\item{prepared_dir}{Output folder of \code{\link[=phylo_prepare]{phylo_prepare()}}. Replaces the next three.}
+
 \item{alignment_dir}{Folder of codon alignments, one per orthogroup.}
 
 \item{species_tree_file}{Rooted Newick species tree.}
@@ -36,6 +41,9 @@ phylo_busted(
 \item{foreground_file}{Foreground hypothesis (see Inputs).}
 
 \item{gene_tree_dir}{Optional folder of gene trees, one per orthogroup.}
+
+\item{gene_tree_mode}{"topology" or "report" (see Gene trees). Defaults to phylo_prepare's
+choice, or "topology".}
 
 \item{output_dir}{Folder for results.}
 
@@ -49,14 +57,16 @@ phylo_busted(
 
 \item{syn_rates}{Number of synonymous rate classes when \code{srv} is not "No" (default 3).}
 
-\item{error_sink}{"No" (HyPhy's default) or "Yes". HyPhy describes the error sink as an
-advanced experimental setting.}
+\item{error_sink}{"No" (HyPhy's default) or "Yes" (BUSTED-E). HyPhy describes the error
+sink as an advanced experimental setting, and so does dndsR.}
 
 \item{grid_size, starting_points}{HyPhy's optimisation settings (defaults 250 and 1).}
 
 \item{genetic_code}{Only "Universal" is supported.}
 
-\item{seed}{Random seed for HyPhy (default 1).}
+\item{seed}{Random seed for HyPhy (default 1). Determines the reported result.}
+
+\item{extra_seeds}{Further seeds for independent starts, reported as diagnostics.}
 
 \item{hyphy_cpu}{Threads for each HyPhy run (default 1). Changing it changes results
 slightly, as a different seed does.}
@@ -66,11 +76,11 @@ slightly, as a different seed does.}
 \item{min_taxa}{Fewest sequences an orthogroup may have (default 4).}
 
 \item{terminal_stops}{"mask" (default) replaces a stop codon ending a sequence with
-gaps, and records it; "exclude" skips the orthogroup instead. Internal stop codons
+gaps, and records it; "exclude" excludes the orthogroup instead. Internal stop codons
 always exclude the orthogroup.}
 
 \item{overwrite}{If \code{FALSE} (default), an orthogroup whose HyPhy inputs, settings,
-and version match a finished earlier run is not rerun.}
+seeds, and version match a finished earlier run is not rerun.}
 
 \item{hyphy}{Path to the HyPhy executable, if not on \code{PATH}.}
 }
@@ -86,12 +96,12 @@ analysis from pairwise dN/dS: a significant BUSTED result is not the same as, an
 be compared with, a pairwise dN/dS above 1.
 }
 \details{
-This is phase 1 of the phylogenetic module: it needs codon alignments you have already
-made. It wraps HyPhy and has been checked to reproduce direct HyPhy runs; it has not yet
-been calibrated as a selection pipeline. See \code{docs/phylo-methods.md}.
+Experimental and unreleased. It reproduces HyPhy run directly; it has not been
+calibrated as a selection pipeline. See \code{docs/phylo-methods.md}.
 }
 \section{Inputs}{
 
+Either \code{prepared_dir}, the output folder of \code{\link[=phylo_prepare]{phylo_prepare()}}, or all of:
 \itemize{
 \item \code{alignment_dir}: one in-frame codon alignment per orthogroup, in FASTA,
 named \code{<orthogroup>.fasta} (or \code{.fa}, \code{.fas}, \code{.fna}).
@@ -104,20 +114,39 @@ lengths as starting values, and species-tree lengths are not in its units.
 \code{taxa}. Scope \code{terminal} labels the terminal branch of each listed taxon;
 \code{stem} labels the branch leading to the clade of the listed taxa; \code{clade}
 labels that stem and every branch within the clade. Rows are combined.
-\item \code{gene_tree_dir} (optional): \code{<orthogroup>.nwk} topologies to use
-instead of the pruned species tree, with tips named by taxon or sequence name.
+\item \code{gene_tree_dir} (optional): \code{<orthogroup>.nwk} topologies, with tips
+named by taxon, sequence name, or gene ID.
 }
+With \code{prepared_dir}, every orthogroup phylo_prepare excluded is also listed, and the
+labelled tree of each orthogroup must equal the one phylo_prepare wrote.
+}
+
+\section{Outcomes}{
+
+Each orthogroup is \code{tested}, \code{excluded} (with \code{reason} and
+\code{exclusion_basis}: \code{mathematical}, \code{no_data}, \code{policy},
+\code{data_quality}, or \code{input}), or \code{failed} (a step errored; basis
+\code{software}). \code{stage} says whether this happened in preparation or analysis.
 }
 
 \section{Missing taxa and identifiability}{
 
 The species tree is pruned to the taxa in each alignment. Branches that join when taxa
-are missing become one branch. If such a branch would combine foreground and background
-branches, the hypothesis cannot be tested for that orthogroup, and it is skipped with
-reason \code{foreground_not_identifiable}; it is never relabelled. For example, a stem
-hypothesis is not identifiable when a clade member, or the clade's sister lineage, is
-missing. With a gene tree, every foreground branch must exist in it, or the orthogroup
-is skipped as \code{foreground_discordant}.
+are missing become one branch. A requested branch joined to a background branch cannot
+be separated from it: if none can be separated, the orthogroup is excluded as
+\code{foreground_unidentifiable} (mathematical); if some can, testing only those would
+narrow the hypothesis, so it is excluded as \code{foreground_partly_unidentifiable}
+(policy). A hypothesis row with no taxon present, or a terminal row lacking a taxon, is
+\code{foreground_incomplete} (policy). Nothing is ever relabelled.
+}
+
+\section{Gene trees}{
+
+With \code{gene_tree_mode = "topology"} the gene tree is given to HyPhy; every requested
+terminal and stem branch must exist in it (\code{foreground_not_in_gene_tree}
+otherwise). With \code{"report"} the species tree is used. In both modes discordance with
+the pruned species tree is reported (\code{gt_*} columns, \code{gene_tree_discordant} and
+\code{gene_tree_discordant_near_foreground} flags), and never excludes an orthogroup.
 }
 
 \section{Statistics}{
@@ -125,30 +154,25 @@ is skipped as \code{foreground_discordant}.
 The p-value is HyPhy's, from a 50:50 mixture of chi-square distributions with 0 and 2
 degrees of freedom, so it is exactly 0.5 when the likelihood ratio is 0. \code{p_adj}
 applies Benjamini-Hochberg across one family: every orthogroup with status
-\code{tested} in this run. Skipped and failed orthogroups are not in the family and are
-reported with reasons. Raw p-values are kept.
+\code{tested} in this run. Raw p-values are kept.
 }
 
-\section{Reproducibility}{
+\section{Reproducibility and multiple starts}{
 
 HyPhy draws random starting values, and its result depends on them and on the thread
 count. dndsR always sets the seed (\code{seed}) and threads per HyPhy run
-(\code{hyphy_cpu}), and records both. With the same HyPhy build, these give identical
-results. A different seed can move the likelihood ratio of a gene; see
-\code{docs/validation/phylo-busted-wrapper.md}.
+(\code{hyphy_cpu}), and records both. \code{extra_seeds} runs further independent starts
+and reports their spread and the best likelihoods found (\code{lrt_best_fits},
+\code{p_best_fits}), as diagnostics only: \code{p_value} and \code{p_adj} always come
+from \code{seed}. The largest likelihood ratio is never chosen automatically.
 }
 
 \section{Outputs}{
 
-In \code{file.path(output_dir, run_name)}:
-\itemize{
-\item \code{<run_name>_results.tsv}: one row per orthogroup, tested or not, with its status and reason.
-\item \code{<run_name>_branches.tsv}: every branch given to HyPhy, its split, and
-whether it is foreground.
-\item \code{<run_name>_sequences.tsv}: per-sequence QC.
-\item \code{<run_name>_provenance.json}: versions, settings, seed, inputs, counts.
-\item \code{hyphy/<orthogroup>/}: the exact alignment, tree, log, and JSON of each run.
-}
+In \code{file.path(output_dir, run_name)}: \code{<run_name>_results.tsv} (one row per
+orthogroup), \code{_branches.tsv}, \code{_sequences.tsv}, \code{_provenance.json}, and
+\code{hyphy/<orthogroup>/} with the exact HyPhy inputs, logs, and JSON (extra starts in
+\code{start_seed<k>/}).
 }
 
 \references{
@@ -158,5 +182,5 @@ substitution rate variation dramatically inflates false positive rates of select
 analyses. Mol Biol Evol 37:2430-2439.
 }
 \seealso{
-\code{\link[=phylo_example]{phylo_example()}}, \code{\link[=verify_phylo_example]{verify_phylo_example()}}
+\code{\link[=phylo_prepare]{phylo_prepare()}}, \code{\link[=phylo_example]{phylo_example()}}, \code{\link[=verify_phylo_example]{verify_phylo_example()}}
 }

@@ -1,0 +1,4 @@
+orthogroup	expected_gene_tree	missing_species_splits
+OG04	tested; discordant, not near the foreground	1
+OG05	tested; discordant near the foreground	2
+OG06	excluded:foreground_not_in_gene_tree	1

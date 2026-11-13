@@ -63,18 +63,26 @@ pass "dnds_contrast" dndsr dnds_contrast -c two_comparisons.txt --contrast-file 
 pass "contrast output" test -s contrast/AvB_vs_AvC_global_q_vs_q_dnds_contrast.tsv
 cd .. || exit 1
 
-echo "== Documented phylogenetic workflow"
+echo "== Documented phylogenetic workflow (experimental)"
+pass "MAFFT runs" sh -c 'mafft --version 2>&1 | grep -q v7'
 pass "copy the phylogenetic example" dndsr phylo_example -o phylo
 cd phylo || exit 1
-pass "phylo_busted" dndsr phylo_busted --alignment-dir alignments --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
-pass "verify_phylo_example: 9 checks" sh -c 'dndsr verify_phylo_example 2>&1 | grep -q "All 9 phylogenetic example checks passed"'
+pass "phylo_prepare from genomes" dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file orthogroup_table.tsv --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
+pass "phylo_busted from the prepared folder" dndsr phylo_busted --prepared-dir prepared -t 4
+pass "verify_phylo_example: 11 checks" sh -c 'dndsr verify_phylo_example 2>&1 | grep -q "All 11 phylogenetic example checks passed"'
+cd .. || exit 1
+pass "copy the alignment example" dndsr phylo_example --type alignments -o phylo_aln
+cd phylo_aln || exit 1
+pass "phylo_busted on alignments" dndsr phylo_busted --alignment-dir alignments --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
+pass "verify_phylo_example (alignments): 9 checks" sh -c 'dndsr verify_phylo_example 2>&1 | grep -q "All 9 phylogenetic example checks passed"'
 cd .. || exit 1
 
 echo "== Failure behavior"
 fail_expected "unknown command fails" dndsr nonsense
 fail_expected "unknown option fails" dndsr extract_cds -c x --overwite
 fail_expected "missing input fails" dndsr calculate_dnds -c does-not-exist.txt
-fail_expected "phylo_busted without a foreground file fails" dndsr phylo_busted --alignment-dir phylo/alignments --species-tree-file phylo/species_tree.nwk --foreground-file missing.tsv
+fail_expected "phylo_busted without a foreground file fails" dndsr phylo_busted --alignment-dir phylo_aln/alignments --species-tree-file phylo_aln/species_tree.nwk --foreground-file missing.tsv
+fail_expected "phylo_prepare without a genome or CDS table fails" dndsr phylo_prepare --orthogroup-file phylo/orthogroup_table.tsv --species-tree-file phylo/species_tree.nwk --foreground-file phylo/foreground.tsv
 fail_expected "gene-level state contrast fails" dndsr dnds_state_contrast --level gene --dnds-annot-files cli/example_AvB/example_AvB_dnds_annot.tsv
 
 echo "== Documented R workflow"

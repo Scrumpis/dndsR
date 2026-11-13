@@ -1,18 +1,18 @@
 # Tutorial: testing for episodic selection across species
 
-`phylo_busted` runs HyPhy's BUSTED on orthogroups of several species, to test whether some sites evolved with dN/dS above 1 on branches you choose. It is separate from dndsR's pairwise dN/dS. Read [phylo-methods.md](../phylo-methods.md) before interpreting results.
+`phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests of whether some sites evolved with dN/dS above 1 on branches you choose. You do not build alignments or HyPhy inputs by hand. This is separate from dndsR's pairwise dN/dS. Read [phylo-methods.md](../phylo-methods.md) before interpreting results.
 
-**Status.** This is development code, not in any release: v0.4.0 does not have it. It reproduces HyPhy run directly, but has not been calibrated as a selection pipeline ([evidence](../validation/phylo-busted-wrapper.md)). In this phase you supply the codon alignments; dndsR does not yet build them.
+**Status: experimental and unreleased.** Development version 0.4.0.9000; v0.4.0 does not have it. dndsR prepares inputs as designed and reproduces HyPhy run directly ([evidence](../validation/phylo-prepare.md)), but the pipeline has not been calibrated as a selection test.
 
 ## 1. Get dndsR and HyPhy
 
-You need a dndsR clone that has the command, and HyPhy 2.5.103. Check the clone:
+You need a dndsR clone that has the commands, and HyPhy 2.5.103. Check the clone:
 
 ```
-grep -q phylo_busted NAMESPACE && echo "this clone has phylo_busted"
+grep -q phylo_prepare NAMESPACE && echo "this clone has phylo_prepare"
 ```
 
-Published dndsR images up to v0.4.0 do not include HyPhy, so install it separately. With micromamba, which this was tested with (conda or mamba take the same arguments, untested):
+Published dndsR images up to v0.4.0 include MAFFT but not HyPhy, so install HyPhy separately. With micromamba, which this was tested with (conda or mamba take the same arguments, untested):
 
 ```
 micromamba create -y -p "$HOME/.dndsr/hyphy" -c conda-forge -c bioconda hyphy=2.5.103
@@ -27,51 +27,67 @@ export PATH="$HOME/.local/bin:$PATH"
 dndsr --help
 ```
 
-The command list includes `phylo_busted`. In an image or environment that already has `hyphy` on its `PATH`, leave out `--hyphy` below.
+The command list includes `phylo_prepare` and `phylo_busted`. In an image or environment with `hyphy` on its `PATH`, leave out `--hyphy` below.
 
-## 2. Run the example
+## 2. Run the example: genomes to results
 
-The example has seven simulated orthogroups of up to eight taxa. Four can be tested; three are designed to be skipped.
+The example has six small simulated genomes (FASTA and GFF3), 14 orthogroups, a species tree, and a foreground: the clade of spA and spB, with its stem. Eight orthogroups can be tested; six are designed to be excluded.
 
 ```
 dndsr phylo_example
 cd dndsr_phylo_example
-dndsr phylo_busted --alignment-dir alignments --species-tree-file species_tree.nwk \
-  --foreground-file foreground.tsv --hyphy "$HOME/.dndsr/hyphy/bin/hyphy" -t 4
+dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file orthogroup_table.tsv \
+  --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
+dndsr phylo_busted --prepared-dir prepared --hyphy "$HOME/.dndsr/hyphy/bin/hyphy" -t 4
 dndsr verify_phylo_example
 ```
 
-This takes about a minute with 4 threads. It reports `tested 4, skipped 3, failed 0`, and the check ends with `All 9 phylogenetic example checks passed.` That confirms dndsR reproduces HyPhy run directly on this example. It says nothing about your data.
+Preparation takes about 20 seconds and reports `prepared 8, excluded 6, failed 0`; BUSTED takes about 40 seconds with 4 threads. The check ends with `All 11 phylogenetic example checks passed.` That confirms dndsR built the alignments as designed and reproduces HyPhy, which the check runs directly on this machine on inputs prepared without dndsR. It says nothing about your data.
+
+`phylo_prepare` extracted each genome's CDS (in `prepared/cds/`), checked them, aligned the proteins with MAFFT, placed the codons under them, pruned the species tree for each orthogroup, and labelled its foreground. Its outputs are in `prepared/`: `alignments/`, `trees/` (labelled, as HyPhy will see them), `prepared_summary.tsv`, `prepared_members.tsv` (every gene of every orthogroup, used or not), `prepared_sequences.tsv`, and `prepared_provenance.json`.
 
 ## 3. Read the results
 
 `busted/busted_results.tsv` has one row per orthogroup:
 
-| orthogroup | status | reason | p_value | p_adj |
-|---|---|---|---:|---:|
-| OG0001 | tested | | 0.0129 | 0.0518 |
-| OG0002 | tested | | 0.5 | 0.5 |
-| OG0003 | tested | | 0.197 | 0.393 |
-| OG0004 | tested | | 0.411 | 0.5 |
-| OG0005 | skipped | foreground_absent | | |
-| OG0006 | skipped | internal_stop | | |
-| OG0007 | skipped | multi_copy | | |
+| orthogroup | status | stage | reason | exclusion_basis | p_value | p_adj |
+|---|---|---|---|---|---:|---:|
+| OG01 | tested | analysis | | | 0.0200 | 0.0799 |
+| OG02 | tested | analysis | | | 0.105 | 0.281 |
+| OG03 | tested | analysis | | | 0.00033 | 0.0027 |
+| OG04, OG05, OG06, OG09, OG10 | tested | analysis | | | 0.309 or 0.5 | 0.5 |
+| OG07 | excluded | prepare | multi_copy | policy | | |
+| OG08 | excluded | prepare | cds_invalid | data_quality | | |
+| OG11 | excluded | prepare | foreground_absent | no_data | | |
+| OG12 | excluded | prepare | foreground_partly_unidentifiable | policy | | |
+| OG13 | excluded | prepare | cds_invalid | data_quality | | |
+| OG14 | excluded | prepare | foreground_unidentifiable | mathematical | | |
 
-- `p_adj` is corrected across the 4 tested orthogroups (`family_size`). OG0001, simulated with selection on the foreground, has p = 0.013, and p_adj = 0.052 after correction.
-- OG0002 has p = 0.5 exactly: its likelihood ratio is 0, so there is no evidence at all.
-- OG0003 was also simulated with selection, and is not significant. One gene says nothing about power.
-- OG0004 lacks spB, so spA's branch includes the clade's stem. Under the `clade` foreground that is still foreground. Under `stem`, it would be skipped as `foreground_not_identifiable`.
-- Check `qc_flags`, and `busted/busted_branches.tsv` to see which branches HyPhy tested.
+- **Tested.** `p_adj` is corrected across the 8 tested orthogroups (`family_size`). OG01 to OG03 were simulated with selection on the foreground; only OG03 is significant after correction. The others were simulated without; a p-value of exactly 0.5 means no evidence at all. One small example says nothing about power or false positives.
+- **Excluded, and why.** OG07 has two spD genes (a paralog). OG08 and OG13 have a gene model that `extract_cds` rejected (an in-frame stop; a frameshift). OG11 has neither foreground taxon. OG12 lacks spC, so the clade's stem joins the branch above it: spA and spB remain separable, but testing only them would narrow the hypothesis. OG14 lacks spB and spC, so nothing in the foreground can be separated from background history. `detail` explains each.
+- OG09 lacks spB: under a `clade` foreground, spA's branch, joined with the stem, still carries the hypothesis, and the flag `foreground_branches_absent:1` records it.
+- `busted/busted_branches.tsv` lists the branches HyPhy tested. `prepared/trees/` has the labelled trees.
 
-Results with HyPhy 2.5.103, seed 1, and 1 HyPhy thread. Another seed or thread count can change the values slightly.
+Results are for HyPhy 2.5.103, seed 1, and 1 HyPhy thread, on a processor with AVX-512; without it, OG01's p-value is 0.0199 rather than 0.0200. Another seed, thread count, or processor can change the values slightly; `--extra-seeds 2,3` reports how much, without changing `p_value`.
 
-## 4. Your own data
+## 4. Gene trees
 
-You need:
+The example has gene trees for OG04 to OG06, with tips named as OrthoFinder names them. With `--gene-tree-dir`, each orthogroup needs a gene tree; the others are excluded as `gene_tree_missing`.
 
-1. **Codon alignments**, one in-frame FASTA per single-copy orthogroup, named `<orthogroup>.fasta`, with sequences named `taxon` or `taxon|gene_id`.
-2. **A rooted species tree** of the taxa, in Newick. Names: letters, digits, and underscores, starting with a letter.
-3. **A foreground file**, tab-separated, decided before you look at results:
+```
+dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file orthogroup_table.tsv \
+  --species-tree-file species_tree.nwk --foreground-file foreground.tsv \
+  --gene-tree-dir gene_trees --run-name prepared_gt -t 4
+dndsr phylo_busted --prepared-dir prepared_gt --run-name busted_gt --hyphy "$HOME/.dndsr/hyphy/bin/hyphy" -t 4
+```
+
+OG04's gene tree differs from the species tree away from the foreground, and OG05's beside it; both are tested, with `gt_*` columns and flags saying so. OG06's gene tree has no branch for spA and spB together, so the hypothesis cannot be placed on it: `foreground_not_in_gene_tree`. Add `--gene-tree-mode report` to test on the species tree and only report discordance.
+
+## 5. Your own data
+
+1. **Genomes** in a table with columns `taxon`, `fasta`, `gff`, or **CDS** in a table with `taxon`, `cds` (use `--cds-file`). Taxon names: letters, digits, and underscores, starting with a letter.
+2. **Orthogroups**: a table with `orthogroup`, `taxon`, `gene_id`, or OrthoFinder's `Orthogroups.tsv` or `N0.tsv`. Gene IDs must match the CDS names: run OrthoFinder on the proteins from `dndsr extract_cds --export-proteins`, and add an `orthofinder_name` column if its species columns are not your taxon names.
+3. **A rooted species tree** and **a foreground file**, tab-separated, decided before you look at results:
 
    ```
    scope	taxa
@@ -81,20 +97,20 @@ You need:
    Use `terminal` for a taxon's own branch, `stem` for the branch leading to a clade, or `clade` for the stem and everything in it.
 
 ```
-dndsr phylo_busted --alignment-dir my_alignments --species-tree-file species.nwk \
-  --foreground-file foreground.tsv -t 16 -o results --run-name busted_stemAB
+dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file Orthogroups.tsv \
+  --species-tree-file species.nwk --foreground-file foreground.tsv -t 16 -o results
+dndsr phylo_busted --prepared-dir results/prepared -o results -t 16
 ```
 
-`-t` sets how many orthogroups run at once; each HyPhy run uses `--hyphy-cpu` threads (default 1). Results do not depend on `-t`. They do depend on `--seed` and `--hyphy-cpu`, which are recorded. A finished orthogroup is not rerun unless its inputs, settings, or HyPhy change; add `--overwrite` to force it.
+`-t` sets how many orthogroups run at once; each HyPhy run uses `--hyphy-cpu` threads (default 1). Results do not depend on `-t`, but do depend on `--seed` and `--hyphy-cpu`, which are recorded. A finished orthogroup is not rerun unless its inputs, settings, or HyPhy change; `--overwrite` forces it.
 
-Before interpreting:
+Before interpreting, count orthogroups by status and reason (both commands print them), and read the [limits](../phylo-methods.md#limits-and-interpretation). A significant result is evidence under the model for episodic positive selection somewhere on the foreground, not proof, and not a statement about particular sites.
 
-- Count skipped orthogroups by reason (the run prints them). Many `foreground_not_identifiable` means the foreground taxa or their sister lineages are often missing.
-- Read the [limits](../phylo-methods.md#limits-and-interpretation). A significant result is evidence under the model for episodic positive selection somewhere on the foreground, not proof, and not a statement about particular sites.
+Codon alignments made elsewhere can be tested directly: `dndsr phylo_busted --alignment-dir <folder> --species-tree-file <tree> --foreground-file <file>`. `dndsr phylo_example --type alignments` has an example.
 
 ## From R
 
-The same steps as functions. HyPhy must be on the `PATH`, or named with `hyphy =` or `options(dndsR.hyphy = ...)`.
+The same steps as functions. MAFFT and HyPhy must be on the `PATH`, or named with `mafft =` and `hyphy =`.
 
 ```r
 library(dndsR)
@@ -103,12 +119,13 @@ setwd(folder)
 ```
 
 ```r
-res <- phylo_busted("alignments", "species_tree.nwk", "foreground.tsv", threads = 2)
+prepared <- phylo_prepare("orthogroup_table.tsv", "species_tree.nwk", "foreground.tsv",
+                          genome_file = "genomes.tsv", threads = 2)
+res <- phylo_busted(prepared_dir = "prepared", threads = 2)
 verify_phylo_example()
 ```
 
 ```r
-res[, c("orthogroup", "status", "reason", "p_value", "p_adj", "qc_flags")]
-branches <- read.delim("busted/busted_branches.tsv")
-subset(branches, foreground)
+table(res$status, res$exclusion_basis, useNA = "ifany")
+res[res$status == "tested", c("orthogroup", "p_value", "p_adj", "qc_flags")]
 ```

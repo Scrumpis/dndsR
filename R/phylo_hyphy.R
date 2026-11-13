@@ -11,6 +11,10 @@
 #' variable, then `hyphy` on `PATH`.
 #' @keywords internal
 .hyphy_path <- function(hyphy = NULL) {
+  if (!is.null(hyphy)) {
+    if (!file.exists(hyphy)) stop("HyPhy not found at ", hyphy, call. = FALSE)
+    return(normalizePath(hyphy))
+  }
   candidates <- c(hyphy, getOption("dndsR.hyphy"), Sys.getenv("DNDSR_HYPHY", ""), Sys.which("hyphy"))
   candidates <- candidates[!is.na(candidates) & nzchar(candidates)]
   for (p in candidates) if (file.exists(p)) return(normalizePath(p))

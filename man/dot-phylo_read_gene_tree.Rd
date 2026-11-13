@@ -4,18 +4,22 @@
 \alias{.phylo_read_gene_tree}
 \title{Read an optional gene tree for one orthogroup}
 \usage{
-.phylo_read_gene_tree(path, seq_species)
+.phylo_read_gene_tree(path, seqs, aliases = NULL)
 }
 \arguments{
 \item{path}{Newick file, or \code{NULL}.}
 
-\item{seq_species}{Named vector mapping sequence names to taxa.}
+\item{seqs}{Data frame with \code{seq_name}, \code{taxon}, and \code{gene_id}.}
+
+\item{aliases}{Named character vector: alias to taxon.}
 }
 \value{
-An \code{ape} phylo with tips renamed to taxa, or \code{NULL}. Stops with a reason string
-attached as the condition message when the tree does not match the alignment.
+An \code{ape} phylo with tips renamed to taxa, or \code{NULL}. Stops with a reason as the
+condition message when the tree does not match the sequences.
 }
 \description{
-Read an optional gene tree for one orthogroup
+Tips may be named by taxon, by sequence name (\code{taxon|gene}), by gene ID, or as
+OrthoFinder names them, \verb{<proteome>_<gene>}, where the proteome name is the taxon or an
+alias given in the genome table.
 }
 \keyword{internal}

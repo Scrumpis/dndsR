@@ -2,6 +2,16 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-13: phylogenetic module, P2
+
+- **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`
+- **Decided by the maintainer after P1:** fixed seed and threads stay default, with extra starts as diagnostics only; HyPhy defaults kept, BUSTED-E experimental; strict identifiability, with mathematical and policy exclusions distinguished; gene-tree discordance reported, never excluding; version 0.4.0.9000; development image built and tested locally, nothing published.
+- **Done:** `phylo_prepare` (genomes or CDS and long or OrthoFinder orthogroups to codon alignments, labelled trees, QC, member and exclusion records, provenance, manifest); `phylo_busted --prepared-dir`, `--extra-seeds`, `--gene-tree-mode`; outcome bases and stages; a six-genome synthetic example with designed failures; direct-HyPhy reference for species and gene trees; tests; docs, tutorial, and skill.
+- **Verified:** all outcomes as designed; alignments equal the designed CDS and a true indel alignment; gene-tree mode equals direct HyPhy exactly; the tutorial ran in a clean `HOME`; the workflow passed in a development image built locally with HyPhy.
+- **Found:** HyPhy's results differ slightly between processors with and without AVX-512 (2 of 8 example runs; LRT by up to 0.005), and are bit-identical within each class. Found when `check.sh` ran on an AVX2 node against references stored on an AVX-512 one. Example checks and tests now run HyPhy directly on the same machine. Also: an explicit `--hyphy` or `--mafft` path that did not exist fell back to `PATH`; fixed. An image build on scratch exceeded the file quota and failed; builds now unpack on node-local storage. One synthetic case was first classed wrongly in its design (OG12: only the stem is lost, so it is partly unidentifiable), caught before running.
+- **Not run here:** `check.sh`'s safeguards and tutorial on AMD Rome nodes, where the host's git crashes with an illegal instruction (a node issue, recorded before); they pass on Intel nodes.
+- **Failed or not done:** P3 not started. CI has not run. Nothing pushed, merged, tagged, or published.
+
 ## 2026-11-13: phylogenetic module, P0 and P1
 
 - **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`

@@ -4,20 +4,32 @@
 \alias{verify_phylo_example}
 \title{Check phylogenetic example results against the design and direct HyPhy runs}
 \usage{
-verify_phylo_example(output_dir = ".", run_name = "busted")
+verify_phylo_example(
+  output_dir = ".",
+  run_name = "busted",
+  prepared_name = "prepared",
+  threads = 2L
+)
 }
 \arguments{
 \item{output_dir}{Folder containing the example and its results.}
 
 \item{run_name}{The \code{run_name} given to \code{\link[=phylo_busted]{phylo_busted()}}.}
+
+\item{prepared_name}{The \code{run_name} given to \code{\link[=phylo_prepare]{phylo_prepare()}} (genomes example).}
+
+\item{threads}{HyPhy runs at once for the direct comparison.}
 }
 \value{
 A data frame with one row per check, invisibly. It stops if any check fails.
 }
 \description{
-Run this after \code{\link[=phylo_busted]{phylo_busted()}} on the bundled example (see \code{\link[=phylo_example]{phylo_example()}}), with its
-default settings. It confirms that dndsR prepares inputs as designed, labels the
-intended branches, and reproduces HyPhy run directly on independently prepared inputs.
-It checks the software, not the biology: it is not evidence that BUSTED detects
-selection correctly in your data.
+Run this in the example folder (see \code{\link[=phylo_example]{phylo_example()}}) after the documented commands,
+with default settings. It confirms that dndsR builds inputs as designed, excludes what it
+should for the stated reasons, labels the intended branches, and reproduces HyPhy, which
+it runs directly here on inputs prepared without dndsR (\code{truth/direct/}), with a
+command written out in full rather than dndsR's own. HyPhy's results differ slightly
+between processors with and without AVX-512, so stored results from both kinds are
+reported for comparison, not checked. It checks the software, not the biology: it
+is not evidence that BUSTED detects selection correctly in your data.
 }

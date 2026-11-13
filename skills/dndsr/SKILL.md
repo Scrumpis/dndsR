@@ -4,7 +4,7 @@ description: Installs and runs dndsR, an R package and CLI for pairwise dN/dS an
 license: MIT
 compatibility: Needs bash and git, plus Singularity, Apptainer, or Docker, or an R installation with dndsR's dependencies. Only Linux amd64 with Singularity has been tested. Cloning and pulling the image need network access unless both are already present.
 metadata:
-  software-version: "0.4.0"
+  software-version: "0.4.0.9000"
   skill-status: "core workflow tested on a designed example and public genomes; see references/verification.md"
 ---
 
@@ -75,23 +75,26 @@ Check `<comparison>/<genome>_CDS_qc.tsv` for exclusions, and the number of pairs
 
 A complete run on public genomes, with measured time and memory: [docs/tutorials/public-genomes.md](../../docs/tutorials/public-genomes.md). For a publication, follow [docs/publication-protocol.md](../../docs/publication-protocol.md).
 
-## 4b. Selection tests across species (development code only)
+## 4b. Selection tests across species (experimental, development code only)
 
-`phylo_busted` runs HyPhy's BUSTED on single-copy orthogroups of several species: does any site show dN/dS above 1 on chosen foreground branches? It is not in v0.4.0. Use it only if `dndsr --help` lists `phylo_busted`, and tell the user it is unreleased and not yet calibrated as a selection pipeline. It needs HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs it with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
+`phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests: does any site show dN/dS above 1 on chosen foreground branches? They are not in v0.4.0. Use them only if `dndsr --help` lists `phylo_prepare`, and tell the user they are experimental, unreleased, and not calibrated as a selection pipeline. They need MAFFT (in the dndsR image) and HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs HyPhy with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
 
 ```
 dndsr phylo_example
 cd dndsr_phylo_example
-dndsr phylo_busted --alignment-dir alignments --species-tree-file species_tree.nwk --foreground-file foreground.tsv --hyphy "$HOME/.dndsr/hyphy/bin/hyphy" -t 4
+dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file orthogroup_table.tsv --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
+dndsr phylo_busted --prepared-dir prepared --hyphy "$HOME/.dndsr/hyphy/bin/hyphy" -t 4
 dndsr verify_phylo_example
 ```
 
-Success ends with `All 9 phylogenetic example checks passed.` On real data the user supplies codon alignments, a rooted species tree, and a foreground file (`terminal`, `stem`, or `clade`), decided before seeing results. When reporting:
+Success ends with `All 11 phylogenetic example checks passed.` On real data the user supplies a genome table (`taxon`, `fasta`, `gff`) or CDS table (`taxon`, `cds`), orthogroups (`orthogroup`, `taxon`, `gene_id`, or OrthoFinder's `Orthogroups.tsv` or `N0.tsv` with gene names matching the CDS), a rooted species tree, and a foreground file (`terminal`, `stem`, or `clade`), decided before seeing results. Do not build alignments or HyPhy inputs by hand. When reporting:
 
 - A significant BUSTED result means some site on some foreground branch had ω above 1 under the model. It is not the same as, and does not confirm, a pairwise dN/dS above 1. Never mix the two in one table or claim.
-- Report `p_adj`, and its `family_size`: only orthogroups with status `tested` are in the correction. Pass on the counts of skipped orthogroups by reason, which limit what the results can say.
-- `foreground_not_identifiable` means missing taxa made the hypothesis untestable for that orthogroup; dndsR never relabels it.
-- Results depend on `--seed` and `--hyphy-cpu`, which are recorded in `busted/busted_provenance.json`. Genes near the threshold can change call with the seed.
+- Report `p_adj` and `family_size`: only orthogroups with status `tested` are corrected together. Report counts of `excluded` (by `reason` and `exclusion_basis`) and `failed` orthogroups, which limit what the results can say. `failed` means a step errored: investigate, do not ignore.
+- `foreground_unidentifiable` (mathematical) means the requested branches cannot be separated from other history with the taxa present; `foreground_partly_unidentifiable` and `foreground_incomplete` are conservative policy. dndsR never relabels a branch.
+- Gene-tree discordance is reported (`gt_*` columns, `gene_tree_discordant_near_foreground`), not corrected.
+- Results depend on `--seed`, `--hyphy-cpu`, and slightly on the processor (with or without AVX-512); the first two are recorded in `busted/busted_provenance.json`, so record the processor too. `--extra-seeds` shows the spread; it never changes `p_value`. Genes near the threshold can change call with the seed.
+- Keep HyPhy's defaults unless the user asks; `--error-sink Yes` (BUSTED-E) is experimental.
 - Methods and limits: [docs/phylo-methods.md](../../docs/phylo-methods.md).
 
 ## 5. Interpret honestly

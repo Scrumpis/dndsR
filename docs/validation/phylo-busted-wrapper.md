@@ -2,6 +2,8 @@
 
 ## Question
 
+Phase 1 evidence, for `phylo_busted` on supplied alignments. Phase 2 (preparation from genomes, gene-tree mode, end to end) is in [phylo-prepare.md](phylo-prepare.md). Since phase 2, outcomes say `excluded` where phase 1 said `skipped`, and the example's check function also covers the genome example.
+
 Does `phylo_busted` give HyPhy the intended inputs, and return exactly what HyPhy computes? This is **wrapper correctness**. Whether BUSTED, as run by this pipeline, controls false positives and detects selection on realistic data is **scientific calibration**: a separate question for phase 3, not answered here. Nothing on this page shows that a significant result means positive selection.
 
 ## Software
@@ -87,5 +89,5 @@ The JSON fixtures in `tests/testthat/fixtures/hyphy/` are HyPhy 2.5.103 output w
 
 - One synthetic example, 8 taxa, 300 codons, equal codon frequencies. Real alignments are larger and messier.
 - Agreement with direct HyPhy shows the wrapper is faithful. It does not show that BUSTED's p-values are calibrated for these data, or that alignment QC thresholds are appropriate.
-- Bit-identity across machines is not established. The stored reference came from one node; CI builds will test another.
+- Bit-identity across machines holds only within a processor class: see [phylo-prepare.md](phylo-prepare.md#processors). OG0001 differs by 2.5e-5 in its likelihood ratio between AVX-512 and AVX2 machines; the example check now runs HyPhy directly on the same machine.
 - Gene-tree mode is tested by unit tests of labelling, not yet by a live HyPhy comparison.
