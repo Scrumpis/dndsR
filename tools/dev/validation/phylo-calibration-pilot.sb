@@ -29,6 +29,7 @@ dndsr() { run Rscript --vanilla -e 'dndsR::cli_main()' -- "$@"; }
 { grep -m1 "model name" /proc/cpuinfo; grep -o -w 'avx512f' /proc/cpuinfo | head -1; hostname; } > "$persist/host_$(hostname).txt"
 git -C "$repo" rev-parse HEAD > "$persist/commit.txt" 2>/dev/null || true
 cp "$params" "$persist/params.json"
+cp "$params" "$work/params.json"; params=$work/params.json   # visible inside the container
 
 simulate() { # cell n seed dir. PILOT_N overrides n, for smoke tests of this script only.
   [ -d "$4" ] || run Rscript --vanilla "$repo/tools/dev/validation/phylo-sim.R" "$params" "$1" "${PILOT_N:-$2}" "$3" "$4"
