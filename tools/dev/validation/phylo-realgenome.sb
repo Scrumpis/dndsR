@@ -71,7 +71,10 @@ done
 keep proteins/*_CDS_qc.tsv
 
 echo "== orthofinder $(date -u +%FT%TZ)"
-timed orthofinder "$ic" orthofinder -f orthofinder_in -t "$threads" -a 8 -S diamond -n run
+# OrthoFinder always runs DIAMOND with --more-sensitive, which segfaults in the image's
+# standalone DIAMOND 2.1.14 on real proteins; the DIAMOND 2.2.8 installed with OrthoFinder
+# does not. Put it first, for this step only.
+timed orthofinder "$ic" bash -c 'PATH=/opt/conda/envs/tools/bin:$PATH; diamond version; orthofinder "$@"' _ -f orthofinder_in -t "$threads" -a 8 -S diamond -n run
 of=$(ls -d orthofinder_in/OrthoFinder/Results_run*)
 ln -sfn "$of" orthofinder
 mkdir -p "$persist/orthofinder"
