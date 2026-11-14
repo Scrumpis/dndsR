@@ -2,6 +2,15 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-14: P3 calibration stage 2A and pairwise reliability flags
+
+- **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`
+- **Approved by the maintainer:** a staged calibration study with conditions (configurations, realistic corruption, filtering, starts, reproducibility, a bounded batch first), and reliability warnings for pairwise dN/dS. No default, release, tag, or merge changes without a separate approval.
+- **Done:** stage 2 plan and tooling committed before any job (`b208db5`, `1b3aaf3`); stage 2A, 108 units and 21,270 fits from a frozen commit, library, and image on one processor class, reported in `docs/validation/phylo-calibration-stage2a.md`; per-pair reliability flags in a separate `_dnds_reliability.tsv` (`3da3075`), with the dN/dS table byte-identical.
+- **Verified:** 0 failed fits; every configuration calibrated under correct nulls (0-1.3%); the empirical corruption profile agrees with dndsR's window counts for all 48,765 real sequences; fast check 165 tests, 0 failed.
+- **Found:** BUSTED-E costs much power (A(10, 0.05): 39% to 8-11%); BUSTED-E leaves 24-28% false positives from one realistic corrupted segment, and masking flagged windows leaves 0-0.7% with no measurable power loss; double hits fix multinucleotide changes; one start understates BUSTED-E's power (39% to 53% with 3); HyPhy can report LRT 0 after a refit while its likelihoods give up to 2.1.
+- **Failed or not done:** stage 2B awaits a decision, since the rules as written exceed the budget; 10-taxon parameters not defined; nothing pushed, merged, tagged, or published.
+
 ## 2026-11-13 to 14: P3 pilot, real-genome benchmark, and pairwise dN/dS methods
 
 - **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`

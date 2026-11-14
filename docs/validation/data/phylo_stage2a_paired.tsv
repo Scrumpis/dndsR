@@ -1,0 +1,138 @@
+comparison	a	b	genes	rate_a	rate_b	a_only	b_only	calls_changed	share_changed	mcnemar_p
+config C1 vs C0	config__N0_L50__C0__none__s1	config__N0_L50__C1__none__s1	300	0.00666666666666667	0.00333333333333333	1	0	1	0.00333333333333333	1
+config C2 vs C0	config__N0_L50__C0__none__s1	config__N0_L50__C2__none__s1	300	0.00666666666666667	0	2	0	2	0.00666666666666667	0.5
+config C3 vs C0	config__N0_L50__C0__none__s1	config__N0_L50__C3__none__s1	300	0.00666666666666667	0	2	0	2	0.00666666666666667	0.5
+config C3 vs C1	config__N0_L50__C1__none__s1	config__N0_L50__C3__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C3 vs C2	config__N0_L50__C2__none__s1	config__N0_L50__C3__none__s1	300	0	0	0	0	0	0	1
+config C1 vs C0	config__N0_L25__C0__none__s1	config__N0_L25__C1__none__s1	300	0.0133333333333333	0.0133333333333333	0	0	0	0	1
+config C2 vs C0	config__N0_L25__C0__none__s1	config__N0_L25__C2__none__s1	300	0.0133333333333333	0	4	0	4	0.0133333333333333	0.125
+config C3 vs C0	config__N0_L25__C0__none__s1	config__N0_L25__C3__none__s1	300	0.0133333333333333	0	4	0	4	0.0133333333333333	0.125
+config C3 vs C1	config__N0_L25__C1__none__s1	config__N0_L25__C3__none__s1	300	0.0133333333333333	0	4	0	4	0.0133333333333333	0.125
+config C3 vs C2	config__N0_L25__C2__none__s1	config__N0_L25__C3__none__s1	300	0	0	0	0	0	0	1
+config C1 vs C0	config__N0_L50_div2__C0__none__s1	config__N0_L50_div2__C1__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C2 vs C0	config__N0_L50_div2__C0__none__s1	config__N0_L50_div2__C2__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C3 vs C0	config__N0_L50_div2__C0__none__s1	config__N0_L50_div2__C3__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C3 vs C1	config__N0_L50_div2__C1__none__s1	config__N0_L50_div2__C3__none__s1	300	0	0	0	0	0	0	1
+config C3 vs C2	config__N0_L50_div2__C2__none__s1	config__N0_L50_div2__C3__none__s1	300	0	0	0	0	0	0	1
+config C1 vs C0	config__N1_L50__C0__none__s1	config__N1_L50__C1__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C2 vs C0	config__N1_L50__C0__none__s1	config__N1_L50__C2__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C3 vs C0	config__N1_L50__C0__none__s1	config__N1_L50__C3__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+config C3 vs C1	config__N1_L50__C1__none__s1	config__N1_L50__C3__none__s1	300	0	0	0	0	0	0	1
+config C3 vs C2	config__N1_L50__C2__none__s1	config__N1_L50__C3__none__s1	300	0	0	0	0	0	0	1
+config C1 vs C0	config__A3_p20__C0__none__s1	config__A3_p20__C1__none__s1	120	0.116666666666667	0.1	2	0	2	0.0166666666666667	0.5
+config C2 vs C0	config__A3_p20__C0__none__s1	config__A3_p20__C2__none__s1	120	0.116666666666667	0.0416666666666667	9	0	9	0.075	0.00390625
+config C3 vs C0	config__A3_p20__C0__none__s1	config__A3_p20__C3__none__s1	120	0.116666666666667	0.0416666666666667	9	0	9	0.075	0.00390625
+config C3 vs C1	config__A3_p20__C1__none__s1	config__A3_p20__C3__none__s1	120	0.1	0.0416666666666667	7	0	7	0.0583333333333333	0.015625
+config C3 vs C2	config__A3_p20__C2__none__s1	config__A3_p20__C3__none__s1	120	0.0416666666666667	0.0416666666666667	0	0	0	0	1
+config C1 vs C0	config__A5_p10__C0__none__s1	config__A5_p10__C1__none__s1	120	0.241666666666667	0.233333333333333	4	3	7	0.0583333333333333	1
+config C2 vs C0	config__A5_p10__C0__none__s1	config__A5_p10__C2__none__s1	120	0.241666666666667	0.075	22	2	24	0.2	3.58819961547851e-05
+config C3 vs C0	config__A5_p10__C0__none__s1	config__A5_p10__C3__none__s1	120	0.241666666666667	0.0833333333333333	21	2	23	0.191666666666667	6.60419464111328e-05
+config C3 vs C1	config__A5_p10__C1__none__s1	config__A5_p10__C3__none__s1	120	0.233333333333333	0.0833333333333333	20	2	22	0.183333333333333	0.000121116638183594
+config C3 vs C2	config__A5_p10__C2__none__s1	config__A5_p10__C3__none__s1	120	0.075	0.0833333333333333	2	3	5	0.0416666666666667	1
+config C1 vs C0	config__A10_p05__C0__none__s1	config__A10_p05__C1__none__s1	120	0.391666666666667	0.341666666666667	10	4	14	0.116666666666667	0.1795654296875
+config C2 vs C0	config__A10_p05__C0__none__s1	config__A10_p05__C2__none__s1	120	0.391666666666667	0.108333333333333	38	4	42	0.35	5.65314621781e-08
+config C3 vs C0	config__A10_p05__C0__none__s1	config__A10_p05__C3__none__s1	120	0.391666666666667	0.0833333333333333	39	2	41	0.341666666666667	7.83984432928268e-10
+config C3 vs C1	config__A10_p05__C1__none__s1	config__A10_p05__C3__none__s1	120	0.341666666666667	0.0833333333333333	33	2	35	0.291666666666667	3.67290340363981e-08
+config C3 vs C2	config__A10_p05__C2__none__s1	config__A10_p05__C3__none__s1	120	0.108333333333333	0.0833333333333333	5	2	7	0.0583333333333333	0.453125
+config C1 vs C0	config__A10_p10__C0__none__s1	config__A10_p10__C1__none__s1	120	0.666666666666667	0.608333333333333	12	5	17	0.141666666666667	0.143463134765625
+config C2 vs C0	config__A10_p10__C0__none__s1	config__A10_p10__C2__none__s1	120	0.666666666666667	0.425	35	6	41	0.341666666666667	4.873598300037e-06
+config C3 vs C0	config__A10_p10__C0__none__s1	config__A10_p10__C3__none__s1	120	0.666666666666667	0.391666666666667	38	5	43	0.358333333333333	2.49950971920044e-07
+config C3 vs C1	config__A10_p10__C1__none__s1	config__A10_p10__C3__none__s1	120	0.608333333333333	0.391666666666667	30	4	34	0.283333333333333	6.16488978266717e-06
+config C3 vs C2	config__A10_p10__C2__none__s1	config__A10_p10__C3__none__s1	120	0.425	0.391666666666667	9	5	14	0.116666666666667	0.4239501953125
+config C1 vs C0	config__A10_p20__C0__none__s1	config__A10_p20__C1__none__s1	120	0.908333333333333	0.7	26	1	27	0.225	4.17232513427736e-07
+config C2 vs C0	config__A10_p20__C0__none__s1	config__A10_p20__C2__none__s1	120	0.908333333333333	0.65	34	3	37	0.308333333333333	1.23312929645181e-07
+config C3 vs C0	config__A10_p20__C0__none__s1	config__A10_p20__C3__none__s1	120	0.908333333333333	0.591666666666667	40	2	42	0.35	4.11091605201365e-10
+config C3 vs C1	config__A10_p20__C1__none__s1	config__A10_p20__C3__none__s1	120	0.7	0.591666666666667	18	5	23	0.191666666666667	0.0106220245361328
+config C3 vs C2	config__A10_p20__C2__none__s1	config__A10_p20__C3__none__s1	120	0.65	0.591666666666667	9	2	11	0.0916666666666667	0.0654296875
+config C1 vs C0	config__M1_mnp__C0__none__s1	config__M1_mnp__C1__none__s1	150	0.966666666666667	0.00666666666666667	144	0	144	0.96	8.96831017167887e-44
+config C2 vs C0	config__M1_mnp__C0__none__s1	config__M1_mnp__C2__none__s1	150	0.966666666666667	0.56	64	3	67	0.446666666666667	6.80120022800155e-16
+config C3 vs C0	config__M1_mnp__C0__none__s1	config__M1_mnp__C3__none__s1	150	0.966666666666667	0	145	0	145	0.966666666666667	4.48415508583943e-44
+config C3 vs C1	config__M1_mnp__C1__none__s1	config__M1_mnp__C3__none__s1	150	0.00666666666666667	0	1	0	1	0.00666666666666667	1
+config C3 vs C2	config__M1_mnp__C2__none__s1	config__M1_mnp__C3__none__s1	150	0.56	0	84	0	84	0.56	1.03397576569128e-25
+config C1 vs C0	config__M3_misalign__C0__none__s1	config__M3_misalign__C1__none__s1	150	0.873333333333333	0.84	7	2	9	0.06	0.1796875
+config C2 vs C0	config__M3_misalign__C0__none__s1	config__M3_misalign__C2__none__s1	150	0.873333333333333	0.0933333333333333	117	0	117	0.78	1.20370621524204e-35
+config C3 vs C0	config__M3_misalign__C0__none__s1	config__M3_misalign__C3__none__s1	150	0.873333333333333	0.08	119	0	119	0.793333333333333	3.00926553810507e-36
+config C3 vs C1	config__M3_misalign__C1__none__s1	config__M3_misalign__C3__none__s1	150	0.84	0.08	114	0	114	0.76	9.62964972193613e-35
+config C3 vs C2	config__M3_misalign__C2__none__s1	config__M3_misalign__C3__none__s1	150	0.0933333333333333	0.08	3	1	4	0.0266666666666667	0.625
+config C1 vs C0	config__M4_indel__C0__none__s1	config__M4_indel__C1__none__s1	150	0.08	0.0866666666666667	2	3	5	0.0333333333333333	1
+config C2 vs C0	config__M4_indel__C0__none__s1	config__M4_indel__C2__none__s1	150	0.08	0	12	0	12	0.08	0.00048828125
+config C3 vs C0	config__M4_indel__C0__none__s1	config__M4_indel__C3__none__s1	150	0.08	0	12	0	12	0.08	0.00048828125
+config C3 vs C1	config__M4_indel__C1__none__s1	config__M4_indel__C3__none__s1	150	0.0866666666666667	0	13	0	13	0.0866666666666667	0.000244140625
+config C3 vs C2	config__M4_indel__C2__none__s1	config__M4_indel__C3__none__s1	150	0	0	0	0	0	0	1
+config C1 vs C0	config__R1_internal_At__C0__none__s1	config__R1_internal_At__C1__none__s1	150	0.92	0.886666666666667	7	2	9	0.06	0.1796875
+config C2 vs C0	config__R1_internal_At__C0__none__s1	config__R1_internal_At__C2__none__s1	150	0.92	0.266666666666667	98	0	98	0.653333333333333	6.3108872417681e-30
+config C3 vs C0	config__R1_internal_At__C0__none__s1	config__R1_internal_At__C3__none__s1	150	0.92	0.24	102	0	102	0.68	3.9443045261051e-31
+config C3 vs C1	config__R1_internal_At__C1__none__s1	config__R1_internal_At__C3__none__s1	150	0.886666666666667	0.24	97	0	97	0.646666666666667	1.26217744835362e-29
+config C3 vs C2	config__R1_internal_At__C2__none__s1	config__R1_internal_At__C3__none__s1	150	0.266666666666667	0.24	4	0	4	0.0266666666666667	0.125
+config C1 vs C0	config__R2_terminal_At__C0__none__s1	config__R2_terminal_At__C1__none__s1	150	0.913333333333333	0.906666666666667	4	3	7	0.0466666666666667	1
+config C2 vs C0	config__R2_terminal_At__C0__none__s1	config__R2_terminal_At__C2__none__s1	150	0.913333333333333	0.273333333333333	96	0	96	0.64	2.52435489670725e-29
+config C3 vs C0	config__R2_terminal_At__C0__none__s1	config__R2_terminal_At__C3__none__s1	150	0.913333333333333	0.28	95	0	95	0.633333333333333	5.0487097934145e-29
+config C3 vs C1	config__R2_terminal_At__C1__none__s1	config__R2_terminal_At__C3__none__s1	150	0.906666666666667	0.28	95	1	96	0.64	2.44862424980603e-27
+config C3 vs C2	config__R2_terminal_At__C2__none__s1	config__R2_terminal_At__C3__none__s1	150	0.273333333333333	0.28	1	2	3	0.02	1
+config C1 vs C0	config__R3_frameshift_At__C0__none__s1	config__R3_frameshift_At__C1__none__s1	150	0.92	0.893333333333333	6	2	8	0.0533333333333333	0.2890625
+config C2 vs C0	config__R3_frameshift_At__C0__none__s1	config__R3_frameshift_At__C2__none__s1	150	0.92	0.24	102	0	102	0.68	3.9443045261051e-31
+config C3 vs C0	config__R3_frameshift_At__C0__none__s1	config__R3_frameshift_At__C3__none__s1	150	0.92	0.24	102	0	102	0.68	3.9443045261051e-31
+config C3 vs C1	config__R3_frameshift_At__C1__none__s1	config__R3_frameshift_At__C3__none__s1	150	0.893333333333333	0.24	99	1	100	0.666666666666667	1.59349902854645e-28
+config C3 vs C2	config__R3_frameshift_At__C2__none__s1	config__R3_frameshift_At__C3__none__s1	150	0.24	0.24	3	3	6	0.04	1
+config C1 vs C0	config__R4_internal_Br__C0__none__s1	config__R4_internal_Br__C1__none__s1	150	0	0	0	0	0	0	1
+config C2 vs C0	config__R4_internal_Br__C0__none__s1	config__R4_internal_Br__C2__none__s1	150	0	0	0	0	0	0	1
+config C3 vs C0	config__R4_internal_Br__C0__none__s1	config__R4_internal_Br__C3__none__s1	150	0	0	0	0	0	0	1
+config C3 vs C1	config__R4_internal_Br__C1__none__s1	config__R4_internal_Br__C3__none__s1	150	0	0	0	0	0	0	1
+config C3 vs C2	config__R4_internal_Br__C2__none__s1	config__R4_internal_Br__C3__none__s1	150	0	0	0	0	0	0	1
+config C1 vs C0	config__A10_p10_R1__C0__none__s1	config__A10_p10_R1__C1__none__s1	120	0.983333333333333	0.975	2	1	3	0.025	1
+config C2 vs C0	config__A10_p10_R1__C0__none__s1	config__A10_p10_R1__C2__none__s1	120	0.983333333333333	0.75	29	1	30	0.25	5.77419996261597e-08
+config C3 vs C0	config__A10_p10_R1__C0__none__s1	config__A10_p10_R1__C3__none__s1	120	0.983333333333333	0.766666666666667	27	1	28	0.233333333333333	2.16066837310791e-07
+config C3 vs C1	config__A10_p10_R1__C1__none__s1	config__A10_p10_R1__C3__none__s1	120	0.975	0.766666666666667	25	0	25	0.208333333333333	5.96046447753906e-08
+config C3 vs C2	config__A10_p10_R1__C2__none__s1	config__A10_p10_R1__C3__none__s1	120	0.75	0.766666666666667	5	7	12	0.1	0.7744140625
+C4 vs C1	config__N0_L50__C1__none__s1	triple__N0_L50__C4__none__s1	300	0.00333333333333333	0	1	0	1	0.00333333333333333	1
+C4 vs C1	config__M1_mnp__C1__none__s1	triple__M1_mnp__C4__none__s1	150	0.00666666666666667	0	1	0	1	0.00666666666666667	1
+C4 vs C1	config__A10_p10__C1__none__s1	triple__A10_p10__C4__none__s1	120	0.608333333333333	0.591666666666667	9	7	16	0.133333333333333	0.803619384765625
+C4 vs C1	config__A10_p20__C1__none__s1	triple__A10_p20__C4__none__s1	120	0.7	0.708333333333333	8	9	17	0.141666666666667	1
+filter mask vs none, C0	config__N0_L50__C0__none__s1	filter__N0_L50__C0__mask__s1	300	0.00666666666666667	0.00666666666666667	0	0	0	0	1
+filter mask vs none, C3	config__N0_L50__C3__none__s1	filter__N0_L50__C3__mask__s1	300	0	0	0	0	0	0	1
+filter mask vs none, C0	config__A10_p10__C0__none__s1	filter__A10_p10__C0__mask__s1	120	0.666666666666667	0.666666666666667	0	0	0	0	1
+filter mask vs none, C3	config__A10_p10__C3__none__s1	filter__A10_p10__C3__mask__s1	120	0.391666666666667	0.391666666666667	0	0	0	0	1
+filter mask vs none, C0	config__A10_p20__C0__none__s1	filter__A10_p20__C0__mask__s1	120	0.908333333333333	0.908333333333333	0	0	0	0	1
+filter mask vs none, C3	config__A10_p20__C3__none__s1	filter__A10_p20__C3__mask__s1	120	0.591666666666667	0.591666666666667	0	0	0	0	1
+filter mask vs none, C0	config__M3_misalign__C0__none__s1	filter__M3_misalign__C0__mask__s1	150	0.873333333333333	0.00666666666666667	130	0	130	0.866666666666667	1.46936793852785e-39
+filter mask vs none, C3	config__M3_misalign__C3__none__s1	filter__M3_misalign__C3__mask__s1	150	0.08	0.00666666666666667	11	0	11	0.0733333333333333	0.0009765625
+filter mask vs none, C0	config__M4_indel__C0__none__s1	filter__M4_indel__C0__mask__s1	150	0.08	0.08	0	0	0	0	1
+filter mask vs none, C3	config__M4_indel__C3__none__s1	filter__M4_indel__C3__mask__s1	150	0	0	0	0	0	0	1
+filter mask vs none, C0	config__R1_internal_At__C0__none__s1	filter__R1_internal_At__C0__mask__s1	150	0.92	0.00666666666666667	137	0	137	0.913333333333333	1.14794370197489e-41
+filter mask vs none, C3	config__R1_internal_At__C3__none__s1	filter__R1_internal_At__C3__mask__s1	150	0.24	0	36	0	36	0.24	2.91038304567337e-11
+filter mask vs none, C0	config__R2_terminal_At__C0__none__s1	filter__R2_terminal_At__C0__mask__s1	150	0.913333333333333	0.00666666666666667	136	0	136	0.906666666666667	2.29588740394977e-41
+filter mask vs none, C3	config__R2_terminal_At__C3__none__s1	filter__R2_terminal_At__C3__mask__s1	150	0.28	0	42	0	42	0.28	4.54747350886465e-13
+filter mask vs none, C0	config__R3_frameshift_At__C0__none__s1	filter__R3_frameshift_At__C0__mask__s1	150	0.92	0	138	0	138	0.92	5.73971850987448e-42
+filter mask vs none, C3	config__R3_frameshift_At__C3__none__s1	filter__R3_frameshift_At__C3__mask__s1	150	0.24	0	36	0	36	0.24	2.91038304567337e-11
+filter mask vs none, C0	config__R4_internal_Br__C0__none__s1	filter__R4_internal_Br__C0__mask__s1	150	0	0.00666666666666667	0	1	1	0.00666666666666667	1
+filter mask vs none, C3	config__R4_internal_Br__C3__none__s1	filter__R4_internal_Br__C3__mask__s1	150	0	0	0	0	0	0	1
+filter mask vs none, C0	config__A10_p10_R1__C0__none__s1	filter__A10_p10_R1__C0__mask__s1	120	0.983333333333333	0.683333333333333	36	0	36	0.3	2.91038304567337e-11
+filter mask vs none, C3	config__A10_p10_R1__C3__none__s1	filter__A10_p10_R1__C3__mask__s1	120	0.766666666666667	0.383333333333333	48	2	50	0.416666666666667	2.26663132707472e-12
+filter mask_gappy vs none, C0	config__N0_L50__C0__none__s1	filter__N0_L50__C0__mask_gappy__s1	300	0.00666666666666667	0.00666666666666667	0	0	0	0	1
+filter mask_gappy vs none, C3	config__N0_L50__C3__none__s1	filter__N0_L50__C3__mask_gappy__s1	300	0	0	0	0	0	0	1
+filter mask_gappy vs none, C0	config__A10_p10__C0__none__s1	filter__A10_p10__C0__mask_gappy__s1	120	0.666666666666667	0.666666666666667	0	0	0	0	1
+filter mask_gappy vs none, C3	config__A10_p10__C3__none__s1	filter__A10_p10__C3__mask_gappy__s1	120	0.391666666666667	0.391666666666667	0	0	0	0	1
+filter mask_gappy vs none, C0	config__M4_indel__C0__none__s1	filter__M4_indel__C0__mask_gappy__s1	150	0.08	0.0666666666666667	4	2	6	0.04	0.6875
+filter mask_gappy vs none, C3	config__M4_indel__C3__none__s1	filter__M4_indel__C3__mask_gappy__s1	150	0	0	0	0	0	0	1
+filter mask_gappy vs none, C0	config__R1_internal_At__C0__none__s1	filter__R1_internal_At__C0__mask_gappy__s1	150	0.92	0.00666666666666667	137	0	137	0.913333333333333	1.14794370197489e-41
+filter mask_gappy vs none, C3	config__R1_internal_At__C3__none__s1	filter__R1_internal_At__C3__mask_gappy__s1	150	0.24	0	36	0	36	0.24	2.91038304567337e-11
+corrupted vs clean, C0	config__N0_L50__C0__none__s1	config__R1_internal_At__C0__none__s1	150	0.00666666666666667	0.92	0	137	137	0.913333333333333	1.14794370197489e-41
+corrupted vs clean, C1	config__N0_L50__C1__none__s1	config__R1_internal_At__C1__none__s1	150	0	0.886666666666667	0	133	133	0.886666666666667	1.83670992315985e-40
+corrupted vs clean, C2	config__N0_L50__C2__none__s1	config__R1_internal_At__C2__none__s1	150	0	0.266666666666667	0	40	40	0.266666666666667	1.81898940354586e-12
+corrupted vs clean, C3	config__N0_L50__C3__none__s1	config__R1_internal_At__C3__none__s1	150	0	0.24	0	36	36	0.24	2.91038304567337e-11
+corrupted vs clean, C0	config__N0_L50__C0__none__s1	config__R2_terminal_At__C0__none__s1	150	0.00666666666666667	0.913333333333333	0	136	136	0.906666666666667	2.29588740394977e-41
+corrupted vs clean, C1	config__N0_L50__C1__none__s1	config__R2_terminal_At__C1__none__s1	150	0	0.906666666666667	0	136	136	0.906666666666667	2.29588740394977e-41
+corrupted vs clean, C2	config__N0_L50__C2__none__s1	config__R2_terminal_At__C2__none__s1	150	0	0.273333333333333	0	41	41	0.273333333333333	9.09494701772931e-13
+corrupted vs clean, C3	config__N0_L50__C3__none__s1	config__R2_terminal_At__C3__none__s1	150	0	0.28	0	42	42	0.28	4.54747350886465e-13
+corrupted vs clean, C0	config__N0_L50__C0__none__s1	config__R3_frameshift_At__C0__none__s1	150	0.00666666666666667	0.92	0	137	137	0.913333333333333	1.14794370197489e-41
+corrupted vs clean, C1	config__N0_L50__C1__none__s1	config__R3_frameshift_At__C1__none__s1	150	0	0.893333333333333	0	134	134	0.893333333333333	9.18354961579921e-41
+corrupted vs clean, C2	config__N0_L50__C2__none__s1	config__R3_frameshift_At__C2__none__s1	150	0	0.24	0	36	36	0.24	2.91038304567337e-11
+corrupted vs clean, C3	config__N0_L50__C3__none__s1	config__R3_frameshift_At__C3__none__s1	150	0	0.24	0	36	36	0.24	2.91038304567337e-11
+corrupted vs clean, C0	config__N0_L50__C0__none__s1	config__R4_internal_Br__C0__none__s1	150	0.00666666666666667	0	1	0	1	0.00666666666666667	1
+corrupted vs clean, C1	config__N0_L50__C1__none__s1	config__R4_internal_Br__C1__none__s1	150	0	0	0	0	0	0	1
+corrupted vs clean, C2	config__N0_L50__C2__none__s1	config__R4_internal_Br__C2__none__s1	150	0	0	0	0	0	0	1
+corrupted vs clean, C3	config__N0_L50__C3__none__s1	config__R4_internal_Br__C3__none__s1	150	0	0	0	0	0	0	1
+corrupted vs clean, C0	config__A10_p10__C0__none__s1	config__A10_p10_R1__C0__none__s1	120	0.666666666666667	0.983333333333333	1	39	40	0.333333333333333	7.45785655453804e-11
+corrupted vs clean, C1	config__A10_p10__C1__none__s1	config__A10_p10_R1__C1__none__s1	120	0.608333333333333	0.975	0	44	44	0.366666666666667	1.13686837721616e-13
+corrupted vs clean, C2	config__A10_p10__C2__none__s1	config__A10_p10_R1__C2__none__s1	120	0.425	0.75	1	40	41	0.341666666666667	3.81987774744631e-11
+corrupted vs clean, C3	config__A10_p10__C3__none__s1	config__A10_p10_R1__C3__none__s1	120	0.391666666666667	0.766666666666667	2	47	49	0.408333333333333	4.3556269702094e-12
