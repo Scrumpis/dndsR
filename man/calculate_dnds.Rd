@@ -29,11 +29,17 @@ calculate_dnds(
 \item{comparison_file}{Path to a whitespace-delimited (tabs/spaces) file OR a data.frame
 describing comparisons (batch mode).
 Must include columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
+Two optional columns turn on the McDonald-Kreitman test for a comparison:
+\code{snp_file} (a VCF or BED of SNP positions) and \code{snp_side}
+(\code{"query"} or \code{"subject"}, whose genome shares the SNP coordinates).
+When they are present, \code{<comparison>_mk.tsv} and \code{<comparison>_mk_pooled.tsv}
+are written beside the dN/dS outputs. See \code{docs/mcdonald-kreitman.md}.
 Additional columns are allowed and ignored.
 
 Notes:
 \itemize{
-\item query_gff/subject_gff are accepted for consistency with other dndsR steps but are not used here.
+\item query_gff/subject_gff are accepted for consistency with other dndsR steps; MK needs the
+SNP side's GFF3, so keep it in place when using snp_file.
 \item For a simpler FASTA-only batch wrapper (no GFF columns), use seq_list_file (see below).
 }}
 

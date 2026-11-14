@@ -47,6 +47,29 @@ QC columns: `id`, `transcript` (the isoform used), `n_isoforms`, `length_nt`, `m
 
 Evidence for the criteria: [validation/estimators.md](validation/estimators.md), "Reliability flags".
 
+### McDonald-Kreitman (development version)
+
+Written when the comparison has `snp_file` and `snp_side` columns. Method, inputs, and checks: [mcdonald-kreitman.md](mcdonald-kreitman.md).
+
+`<comparison>_mk.tsv` has one row per 1:1 pair that was counted.
+
+| Column | Meaning |
+|---|---|
+| `query_id`, `subject_id` | The pair |
+| `reference_side` | `query` or `subject`: whose SNPs were counted |
+| `pn`, `ps` | Polymorphic nonsynonymous and synonymous sites |
+| `dn`, `ds` | Divergent nonsynonymous and synonymous differences, path-averaged and so possibly fractional |
+| `dn_int`, `ds_int` | `round()` of the above, the counts Fisher's test uses |
+| `codons_used` | Aligned codons counted for divergence |
+| `codons_excluded_polymorphic` | Codons left out because they carry a SNP |
+| `alpha` | `1 - (ds * pn) / (dn * ps)` |
+| `neutrality_index` | `(pn * ds) / (ps * dn)` |
+| `dos` | Direction of selection: `pn / (pn + ps) - dn / (dn + ds)` |
+| `fisher_p` | Fisher's exact test on `[pn, ps; dn_int, ds_int]`, NA when a margin is zero |
+| `fisher_q` | Benjamini-Hochberg across the finite p-values in the file |
+
+`<comparison>_mk_pooled.tsv` has one row: `comparison`, `reference_side`, `n_pairs`, the summed `pn`, `ps`, `dn`, `ds`, `dn_int`, `ds_int`, `codons_used`, `codons_excluded_polymorphic`, and `alpha`, `neutrality_index`, `dos`, `fisher_p` recomputed from the sums.
+
 ## append_annotations
 
 `<comparison>_dnds_annot.tsv` adds to the above: `q_attributes`, `s_attributes`, `q_<term>`, and `s_<term>` for terms found (`ipr`, `go`, `kegg`, `panther`, `pfam`, `tigrfam`, `cog`, plus any `--custom` patterns), and `q_gff_seqname`, `q_gff_start`, `q_gff_end` with their `s_` equivalents. `q_` means query and `s_` means subject.

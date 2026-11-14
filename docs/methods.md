@@ -51,6 +51,10 @@ The first three commands do not account for gene length or dS, and `go_enrichmen
 
 `phylo_busted` runs HyPhy's BUSTED on codon alignments of several species, with foreground branches labelled from a species tree, and applies Benjamini-Hochberg across orthogroups. It is separate from the pairwise estimates above: [phylo-methods.md](phylo-methods.md).
 
+## McDonald-Kreitman test
+
+When the comparison file names a SNP file and the genome its coordinates belong to (`snp_file`, `snp_side`), `calculate_dnds` also counts polymorphism and divergence for a 2×2 McDonald-Kreitman test on 1:1 orthologs, reusing the codon alignments it just built. Only bi-allelic SNPs are used, multi-base codons are path-averaged, and codons carrying a SNP are excluded from divergence. Method and checks: [mcdonald-kreitman.md](mcdonald-kreitman.md).
+
 ## Reporting a dndsR analysis
 
 Report the dndsR version and commit, image digest, and the provenance file `*_dnds_provenance.json`, which records software versions, parameters, and input hashes. Also cite orthologr, DIAMOND, and the estimator.

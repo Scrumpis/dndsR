@@ -13,10 +13,16 @@
 #' @param comparison_file Path to a whitespace-delimited (tabs/spaces) file OR a data.frame
 #'   describing comparisons (batch mode).
 #'   Must include columns: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff.
+#'   Two optional columns turn on the McDonald-Kreitman test for a comparison:
+#'   \code{snp_file} (a VCF or BED of SNP positions) and \code{snp_side}
+#'   (\code{"query"} or \code{"subject"}, whose genome shares the SNP coordinates).
+#'   When they are present, \code{<comparison>_mk.tsv} and \code{<comparison>_mk_pooled.tsv}
+#'   are written beside the dN/dS outputs. See \code{docs/mcdonald-kreitman.md}.
 #'   Additional columns are allowed and ignored.
 #'
 #'   Notes:
-#'   - query_gff/subject_gff are accepted for consistency with other dndsR steps but are not used here.
+#'   - query_gff/subject_gff are accepted for consistency with other dndsR steps; MK needs the
+#'     SNP side's GFF3, so keep it in place when using snp_file.
 #'   - For a simpler FASTA-only batch wrapper (no GFF columns), use seq_list_file (see below).
 #'
 #' @param seq_list_file Path to a whitespace-delimited (tabs/spaces) file OR a data.frame
@@ -237,10 +243,13 @@ calculate_dnds <- function(comparison_file = NULL,
     # ensure required columnts exist
     needed <- c("comparison_name", "query_fasta", "subject_fasta", "query_gff", "subject_gff")
 
-    # headerless 5-column schema inference: comparison_name, query_fasta, query_gff, subject_fasta, subject_gff
+    # headerless schema inference: comparison_name, query_fasta, query_gff, subject_fasta,
+    # subject_gff, and optionally snp_file and snp_side
     headerless_like <- !any(grepl("^(query_|subject_)", names(df)))
     if (!all(needed %in% names(df)) && headerless_like && ncol(df) >= 5) {
       names(df)[1:5] <- c("comparison_name", "query_fasta", "query_gff", "subject_fasta", "subject_gff")
+      if (ncol(df) >= 6L) names(df)[6] <- "snp_file"
+      if (ncol(df) >= 7L) names(df)[7] <- "snp_side"
     }
 
     if (!all(needed %in% names(df))) {
@@ -374,6 +383,11 @@ calculate_dnds <- function(comparison_file = NULL,
       } else {
         message("Keeping existing result for ", comparison_basename, ", but ", why,
                 ". It may not reflect current inputs or fixes. Use --overwrite to recalculate.")
+      }
+      mk <- .mk_validate_snp_args(row[["snp_file"]], row[["snp_side"]], comparison_basename)
+      if (!is.null(mk) && !file.exists(file.path(comp_dir, paste0(comparison_basename, "_mk.tsv")))) {
+        message("  - MK: no ", comparison_basename, "_mk.tsv yet, but dN/dS was cached, so the codon ",
+                "alignments are gone. Run with overwrite = TRUE to compute dN/dS and MK together.")
       }
       return(out_tsv)
     }
@@ -514,6 +528,36 @@ calculate_dnds <- function(comparison_file = NULL,
     flags_tsv <- file.path(comp_dir, paste0(comparison_basename, "_dnds_reliability.tsv"))
     utils::write.table(flags, flags_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
     .report_pair_flags(flags, comparison_basename, flags_tsv)
+
+    # ---- McDonald-Kreitman (optional; declared by snp_file/snp_side in the comparison) ----
+    mk <- .mk_validate_snp_args(row[["snp_file"]], row[["snp_side"]], comparison_basename)
+    if (!is.null(mk)) {
+      need <- if (mk$side == "query") c("query_fasta", "query_gff") else c("subject_fasta", "subject_gff")
+      missing_cols <- setdiff(need, names(row))
+      empty <- vapply(need[need %in% names(row)], function(nm) {
+        v <- row[[nm]]; is.na(v) || !nzchar(trimws(as.character(v)))
+      }, logical(1))
+      if (length(missing_cols) || any(empty)) {
+        stop("MK (snp_file) needs ", paste(need, collapse = " and "), " in the comparison file; ",
+             "they are missing or empty for comparison '", comparison_basename, "'. ",
+             "seq_list_file mode has no GFFs, so it cannot run MK.", call. = FALSE)
+      }
+      aln_files <- list.files(codon_dir, pattern = "_pal2nal\\.aln$", full.names = TRUE)
+      if (!length(aln_files)) {
+        warning(comparison_basename, ": MK requested but orthologr wrote no codon alignments; ",
+                "the MK table will have no pairs.", call. = FALSE)
+      }
+      .mk_run(
+        comp_dir = comp_dir, comparison_name = comparison_basename,
+        dnds_res = res, aln_files = aln_files,
+        snp_file = mk$file, snp_side = mk$side,
+        query_fasta = if ("query_fasta" %in% names(row)) as.character(row[["query_fasta"]]) else NA_character_,
+        subject_fasta = if ("subject_fasta" %in% names(row)) as.character(row[["subject_fasta"]]) else NA_character_,
+        query_gff = if ("query_gff" %in% names(row)) as.character(row[["query_gff"]]) else NA_character_,
+        subject_gff = if ("subject_gff" %in% names(row)) as.character(row[["subject_gff"]]) else NA_character_,
+        query_cds_fasta = q_in, subject_cds_fasta = s_in
+      )
+    }
     message("[calculate_dnds] Finished: ", comparison_basename)
     out_tsv
   }
