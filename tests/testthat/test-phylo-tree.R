@@ -173,12 +173,27 @@ test_that("gene tree tips may be taxa, sequence names, gene IDs, or OrthoFinder 
   expect_identical(read("((A_prot_g1,spB_g2),(spC,spD));", aliases = c(A_prot = "spA")), c("spA", "spB", "spC", "spD"))
   expect_error(read("((spA,spB),(spC,spD));", seqs[1:3, ]), "gene_tree_taxa_mismatch")
   expect_error(read("((spA,spB),(spC,spZ));"), "gene_tree_taxa_mismatch")
+  # An alias whose taxon is absent from the orthogroup is skipped (regression: setNames error).
+  expect_identical(read("((A_prot_g1,spB_g2),spC_g3);", seqs[1:3, ], aliases = c(A_prot = "spA", D_prot = "spD")),
+                   c("spA", "spB", "spC"))
+})
+
+test_that("gene tree errors are exclusions only for known reasons, otherwise failures", {
+  dir <- withr::local_tempdir()
+  seqs <- data.frame(seq_name = c("spA", "spB", "spC", "spD"), taxon = c("spA", "spB", "spC", "spD"), gene_id = NA_character_)
+  writeLines("((spA,spB),(spC,spZ));", f <- file.path(dir, "g.nwk"))
+  g <- .phylo_try_gene_tree(f, seqs)
+  expect_identical(c(g$status, g$reason), c("excluded", "gene_tree_taxa_mismatch"))
+  testthat::local_mocked_bindings(.phylo_read_gene_tree = function(...) stop("something unexpected"))
+  g <- .phylo_try_gene_tree(f, seqs)
+  expect_identical(c(g$status, g$reason), c("failed", "gene_tree_error"))
+  expect_match(g$detail, "something unexpected")
 })
 
 test_that("every reason has a basis", {
   reasons <- c("foreground_unidentifiable", "foreground_not_in_gene_tree", "foreground_absent", "foreground_partly_unidentifiable",
                "foreground_incomplete", "multi_copy", "too_few_taxa", "cds_invalid", "internal_stop", "gene_not_found",
-               "hyphy_error", "backtranslation_mismatch", "prepared_tree_mismatch", "label_mismatch")
+               "hyphy_error", "backtranslation_mismatch", "prepared_tree_mismatch", "label_mismatch", "gene_tree_error")
   expect_false(anyNA(.phylo_reason_basis(reasons)))
   expect_identical(.phylo_reason_basis(c("multi_copy", "hyphy_error", "foreground_absent")), c("policy", "software", "no_data"))
 })

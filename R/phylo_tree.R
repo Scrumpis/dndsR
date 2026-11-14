@@ -198,7 +198,8 @@
     gene_not_found = "input", unknown_taxon = "input", empty_alignment = "input", not_aligned = "input",
     gene_tree_missing = "input", gene_tree_unreadable = "input", gene_tree_taxa_mismatch = "input",
     hyphy_error = "software", hyphy_output_invalid = "software", label_mismatch = "software",
-    alignment_failed = "software", backtranslation_mismatch = "software", prepared_tree_mismatch = "software"
+    alignment_failed = "software", backtranslation_mismatch = "software", prepared_tree_mismatch = "software",
+    gene_tree_error = "software"
   )
   out <- unname(map[reason])
   out[is.na(reason)] <- NA_character_
@@ -385,7 +386,8 @@
                 stats::setNames(seqs$taxon[gene], paste0(seqs$taxon[gene], "_", seqs$gene_id[gene])))
     for (a in names(aliases)) {
       hit <- gene & seqs$taxon == aliases[[a]]
-      lookup <- c(lookup, stats::setNames(seqs$taxon[hit], paste0(a, "_", seqs$gene_id[hit])))
+      # paste0() with an empty vector returns one string, so skip aliases of absent taxa.
+      if (any(hit)) lookup <- c(lookup, stats::setNames(seqs$taxon[hit], paste0(a, "_", seqs$gene_id[hit])))
     }
   }
   lookup <- lookup[!duplicated(names(lookup))]
@@ -393,4 +395,17 @@
   if (anyNA(mapped) || anyDuplicated(mapped) || !setequal(mapped, seqs$taxon)) stop("gene_tree_taxa_mismatch")
   tree$tip.label <- mapped
   tree
+}
+
+#' Read a gene tree for one orthogroup, classifying the outcome
+#'
+#' @return A list with \code{tree} (phylo or NULL), or \code{status} ("excluded" for a known
+#'   input reason, "failed" for any other error), \code{reason}, and \code{detail}.
+#' @keywords internal
+.phylo_try_gene_tree <- function(path, seqs, aliases = NULL) {
+  tryCatch(list(tree = .phylo_read_gene_tree(path, seqs, aliases)), error = function(e) {
+    msg <- conditionMessage(e)
+    if (msg %in% c("gene_tree_unreadable", "gene_tree_taxa_mismatch")) list(status = "excluded", reason = msg, detail = path)
+    else list(status = "failed", reason = "gene_tree_error", detail = paste0(path, ": ", msg))
+  })
 }

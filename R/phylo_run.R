@@ -118,8 +118,9 @@
   gt_path <- .phylo_find_gene_tree(ctx$gene_tree_dir, og)
   if (!is.null(gt_path)) {
     if (is.na(gt_path)) return(done("excluded", "gene_tree_missing", paste("no gene tree for", og, "in", ctx$gene_tree_dir), info, sequences = seq_qc))
-    gene_tree <- tryCatch(.phylo_read_gene_tree(gt_path, aln, ctx$aliases), error = function(e) conditionMessage(e))
-    if (is.character(gene_tree)) return(done("excluded", gene_tree, gt_path, info, sequences = seq_qc))
+    g <- .phylo_try_gene_tree(gt_path, aln, ctx$aliases)
+    if (is.null(g$tree)) return(done(g$status, g$reason, g$detail, info, sequences = seq_qc))
+    gene_tree <- g$tree
   }
   map <- .phylo_map_foreground(ctx$hyp, present, gene_tree, ctx$gene_tree_mode)
   info <- c(info, map$info)

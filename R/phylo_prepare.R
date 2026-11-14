@@ -337,8 +337,9 @@ phylo_prepare <- function(orthogroup_file,
   gt_path <- .phylo_find_gene_tree(ctx$gene_tree_dir, og)
   if (!is.null(gt_path)) {
     if (is.na(gt_path)) return(out("excluded", "gene_tree_missing", paste("no gene tree for", og), info, sequences))
-    gene_tree <- tryCatch(.phylo_read_gene_tree(gt_path, seq_df, ctx$aliases), error = function(e) conditionMessage(e))
-    if (is.character(gene_tree)) return(out("excluded", gene_tree, gt_path, info, sequences))
+    g <- .phylo_try_gene_tree(gt_path, seq_df, ctx$aliases)
+    if (is.null(g$tree)) return(out(g$status, g$reason, g$detail, info, sequences))
+    gene_tree <- g$tree
   }
   map <- .phylo_map_foreground(ctx$hyp, present, gene_tree, ctx$gene_tree_mode)
   info <- c(info, map$info)
