@@ -54,7 +54,17 @@
 #' @param aligner Character. Aligner passed to \code{orthologr::dNdS()} (e.g. \code{"diamond"} or \code{"blast"}).
 #'   If \code{"diamond"}, the \code{diamond} binary must be available on \code{PATH}.
 #' @param sensitivity_mode Character. Passed to \code{orthologr::dNdS()} as \code{sensitivity_mode}.
-#' @param dnds_method Character. Passed to \code{orthologr::dNdS()} as \code{dnds_est.method}.
+#' @param dnds_method Character. How dN and dS are estimated for each ortholog pair.
+#'   \code{"Comeron"} (default; Comeron 1995, computed in orthologr). Or one of these, computed
+#'   with KaKs_Calculator 2.0 on the same codon alignments: \code{"NG"} (Nei and Gojobori
+#'   1986), \code{"LWL"} (Li, Wu and Luo 1985), \code{"LPB"} (Li 1993; Pamilo and Bianchi
+#'   1993), \code{"MLWL"} (Tzeng et al. 2004), \code{"YN"} (Yang and Nielsen 2000), or
+#'   \code{"MYN"} (Zhang et al. 2006). Ortholog detection and alignment do not depend on the
+#'   method. KaKs_Calculator writes "NA" for a value of 0; dndsR reports 0 where the
+#'   alignment shows it must be. Validation and known differences from PAML:
+#'   \code{docs/validation/estimators.md}.
+#' @param kaks_calculator Path to the KaKs_Calculator executable, if not on \code{PATH}.
+#'   Used only by methods other than \code{"Comeron"}.
 #'
 #' @param ... Additional arguments forwarded to \code{orthologr::dNdS()}. Only named arguments
 #'   matching \code{formals(orthologr::dNdS)} are forwarded. If an argument overlaps a default
@@ -103,9 +113,14 @@ calculate_dnds <- function(comparison_file = NULL,
                            aligner = "diamond",
                            sensitivity_mode = "fast",
                            dnds_method = "Comeron",
+                           kaks_calculator = NULL,
                            ...) {
 
   seq_type <- match.arg(seq_type)
+  if (!is.character(dnds_method) || length(dnds_method) != 1L || !dnds_method %in% .dnds_methods()) {
+    stop("dnds_method must be one of: ", paste(.dnds_methods(), collapse = ", "), call. = FALSE)
+  }
+  kaks <- if (dnds_method %in% .kaks_methods()) .kaks_find(kaks_calculator) else NULL
   if (!is.null(comparison_file) && !is.null(seq_list_file)) {
     stop("Supply only one of comparison_file (batch mode) or seq_list_file (FASTA-only list mode).", call. = FALSE)
   }
@@ -353,7 +368,7 @@ calculate_dnds <- function(comparison_file = NULL,
     s_in <- inp$subject_file
 
     if (!isTRUE(overwrite) && file.exists(out_tsv) && file.info(out_tsv)$size > 0) {
-      why <- .provenance_mismatch(prov_json, q_in, s_in)
+      why <- .provenance_mismatch(prov_json, q_in, s_in, dnds_method)
       if (is.null(why)) {
         message("Skipping ", comparison_basename, " (exists; inputs unchanged).")
       } else {
@@ -387,7 +402,7 @@ calculate_dnds <- function(comparison_file = NULL,
       aa_aln_type        = "pairwise",
       aa_aln_tool        = "NW",
       codon_aln_tool     = "pal2nal",
-      dnds_est.method    = dnds_method,
+      dnds_est.method    = "Comeron",
       comp_cores         = as.integer(comp_cores),
       quiet              = TRUE,
       clean_folders      = FALSE,
@@ -434,6 +449,10 @@ calculate_dnds <- function(comparison_file = NULL,
                paste(setdiff(nms, dnds_formals), collapse = ", "), call. = FALSE)
         }
 
+        if ("dnds_est.method" %in% names(user)) {
+          stop("Use dnds_method, not dnds_est.method.", call. = FALSE)
+        }
+
         overlap <- intersect(names(user), names(args))
         if (length(overlap)) {
           message("Overriding defaults: ", paste(overlap, collapse = ", "))
@@ -452,9 +471,25 @@ calculate_dnds <- function(comparison_file = NULL,
       " (seq_type=", seq_type, ", mode=", inp$mode, ")"
     )
 
-    # orthologr writes files about discarded sequences to the working directory.
+    # orthologr writes files about discarded sequences to the working directory. Its codon
+    # alignments go to a fixed folder in the session's temporary directory; clear it, so that
+    # only this comparison's alignments are there for methods computed afterwards.
+    codon_dir <- file.path(tempdir(), "_alignment", "codon_aln")
+    unlink(codon_dir, recursive = TRUE)
     previous_wd <- setwd(comp_dir)
     res <- tryCatch(do.call(orthologr::dNdS, args), finally = setwd(previous_wd))
+    if (!is.null(kaks)) {
+      work <- tempfile("kaks-"); dir.create(work)
+      est <- tryCatch(.kaks_estimate(list.files(codon_dir, pattern = "_pal2nal\\.aln$", full.names = TRUE),
+                                     dnds_method, kaks$bin, work),
+                      finally = unlink(work, recursive = TRUE))
+      res <- .dnds_replace_values(res, est)
+      if (attr(res, "unmatched") > 0) {
+        warning(comparison_basename, ": ", attr(res, "unmatched"), " ortholog pair(s) had no codon alignment for ",
+                dnds_method, "; their dN, dS, and dN/dS are NA.", call. = FALSE)
+      }
+      attr(res, "unmatched") <- NULL
+    }
 
     utils::write.table(
       res,
@@ -465,7 +500,7 @@ calculate_dnds <- function(comparison_file = NULL,
     )
 
     jsonlite::write_json(
-      .dnds_provenance(q_in, s_in, args),
+      .dnds_provenance(q_in, s_in, args, dnds_method, kaks),
       prov_json, auto_unbox = TRUE, pretty = TRUE, null = "null"
     )
 

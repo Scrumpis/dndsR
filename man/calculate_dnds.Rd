@@ -21,6 +21,7 @@ calculate_dnds(
   aligner = "diamond",
   sensitivity_mode = "fast",
   dnds_method = "Comeron",
+  kaks_calculator = NULL,
   ...
 )
 }
@@ -80,7 +81,18 @@ If \code{"diamond"}, the \code{diamond} binary must be available on \code{PATH}.
 
 \item{sensitivity_mode}{Character. Passed to \code{orthologr::dNdS()} as \code{sensitivity_mode}.}
 
-\item{dnds_method}{Character. Passed to \code{orthologr::dNdS()} as \code{dnds_est.method}.}
+\item{dnds_method}{Character. How dN and dS are estimated for each ortholog pair.
+\code{"Comeron"} (default; Comeron 1995, computed in orthologr). Or one of these, computed
+with KaKs_Calculator 2.0 on the same codon alignments: \code{"NG"} (Nei and Gojobori
+1986), \code{"LWL"} (Li, Wu and Luo 1985), \code{"LPB"} (Li 1993; Pamilo and Bianchi
+1993), \code{"MLWL"} (Tzeng et al. 2004), \code{"YN"} (Yang and Nielsen 2000), or
+\code{"MYN"} (Zhang et al. 2006). Ortholog detection and alignment do not depend on the
+method. KaKs_Calculator writes "NA" for a value of 0; dndsR reports 0 where the
+alignment shows it must be. Validation and known differences from PAML:
+\code{docs/validation/estimators.md}.}
+
+\item{kaks_calculator}{Path to the KaKs_Calculator executable, if not on \code{PATH}.
+Used only by methods other than \code{"Comeron"}.}
 
 \item{...}{Additional arguments forwarded to \code{orthologr::dNdS()}. Only named arguments
 matching \code{formals(orthologr::dNdS)} are forwarded. If an argument overlaps a default

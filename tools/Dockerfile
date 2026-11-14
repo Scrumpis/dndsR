@@ -96,14 +96,17 @@ RUN set -eux; \
   rm -f /tmp/micromamba.tar.bz2
 
 # HyPhy is the engine for the phylogenetic commands (phylo_busted). Pinned to the release
-# dndsR was validated against: docs/validation/phylo-busted-wrapper.md.
+# dndsR was validated against: docs/validation/phylo-busted-wrapper.md. KaKs_Calculator
+# computes the dN/dS methods other than Comeron: docs/validation/estimators.md.
 RUN micromamba create -y -n tools -c conda-forge -c bioconda \
       python=3.10.19 \
       orthofinder=2.5.4 \
       mafft=7.526 mcl=22.282 fasttree=2.2.0 \
       hyphy=2.5.103 \
+      kakscalculator2=2.0.1 \
   && micromamba clean -a -y \
-  && $MAMBA_ROOT_PREFIX/envs/tools/bin/hyphy --version
+  && $MAMBA_ROOT_PREFIX/envs/tools/bin/hyphy --version \
+  && $MAMBA_ROOT_PREFIX/envs/tools/bin/KaKs_Calculator -h | grep -q "Version: 2.0"
 
 # ============================================================
 # DIAMOND binary

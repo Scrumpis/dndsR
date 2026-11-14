@@ -4,15 +4,22 @@
 \alias{.provenance_mismatch}
 \title{Explain why an existing dN/dS result might not match its current inputs}
 \usage{
-.provenance_mismatch(prov_path, query_file, subject_file)
+.provenance_mismatch(
+  prov_path,
+  query_file,
+  subject_file,
+  dnds_method = "Comeron"
+)
 }
 \arguments{
 \item{prov_path}{Path to a provenance JSON file.}
 
 \item{query_file, subject_file}{Current sequence inputs.}
+
+\item{dnds_method}{The method now requested.}
 }
 \value{
-\code{NULL} if the recorded hashes match, otherwise a one-line reason.
+\code{NULL} if the recorded hashes and method match, otherwise a one-line reason.
 }
 \description{
 Explain why an existing dN/dS result might not match its current inputs

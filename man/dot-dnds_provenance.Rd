@@ -4,7 +4,13 @@
 \alias{.dnds_provenance}
 \title{Identify the file contents and software behind a dN/dS result}
 \usage{
-.dnds_provenance(query_file, subject_file, args)
+.dnds_provenance(
+  query_file,
+  subject_file,
+  args,
+  dnds_method = "Comeron",
+  kaks = NULL
+)
 }
 \arguments{
 \item{query_file, subject_file}{Paths to the sequence inputs.}

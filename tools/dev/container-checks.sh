@@ -33,6 +33,7 @@ pass "dndsr is on PATH" command -v dndsr
 pass "DIAMOND runs" diamond version
 pass "OrthoFinder runs" orthofinder -h
 pass "HyPhy 2.5.103 runs" sh -c 'hyphy --version | grep -q "2.5.103"'
+pass "KaKs_Calculator 2.0 runs" sh -c 'KaKs_Calculator -h | grep -q "Version: 2.0"'
 pass "ape loads" Rscript -e 'stopifnot(requireNamespace("ape", quietly = TRUE))'
 pass "required R packages load" Rscript -e 'for (p in c("dndsR","orthologr","Biostrings","GenomicFeatures","txdbmaker","pwalign","topGO","GO.db","IHW","qvalue","RIdeogram","lme4","testthat")) stopifnot(requireNamespace(p, quietly = TRUE))'
 if [ -n "$expected_version" ]; then

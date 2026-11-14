@@ -57,7 +57,7 @@
 #' @param args Named list of options given to `orthologr::dNdS()`.
 #' @return A list suitable for writing as JSON.
 #' @keywords internal
-.dnds_provenance <- function(query_file, subject_file, args) {
+.dnds_provenance <- function(query_file, subject_file, args, dnds_method = "Comeron", kaks = NULL) {
   version_of <- function(pkg) {
     if (requireNamespace(pkg, quietly = TRUE)) as.character(utils::packageVersion(pkg)) else NA_character_
   }
@@ -75,6 +75,8 @@
     diamond = if (length(diamond)) diamond[1] else NA_character_,
     query_md5 = unname(tools::md5sum(query_file)),
     subject_md5 = unname(tools::md5sum(subject_file)),
+    dnds_method = dnds_method,
+    kaks_calculator = if (is.null(kaks)) NA_character_ else kaks$version,
     parameters = args[keep]
   )
 }
@@ -83,9 +85,10 @@
 #'
 #' @param prov_path Path to a provenance JSON file.
 #' @param query_file,subject_file Current sequence inputs.
-#' @return `NULL` if the recorded hashes match, otherwise a one-line reason.
+#' @param dnds_method The method now requested.
+#' @return `NULL` if the recorded hashes and method match, otherwise a one-line reason.
 #' @keywords internal
-.provenance_mismatch <- function(prov_path, query_file, subject_file) {
+.provenance_mismatch <- function(prov_path, query_file, subject_file, dnds_method = "Comeron") {
   if (!file.exists(prov_path)) {
     return("it has no provenance record, so it was made by an older dndsR")
   }
@@ -95,7 +98,13 @@
   old <- jsonlite::read_json(prov_path, simplifyVector = TRUE)
   same <- identical(old$query_md5, unname(tools::md5sum(query_file))) &&
     identical(old$subject_md5, unname(tools::md5sum(subject_file)))
-  if (same) NULL else "its sequence inputs have changed"
+  if (!same) return("its sequence inputs have changed")
+  # Records made before dnds_method was recorded were all Comeron.
+  old_method <- old$dnds_method
+  if (is.null(old_method)) old_method <- old$parameters$dnds_est.method
+  if (is.null(old_method)) old_method <- "Comeron"
+  if (!identical(old_method, dnds_method)) return(paste0("it was calculated with dnds_method ", old_method, ", not ", dnds_method))
+  NULL
 }
 
 #' Assign genes of significant terms to all of their ancestors

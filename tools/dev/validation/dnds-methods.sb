@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=dnds-methods
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --tmp=40G
+#SBATCH --time=12:00:00
+# Runs dnds-methods.R on real gene pairs, in the image, on node-local storage.
+#   DNDSR_SIF=<image> DNDSR_DEV_LIB=<lib with this checkout installed> TOOLS_BIN=<dir with KaKs_Calculator, yn00> \
+#   sbatch tools/dev/validation/dnds-methods.sb <pairs.tsv> <results dir>
+# Use the same KaKs_Calculator as the image (kakscalculator2 2.0.1) for TOOLS_BIN.
+set -euo pipefail
+pairs=$(realpath "$1"); persist=$(realpath -m "$2")
+repo=${SLURM_SUBMIT_DIR:-$PWD}
+work=${TMPDIR:-/tmp}/dnds-methods-${SLURM_JOB_ID:-$$}
+mkdir -p "$persist" "$work"; trap 'rm -rf "$work"' EXIT
+binds=(--bind "$repo" --bind "$work" --bind "$DNDSR_DEV_LIB" --bind "$TOOLS_BIN" --bind "$(dirname "$pairs")")
+while read -r _ q s; do binds+=(--bind "$(dirname "$q")" --bind "$(dirname "$s")"); done < <(tail -n +2 "$pairs")
+{ grep -m1 "model name" /proc/cpuinfo; hostname; git -C "$repo" rev-parse HEAD 2>/dev/null || true; } > "$persist/host.txt"
+singularity exec --cleanenv "${binds[@]}" --pwd "$work" --env "R_LIBS_USER=$DNDSR_DEV_LIB" --env "TMPDIR=$work" \
+  --env "PATH=/usr/local/bin:/opt/conda/envs/tools/bin:/usr/bin:/bin:$TOOLS_BIN" "$DNDSR_SIF" \
+  Rscript --vanilla "$repo/tools/dev/validation/dnds-methods.R" "$pairs" "$TOOLS_BIN" "$work/out" "${SLURM_CPUS_PER_TASK:-8}" > "$persist/run.log" 2>&1
+cp "$work"/out/*.tsv "$persist/"
+echo done
