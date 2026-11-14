@@ -4,8 +4,6 @@
 [![DOI](https://zenodo.org/badge/927389986.svg)](https://doi.org/10.5281/zenodo.23879469)
 <!-- badges: end -->
 
-> **Correctness notice:** v0.1.0 and v0.2.0 were unvalidated pre-releases with defects that can give wrong dN/dS, including false signals of positive selection. Please recompute any results from them. [What was affected and how to rerun](docs/migrating-to-0.3.md).
-
 **dndsR** calculates and analyzes dN/dS between orthologous genes in pairwise genome comparisons, starting from genome FASTA and GFF3 files. It is an R package you can call from R, and a command-line tool that runs in a container. It is meant to be easy to use, for researchers and for AI agents alike.
 
 | Step | Command | R function |
@@ -52,7 +50,7 @@ The last command checks your results against independently established values an
 - [Installation options](INSTALL.md): containers, conda, and R
 - [How dndsR computes its results](docs/methods.md)
 - [Validation evidence](docs/validation/README.md) and [known issues](docs/validation/known-issues.md)
-- [Changes between versions](NEWS.md)
+- [Changes between versions](NEWS.md), and [rerunning results from v0.1.0 or v0.2.0](docs/migrating-to-0.3.md)
 
 Use `dndsr --help` or `dndsr <command> --help` for every option.
 
