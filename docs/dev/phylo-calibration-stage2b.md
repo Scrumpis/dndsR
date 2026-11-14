@@ -1,0 +1,130 @@
+# Phylogenetic module: calibration, stage 2B (proposed design)
+
+**Status: proposed, not approved. Nothing is launched until the maintainer approves the matrix and costs.** Changes after approval go in the change log at the end, with their reason.
+
+This revises the stage 2B scope in [phylo-calibration-stage2.md](phylo-calibration-stage2.md), following the maintainer's priorities after [stage 2A](../validation/phylo-calibration-stage2a.md). It replaces that page's "Rules for stage 2B", whose 1% paired threshold 2A showed to be below optimizer noise. Everything else in the stage 2 plan stands: the simulator, parameters, corruption profile, filters F1 and F2, measures, and reproducibility.
+
+The goal is a reliable, reproducible, defensible selection-testing workflow for dndsR, not the largest number of fits. No package default changes, and masking is not added to the package.
+
+## Budget
+
+| | Core-hours |
+|---|---:|
+| Approved for the study | about 3,100 |
+| Used by stage 2A | 635 |
+| Remaining | about 2,465 |
+| **This design: essential blocks** | **about 1,570** |
+| Contingent: null grid with 3 starts, if the audit fails | +240 |
+| **Committed at most** | **about 1,810** |
+| Left uncommitted, for follow-up and reruns | at least 650 |
+| Optional blocks, each needing its own go-ahead | 42-354 each |
+
+Estimates use 2A's measured core-seconds per fit, by configuration and scenario kind, on the same processor class, scaled by gene length where it differs. 2A ran every fit with 0 failures, so no failure margin is added beyond the uncommitted reserve. Expect ±20%.
+
+## What 2A leaves open
+
+1. Double hits with masking (C1 + F1), the likely routine workflow, was never run.
+2. Realigned indels (M4) inflate C0 and C1 (8%), and the window rule does not flag them.
+3. Whether masking removes genuine selection when selection and corruption coexist, at weak as well as strong selection, and when selection is concentrated in one region.
+4. Whether one optimizer start is enough for null cells, including difficult ones.
+5. Whether Double+Triple differs from Double once optimization is stabilized.
+6. How agreement between BUSTED and BUSTED-E compares with the model averaging of the BUSTED-E paper.
+7. False discovery after BH in a genome-like mixture.
+
+**Model averaging, preview from 2A.** Selberg et al. (2024, bioRxiv 10.1101/2024.11.13.620707, "Minus the Error"; PMC11601313) fit BUSTED and BUSTED-E to the same data, compute Akaike weights from AICc, and combine p-values: p(MA) = w(BUSTED) p(BUSTED) + w(BUSTED-E) p(BUSTED-E). It needs no extra fits: each alternative fit's AICc is in the HyPhy JSON that 2A kept. Applied to 2A's one-start fits (C1 with C3), MA tracked BUSTED closely: clean nulls 0-1.3%; A(10, 0.1) 62% (C1 61%, C3 39%); R1-R3 85-88% (C1 89-91%, C3 24-28%); M3 83%; M4 8.7%. Agreement (significant under both) tracked C3. In this simulation, then, MA recovers power but not protection from corruption. It is a one-start preview only: C3's fits are the least converged (2A, finding 8), which lowers its likelihood and so its weight.
+
+## Procedures compared
+
+| | Model | Alignment | Role |
+|---|---|---|---|
+| C1 | `--multiple-hits Double` | as prepared | routine candidate |
+| C1+F1 | C1 | flagged windows masked | routine candidate |
+| C1+F1fg | C1 | flagged windows masked in foreground sequences only | variant of F1 |
+| C1+F3 | C1 | F1, and codons within 3 of an internal gap masked | indel candidate |
+| C3 | `--error-sink Yes --multiple-hits Double` | as prepared | conservative candidate |
+| C3+F1 | C3 | masked | conservative candidate |
+| C1∧C3 | significant under both | | conservative rule |
+| MA(C1, C3) | Akaike-weighted p, as Selberg et al. | | conservative rule |
+| C4 | `--multiple-hits Double+Triple` | as prepared | targeted |
+| C0 | BUSTED, dndsR's default | as prepared | baseline, power cells only |
+
+- **Dropped:** C2 (BUSTED-E without double hits). It does not protect against multinucleotide changes (56% in 2A) and was within noise of C3 elsewhere. F2 (gappy columns dropped) is replaced by F3, which targets the indel problem directly.
+- **Masking uses only what a real analysis has.** F1 applies dndsR's own dissimilar-window rule to the alignment. F3 uses only gap positions in the alignment. Neither reads the simulator's records of which codons were corrupted or selected. The true alignment of indel cells is used only as a diagnostic control, never as a filter.
+- **F1 or F1fg.** F1 masks flagged windows in every sequence, as in 2A. Masking background sequences had no effect on false positives in 2A (R4: 0% unmasked), but it removes data. F1fg masks only the foreground's flagged windows. Both are run where they differ, and the recommendation names one.
+
+## Optimizer, likelihoods, and records
+
+- **Three starts (HyPhy seeds 1, 2, 3)** in every cell with selection, every misspecified or corrupted null, and the null audit. Combined by the best alternative and the best null likelihoods, never the smallest p-value or largest LRT. This is how dndsR's `lrt_best_fits` works.
+- **One start for the clean null grid only if the audit passes** (D4 below).
+- **Noise floor:** a second, independent three-start replicate (seeds 4, 5, 6) of C1 in two power cells measures how many calls differ between two stabilized runs of the same model. Differences between procedures are judged against it, never against a fixed 1%.
+- **Likelihood consistency:** for every fit, the reported LRT is compared with twice the likelihood difference. Counts above 0.01 and 0.5 are reported by procedure, as are refits after negative LRTs. Inference uses the likelihood-based LRT.
+- **Preserved:** every start's HyPhy JSON and log, every alignment (simulated, corrupted, filtered), the corruption and filter logs, the unit specifications, and the summary tables.
+
+## Matrix
+
+3 starts unless stated. Genes per cell in brackets. "Reuse" means 2A fits of byte-identical alignments with the same options and seed (see Reproducibility).
+
+### Essential
+
+| Block | Scenarios [genes] | Procedures | Core-h |
+|---|---|---|---:|
+| B1. Null audit for one start | N0 L25, N0 L50 div ×2, N1 L50, M1 δ 0.2, R1 with F1 [300 each] (M4 in B6) | C1, C3 | 171 |
+| B2. Null grid | N0 × L25, L50, L75 × divergence ×0.5, 1, 2 [300]; 3 cells reused | C1, C3; 1 start if D4 passes | 104 |
+| B3. Power, stratified | Weak: A(2, 0.2), A(3, 0.05), A(3, 0.1), A(3, 0.2). Moderate and strong: A(5, 0.1), A(5, 0.2), A(10, 0.05), A(10, 0.1), A(10, 0.2) [150] | C1, C3; F1 refits where any window is flagged | 374 |
+| B3b. Baseline | A(3, 0.2), A(10, 0.05), A(10, 0.1), A(10, 0.2) [150] | C0 | 23 |
+| B4. Triple hits, stabilized | A(10, 0.1), A(10, 0.2) [150]; M1 δ 0.3 [150]; noise floor: C1 seeds 4-6 on both power cells | C4, C1 | 131 |
+| B5. Selection with corruption | R1 in At on A(3, 0.2), A(5, 0.1), A(10, 0.1), A(10, 0.2) [150] | C1, C1+F1; C3, C3+F1 on A(10, 0.1) only | 211 |
+| B5b. Clustered selection | New cells: the selected sites as one contiguous foreground block, A(10, 0.05) (21 codons) and A(5, 0.1) (42 codons) [150] | C1, C1+F1, C3 | 122 |
+| B6. Realigned indels | M4 [300]: realigned, the true alignment (diagnostic), F1, F3. New cell A(10, 0.1) with indels, realigned [150] | M4: C1 all four, C3 realigned; A(10, 0.1) with indels: C1, C1+F3 | 158 |
+| B7. Genome-like mixture | 1,000 genes: 900 null and 100 selected (25 each of A(3, 0.2), A(5, 0.1), A(10, 0.05), A(10, 0.1)), each sequence corrupted independently at the empirical per-taxon rates (At 3.2%, Al 2.0%, Cr 5.6%, Es 8.3%, Br 15.4%), segment lengths and types from the P3A profile | C1, C3, each with and without F1, and F1fg (refits only where masking changes the alignment) | 272 |
+| | | **Essential total** | **about 1,570** |
+| Contingent | B2 with 3 starts, if D4 fails | | +240 |
+
+C1∧C3 and MA(C1, C3) are computed for every cell that has both C1 and C3, with and without F1, at no extra cost.
+
+### Optional, each needing its own go-ahead
+
+| Block | Core-h | Why it might be worth it |
+|---|---:|---|
+| O1. A(3, 0.2) with indels, C1 and C1+F3 | 42 | F3's power cost at weak selection |
+| O2. C3 and C3+F1 on A(3, 0.2) with R1 | 64 | The conservative candidate's weak-selection power under corruption |
+| O3. N1 over the length and divergence grid, 1 start | 132 | Calibration with stronger purifying selection beyond L50 |
+| O4. The rest of the power grid (ω+ 2, 3, 5, 10 at p+ 0.02; ω+ 2 at 0.05, 0.1; ω+ 5 at 0.05) | 354 | Complete power surface; low value, since power there is near the null rate |
+
+## Decision criteria, fixed before any 2B job
+
+- **D1. Calibration class** of a procedure in a null-like cell, at α = 0.05 with an exact 95% interval: *calibrated* if the upper bound is at most 5%; *unsafe* if the lower bound exceeds 5%; *inconclusive* otherwise. At 300 genes, *calibrated* needs at most 7 calls.
+- **D2. Robustness:** D1 applied to M1 (δ 0.2, 0.3), M3, M4, R1-R3, and R1 with F1.
+- **D3. A real difference between two procedures** on the same genes needs both an exact McNemar p below 0.05 and more discordant calls than the 95th percentile of the replicate discordance (B4's noise floor, for the matching scenario type). Power is reported by stratum (weak: ω+ ≤ 3; moderate: ω+ = 5; strong: ω+ = 10) with paired differences and their 95% intervals. A loss that meets D3 is *material*.
+- **D4. One start in the clean null grid** is accepted only if, in every audited cell (B1, and M4 in B6), going from 1 to 3 starts changes at most 2 of 300 calls and leaves the D1 class unchanged, for both C1 and C3. Otherwise B2 runs with 3 starts. The outcome is recorded in the change log before B2 is launched.
+- **D5. Triple hits:** C4 is a candidate only if, against C1 at 3 starts, it meets D3 in some cell or improves a D1 or D2 class. Otherwise, Double is enough in the settings tested.
+- **D6. Masking:** F1 (or F1fg) is recommended for evaluation as a package feature only if it moves corrupted nulls to *calibrated* without a *material* power loss in clean, corrupted-with-selection, and clustered-selection cells. If clustered selection loses material power, masking is recommended only as a sensitivity analysis, with both results reported.
+- **D7. F3:** a candidate only if it makes M4 *calibrated* under C1 without a material power loss in A(10, 0.1) with indels. The true-alignment control says whether M4's false positives come from alignment error (true alignment calibrated) or from indels as such.
+- **D8. Conservative rule:** C1∧C3, MA(C1, C3), and C3 alone, each with and without F1, are compared by D1 and D2 in every null-like cell, by power per stratum, and by B7's false discovery proportion. A rule is recommended for conservative genome-wide scans only if it is *calibrated* in every null-like cell tested. Neither agreement nor MA becomes a default.
+- **D9. Genome-like mixture:** after BH at q = 0.05 and 0.10, per procedure: false discovery proportion with an exact interval, power, and the calls attributable to corrupted genes. With 100 selected genes this measures gross failures of FDR control only.
+
+## Order
+
+1. Commit the tooling: the new simulator cells (A2_p20, A3_p10, A5_p20, the four L25/L75 × divergence null cells, the two clustered cells, A(10, 0.1) with indels), F1fg and F3 in `phylo-windows.py`, the mixture builder, the reuse checker, and summaries with MA, noise floor, and consistency counts. Check that every existing cell's alignments are byte-identical to 2A's.
+2. Smoke test in a separate root (4 genes per cell), then discard it.
+3. Launch B1 and B3-B7.
+4. Evaluate D4 on B1 and M4, record it in the change log, then launch B2 with 1 or 3 starts.
+5. Report stage 2B, with the recommendation, before anything else is run.
+
+## Reproducibility
+
+- **The same dndsR and HyPhy as 2A:** the read-only library installed from `5020a91`, and the image `sha256:e24b394df53597922308224fd2507956fb6f70bd146e470540b1c91179f1d17f`, both checked by every job. This keeps 2A and 2B one benchmark, and lets 2A's fits be reused. The new tooling (simulation, filters, summaries) is frozen at its own commit, recorded beside the library's.
+- **Reuse rule:** a 2A fit is reused only when the alignment's checksum, the tree, the HyPhy options, and the seed are identical. The simulator draws genes in order from one seed, so a larger cell at 2A's seed reproduces 2A's genes; the checksums confirm it gene by gene. Corrupted cells differ in their last gene, whose donor changes.
+- One processor class (AMD EPYC 9654), resumable units with `DONE` markers, raw results outside the repository, summaries and the report in it.
+
+## Limits
+
+- **One phylogenetic configuration:** five taxa, one tree, one foreground clade (At+Al), κ = 2, P3A parameters. The 10-taxon simulation is postponed. Conclusions apply to the configurations tested and are not extended to other trees, taxon numbers, or foreground choices.
+- The generating model is close to BUSTED's. Corruption is applied as one segment of empirical length per affected sequence. Indels are simulated at one rate.
+- The genome-like mixture has one proportion of selected genes (10%) and no multinucleotide changes.
+- Which real flagged segments are errors is unknown; only simulation knows the truth.
+
+## Change log
+
+| Change | Reason | Effect on results |
+|---|---|---|
