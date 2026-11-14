@@ -5,13 +5,26 @@
 #   tools/dev/validation/phylo-stage2b-submit.sh <results root> <K> B2
 #       B2 with the start count in <root>/b2_decision.txt ("1start" or "3start"), which must
 #       equal the D4 audit result in <root>/summary/audit_decision.txt; then the summary again
-# Resubmitting is safe: finished scenarios and units are skipped.
+# Resubmitting is safe: finished scenarios and units are skipped. Submission is refused while
+# any job in <root>/jobs.txt is still queued or running, so a study cannot be submitted twice.
+# Full-fit units run on 48 cores; units that fit only the alignments a filter changed (often a
+# few genes) run in a separate array on 8 cores, so that cores are not held idle. The thread
+# count only sets how many orthogroups run at once; each HyPhy fit uses one CPU.
 set -euo pipefail
 root=$(realpath "$1"); K=${2:-16}; mode=${3:-main}
 [ -f "$root/freeze.json" ] || { echo "freeze first (phylo-stage2-freeze.sh)" >&2; exit 1; }
 v=$root/src/tools/dev/validation
 mkdir -p "$root/logs"
+exec 8>"$root/submit.lock"; flock -n 8 || { echo "another submission of $root is in progress" >&2; exit 1; }
+if [ -f "$root/jobs.txt" ]; then
+  live=$(squeue -h -u "$USER" -o '%A %F' | tr ' ' '\n' | sort -u) || { echo "squeue failed; not submitting" >&2; exit 1; }
+  active=$(grep -o '[0-9]\{6,\}' "$root/jobs.txt" | sort -u | comm -12 - <(printf '%s\n' "$live"))
+  [ -z "$active" ] || { echo "jobs from $root/jobs.txt are still queued or running; not submitting again:" $active >&2; exit 1; }
+fi
+rm -rf "$root/running"   # no job of this root is active, so any claim marker is stale
+CHANGED_CPUS=8
 sub() { sbatch --parsable --export=ALL "$@"; }
+subu() { local units=$1; shift; sbatch --parsable --export=ALL,P3S2_UNITS="$units" "$@"; }
 sif=$(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['image'])" "$root/freeze.json")
 lib=$(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['library'])" "$root/freeze.json")
 summary() {  # $1: dependency; remaining: unit tables
@@ -46,10 +59,16 @@ if [ "$mode" = main ]; then
   echo "$cap" > "$root/budget_cap.txt"
   ns=$(($(wc -l < "$v/phylo-stage2b-scenarios.tsv") - 1))
   a=$(sub --array=1-"$ns" --output="$root/logs/sim-%A_%a.out" "$v/phylo-stage2-sim.sb" "$root" phylo-stage2b-scenarios.tsv)
-  b=$(sub --dependency=afterok:"$a" --array=0-$((K - 1)) --output="$root/logs/run-%A_%a.out" "$v/phylo-stage2-run.sb" "$root" "$K" phylo-stage2b-units.tsv)
-  c=$(summary "$b" phylo-stage2b-units.tsv)
-  printf 'sim %s\nrun %s\nsummary %s\n' "$a" "$b" "$c" | tee -a "$root/jobs.txt"
+  b=$(subu full --dependency=afterok:"$a" --array=0-$((K - 1)) --output="$root/logs/run-%A_%a.out" \
+      "$v/phylo-stage2-run.sb" "$root" "$K" phylo-stage2b-units.tsv)
+  b2=$(subu changed --dependency=afterok:"$a" --array=0-$((K - 1)) --cpus-per-task=$CHANGED_CPUS --mem=24G \
+       --output="$root/logs/runchg-%A_%a.out" "$v/phylo-stage2-run.sb" "$root" "$K" phylo-stage2b-units.tsv)
+  c=$(summary "$b:$b2" phylo-stage2b-units.tsv)
+  printf 'sim %s\nrun %s\nrunchanged %s\nsummary %s\n' "$a" "$b" "$b2" "$c" | tee -a "$root/jobs.txt"
 elif [ "$mode" = B2 ]; then
+  missing=$(tail -n +2 "$v/phylo-stage2b-units.tsv" | cut -f1 | while read -r u; do [ -f "$root/units/$u/DONE" ] || echo "$u"; done)
+  [ -z "$missing" ] || { echo "main units not finished; B2 waits:" >&2; echo "$missing" >&2; exit 1; }
+  [ ! -s "$root/BUDGET_STOP" ] || { echo "$root/BUDGET_STOP is not empty; the maintainer decides" >&2; exit 1; }
   want=$(cat "$root/b2_decision.txt"); got=$(cat "$root/summary/audit_decision.txt")
   [ "$want" = "$got" ] || { echo "b2_decision.txt ($want) differs from the audit ($got)" >&2; exit 1; }
   t=phylo-stage2b-units-B2-$want.tsv

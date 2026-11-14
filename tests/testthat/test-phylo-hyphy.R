@@ -51,10 +51,13 @@ test_that("settings default to HyPhy's, and invalid ones stop", {
 
 test_that("every BUSTED setting is passed to HyPhy explicitly", {
   a <- .hyphy_methods$busted$args(.hyphy_settings("busted", list()), "a.fas", "t.nwk", "o.json")
-  expect_identical(a, c("--alignment", "'a.fas'", "--tree", "'t.nwk'", "--branches", "FG", "--code", "Universal",
-                        "--srv", "Yes", "--rates", "3", "--syn-rates", "3", "--multiple-hits", "'None'",
+  # shQuote() quotes for the platform's shell: 'a.fas' on Unix, "a.fas" on Windows.
+  q <- shQuote
+  expect_identical(a, c("--alignment", q("a.fas"), "--tree", q("t.nwk"), "--branches", "FG", "--code", "Universal",
+                        "--srv", "Yes", "--rates", "3", "--syn-rates", "3", "--multiple-hits", q("None"),
                         "--error-sink", "No", "--grid-size", "250", "--starting-points", "1", "--kill-zero-lengths", "Yes",
-                        "--output", "'o.json'"))
+                        "--output", q("o.json")))
+  if (.Platform$OS.type != "windows") expect_identical(a[2], "'a.fas'")
   no_srv <- .hyphy_methods$busted$args(.hyphy_settings("busted", list(srv = "No")), "a.fas", "t.nwk", "o.json")
   expect_false("--syn-rates" %in% no_srv)
 })

@@ -23,11 +23,16 @@ args_for() { case $1 in
 # hours already used (every unit's meta.tsv, and earlier attempts in <root>/ledger), plus the estimates of units running now, plus this
 # unit's estimate (phylo-stage2b-estimates.tsv) stay within the cap. Otherwise the task stops
 # and writes <root>/BUDGET_STOP; the unit stays undone and reruns once the cap is raised.
+# A unit with a marker in <root>/running is claimed by another task and is skipped (return 2),
+# so overlapping submissions cannot fit a unit twice; the submit script clears stale markers.
+# P3S2_UNITS=full or changed runs only units with fit "all", or only "changed:" units.
 guard() {
   [ -f "$root/budget_cap.txt" ] || return 0
   mkdir -p "$root/running"
   exec 9>"$root/budget.lock"; flock 9
-  if python3 -I - "$root" "$1" "$v/phylo-stage2b-estimates.tsv" <<'PY'
+  [ -e "$root/running/$1" ] && { flock -u 9; return 2; }
+  local rc=0
+  python3 -I - "$root" "$1" "$v/phylo-stage2b-estimates.tsv" <<'PY' || rc=$?
 import csv, glob, os, sys
 root, unit, estf = sys.argv[1:]
 cap = float(open(os.path.join(root, "budget_cap.txt")).read().split()[0])
@@ -36,24 +41,31 @@ used = 0.0
 for m in glob.glob(os.path.join(root, "units", "*", "meta.tsv")) + glob.glob(os.path.join(root, "ledger", "*.tsv")):
     r = next(csv.DictReader(open(m), delimiter="\t"))
     used += float(r["seconds"]) * float(r["threads"]) / 3600
-running = sum(float(open(f).read()) for f in glob.glob(os.path.join(root, "running", "*")))
+running = sum(float(open(f).read().split()[0]) for f in glob.glob(os.path.join(root, "running", "*")))
 need = est.get(unit, 0.0)
 total = used + running + need
 if total > cap:
     open(os.path.join(root, "BUDGET_STOP"), "a").write(
         "%s: used %.1f + running %.1f + %s %.1f = %.1f > cap %.1f core-hours\n" % (unit, used, running, unit, need, total, cap))
     sys.exit(1)
-open(os.path.join(root, "running", unit), "w").write(str(need))
+open(os.path.join(root, "running", unit), "w").write("%s %s\n" % (need, os.environ.get("SLURM_JOB_ID", "-")))
 PY
-  then flock -u 9; return 0; else flock -u 9; return 1; fi
+  flock -u 9; [ "$rc" = 0 ] && return 0 || return 1
 }
-mapfile -t rows < <(tail -n +2 "$v/$table")
+case ${P3S2_UNITS:-all} in   # column 7, fit: empty or "all" for full fits, "changed:<base>" otherwise
+  all) mapfile -t rows < <(tail -n +2 "$v/$table") ;;
+  full) mapfile -t rows < <(tail -n +2 "$v/$table" | awk -F'\t' '$7 == "" || $7 == "all"') ;;
+  changed) mapfile -t rows < <(tail -n +2 "$v/$table" | awk -F'\t' '$7 ~ /^changed:/') ;;
+  *) echo "P3S2_UNITS must be all, full, or changed" >&2; exit 1 ;;
+esac
 for ((j = t; j < ${#rows[@]}; j += K)); do
   row=${rows[$j]}
   IFS=$'\t' read -r unit block scenario config filter seeds fit <<<"$row"; fit=${fit:-all}
   out=$root/units/$unit; h=$(spec_hash "$row")
   done_ok "$out" "$h" && { echo "skip $unit"; continue; }
-  guard "$unit" || { echo "budget cap reached before $unit; stopping (see $root/BUDGET_STOP)"; break; }
+  g=0; guard "$unit" || g=$?
+  [ "$g" = 2 ] && { echo "skip $unit: claimed by another task"; continue; }
+  [ "$g" = 0 ] || { echo "budget cap reached before $unit; stopping (see $root/BUDGET_STOP)"; break; }
   sim=$root/sim/$scenario
   [ -f "$sim/DONE" ] || { echo "no simulation for $scenario" >&2; exit 1; }
   aln=$sim/alignments; [ "$filter" = none ] || aln=$sim/filtered_$filter

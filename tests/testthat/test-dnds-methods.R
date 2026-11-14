@@ -36,6 +36,7 @@ test_that("zero changes are detected from the alignment, by hand", {
 })
 
 test_that("KaKs_Calculator output is read with zeros, ratios, and names preserved", {
+  skip_on_os("windows")   # the stand-in below is a /bin/sh script
   dir <- withr::local_tempdir()
   # A fake KaKs_Calculator: fixed output in its format, with "NA" for 0 and "-0".
   fake <- file.path(dir, "KaKs_Calculator")
