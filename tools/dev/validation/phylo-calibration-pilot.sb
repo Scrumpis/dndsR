@@ -26,8 +26,10 @@ cd "$work"
 run() { singularity exec --cleanenv --bind "$repo" --bind "$work" --bind "$DNDSR_DEV_LIB" --pwd "$PWD" \
           --env "R_LIBS_USER=$DNDSR_DEV_LIB" "$DNDSR_SIF" "$@"; }
 dndsr() { run Rscript --vanilla -e 'dndsR::cli_main()' -- "$@"; }
-{ grep -m1 "model name" /proc/cpuinfo; grep -o -w 'avx512f' /proc/cpuinfo | head -1; hostname; } > "$persist/host_$(hostname).txt"
-git -C "$repo" rev-parse HEAD > "$persist/commit.txt" 2>/dev/null || true
+# AVX2 nodes have no avx512f, so that grep finds nothing; it must not end the script.
+{ grep -m1 "model name" /proc/cpuinfo; grep -o -w 'avx512f' /proc/cpuinfo | head -1 || true; hostname; } > "$persist/host_$(hostname).txt"
+# Per host: host git crashes on some nodes, and the redirect would empty a shared file.
+git -C "$repo" rev-parse HEAD > "$persist/commit_$(hostname).txt" 2>/dev/null || true
 cp "$params" "$persist/params.json"
 cp "$params" "$work/params.json"; params=$work/params.json   # visible inside the container
 
