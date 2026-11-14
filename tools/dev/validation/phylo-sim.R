@@ -171,6 +171,8 @@ cell_spec <- function(cell, par) {
     N0_L50_div2 = modifyList(base, list(scale = 2)),
     N1_L50 = modifyList(base, list(omega_bg = c(0.02, 0.15, 0.5), omega_fg = c(0.02, 0.15, 0.5))),
     A3_p05 = alt(3, 0.05), A3_p20 = alt(3, 0.2), A10_p05 = alt(10, 0.05), A10_p20 = alt(10, 0.2), A10_p10 = alt(10, 0.1),
+    # Added for stage 2 (phylo-calibration-stage2.md); existing cells are unchanged.
+    A5_p10 = alt(5, 0.1), M1_mnp_d01 = modifyList(base, list(delta = 0.1)), M1_mnp_d03 = modifyList(base, list(delta = 0.3)),
     M1_mnp = modifyList(base, list(delta = 0.2)),
     M2_srv = modifyList(base, list(srv = srv_strong())),
     M3_misalign = modifyList(base, list(misalign = TRUE)),

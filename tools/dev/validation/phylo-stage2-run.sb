@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=p3s2-run
+#SBATCH --constraint=agg
+#SBATCH --cpus-per-task=48
+#SBATCH --mem=96G
+#SBATCH --tmp=100G
+#SBATCH --time=24:00:00
+# Stage 2 analyses. Array task t of K runs units t, t+K, t+2K, ... of the unit table.
+# Resumable: a unit with a matching DONE is skipped; a crashed unit has no DONE and reruns.
+#   sbatch --array=0-<K-1> phylo-stage2-run.sb <results root> <K>
+root=$(realpath "$1"); K=$2
+source "$root/src/tools/dev/validation/phylo-stage2-common.sh"
+t=${SLURM_ARRAY_TASK_ID:?array job}
+args_for() { case $1 in
+  C0) echo "" ;; C1) echo "--multiple-hits Double" ;; C2) echo "--error-sink Yes" ;;
+  C3) echo "--error-sink Yes --multiple-hits Double" ;; C4) echo "--multiple-hits Double+Triple" ;;
+  *) echo "unknown configuration $1" >&2; return 1 ;; esac; }
+mapfile -t rows < <(tail -n +2 "$v/phylo-stage2-units.tsv")
+for ((j = t; j < ${#rows[@]}; j += K)); do
+  row=${rows[$j]}
+  IFS=$'\t' read -r unit block scenario config filter seeds <<<"$row"
+  out=$root/units/$unit; h=$(spec_hash "$row")
+  done_ok "$out" "$h" && { echo "skip $unit"; continue; }
+  sim=$root/sim/$scenario
+  [ -f "$sim/DONE" ] || { echo "no simulation for $scenario" >&2; exit 1; }
+  aln=$sim/alignments; [ "$filter" = none ] || aln=$sim/filtered_$filter
+  extra=(); [ "$seeds" = 1 ] || extra=(--extra-seeds "${seeds#1,}")
+  work=${TMPDIR:-/tmp}/p3s2-$unit; rm -rf "$work"; mkdir -p "$work"
+  cd "$work"
+  start=$(date -u +%FT%TZ); s0=$SECONDS
+  set +e
+  # shellcheck disable=SC2046
+  dndsr phylo_busted --alignment-dir "$aln" --species-tree-file "$sim/species_tree.nwk" \
+    --foreground-file "$sim/foreground.tsv" -o "$work" --run-name "$unit" -t "$threads" --seed 1 \
+    $(args_for "$config") "${extra[@]}" > run.log 2>&1
+  rc=$?; set -e
+  secs=$((SECONDS - s0))
+  rm -rf "$out"; mkdir -p "$out"
+  cp run.log "$out/"
+  cp "$work/$unit/${unit}_results.tsv" "$work/$unit/${unit}_provenance.json" "$out/" 2>/dev/null || true
+  [ -d "$work/$unit/hyphy" ] && tar -czf "$out/hyphy_raw.tar.gz" -C "$work/$unit" hyphy
+  printf 'unit\tstart_utc\tseconds\tthreads\thost\tcpu\texit_code\tcommit\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$unit" "$start" "$secs" "$threads" "$(hostname)" "$(cpu_model)" "$rc" "$commit" > "$out/meta.tsv"
+  # DONE only for a complete run; the summary counts and classifies everything else.
+  [ "$rc" = 0 ] && [ -f "$out/${unit}_results.tsv" ] && echo "$h" > "$out/DONE"
+  cd /; rm -rf "$work"
+  echo "$unit rc=$rc ${secs}s"
+done

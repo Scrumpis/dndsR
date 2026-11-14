@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=p3s2-sim
+#SBATCH --constraint=agg
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16G
+#SBATCH --tmp=20G
+#SBATCH --time=4:00:00
+# Stage 2 simulation, one scenario per array task: simulate, corrupt, realign (indel
+# scenarios), and write the filtered copies. Resumable: a scenario with a matching DONE is
+# skipped.
+#   sbatch --array=1-<scenarios> phylo-stage2-sim.sb <results root>
+root=$(realpath "$1")
+source "$root/src/tools/dev/validation/phylo-stage2-common.sh"   # the frozen copy
+i=${SLURM_ARRAY_TASK_ID:?array job}
+row=$(sed -n "$((i + 1))p" "$v/phylo-stage2-scenarios.tsv")
+IFS=$'\t' read -r scenario cell n seed corrupt ctaxon cseed kind <<<"$row"
+out=$root/sim/$scenario; h=$(spec_hash "$row")
+done_ok "$out" "$h" && { echo "$scenario done"; exit 0; }
+work=${TMPDIR:-/tmp}/p3s2-sim-$scenario-$$; rm -rf "$work"; mkdir -p "$work"; trap 'rm -rf "$work"' EXIT
+cd "$work"
+run Rscript --vanilla "$v/phylo-sim.R" "$root/inputs/params.json" "$cell" "${STAGE2_N:-$n}" "$seed" raw
+if [ -f raw/cds_table.tsv ]; then   # indels: realign with the pipeline, as users would
+  (cd raw && dndsr phylo_prepare --cds-file cds_table.tsv --orthogroup-file orthogroup_table.tsv \
+     --species-tree-file species_tree.nwk --foreground-file foreground.tsv -o . -t "$threads" > prepare.log 2>&1)
+  mkdir -p data/alignments; cp raw/prepared/alignments/*.fasta data/alignments/
+else
+  mkdir -p data; cp -r raw/alignments data/alignments
+fi
+cp raw/species_tree.nwk raw/foreground.tsv raw/truth.tsv data/
+if [ "$corrupt" != none ]; then
+  run python3 -I "$v/phylo-windows.py" corrupt data/alignments data/corrupted "$corrupt" "$ctaxon" "$root/inputs/fg_segments.tsv" "$cseed"
+  mv data/corrupted/corrupt_log.tsv data/; rm -rf data/alignments; mv data/corrupted data/alignments
+fi
+for f in mask mask+gappy; do
+  run python3 -I "$v/phylo-windows.py" filter data/alignments "data/filtered_$f" "$f"
+done
+run python3 -I "$v/phylo-windows.py" profile data/alignments data/windows_profile.tsv
+rm -rf "$out"; mkdir -p "$root/sim"; cp -r data "$out"
+[ -f raw/prepare.log ] && cp raw/prepare.log "$out/"
+tar -czf "$out/raw_simulation.tar.gz" -C raw .
+echo "$h" > "$out/DONE"; echo "$scenario done"
