@@ -166,6 +166,25 @@ Ratio of dndsR's value to yn00's (or `ng86.py`'s), medians and shares within 5%,
 
 **Use.** Choose one method before looking at results, use it for the whole analysis, and say which one. The simulated benchmark above shows how YN00 and the site-class methods behave against a known truth. Methods differ by a few percent per gene, which matters only near a threshold such as dN/dS = 1.
 
+## Reliability flags
+
+`calculate_dnds` writes `<comparison>_dnds_reliability.tsv` beside the dN/dS table (development code). The dN/dS table is unchanged. The flags are warnings, not filters, and the thresholds are rules of thumb tied to the evidence below, not optimized cut-offs. The counts are NG86 on the codon alignment that every method used. `tests/testthat/test-dnds-reliability.R` checks them against hand counts and against `ng86.py` on the designed example (g09: 40 synonymous and 8 nonsynonymous differences, 230.0833 synonymous sites).
+
+| Flag | Criterion | Basis |
+|---|---|---|
+| `few_codons` | < 100 codons compared | Benchmark above: at 100 codons, 70% of ratios are undefined at dS 0.005, and many fall on the wrong side of 1 |
+| `few_synonymous_differences` | < 3 NG86 synonymous differences | With fewer than 3 events, the Poisson relative error of dS alone exceeds 58% |
+| `ds_below_observed` | dS < 0.5 × the NG86 synonymous p-distance, with at least 1 synonymous difference | The NG86 correction only raises dS above the p-distance, so a much lower dS is a failed estimate or a large difference between methods. (GY's dS of 0.00096 on a pair with no synonymous change would instead be flagged `few_synonymous_differences` and `extreme_ratio`.) |
+| `extreme_ratio` | dN/dS > 10 | None of 22,149 real NG ratios exceeded 10. The YN and MYN ones that did were artifacts (above) |
+| `low_ds`, `high_ds`, `outlier_ds` | dS < 0.02, > 0.8, or > 3 × the median | As in the existing `calculate_dnds` message: benchmark above and [orthology](orthology.md) |
+
+On the 22,149 *A. thaliana*-*A. lyrata* pairs, with each KaKs_Calculator method's values:
+
+- `few_codons` 1,138 pairs (5.1%), and `few_synonymous_differences` 81.
+- `ds_below_observed` 0 (NG, MLWL) to 8 (LPB). The one YN pair flagged is a real method difference: YN's dS of 0.084 agrees with PAML yn00 (0.0845), while NG gives 0.19.
+- `extreme_ratio` 0 for NG and the site-class methods. For YN and MYN, 1 each: the 36-codon pair above, which is also flagged `few_codons` and `few_synonymous_differences`.
+- 8.5-9.0% of pairs have at least one flag, mostly `outlier_ds` and `few_codons`.
+
 ## Limits of this validation
 
 The model has one ω per gene, no recombination, no site variation in rate, and stationary codon usage from one species. Real data can differ in all of these. Different codon usage may shift the results.

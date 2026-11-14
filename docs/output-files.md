@@ -27,6 +27,26 @@ QC columns: `id`, `transcript` (the isoform used), `n_isoforms`, `length_nt`, `m
 
 `<comparison>_dnds_provenance.json` records versions, parameters, and MD5 hashes of the CDS inputs.
 
+`<comparison>_dnds_reliability.tsv` (development version) has one row per pair, in the same order. It flags estimates to treat with care and changes no value: the dN/dS table is written exactly as without it.
+
+| Column | Meaning |
+|---|---|
+| `query_id`, `subject_id` | As in the dN/dS table |
+| `codons_compared` | Codons with A, C, G, T in both sequences and a stop in neither |
+| `syn_sites`, `syn_differences`, `nonsyn_differences` | Nei-Gojobori (1986) counts on those codons, whatever `--dnds-method` was |
+| `flags` | Semicolon-separated, empty when none |
+
+| Flag | Criterion |
+|---|---|
+| `few_codons` | Fewer than 100 codons compared |
+| `few_synonymous_differences` | Fewer than 3 synonymous differences, so dS rests on very few events |
+| `ds_below_observed` | dS below half the synonymous p-distance, with at least one synonymous difference: a failed estimate or a large difference between methods |
+| `extreme_ratio` | dN/dS above 10 |
+| `low_ds`, `high_ds`, `outlier_ds` | dS below 0.02, above 0.8, or above 3 times the table's median, as counted in the `calculate_dnds` message |
+| `no_alignment` | No codon alignment was found for the pair |
+
+Evidence for the criteria: [validation/estimators.md](validation/estimators.md), "Reliability flags".
+
 ## append_annotations
 
 `<comparison>_dnds_annot.tsv` adds to the above: `q_attributes`, `s_attributes`, `q_<term>`, and `s_<term>` for terms found (`ipr`, `go`, `kegg`, `panther`, `pfam`, `tigrfam`, `cog`, plus any `--custom` patterns), and `q_gff_seqname`, `q_gff_start`, `q_gff_end` with their `s_` equivalents. `q_` means query and `s_` means subject.

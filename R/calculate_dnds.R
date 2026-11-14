@@ -509,6 +509,11 @@ calculate_dnds <- function(comparison_file = NULL,
     )
 
     .report_dnds_reliability(.dnds_reliability(res$dS, res$dNdS), comparison_basename)
+    # Per-pair reliability flags, in a separate table; the dN/dS table above is unchanged.
+    flags <- .dnds_pair_flags(res, list.files(codon_dir, pattern = "_pal2nal\\.aln$", full.names = TRUE))
+    flags_tsv <- file.path(comp_dir, paste0(comparison_basename, "_dnds_reliability.tsv"))
+    utils::write.table(flags, flags_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
+    .report_pair_flags(flags, comparison_basename, flags_tsv)
     message("[calculate_dnds] Finished: ", comparison_basename)
     out_tsv
   }

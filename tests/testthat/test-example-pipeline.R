@@ -24,6 +24,17 @@ test_that("the user-facing example check passes", {
   expect_gte(nrow(checks), 13L)
 })
 
+test_that("per-pair reliability flags are written beside an unchanged table", {
+  flags <- utils::read.delim("example_AvB/example_AvB_dnds_reliability.tsv", stringsAsFactors = FALSE)
+  expect_identical(paste(flags$query_id, flags$subject_id), paste(result$query_id, result$subject_id))
+  # The dN/dS table keeps orthologr's columns; the flags are not added to it.
+  expect_false(any(c("flags", "codons_compared") %in% names(result)))
+  # g01 is identical and g03 has only nonsynonymous changes (designed): no synonymous difference.
+  f <- function(p) flags$flags[sub("^spA_", "", flags$query_id) == p]
+  expect_match(f("g01"), "few_synonymous_differences"); expect_match(f("g03"), "few_synonymous_differences")
+  expect_equal(flags$syn_differences[sub("^spA_", "", flags$query_id) == "g09"], 40)   # ng86.py: 40
+})
+
 test_that("the user-facing example check catches wrong results", {
   dir.create("broken")
   file.copy("truth", "broken", recursive = TRUE)
