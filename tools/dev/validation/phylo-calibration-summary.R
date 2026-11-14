@@ -65,7 +65,11 @@ timing <- if (file.exists(file.path(res_dir, "timing.tsv"))) utils::read.delim(f
 paired <- do.call(rbind, lapply(pairs, function(pr) {
   if (!all(pr %in% names(dat))) return(NULL)
   a <- dat[[pr[1]]]; b <- dat[[pr[2]]]
-  m <- merge(a[a$status == "tested", ], b[b$status == "tested", ], by = "orthogroup", suffixes = c(".a", ".b"))
+  # Suffix every column of b, so its own columns (lrt_best_fits, ...) are found as ".b" too;
+  # merge() adds suffixes only to columns both tables have.
+  b <- b[b$status == "tested", ]; names(b)[names(b) != "orthogroup"] <- paste0(names(b)[names(b) != "orthogroup"], ".b")
+  a <- a[a$status == "tested", ]; names(a)[names(a) != "orthogroup"] <- paste0(names(a)[names(a) != "orthogroup"], ".a")
+  m <- merge(a, b, by = "orthogroup")
   call_a <- m$p_value.a < 0.05; call_b <- m$p_value.b < 0.05
   best <- if ("lrt_best_fits.b" %in% names(m)) m$lrt_best_fits.b else NA
   call_best <- if (!all(is.na(best))) 0.5 * stats::pchisq(best, 2, lower.tail = FALSE) < 0.05 else NA
