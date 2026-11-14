@@ -84,9 +84,14 @@ p_matrix <- function(kappa, omega, r, delta, pi, t) {
 #' @param srv Multipliers and weights of synonymous rate classes.
 #' @return A character matrix of codons, taxa by sites (true alignment, "---" for gaps).
 sim_gene <- function(tree, n_sites, pi, kappa, omega_bg, omega_fg, prop, srv, delta = 0,
-                     fg_nodes = integer(), indel_rate = 0, indel_mean = 2) {
+                     fg_nodes = integer(), indel_rate = 0, indel_mean = 2, cluster = FALSE) {
   n_tip <- ape::Ntip(tree); root <- n_tip + 1L
-  cls <- sample.int(length(prop), n_sites, TRUE, prob = prop)
+  block <- NULL
+  if (cluster) { # stage 2B: the last class as one contiguous block of round(prop * sites) codons
+    k <- length(prop); m <- round(prop[k] * n_sites)
+    cls <- sample.int(k - 1L, n_sites, TRUE, prob = prop[-k])
+    at <- sample.int(n_sites - m + 1L, 1L); cls[at:(at + m - 1L)] <- k; block <- c(at, at + m - 1L)
+  } else cls <- sample.int(length(prop), n_sites, TRUE, prob = prop)
   rcls <- sample.int(length(srv$rate), n_sites, TRUE, prob = srv$weight)
   states <- vector("list", max(tree$edge))
   states[[root]] <- sample.int(n_sense, n_sites, TRUE, prob = pi)
@@ -112,6 +117,7 @@ sim_gene <- function(tree, n_sites, pi, kappa, omega_bg, omega_fg, prop, srv, de
   aln <- t(vapply(seq_len(n_tip), function(i) sense[states[[i]]], character(n_sites)))
   rownames(aln) <- tree$tip.label
   if (indel_rate > 0) aln <- add_indels(aln, tree, ord, lens, indel_rate, indel_mean, pi)
+  attr(aln, "block") <- block
   aln
 }
 
@@ -161,7 +167,7 @@ srv_strong <- function() { # gamma shape 0.4, 8 equal-weight classes by their co
 cell_spec <- function(cell, par) {
   n0 <- list(omega_bg = c(0.05, 0.3, 1.0), omega_fg = c(0.05, 0.3, 1.0), prop = c(0.6, 0.3, 0.1))
   base <- c(n0, list(length = par$L50, scale = 1, srv = srv_default(), delta = 0, indel = 0,
-                     misalign = FALSE, gene_tree = NULL, alternative = FALSE))
+                     misalign = FALSE, gene_tree = NULL, alternative = FALSE, cluster = FALSE))
   alt <- function(w, p) { s <- base; s$omega_fg <- c(0.05, 0.3, w); s$prop <- c(0.6, 0.3, 0.1) * (1 - p) / 0.9; s$prop[3] <- p; s$alternative <- TRUE; s }
   switch(cell,
     N0_L25 = modifyList(base, list(length = par$L25)),
@@ -174,6 +180,12 @@ cell_spec <- function(cell, par) {
     # Added for stage 2 (phylo-calibration-stage2.md); existing cells are unchanged.
     A5_p10 = alt(5, 0.1), M1_mnp_d01 = modifyList(base, list(delta = 0.1)), M1_mnp_d03 = modifyList(base, list(delta = 0.3)),
     M1_mnp = modifyList(base, list(delta = 0.2)),
+    # Added for stage 2B (phylo-calibration-stage2b.md); existing cells are unchanged.
+    A2_p20 = alt(2, 0.2), A3_p10 = alt(3, 0.1), A5_p20 = alt(5, 0.2),
+    N0_L25_div05 = modifyList(base, list(length = par$L25, scale = 0.5)), N0_L25_div2 = modifyList(base, list(length = par$L25, scale = 2)),
+    N0_L75_div05 = modifyList(base, list(length = par$L75, scale = 0.5)), N0_L75_div2 = modifyList(base, list(length = par$L75, scale = 2)),
+    AC10_p05 = modifyList(alt(10, 0.05), list(cluster = TRUE)), AC5_p10 = modifyList(alt(5, 0.1), list(cluster = TRUE)),
+    A10_p10_indel = modifyList(alt(10, 0.1), list(indel = 0.02)),
     M2_srv = modifyList(base, list(srv = srv_strong())),
     M3_misalign = modifyList(base, list(misalign = TRUE)),
     M4_indel = modifyList(base, list(indel = 0.02)),
@@ -203,7 +215,8 @@ run_cell <- function(params_file, cell, n, seed, out) {
   for (i in seq_len(n)) {
     id <- sprintf("%s_%04d", cell, i)
     aln <- sim_gene(sim_tree, spec$length, pi, par$kappa, spec$omega_bg, spec$omega_fg, spec$prop, spec$srv,
-                    spec$delta, fg_nodes, spec$indel)
+                    spec$delta, fg_nodes, spec$indel, cluster = isTRUE(spec$cluster))
+    block <- attr(aln, "block")
     if (spec$misalign) aln <- misalign(aln, fg_tips[1], 12L, pi)
     aln <- aln[species$tip.label, , drop = FALSE]
     seqs <- apply(aln, 1, paste, collapse = "")
@@ -215,6 +228,7 @@ run_cell <- function(params_file, cell, n, seed, out) {
       writeLines(as.vector(rbind(paste0(">", names(seqs)), seqs)), file.path(out, "alignments", paste0(id, ".fasta")))
     }
     truth[[i]] <- data.frame(gene = id, cell = cell, alternative = spec$alternative, codons = ncol(aln))
+    if (isTRUE(spec$cluster)) { truth[[i]]$selected_start <- block[1]; truth[[i]]$selected_end <- block[2] }
   }
   write.table(do.call(rbind, truth), file.path(out, "truth.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
   if (length(cds)) {

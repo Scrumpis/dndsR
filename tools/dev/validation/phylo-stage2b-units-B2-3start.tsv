@@ -1,0 +1,15 @@
+unit	block	scenario	config	filter	seeds	fit
+B2__b_N0_L25_div05__C1__none__s123	B2	b_N0_L25_div05	C1	none	1,2,3	all
+B2__b_N0_L25_div05__C3__none__s123	B2	b_N0_L25_div05	C3	none	1,2,3	all
+B2__b_N0_L25_div2__C1__none__s123	B2	b_N0_L25_div2	C1	none	1,2,3	all
+B2__b_N0_L25_div2__C3__none__s123	B2	b_N0_L25_div2	C3	none	1,2,3	all
+B2__b_N0_L50_div05__C1__none__s123	B2	b_N0_L50_div05	C1	none	1,2,3	all
+B2__b_N0_L50_div05__C3__none__s123	B2	b_N0_L50_div05	C3	none	1,2,3	all
+B2__b_N0_L50__C1__none__s123	B2	b_N0_L50	C1	none	1,2,3	all
+B2__b_N0_L50__C3__none__s123	B2	b_N0_L50	C3	none	1,2,3	all
+B2__b_N0_L75_div05__C1__none__s123	B2	b_N0_L75_div05	C1	none	1,2,3	all
+B2__b_N0_L75_div05__C3__none__s123	B2	b_N0_L75_div05	C3	none	1,2,3	all
+B2__b_N0_L75__C1__none__s123	B2	b_N0_L75	C1	none	1,2,3	all
+B2__b_N0_L75__C3__none__s123	B2	b_N0_L75	C3	none	1,2,3	all
+B2__b_N0_L75_div2__C1__none__s123	B2	b_N0_L75_div2	C1	none	1,2,3	all
+B2__b_N0_L75_div2__C3__none__s123	B2	b_N0_L75_div2	C3	none	1,2,3	all

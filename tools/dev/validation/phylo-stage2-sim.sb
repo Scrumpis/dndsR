@@ -8,17 +8,33 @@
 # Stage 2 simulation, one scenario per array task: simulate, corrupt, realign (indel
 # scenarios), and write the filtered copies. Resumable: a scenario with a matching DONE is
 # skipped.
-#   sbatch --array=1-<scenarios> phylo-stage2-sim.sb <results root>
-root=$(realpath "$1")
+#   sbatch --array=1-<scenarios> phylo-stage2-sim.sb <results root> [scenario table]
+# The table defaults to stage 2A's. Stage 2B adds: a mixture cell "MIX:<cell>:<n>+..." (each
+# component simulated with seed + its index, 0-based), "pool" corruption with per-taxon rates
+# in the taxon column, foreground-only and gap-flank masks, the true alignment of indel cells
+# (filtered_true, a diagnostic), and alignment checksums.
+root=$(realpath "$1"); table=${2:-phylo-stage2-scenarios.tsv}
 source "$root/src/tools/dev/validation/phylo-stage2-common.sh"   # the frozen copy
 i=${SLURM_ARRAY_TASK_ID:?array job}
-row=$(sed -n "$((i + 1))p" "$v/phylo-stage2-scenarios.tsv")
+row=$(sed -n "$((i + 1))p" "$v/$table")
 IFS=$'\t' read -r scenario cell n seed corrupt ctaxon cseed kind <<<"$row"
 out=$root/sim/$scenario; h=$(spec_hash "$row")
 done_ok "$out" "$h" && { echo "$scenario done"; exit 0; }
 work=${TMPDIR:-/tmp}/p3s2-sim-$scenario-$$; rm -rf "$work"; mkdir -p "$work"; trap 'rm -rf "$work"' EXIT
 cd "$work"
-run Rscript --vanilla "$v/phylo-sim.R" "$root/inputs/params.json" "$cell" "${STAGE2_N:-$n}" "$seed" raw
+if [[ $cell == MIX:* ]]; then
+  IFS=+ read -ra comps <<<"${cell#MIX:}"; k=0; mkdir -p raw/alignments
+  for c in "${comps[@]}"; do
+    cn=${c%%:*}; cnum=${c##*:}; [ -n "${STAGE2_N:-}" ] && [ "$STAGE2_N" -lt "$cnum" ] && cnum=$STAGE2_N
+    run Rscript --vanilla "$v/phylo-sim.R" "$root/inputs/params.json" "$cn" "$cnum" "$((seed + k))" "raw_$k"
+    cp raw_$k/alignments/*.fasta raw/alignments/
+    if [ $k = 0 ]; then cp raw_0/species_tree.nwk raw_0/foreground.tsv raw/; cp raw_0/truth.tsv raw/truth.tsv
+    else tail -n +2 raw_$k/truth.tsv >> raw/truth.tsv; fi
+    rm -rf "raw_$k"; k=$((k + 1))
+  done
+else
+  run Rscript --vanilla "$v/phylo-sim.R" "$root/inputs/params.json" "$cell" "${STAGE2_N:-$n}" "$seed" raw
+fi
 if [ -f raw/cds_table.tsv ]; then   # indels: realign with the pipeline, as users would
   (cd raw && dndsr phylo_prepare --cds-file cds_table.tsv --orthogroup-file orthogroup_table.tsv \
      --species-tree-file species_tree.nwk --foreground-file foreground.tsv -o . -t "$threads" > prepare.log 2>&1)
@@ -27,13 +43,26 @@ else
   mkdir -p data; cp -r raw/alignments data/alignments
 fi
 cp raw/species_tree.nwk raw/foreground.tsv raw/truth.tsv data/
-if [ "$corrupt" != none ]; then
+if [ "$corrupt" = pool ]; then
+  run python3 -I "$v/phylo-windows.py" corrupt-pool data/alignments data/corrupted "$ctaxon" "$root/inputs/fg_segments.tsv" "$cseed"
+  mv data/corrupted/corrupt_log.tsv data/; rm -rf data/alignments; mv data/corrupted data/alignments
+elif [ "$corrupt" != none ]; then
   run python3 -I "$v/phylo-windows.py" corrupt data/alignments data/corrupted "$corrupt" "$ctaxon" "$root/inputs/fg_segments.tsv" "$cseed"
   mv data/corrupted/corrupt_log.tsv data/; rm -rf data/alignments; mv data/corrupted data/alignments
 fi
 for f in mask mask_gappy; do   # folder names are safe as run names; the filter mode is mask+gappy
   run python3 -I "$v/phylo-windows.py" filter data/alignments "data/filtered_$f" "${f/_/+}"
 done
+if [ "$table" != phylo-stage2-scenarios.tsv ]; then   # stage 2B filters
+  fg=$(awk -F'\t' 'NR == 2 {print $2}' data/foreground.tsv)
+  run python3 -I "$v/phylo-windows.py" filter data/alignments data/filtered_mask_fg mask_fg "$fg"
+  run python3 -I "$v/phylo-windows.py" filter data/alignments data/filtered_gapflank gapflank
+  if compgen -G "raw/alignments/*.true.fasta" > /dev/null; then
+    mkdir -p data/filtered_true
+    for f in raw/alignments/*.true.fasta; do b=$(basename "$f" .true.fasta); cp "$f" "data/filtered_true/$b.fasta"; done
+  fi
+  (cd data && find . -name '*.fasta' -print0 | sort -z | xargs -0 md5sum) > data/checksums.md5
+fi
 run python3 -I "$v/phylo-windows.py" profile data/alignments data/windows_profile.tsv
 rm -rf "$out"; mkdir -p "$root/sim"; cp -r data "$out"
 [ -f raw/prepare.log ] && cp raw/prepare.log "$out/"
