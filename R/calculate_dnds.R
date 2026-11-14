@@ -483,6 +483,10 @@ calculate_dnds <- function(comparison_file = NULL,
       est <- tryCatch(.kaks_estimate(list.files(codon_dir, pattern = "_pal2nal\\.aln$", full.names = TRUE),
                                      dnds_method, kaks$bin, work),
                       finally = unlink(work, recursive = TRUE))
+      if (attr(est, "capped") > 0) {
+        warning(comparison_basename, ": KaKs_Calculator could not estimate dN or dS for ", attr(est, "capped"),
+                " ortholog pair(s) with ", dnds_method, " (it wrote its cap, 99); they are NA.", call. = FALSE)
+      }
       res <- .dnds_replace_values(res, est)
       if (attr(res, "unmatched") > 0) {
         warning(comparison_basename, ": ", attr(res, "unmatched"), " ortholog pair(s) had no codon alignment for ",

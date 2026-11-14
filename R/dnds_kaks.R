@@ -7,10 +7,10 @@
 #' @keywords internal
 .dnds_methods <- function() c("Comeron", .kaks_methods())
 
+# KaKs_Calculator's GY and MLPB are left out: GY gives a near-zero dS and a large ratio
+# where no synonymous change occurred, and MLPB has had no check against another tool.
 #' @rdname dot-dnds_methods
 #' @keywords internal
-#' KaKs_Calculator's GY and MLPB are left out: GY gives a near-zero dS and a large ratio
-#' where no synonymous change occurred, and MLPB has had no check against another tool.
 .kaks_methods <- function() c("NG", "LWL", "LPB", "MLWL", "YN", "MYN")
 
 #' Find KaKs_Calculator and its version
@@ -44,28 +44,72 @@
   seqs
 }
 
-#' Whether a pair has no nonsynonymous and no synonymous change
+#' Classify the mutational pathways between two sense codons
 #'
-#' Used where KaKs_Calculator writes "NA" for a value of 0. Codons with any character other
-#' than A, C, G, T in either sequence are skipped, as KaKs_Calculator does, as are stop codons.
-#' \code{no_n}: every compared codon pair encodes the same amino acid, so no pathway between
-#' them is nonsynonymous. \code{no_s}: every differing codon pair differs at one position and
-#' changes the amino acid, so no pathway is synonymous.
+#' Every order of the single-base changes between \code{a} and \code{b} is a pathway. Returns
+#' \code{"same"}, \code{"syn"} (every step on every pathway keeps the amino acid),
+#' \code{"nonsyn"} (every step changes it), \code{"mixed"}, or \code{"stop"} (a pathway passes
+#' through a stop codon, which methods treat differently). Cached per codon pair.
+#' @keywords internal
+.codon_paths <- local({
+  cache <- new.env(parent = emptyenv())
+  perms <- function(v) if (length(v) <= 1L) list(v) else
+    unlist(lapply(seq_along(v), function(i) lapply(perms(v[-i]), function(p) c(v[i], p))), recursive = FALSE)
+  function(a, b) {
+    key <- paste0(a, b)
+    if (!is.null(hit <- cache[[key]])) return(hit)
+    code <- Biostrings::GENETIC_CODE
+    x <- strsplit(a, "")[[1]]; y <- strsplit(b, "")[[1]]
+    pos <- which(x != y)
+    out <- if (!length(pos)) "same" else {
+      steps <- unlist(lapply(perms(pos), function(o) {
+        cur <- x; aa <- code[[a]]; r <- logical(length(o))
+        for (j in seq_along(o)) {
+          cur[o[j]] <- y[o[j]]; nxt <- code[[paste(cur, collapse = "")]]
+          if (nxt == "*") return(NA)
+          r[j] <- nxt == aa; aa <- nxt
+        }
+        r
+      }))
+      if (anyNA(steps)) "stop" else if (all(steps)) "syn" else if (!any(steps)) "nonsyn" else "mixed"
+    }
+    assign(key, out, envir = cache)
+    out
+  }
+})
+
+#' Whether a pair must have dN = 0 or dS = 0 under a KaKs_Calculator method
+#'
+#' Used where KaKs_Calculator writes "NA", which it writes both for a value of 0 and for an
+#' undefined one. Codons with any character other than A, C, G, T in either sequence are
+#' skipped, as KaKs_Calculator does, as are stop codons.
+#'
+#' For NG, YN, and MYN, which count differences along mutational pathways: \code{no_n} when
+#' every step of every pathway between every compared codon pair keeps the amino acid, and
+#' \code{no_s} when every step changes it. A pathway through a stop codon decides neither.
+#' Identical proteins are not enough: TTA and CTC both encode Leu, but one pathway passes
+#' through TTC (Phe).
+#'
+#' For LWL, LPB, and MLWL, which classify sites by degeneracy, a synonymous transversion at a
+#' twofold site counts toward dN, and corrections can be negative, so only identical compared
+#' codons give 0 (both values).
+#' @param method A KaKs_Calculator method.
 #' @return A list with logicals \code{no_n} and \code{no_s}.
 #' @keywords internal
-.pair_zero_changes <- function(x, y) {
+.pair_zero_changes <- function(x, y, method = "NG") {
   starts <- seq(1L, nchar(x), by = 3L)
   cx <- substring(x, starts, starts + 2L)
   cy <- substring(y, starts, starts + 2L)
   code <- Biostrings::GENETIC_CODE
   ok <- grepl("^[ACGT]{3}$", cx) & grepl("^[ACGT]{3}$", cy)
   cx <- cx[ok]; cy <- cy[ok]
-  ax <- code[cx]; ay <- code[cy]
-  keep <- ax != "*" & ay != "*"
-  cx <- cx[keep]; cy <- cy[keep]; ax <- ax[keep]; ay <- ay[keep]
-  diff <- cx != cy
-  ndiff <- vapply(seq_along(cx), function(i) sum(strsplit(cx[i], "")[[1]] != strsplit(cy[i], "")[[1]]), integer(1))
-  list(no_n = all(ax == ay), no_s = all(!diff | (ndiff == 1L & ax != ay)))
+  keep <- code[cx] != "*" & code[cy] != "*"
+  cx <- cx[keep]; cy <- cy[keep]
+  d <- cx != cy
+  if (!any(d)) return(list(no_n = TRUE, no_s = TRUE))
+  if (!method %in% c("NG", "YN", "MYN")) return(list(no_n = FALSE, no_s = FALSE))
+  cls <- mapply(.codon_paths, cx[d], cy[d], USE.NAMES = FALSE)
+  list(no_n = all(cls == "syn"), no_s = all(cls == "nonsyn"))
 }
 
 #' Estimate dN and dS with KaKs_Calculator for every codon alignment in a folder
@@ -73,8 +117,10 @@
 #' Each alignment holds one query and one subject sequence (orthologr's pal2nal output).
 #' Pairs are named \code{p<k>} in the AXT file, so sequence names are never parsed.
 #' KaKs_Calculator writes "NA" both for a value of 0 and for an undefined one; dndsR sets
-#' dN or dS to 0 only when \code{.pair_zero_changes} shows it must be, and dN/dS is
-#' \code{dN / dS} when dS > 0, otherwise NA.
+#' dN or dS to 0 only when \code{.pair_zero_changes} shows it must be. KaKs_Calculator's YN
+#' code writes 99 where it cannot estimate a distance (the cap PAML's yn00, from which it
+#' derives, uses); values of 99 or more are set to NA, and their number is the attribute
+#' \code{capped}. dN/dS is \code{dN / dS} when dS > 0, otherwise NA.
 #'
 #' @param aln_files Codon alignment files.
 #' @param method A KaKs_Calculator method.
@@ -99,14 +145,19 @@
   num <- function(v) suppressWarnings(as.numeric(v))
   ka <- num(k$Ka)[match(ids, k$Sequence)]
   ks <- num(k$Ks)[match(ids, k$Sequence)]
-  zero <- lapply(pairs, function(p) .pair_zero_changes(p[[1]], p[[2]]))
-  ka[is.na(ka) & vapply(zero, `[[`, logical(1), "no_n")] <- 0
-  ks[is.na(ks) & vapply(zero, `[[`, logical(1), "no_s")] <- 0
+  na_ka <- is.na(ka); na_ks <- is.na(ks)
+  capped <- sum(ka >= 99 | ks >= 99, na.rm = TRUE)
+  ka[!na_ka & ka >= 99] <- NA; ks[!na_ks & ks >= 99] <- NA
+  zero <- lapply(pairs, function(p) .pair_zero_changes(p[[1]], p[[2]], method))
+  ka[na_ka & vapply(zero, `[[`, logical(1), "no_n")] <- 0
+  ks[na_ks & vapply(zero, `[[`, logical(1), "no_s")] <- 0
   ka[!is.na(ka) & ka == 0] <- 0   # "-0"
   ks[!is.na(ks) & ks == 0] <- 0
-  data.frame(query_id = vapply(pairs, function(p) names(p)[1], character(1)),
-             subject_id = vapply(pairs, function(p) names(p)[2], character(1)),
-             dN = ka, dS = ks, dNdS = ifelse(!is.na(ks) & ks > 0, ka / ks, NA_real_))
+  est <- data.frame(query_id = vapply(pairs, function(p) names(p)[1], character(1)),
+                    subject_id = vapply(pairs, function(p) names(p)[2], character(1)),
+                    dN = ka, dS = ks, dNdS = ifelse(!is.na(ks) & ks > 0, ka / ks, NA_real_))
+  attr(est, "capped") <- capped
+  est
 }
 
 #' Replace orthologr's Comeron values with another method's

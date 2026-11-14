@@ -38,12 +38,17 @@ yn00 <- function(p) {
   writeLines(c("seqfile = pair.phy", "outfile = yn.out", "verbose = 0", "icode = 0", "weighting = 0", "commonf3x4 = 0"), "yn00.ctl")
   system2(file.path(bin, "yn00"), "yn00.ctl", stdout = FALSE, stderr = FALSE)
   r <- readLines("yn.out")
-  num <- function(x) as.numeric(regmatches(x, gregexpr("-?[0-9]+\\.[0-9]+", x))[[1]])
-  ng <- num(grep("^s\\s", r[grep("Nei & Gojobori", r):length(r)], value = TRUE)[1])
-  yn <- num(grep("^\\s*2\\s+1\\s+[0-9]", r, value = TRUE)[1])
-  lwl <- num(grep("^LWL85:", r, value = TRUE)); lpb <- num(grep("^LPB93:", r, value = TRUE))
-  c(NG_dN = ng[2], NG_dS = ng[3], YN_dN = yn[6], YN_dS = yn[8],
-    LWL_dN = lwl[2], LWL_dS = lwl[1], LPB_dN = lpb[2], LPB_dS = lpb[1])
+  # Read by label or field, so that "nan" or "inf" never shifts a value into another column.
+  num <- function(v) suppressWarnings(as.numeric(v))
+  lab <- function(line, key) num(sub(paste0(".*\\b", key, " *= *([^ ]+).*"), "\\1", line))
+  ngl <- grep("^s\\s", r[grep("Nei & Gojobori", r):length(r)], value = TRUE)[1]   # "s  w (dN dS)"
+  ng <- num(strsplit(trimws(gsub("[()]", " ", sub("^s", "", ngl))), "\\s+")[[1]])
+  ng[ng %in% -1] <- NA   # yn00 writes -1 where NG86 cannot be estimated
+  ynl <- grep("^\\s*2\\s+1\\s+[0-9]", r, value = TRUE)[1]   # "2 1 S N t kappa omega dN +- SE dS +- SE"
+  yn <- num(strsplit(trimws(ynl), "\\s+")[[1]])
+  lwl <- grep("^LWL85:", r, value = TRUE); lpb <- grep("^LPB93:", r, value = TRUE)
+  c(NG_dN = ng[2], NG_dS = ng[3], YN_dN = yn[8], YN_dS = yn[11],
+    LWL_dN = lab(lwl, "dN"), LWL_dS = lab(lwl, "dS"), LPB_dN = lab(lpb, "dN"), LPB_dS = lab(lpb, "dS"))
 }
 
 # Ratios of dndsR to the independent tool, over values above 0.005 (rounding matters below).
@@ -62,6 +67,8 @@ for (i in seq_len(nrow(specs))) {
     files <- list.files(file.path(tempdir(), "_alignment", "codon_aln"), pattern = "_pal2nal\\.aln$", full.names = TRUE)
     aln[[m]] <- sort(unname(tools::md5sum(files)))
     if (m == "Comeron") {
+      keep <- file.path(out, "alignments", cmp); dir.create(keep, recursive = TRUE, showWarnings = FALSE)
+      file.copy(files, keep, overwrite = TRUE)   # kept for inspection, outside the repository
       pairs <- Filter(Negate(is.null), lapply(files, read_pair))
       keys <- vapply(pairs, function(p) paste(names(p), collapse = "\t"), character(1))
     }
@@ -96,8 +103,9 @@ for (i in seq_len(nrow(specs))) {
     summ[[length(summ) + 1L]] <- data.frame(
       comparison = cmp, method = m, pairs = nrow(x), same_alignments = same_alignments,
       direct_numeric = sum(is.finite(x$direct_dN)) + sum(is.finite(x$direct_dS)),
-      direct_max_abs_diff = max(absd(x$dN, x$direct_dN), absd(x$dS, x$direct_dS)),
+      direct_max_abs_diff = max(absd(x$dN, ifelse(x$direct_dN < 99, x$direct_dN, NA)), absd(x$dS, ifelse(x$direct_dS < 99, x$direct_dS, NA))),
       direct_NA_to_zero = sum(is.na(x$direct_dN) & x$dN %in% 0) + sum(is.na(x$direct_dS) & x$dS %in% 0),
+      capped_99 = sum(x$direct_dN >= 99 | x$direct_dS >= 99, na.rm = TRUE),
       direct_NA_kept = sum(is.na(x$direct_dN) & is.na(x$dN)) + sum(is.na(x$direct_dS) & is.na(x$dS)),
       ind_max_abs_diff_dN = absd(x$dN, x$ind_dN), ind_max_abs_diff_dS = absd(x$dS, x$ind_dS),
       # yn00 prints 4 decimals, and LWL-type estimates can be slightly negative.

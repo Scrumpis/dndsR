@@ -2,18 +2,30 @@
 % Please edit documentation in R/dnds_kaks.R
 \name{.pair_zero_changes}
 \alias{.pair_zero_changes}
-\title{Whether a pair has no nonsynonymous and no synonymous change}
+\title{Whether a pair must have dN = 0 or dS = 0 under a KaKs_Calculator method}
 \usage{
-.pair_zero_changes(x, y)
+.pair_zero_changes(x, y, method = "NG")
+}
+\arguments{
+\item{method}{A KaKs_Calculator method.}
 }
 \value{
 A list with logicals \code{no_n} and \code{no_s}.
 }
 \description{
-Used where KaKs_Calculator writes "NA" for a value of 0. Codons with any character other
-than A, C, G, T in either sequence are skipped, as KaKs_Calculator does, as are stop codons.
-\code{no_n}: every compared codon pair encodes the same amino acid, so no pathway between
-them is nonsynonymous. \code{no_s}: every differing codon pair differs at one position and
-changes the amino acid, so no pathway is synonymous.
+Used where KaKs_Calculator writes "NA", which it writes both for a value of 0 and for an
+undefined one. Codons with any character other than A, C, G, T in either sequence are
+skipped, as KaKs_Calculator does, as are stop codons.
+}
+\details{
+For NG, YN, and MYN, which count differences along mutational pathways: \code{no_n} when
+every step of every pathway between every compared codon pair keeps the amino acid, and
+\code{no_s} when every step changes it. A pathway through a stop codon decides neither.
+Identical proteins are not enough: TTA and CTC both encode Leu, but one pathway passes
+through TTC (Phe).
+
+For LWL, LPB, and MLWL, which classify sites by degeneracy, a synonymous transversion at a
+twofold site counts toward dN, and corrections can be negative, so only identical compared
+codons give 0 (both values).
 }
 \keyword{internal}

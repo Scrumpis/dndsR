@@ -22,7 +22,9 @@ A data frame: query_id, subject_id, dN, dS, dNdS.
 Each alignment holds one query and one subject sequence (orthologr's pal2nal output).
 Pairs are named \code{p<k>} in the AXT file, so sequence names are never parsed.
 KaKs_Calculator writes "NA" both for a value of 0 and for an undefined one; dndsR sets
-dN or dS to 0 only when \code{.pair_zero_changes} shows it must be, and dN/dS is
-\code{dN / dS} when dS > 0, otherwise NA.
+dN or dS to 0 only when \code{.pair_zero_changes} shows it must be. KaKs_Calculator's YN
+code writes 99 where it cannot estimate a distance (the cap PAML's yn00, from which it
+derives, uses); values of 99 or more are set to NA, and their number is the attribute
+\code{capped}. dN/dS is \code{dN / dS} when dS > 0, otherwise NA.
 }
 \keyword{internal}

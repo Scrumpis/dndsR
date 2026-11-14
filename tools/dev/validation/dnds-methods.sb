@@ -20,4 +20,5 @@ singularity exec --cleanenv "${binds[@]}" --pwd "$work" --env "R_LIBS_USER=$DNDS
   --env "PATH=/usr/local/bin:/opt/conda/envs/tools/bin:/usr/bin:/bin:$TOOLS_BIN" "$DNDSR_SIF" \
   Rscript --vanilla "$repo/tools/dev/validation/dnds-methods.R" "$pairs" "$TOOLS_BIN" "$work/out" "${SLURM_CPUS_PER_TASK:-8}" > "$persist/run.log" 2>&1
 cp "$work"/out/*.tsv "$persist/"
+tar -czf "$persist/alignments.tar.gz" -C "$work/out" alignments   # codon alignments, for inspection
 echo done
