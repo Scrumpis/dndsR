@@ -42,6 +42,15 @@ tools/dev/run-tests.sh --fast enrichment                  # only the files that 
 
 Test files run in parallel, using `SLURM_CPUS_PER_TASK`, or `DNDSR_TEST_CPUS`. A file runs on one worker, so the longest file sets the wall time: keep slow tests in files of their own. `R CMD check` still runs them one at a time.
 
+On a machine with limited memory, or WSL with its default limits, cap the workers and run the checks one at a time. Each R worker holds several hundred MB once Bioconductor and orthologr are loaded, and the default is one worker per CPU:
+
+```
+DNDSR_TEST_CPUS=4 tools/dev/check.sh --fast --serial
+DNDSR_TEST_CPUS=4 tools/dev/run-tests.sh --fast enrichment   # one filter at a time
+```
+
+`--serial` runs the tests, skill, and safeguards (and the tutorial, without `--fast`) one after another instead of side by side.
+
 Runtime files can be recreated if purged: pull the image by the digest in `skills/dndsr/SKILL.md`. For the estimator comparison, create a micromamba environment with `paml` and `kakscalculator2` from bioconda, and for regenerating docs, install roxygen2 into `DNDSR_DEV_LIB`.
 
 Individual checks: `tools/dev/run-tests.sh`, `tools/dev/test-tutorial.sh`, `tools/dev/test-safeguards.sh`, `tools/dev/test-agent.sh claude`, and `tools/dev/validation/compare-estimators.R`.

@@ -62,6 +62,29 @@ dndsr dnds_contrast -c comparison_file.txt --contrast-file contrast_file.txt
 
 `dnds_summary` and `dnds_contrast` read `--regions-bed` as BED by default: 0-based start, end not included. Use `--regions-coord gff1` with `dnds_contrast` for 1-based inclusive coordinates.
 
+## 6. McDonald-Kreitman test (development version)
+
+To ask whether selection shapes a gene's polymorphism as well as its divergence, add a within-species SNP set. It must use the coordinates of one of the two genomes in the comparison: the genome FASTA and GFF3 for that side, already in the comparison file, are used to place each SNP in its codon.
+
+Add two columns to the comparison file: `snp_file`, a VCF (`.vcf`, `.vcf.gz`) or BED (`.bed`, `.bed.gz`), and `snp_side`, `query` or `subject`. In a headerless file they are columns 6 and 7.
+
+```
+sp1_v_sp2 data/sp1.fasta data/sp1.gff3 data/sp2.fasta data/sp2.gff3 data/sp1_snps.vcf query
+```
+
+Then run the same commands as before; `calculate_dnds` writes two extra tables.
+
+```
+dndsr calculate_dnds -c comparison_file.txt -t 40
+```
+
+- `<comparison>_mk.tsv`: one row per 1:1 pair, with `pn`, `ps`, `dn`, `ds`, `alpha`, `neutrality_index`, `dos`, `fisher_p`, `fisher_q`.
+- `<comparison>_mk_pooled.tsv`: the same statistics from the summed counts, one row for the whole comparison.
+
+Only bi-allelic SNPs are used: multiallelic records, indels, and genotype columns are ignored. Codons carrying a SNP are left out of the divergence counts. dN/dS cached from unchanged inputs skips the test; add `--overwrite` to recompute both.
+
+Before trusting a table, check the run's messages. dndsR stops when no contig of the SNP file matches the chosen genome, when a VCF `##contig` length disagrees with the FASTA, or when more than 10% of REF alleles disagree with the genome. Those checks catch a SNP file from the wrong assembly, but not one that shares contig names and lengths, so confirm the source. Method, counting rules, and limits: [McDonald-Kreitman](../mcdonald-kreitman.md).
+
 ## Re-running
 
 Existing results are kept unless you add `--overwrite`. dndsR tells you when an existing result no longer matches its inputs, using content hashes rather than file dates. Results record their software versions and parameters in `<comparison>_dnds_provenance.json`. Keep that file with your results and report it in your methods.

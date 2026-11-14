@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # Runs the development checks side by side, and reports each one's result and time.
-#   DNDSR_SIF=/path/image.sif DNDSR_DEV_LIB=/path/rlib tools/dev/check.sh [--fast]
+#   DNDSR_SIF=/path/image.sif DNDSR_DEV_LIB=/path/rlib tools/dev/check.sh [--fast] [--serial]
 # --fast takes under a minute with several CPUs: fast package tests, skill, and safeguards.
 # Without it, also the slow tests and the tutorial, which is checked out from HEAD.
+# --serial runs the checks one at a time, for limited memory; combine with
+# DNDSR_TEST_CPUS=4 to cap the test workers too.
 # Exits nonzero if any check fails, and prints the end of its output.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-fast=; [ "${1:-}" = --fast ] && fast=--fast
+fast=; serial=
+for arg in "$@"; do
+  case "$arg" in
+    --fast) fast=--fast ;;
+    --serial) serial=1 ;;
+    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
 log=$(mktemp -d); trap 'rm -rf "$log"' EXIT
 "$here/in-container.sh" true || exit 1
 export DNDSR_NO_INSTALL=1
@@ -15,11 +24,22 @@ start() { # name, command...
   local name=$1; shift
   ( s=$SECONDS; "$@" >"$log/$name.log" 2>&1; rc=$?; echo "$rc $((SECONDS - s))" >"$log/$name.result" ) &
 }
-start tests "$here/run-tests.sh" $fast
-start skill "$here/in-container.sh" Rscript --vanilla "$here/validate-skill.R" "$here/../.."
-start safeguards "$here/test-safeguards.sh"
-[ -n "$fast" ] || start tutorial "$here/test-tutorial.sh"
-wait
+check_tests() { start tests "$here/run-tests.sh" $fast; }
+check_skill() { start skill "$here/in-container.sh" Rscript --vanilla "$here/validate-skill.R" "$here/../.."; }
+check_safeguards() { start safeguards "$here/test-safeguards.sh"; }
+check_tutorial() { start tutorial "$here/test-tutorial.sh"; }
+
+if [ -n "$serial" ]; then
+  # One check at a time: the low-memory route (limited RAM, WSL, a small laptop).
+  check_tests; wait
+  check_skill; wait
+  check_safeguards; wait
+  [ -n "$fast" ] || { check_tutorial; wait; }
+else
+  check_tests; check_skill; check_safeguards
+  [ -n "$fast" ] || check_tutorial
+  wait
+fi
 
 failed=0
 for f in "$log"/*.result; do
