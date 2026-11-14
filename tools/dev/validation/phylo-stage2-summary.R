@@ -102,8 +102,12 @@ for (u in un$unit[un$block == "starts"]) {
     nullp <- ifelse(is.na(L[, 2]), L[, 1], L[, 2])
     best <- function(k) { lrt <- max(0, 2 * (max(L[1:k, 1]) - max(nullp[1:k]))); c(lrt, 0.5 * stats::pchisq(lrt, 2, lower.tail = FALSE)) }
     b <- sapply(1:3, best)
-    st[[length(st) + 1]] <- data.frame(unit = u, orthogroup = og, primary_lrt = res$lrt[res$orthogroup == og],
-      lrt_1 = b[1, 1], lrt_2 = b[1, 2], lrt_3 = b[1, 3], p_1 = b[2, 1], p_2 = b[2, 2], p_3 = b[2, 3],
+    # One start is the reported result (what a user gets). HyPhy can report LRT 0 after a refit
+    # although its final likelihoods differ slightly; such genes are counted, not hidden.
+    # Two and three starts combine likelihoods, as dndsR's lrt_best_fits does.
+    prim <- res$lrt[res$orthogroup == og]; pp <- res$p_value[res$orthogroup == og]
+    st[[length(st) + 1]] <- data.frame(unit = u, orthogroup = og, primary_lrt = prim,
+      lrt_1 = prim, lrt_1_lnl = b[1, 1], lrt_2 = b[1, 2], lrt_3 = b[1, 3], p_1 = pp, p_2 = b[2, 2], p_3 = b[2, 3],
       alt_gain_2 = max(L[1:2, 1]) - L[1, 1], alt_gain_3 = max(L[, 1]) - L[1, 1],
       null_gain_2 = max(nullp[1:2]) - nullp[1], null_gain_3 = max(nullp) - nullp[1], stringsAsFactors = FALSE)
   }
@@ -117,8 +121,9 @@ if (length(st)) {
     changed_1_vs_3 = sum((x$p_1 < 0.05) != (x$p_3 < 0.05)), changed_2_vs_3 = sum((x$p_2 < 0.05) != (x$p_3 < 0.05)),
     improved_01_by_2 = mean(pmax(x$alt_gain_2, x$null_gain_2) > 0.1), improved_05_by_2 = mean(pmax(x$alt_gain_2, x$null_gain_2) > 0.5),
     improved_01_by_3 = mean(pmax(x$alt_gain_3, x$null_gain_3) > 0.1), improved_05_by_3 = mean(pmax(x$alt_gain_3, x$null_gain_3) > 0.5),
-    # Seed 1 alone must reproduce the reported LRT (a check of this reconstruction).
-    max_abs_lrt1_vs_primary = max(abs(pmax(x$primary_lrt, 0) - x$lrt_1)))))
+    # Seed 1 likelihoods against the reported LRT: equal except where HyPhy refit.
+    reported_vs_likelihood_differ = sum(abs(pmax(x$primary_lrt, 0) - x$lrt_1_lnl) > 1e-6),
+    max_abs_reported_vs_likelihood = max(abs(pmax(x$primary_lrt, 0) - x$lrt_1_lnl)))))
   utils::write.table(ss, file.path(out, "starts_summary.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 }
 
@@ -129,7 +134,7 @@ fl <- do.call(rbind, lapply(sc$scenario, function(s) {
   g <- tapply(p$windows > 0 & p$taxon %in% c("At", "Al"), p$alignment, any)
   gb <- tapply(p$windows > 0, p$alignment, any)
   out <- data.frame(scenario = s, genes = length(g), flagged_foreground = mean(g), flagged_any = mean(gb))
-  for (f in c("mask", "mask+gappy")) {
+  for (f in c("mask", "mask_gappy")) {
     lg <- utils::read.delim(file.path(d, paste0("filtered_", f), "filter_log.tsv"))
     out[[paste0(f, "_codons_masked_mean")]] <- mean(lg$codons_masked)
     out[[paste0(f, "_columns_dropped_mean")]] <- mean(lg$columns_dropped)

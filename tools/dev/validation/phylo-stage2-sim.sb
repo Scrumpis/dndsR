@@ -31,8 +31,8 @@ if [ "$corrupt" != none ]; then
   run python3 -I "$v/phylo-windows.py" corrupt data/alignments data/corrupted "$corrupt" "$ctaxon" "$root/inputs/fg_segments.tsv" "$cseed"
   mv data/corrupted/corrupt_log.tsv data/; rm -rf data/alignments; mv data/corrupted data/alignments
 fi
-for f in mask mask+gappy; do
-  run python3 -I "$v/phylo-windows.py" filter data/alignments "data/filtered_$f" "$f"
+for f in mask mask_gappy; do   # folder names are safe as run names; the filter mode is mask+gappy
+  run python3 -I "$v/phylo-windows.py" filter data/alignments "data/filtered_$f" "${f/_/+}"
 done
 run python3 -I "$v/phylo-windows.py" profile data/alignments data/windows_profile.tsv
 rm -rf "$out"; mkdir -p "$root/sim"; cp -r data "$out"

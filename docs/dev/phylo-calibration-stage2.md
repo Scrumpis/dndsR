@@ -47,7 +47,7 @@ Simulated with `phylo-sim.R` on the P3A parameters (`params.json`, unchanged), f
 `phylo-windows.py filter`, the same window rule:
 
 - **F1, mask:** codons of a sequence inside its dissimilar windows become gaps.
-- **F2, mask + gappy:** F1, then columns gapped in more than half the sequences are dropped.
+- **F2, mask + gappy** (`mask_gappy` in unit names): F1, then columns gapped in more than half the sequences are dropped.
 
 Both are applied to clean and corrupted alignments, nulls and alternatives, so the false positives removed can be weighed against the power lost.
 
@@ -104,4 +104,5 @@ Stage 2B then takes the retained configurations to the full study's scope: 1,000
 
 | Change | Reason | Effect on results |
 |---|---|---|
-| | | |
+| F2 units and folders are named `mask_gappy` | A smoke test of the tooling (4 genes per scenario, in a separate root, discarded) found that `phylo_busted` rejects "+" in a run name | Before stage 2A; none |
+| One start is the reported result; two and three combine likelihoods. Genes where HyPhy's reported LRT differs from twice its final likelihood difference are counted | The smoke test found HyPhy reporting LRT 0 after a refit while its final likelihoods differed by 0.017 (LRT 0.034). dndsR's `lrt_best_fits` uses likelihoods, so it inherits this | Before stage 2A; none |
