@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-14: P3 stage 2B smoke test and budget guard
+
+- **Session:** `b6da01bb-9705-4b1a-b515-5e35c72e11b0`, resuming `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`
+- **Done:** a budget guard for stage 2B: each unit checks the core-hours used, the estimates of units running, and its own against a cap before it starts; the submit script checks projected cost against the 1,806 ceiling. Per-unit estimates are in `phylo-stage2b-estimates.tsv`.
+- **Verified:** the smoke test at `0aa137d` finished 101 of 101 units with 0 failed, and its summary and D4 audit ran. The guard was tested on a fake root (it passes under the cap, stops and writes `BUDGET_STOP` over it, and does nothing without a cap). The tables script reproduces every committed table byte for byte. Estimates: 1,458 core-hours for the main blocks, and 120 or 361 for B2.
+- **Found:** the smoke test used 386 allocated core-hours, because 48 cores were held for 4 genes per cell.
+- **Failed or not done:** the main blocks are not launched, pending the maintainer's decision on how the smoke test counts against the budget. Nothing pushed, merged, tagged, or published.
+
 ## 2026-11-14: P3 calibration stage 2A and pairwise reliability flags
 
 - **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`

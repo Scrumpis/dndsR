@@ -90,10 +90,38 @@ for c in ["C1", "C3"]:
     un("B7", "b_MIX", c, "mask", fit="changed:none")
     un("B7", "b_MIX", c, "mask_fg", fit="changed:mask")
 
+# Per-unit cost estimates (core-hours), from stage 2A's measured core-seconds per fit, for the
+# budget guard in phylo-stage2-run.sb. Filtered units fit only changed alignments; the shares
+# changed are assumptions from 2A's flag rates and are replaced by measured costs as units finish.
+COST = {("C0", "power"): 97, ("C1", "null"): 78, ("C1", "power"): 169, ("C1", "misspec"): 111, ("C1", "corrupt_alt"): 170,
+        ("C3", "null"): 111, ("C3", "power"): 235, ("C3", "misspec"): 167, ("C3", "corrupt_alt"): 280,
+        ("C4", "power"): 318, ("C4", "misspec"): 135}
+LENF = {"N0_L25": 0.67, "N0_L25_div05": 0.67, "N0_L25_div2": 0.67, "N0_L75": 1.43, "N0_L75_div05": 1.43, "N0_L75_div2": 1.43}
+SC = {r[0]: r for r in S}
+def estimate(u):
+    _, _, s, c, f, seeds, fit = u
+    name, cell, n, _, _, _, _, kind = SC[s]
+    if kind == "mixture":
+        per = {"C1": 0.9 * 78 + 0.1 * 169, "C3": 0.9 * 111 + 0.1 * 235}[c]
+    else:
+        k = "null" if kind == "corrupt" else kind
+        per = COST.get((c, k)) or COST[(c, "misspec")]
+    share = 1.0
+    if fit != "all":
+        if s == "b_MIX": share = 0.30 if f == "mask" else 0.25
+        elif s.startswith("b_AC"): share = 0.5 if f == "mask" else 0.05
+        elif f == "gapflank": share = 0.95
+        elif s in ("b_M4", "b_A10_p10_indel"): share = 0.08
+        else: share = 0.03 if f == "mask" else 0.02
+    return round(n * len(seeds.split(",")) * per * LENF.get(cell, 1) * share / 3600, 2)
+
+EST = []
 def write(name, rows, header):
     with open(os.path.join(out, name), "w", newline="") as f:
         w = csv.writer(f, delimiter="\t", lineterminator="\n")
         w.writerow(header); w.writerows(rows)
+    if name.startswith("phylo-stage2b-units"):
+        EST.extend([r[0], estimate(r)] for r in rows)
 
 write("phylo-stage2b-scenarios.tsv", S, ["scenario", "cell", "n", "seed", "corrupt", "corrupt_taxon", "corrupt_seed", "kind"])
 hdr = ["unit", "block", "scenario", "config", "filter", "seeds", "fit"]
@@ -105,3 +133,4 @@ for seeds, tag in [("1", "1start"), ("1,2,3", "3start")]:
         for c in ["C1", "C3"]:
             un("B2", s, c, seeds=seeds)
     write("phylo-stage2b-units-B2-%s.tsv" % tag, U, hdr)
+write("phylo-stage2b-estimates.tsv", EST, ["unit", "core_hours"])
