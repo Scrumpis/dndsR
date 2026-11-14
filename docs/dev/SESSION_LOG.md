@@ -2,6 +2,16 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-13 to 14: P3 pilot, real-genome benchmark, and pairwise dN/dS methods
+
+- **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`
+- **Done:** P3 pilot (25 cells, about 5,000 BUSTED fits) and the real-genome benchmark on five public Brassicaceae genomes, reported in `docs/validation/phylo-calibration-pilot.md` with a full-study proposal. At the maintainer's request (a collaborator asked), `calculate_dnds --dnds-method` NG, LWL, LPB, MLWL, YN, MYN through KaKs_Calculator 2.0.1, validated in `estimators.md`; `verify_example` refuses other methods' results. McDonald-Kreitman tests recorded as a later to-do.
+- **Verified:** pilot rates and paired comparisons; dndsR equals HyPhy run directly on 40 real orthogroups (LRT to 5e-14), and the one HyPhy failure reproduces directly; methods identical to KaKs_Calculator run directly and with no zero conflicts against PAML yn00 on 22,149 real pairs; a development image with KaKs_Calculator passed all 41 container checks; `check.sh` 162 tests, 0 failed, 0 skipped, tutorial passed.
+- **Found and fixed:** a gene-tree bug wrongly excluded 918 four-taxon orthogroups (`f483869`); the pilot's AVX2 job died on `grep` under `set -e` (`cb87647`); the pilot summary never read the multi-start columns (`ed1bf93`); my first zero rule for KaKs_Calculator gave dN = 0 for identical proteins, wrong for 27 real YN pairs (`ff2f758`, before any push); KaKs_Calculator's cap of 99 is now NA; the validation script misread yn00's `nan`.
+- **Found, reported:** with defaults, multinucleotide changes (95%) and misaligned windows (87.5%) give severe false positives; a single optimizer start misses optima under selection (9 of 100 calls change with best fits over 3 seeds); in real genomes, 148 of 322 BH-significant genes carry a foreground dissimilar-window flag.
+- **Provenance gap:** `check.sh` reinstalled the library the pilot loaded dndsR from during the run; only unused gene-tree code changed. The full study needs a dedicated library.
+- **Failed or not done:** the full calibration study awaits approval; Q7 filtering sensitivity not run; no default changed; nothing published, tagged, or merged.
+
 ## 2026-11-13: phylogenetic module, P2
 
 - **Session:** `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`
