@@ -92,72 +92,7 @@ extract_cds <- function(comparison_name = NULL,
     list(fafile = ff, chroms = GenomeInfoDb::seqnames(idx))
   }
 
-  # ---- helper: build TxDb and group CDS ----
-  # - Always muffle the known harmless genome-metadata warning.
-  # - If verbose=TRUE, print it immediately as an informational note.
-  .cds_groups <- function(gff, by = "gene") {
-    if (!file.exists(gff)) stop("GFF not found: ", gff, call. = FALSE)
-
-    meta_pat <- "genome version information is not available for this TxDb object"
-
-    txdb <- tryCatch(
-      withCallingHandlers(
-        txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character()),
-        warning = function(w) {
-          msg <- conditionMessage(w)
-          is_meta <- grepl(meta_pat, msg, fixed = TRUE)
-
-          if (is_meta) {
-            if (isTRUE(verbose)) vmsg("  [TxDb note] ", msg)
-            invokeRestart("muffleWarning")
-          }
-        }
-      ),
-      error = function(e) {
-        hint <- if (grepl("exons linked to transcripts not found", conditionMessage(e), fixed = TRUE)) {
-          paste0(" This can come from a trans-spliced gene with parts on both strands, such as plastid rps12. ",
-                 "Remove organelle sequences from the GFF3, which also use other genetic codes.")
-        } else {
-          ""
-        }
-        stop("Could not read gene models from ", gff, ": ", conditionMessage(e), hint, call. = FALSE)
-      }
-    )
-
-    if (isTRUE(verbose)) {
-      gi <- try(GenomeInfoDb::genome(txdb), silent = TRUE)
-      if (inherits(gi, "try-error") || all(is.na(gi)) || !any(nzchar(trimws(gi)))) {
-        vmsg("  - TxDb genome metadata not provided by GFF; safe to ignore for CDS extraction")
-      }
-    }
-
-    # Group by transcript in both modes. cdsBy(by = "gene") returns the CDS parts of all
-    # isoforms together in genomic order, which is not a valid coding sequence for
-    # multi-isoform genes or for multi-exon genes on the minus strand.
-    # Index by Bioconductor's internal ID: transcript names can be missing or duplicated,
-    # for example when only some transcripts in a RefSeq GFF have transcript_id.
-    tx_cds <- GenomicFeatures::cdsBy(txdb, by = "tx")
-    tx_meta <- suppressMessages(AnnotationDbi::select(
-      txdb, keys = names(tx_cds), keytype = "TXID", columns = c("TXNAME", "GENEID")
-    ))
-    tx_meta <- tx_meta[match(names(tx_cds), tx_meta$TXID), , drop = FALSE]
-    named <- .label_transcripts(tx_meta$TXID, tx_meta$TXNAME, tx_meta$GENEID)
-    names(tx_cds) <- named$tx
-    gene <- if (by == "gene") named$gene else named$tx
-    list(cds = tx_cds, gene = gene)
-  }
-
-  # ---- helper: filter out groups whose seqlevels aren't in FASTA ----
-  .keep_valid_groups <- function(groups, genome_chroms) {
-    parts <- BiocGenerics::unlist(groups$cds, use.names = FALSE)
-    on_missing <- !(as.character(GenomeInfoDb::seqnames(parts)) %in% as.character(genome_chroms))
-    owner <- rep(seq_along(groups$cds), S4Vectors::elementNROWS(groups$cds))
-    keep <- !(seq_along(groups$cds) %in% owner[on_missing])
-    if (any(!keep)) {
-      message("  - ", sum(!keep), " transcript(s) skipped: on sequences missing from the FASTA")
-    }
-    list(cds = groups$cds[keep], gene = groups$gene[keep])
-  }
+  # ---- helpers live in utils_science.R: .tx_cds_groups(), .keep_valid_groups() ----
 
   # ---- helper: translate CDS -> AA with options ----
   .translate_cds <- function(dna, genetic_code = 1L, keep_internal_stops = FALSE) {
@@ -256,7 +191,7 @@ extract_cds <- function(comparison_name = NULL,
     on.exit(try(close(h$fafile), silent = TRUE), add = TRUE)
 
     vmsg("  - Parsing GFF and grouping CDS by ", group_by)
-    cds_groups <- .cds_groups(gff_path, by = group_by)
+    cds_groups <- .tx_cds_groups(gff_path, by = group_by, verbose = verbose)
 
     cds_groups2 <- .keep_valid_groups(cds_groups, h$chroms)
     if (length(cds_groups2$cds) == 0L) {

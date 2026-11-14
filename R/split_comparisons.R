@@ -23,12 +23,19 @@ split_comparisons <- function(comparison_file,
   }
   .read_comparisons <- function(x) {
     req <- c("comparison_name","query_fasta","query_gff","subject_fasta","subject_gff")
+    optional <- c("snp_file", "snp_side")
     df1 <- try(.read_ws(x, header_try = TRUE), silent = TRUE)
-    if (!inherits(df1, "try-error") && all(req %in% names(df1))) return(df1[, req, drop = FALSE])
+    if (!inherits(df1, "try-error") && all(req %in% names(df1))) {
+      keep <- c(req, intersect(optional, names(df1)))
+      return(df1[, keep, drop = FALSE])
+    }
     df2 <- .read_ws(x, header_try = FALSE)
     stopifnot(ncol(df2) >= 5)
     names(df2)[1:5] <- req
-    df2[, req, drop = FALSE]
+    if (ncol(df2) >= 6L) names(df2)[6] <- "snp_file"
+    if (ncol(df2) >= 7L) names(df2)[7] <- "snp_side"
+    keep <- c(req, intersect(optional, names(df2)))
+    df2[, keep, drop = FALSE]
   }
   .split_ext <- function(path) {
     # returns list(base_noext, ext_full) preserving composite extensions like .fa.gz or .gff3.gz
@@ -160,7 +167,7 @@ split_comparisons <- function(comparison_file,
     sgff_map <- map_outfile(sgff, s_labels)
 
     for (L in both) {
-      out_rows[[length(out_rows) + 1]] <- data.frame(
+      row <- data.frame(
         comparison_name = paste0(comp, "_", L),
         query_fasta     = qfa_map[[L]],
         query_gff       = qgff_map[[L]],
@@ -168,6 +175,12 @@ split_comparisons <- function(comparison_file,
         subject_gff     = sgff_map[[L]],
         stringsAsFactors = FALSE
       )
+      # A whole-assembly SNP file stays valid for each split genome: coordinates are
+      # unchanged, and SNPs on contigs that a split file lacks are dropped (with a note)
+      # when the comparison runs.
+      if ("snp_file" %in% names(df)) row$snp_file <- as.character(df$snp_file[i])
+      if ("snp_side" %in% names(df)) row$snp_side <- as.character(df$snp_side[i])
+      out_rows[[length(out_rows) + 1]] <- row
     }
   }
 
@@ -180,6 +193,7 @@ split_comparisons <- function(comparison_file,
   out_df$query_gff     <- .dq(out_df$query_gff)
   out_df$subject_fasta <- .dq(out_df$subject_fasta)
   out_df$subject_gff   <- .dq(out_df$subject_gff)
+  if ("snp_file" %in% names(out_df)) out_df$snp_file <- .dq(out_df$snp_file)
 
   # write new comparison file next to the original, with "_split" inserted before extension
   comp_dir <- dirname(comparison_file)

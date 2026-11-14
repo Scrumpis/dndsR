@@ -6,7 +6,7 @@ Every command is also an R function with the same name and options, except `exam
 |---|---|
 | `split_comparisons` | Split genomes by subgenome or haplotype and write a new comparison file |
 | `extract_cds` | Extract CDS or proteins from FASTA and GFF3 |
-| `calculate_dnds` | Calculate dN/dS with `orthologr`. `--dnds-method` is `Comeron` (default), `NG`, `LWL`, `LPB`, `MLWL`, `YN`, or `MYN`; the others need KaKs_Calculator, which images up to v0.4.0 lack |
+| `calculate_dnds` | Calculate dN/dS with `orthologr`. `--dnds-method` is `Comeron` (default), `NG`, `LWL`, `LPB`, `MLWL`, `YN`, or `MYN`; the others need KaKs_Calculator, which images up to v0.4.0 lack. Development code also runs a McDonald-Kreitman test when the comparison row has `snp_file` and `snp_side` |
 | `append_annotations` | Add GFF attributes and coordinates to dN/dS results |
 | `ipr_enrichment` | InterPro term enrichment under positive selection |
 | `go_enrichment` | Gene Ontology enrichment with topGO |
@@ -37,10 +37,10 @@ Option and command names accept `-` or `_` as separators. Unknown options are er
 
 ## Comparison file
 
-Whitespace-delimited with one comparison per row: `comparison_name query_fasta query_gff subject_fasta subject_gff`. Paths containing spaces must be double-quoted.
+Whitespace-delimited with one comparison per row: `comparison_name query_fasta query_gff subject_fasta subject_gff`, with optional development-code columns `snp_file` and `snp_side` (`query` or `subject`), which turn on the McDonald-Kreitman test; in a file without a header they are columns 6 and 7. Paths containing spaces must be double-quoted.
 
 ```
 sp1_v_sp2 ./path_to/sp1.fasta ./path_to/sp1.gff ./path_to/sp2.fasta ./path_to/sp2.gff
 ```
 
-The default `calculate_dnds` output path, from the code, is `<output_dir>/<comparison_name>/<comparison_name>_dnds.tsv`.
+The default `calculate_dnds` output path, from the code, is `<output_dir>/<comparison_name>/<comparison_name>_dnds.tsv`. With `snp_file`, also `<comparison_name>_mk.tsv` and `<comparison_name>_mk_pooled.tsv` there.
