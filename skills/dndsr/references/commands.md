@@ -6,7 +6,7 @@ Every command is also an R function with the same name and options, except `exam
 |---|---|
 | `split_comparisons` | Split genomes by subgenome or haplotype and write a new comparison file |
 | `extract_cds` | Extract CDS or proteins from FASTA and GFF3 |
-| `calculate_dnds` | Calculate dN/dS with `orthologr` |
+| `calculate_dnds` | Calculate dN/dS with `orthologr`. `--dnds-method` is `Comeron` (default), `NG`, `LWL`, `LPB`, `MLWL`, `YN`, or `MYN`; the others need KaKs_Calculator, which images up to v0.4.0 lack |
 | `append_annotations` | Add GFF attributes and coordinates to dN/dS results |
 | `ipr_enrichment` | InterPro term enrichment under positive selection |
 | `go_enrichment` | Gene Ontology enrichment with topGO |

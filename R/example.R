@@ -49,6 +49,18 @@ verify_example <- function(output_dir = ".", comparison = "example_AvB") {
   if (!file.exists(dnds_file)) {
     stop("No results at ", dnds_file, ". Run extract_cds and calculate_dnds on the example first.", call. = FALSE)
   }
+  # The checks are for the default method; another method's values differ by design.
+  prov_file <- path(comparison, paste0(comparison, "_dnds_provenance.json"))
+  if (file.exists(prov_file)) {
+    prov <- tryCatch(jsonlite::read_json(prov_file), error = function(e) NULL)
+    method <- if (!is.null(prov$dnds_method)) prov$dnds_method else if (!is.null(prov$parameters$dnds_est.method))
+      prov$parameters$dnds_est.method else "Comeron"
+    if (!identical(method, "Comeron")) {
+      stop("These results were calculated with dnds_method ", method, ". verify_example checks the default ",
+           "method, Comeron. Rerun calculate_dnds without --dnds-method, with --overwrite true, then verify.",
+           call. = FALSE)
+    }
+  }
   result <- utils::read.delim(dnds_file)
   result$pair <- sub("^spA_", "", result$query_id)
   value <- function(pair, column) result[[column]][match(pair, result$pair)]

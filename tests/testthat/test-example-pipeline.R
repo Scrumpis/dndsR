@@ -43,6 +43,13 @@ test_that("the example can be copied, once", {
   expect_error(verify_example(tempdir()), "No results")
 })
 
+test_that("verify_example refuses results from another dN/dS method", {
+  dir <- withr::local_tempdir(); cmp <- file.path(dir, "example_AvB"); dir.create(cmp)
+  writeLines("query_id\tsubject_id\tdN\tdS\tdNdS", file.path(cmp, "example_AvB_dnds.tsv"))
+  jsonlite::write_json(list(dnds_method = "YN"), file.path(cmp, "example_AvB_dnds_provenance.json"), auto_unbox = TRUE)
+  expect_error(verify_example(dir), "calculated with dnds_method YN")
+})
+
 test_that("every written CDS matches the designed sequence exactly", {
   for (species in c("spA", "spB")) {
     got <- Biostrings::readDNAStringSet(file.path("example_AvB", paste0(species, "_CDS.fasta")))
