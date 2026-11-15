@@ -2,9 +2,10 @@ Package: dndsR
 Type: Package
 Title: dN/dS Pipeline for Comparative Genomics
 Version: 0.4.0.9000
-Authors@R: 
+Authors@R: c(
     person(given = "Nick", family = "Johnson", 
-           email = "john7932@msu.edu", role = c("aut","cre"))
+           email = "john7932@msu.edu", role = c("aut","cre")),
+    person(given = "Miles", family = "Roberts", role = "aut"))
 Description: Utilities to extract CDS and proteins from FASTA/GFF, 
     orchestrate ortholog discovery, and run dN/dS analyses at scale. 
     Includes helpers for batch comparisons, annotation joins, and QC.
