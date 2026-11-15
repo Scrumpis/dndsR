@@ -6,11 +6,17 @@ Tables: `docs/validation/data/phylo_stage2b_*.tsv` (`units`, `rules`, `paired`, 
 
 ## Run
 
-- 115 units, B1 and B3-B7 then B2: 115 units, all finished, **0 genes failed or excluded**. B2, the clean null grid, ran with three starts because the D4 audit failed in one cell (below).
+- 115 units (B1 and B3-B7, then B2), 50,220 BUSTED fits, all finished, **0 genes failed or excluded**. B2, the clean null grid, ran with three starts because the D4 audit failed in one cell (below).
 - Frozen at `3603efc`, whose dndsR package is identical to 2A's `5020a91`, in a read-only library. Development image `sha256:e24b394df53597922308224fd2507956fb6f70bd146e470540b1c91179f1d17f` (HyPhy 2.5.103, not published), checked by every job. Every fit ran on AMD EPYC 9654.
 - Inputs as 2A: `params.json` md5 `6a678fadefcbcf6b4d6d6377505997a9`, segment lengths md5 `30766db96c312d825e0c49e331db23bc`. Simulation seeds 8001-8150, none shared with 2A (7001-7135), so every 2B cell is an independent replicate. HyPhy seeds 1, 2, 3 (4, 5, 6 for the noise floor).
 - Configurations: C0 BUSTED (dndsR's default), C1 `--multiple-hits Double`, C3 BUSTED-E with `Double`, C4 `Double+Triple`, all with `--srv Yes`. Filters: F1 masks dndsR's flagged dissimilar windows in every sequence (`mask`); F1fg only in foreground sequences (`mask_fg`); F3 is F1 plus codons within 3 of an internal gap (`gapflank`). Calls are at α = 0.05 on `lrt_best_fits`: the best alternative and best null likelihood over the starts, never the smallest p-value.
 - Budget: 1,475.5 core-hours for stage 2B: 1,194.5 for B1 and B3-B7, 281.1 for B2 (estimated 361). The approved prospective ceiling was 1,806; the smoke test's 386 is recorded separately, as the maintainer ruled. Stage 2A used 635.
+
+**What the numbers are, and what they are not.** Every result here is from simulated data on one five-taxon tree with one foreground clade. The rates below must not be read as false-positive rates for other datasets.
+- *Nominal Type I error* is α = 0.05, the rate a valid test would have under the null.
+- A procedure is *calibrated* in a cell (D1) when the upper bound of the exact 95% interval on its observed rate of significant null genes is at most 5%. Rates far below 5% (C3's 0%) mean the test is *conservative*, which costs power. They do not mean it is more correct.
+- The *false discovery proportion* (FDP) is the observed share of false calls among BH discoveries in one simulated mixture. It is one realization, not an estimate of the expected FDR on real genomes.
+- *Power* is the share of truly selected genes called significant at α = 0.05, before any multiple-testing correction, unless stated.
 
 ## Answers
 
@@ -21,14 +27,14 @@ Rate at α = 0.05, three starts, exact 95% interval; D1 class (*calibrated* if t
 | Scenario | C1 | C3 | C1∧C3 | MA(C1, C3) |
 |---|---|---|---|---|
 | N0 L25 div ×0.5 | 0.3% (0-1.8) | 0% (0-1.2) | 0% | 0% |
+| N0 L25 | 0.7% (0.1-2.4) | 0% | 0% | 0.3% |
 | N0 L25 div ×2 | 0.7% (0.1-2.4) | 0% | 0% | 0.7% |
 | N0 L50 div ×0.5 | 0.3% (0-1.8) | 0% | 0% | 0% |
 | N0 L50 | 1.0% (0.2-2.9) | 0% | 0% | 0.7% |
+| N0 L50 div ×2 | 0.3% (0-1.8) | 0% | 0% | 0% |
 | N0 L75 div ×0.5 | 0.3% (0-1.8) | 0% | 0% | 0.3% |
 | N0 L75 | 1.3% (0.4-3.4) | 0% | 0% | 1.3% |
 | N0 L75 div ×2 | 0% (0-1.2) | 0% | 0% | 0% |
-| N0 L25 | 0.7% (0.1-2.4) | 0% (0-1.2) | 0% | 0.3% |
-| N0 L50 div ×2 | 0.3% (0-1.8) | 0% | 0% | 0% |
 | N1 L50 (stronger purifying selection) | 0% (0-1.2) | 0% | 0% | 0% |
 | M1, multinucleotide, δ 0.2 | 2.0% (0.7-4.3) | 0% | 0% | 0.7% |
 | M1, multinucleotide, δ 0.3 [150] | 0% (0-2.4); C4 0% | | | |
@@ -40,9 +46,9 @@ Rate at α = 0.05, three starts, exact 95% interval; D1 class (*calibrated* if t
 | Mixture, 720 null genes, unmasked | 4.4% (3.1-6.2), inconclusive | 1.0% (0.4-2.0) | 1.0% | 4.0% (2.7-5.7), inconclusive |
 | Mixture, 720 null genes, + F1 | 1.1% (0.5-2.2) | 0% (0-0.5) | 0% | 0.8% |
 
-- **Correct nulls are calibrated under every configuration**: in the nine-cell grid of gene length (L25, L50, L75: the quartiles of codon counts in the real P3A orthogroups) by divergence (×0.5, 1, 2), plus N1, C1 ranges from 0% to 1.3% (largest upper bound 3.4%), and C3 makes no call in 2,700 genes. This replicates 2A (0-1.3%).
+- **Correct nulls are calibrated under every configuration**: in the nine-cell grid of gene length (L25, L50, L75: the quartiles of codon counts in the real P3A orthogroups) by divergence (×0.5, 1, 2), plus N1, C1 ranges from 0% to 1.3% (largest upper bound 3.4%), and C3 makes no call in 3,000 genes. This replicates 2A (0-1.3%).
 - **Multinucleotide changes are handled by double hits.** C1 is calibrated at δ 0.2 and 0.3, as in 2A (0.7%). Without double hits, 2A measured 97% (C0). Triple hits add nothing here (C4 0%).
-- **Indels are the remaining failure of C1.** M4 gives 8.3%, replicating 2A's 8.7%. The true alignment brings it to 2.0%, so the excess comes from alignment error around indels, not from indels as such. F1 does not help: it flags only 33 of 300 M4 genes. F3 makes M4 calibrated (1.7%), but it costs power (below). C3 is calibrated on M4 (0.3%), as in 2A.
+- **Indels are the remaining failure of C1.** M4 gives 8.3%, replicating 2A's 8.7%. The true alignment brings it to 2.0%, so the excess comes from alignment error around indels, not from indels as such. F1 does not help: it flags only 33 of 300 M4 genes. F3 makes M4 calibrated (1.7%), but it costs power (below). C3 is calibrated on M4 (0.3%), as in 2A (0%, also with F1; one start, 150 genes).
 - **Alignment corruption.** One empirical-length corrupted segment in a foreground sequence gave 89-92% false positives under C1 and 24-28% under C3 in 2A, unmasked. Masking it is calibrated in 2B for C1 (1.0%) and C3 (0%), as in 2A.
 - **In the genome-like mixture, every unmasked C1 false positive beyond the clean rate comes from foreground corruption.** 28 of the 720 null genes carry a corrupted foreground segment. C1 calls 24 of them (86%), against 1.4% of the 500 clean null genes and 0.5% of the 192 null genes corrupted only in the background. C3 calls 7 of the 28 (25%). Masking removes all of them under both C1 and C3.
 
@@ -82,7 +88,7 @@ Paired differences on the same genes (difference, Newcombe 95% interval, McNemar
 | C4 − C1 | A(10, 0.1), A(10, 0.2) | −2.5, −3.3 | 11, 8 | 0.55, 0.29 | no |
 
 - **Weak selection is barely detectable by any configuration**: 2.5-10.8% under C1, near the null rate under C3. That is a property of the test at this sample size (five taxa), not of a setting.
-- **C3's protection costs material power at moderate and strong selection, and with clustered selection**: 14-25 points, each meeting D3. Only at A(10, 0.2) is the loss small. C1∧C3 is within 4.2 points of C3 everywhere.
+- **C3's protection costs material power at moderate and strong selection, and with clustered selection**: 14-25 points, each meeting D3. Among those cells, only A(10, 0.2) shows a small loss. C1∧C3 is within 4.2 points of C3 everywhere.
 - **Double hits cost little against BUSTED.** C1 − C0 is 0 to −3.3 points except at A(10, 0.2), −8.3 points, which is significant by McNemar but below the noise threshold. 2A measured a larger loss there with one start (91% to 70%); with three starts it is 86% to 78%.
 - **Triple hits (C4) never meet D3 against C1** and change no D1 class (D5): Double is enough in the settings tested, as in 2A.
 - **Model averaging gives BUSTED-E almost no weight** (mean Akaike weight 1.5-6%), so MA tracks C1 within 2 points in every cell. Three starts lowered the weight, rather than raising it: at A(10, 0.1), from 9.4% to 5.9%. Better BUSTED-E optimization does not make MA conservative here.
@@ -171,20 +177,34 @@ New in 2B, not tested in 2A: masking removes clustered selection; F3 fixes M4 bu
 **Still uncertain:**
 - Whether masking is non-inferior for moderately clustered selection (AC(5, 0.1)), and in one corrupted cell (A(10, 0.1) + R1). Both are inconclusive at 120 genes.
 - F3's power cost under indels: −10.8 points (−17.2, −4.4). That meets D3 but is inconclusive by the D7 margin.
-- C3 + F1 on realigned indels: not fitted. C3 alone is calibrated there.
+- C3 + F1 on realigned indels was fitted only in 2A, with one start and 150 genes (0 of 150, 0-2.4%), not in 2B with three starts. C3 alone is calibrated there in both stages.
 - D3's noise threshold was measured only in power cells, and is applied to null cells as the prespecified rule says (29 of 300). Extra starts change at most one null call, so the threshold is probably conservative for nulls. That is why C3 − C1 on M4 (24 discordant, McNemar p 1e-7) does not count as a D3 difference.
 - Whether any of this holds for other trees, more taxa, other foregrounds, or real data, where nobody knows which flagged windows are errors.
 
+## Prespecified criteria and their outcomes
+
+| Criterion | Outcome |
+|---|---|
+| D1 calibration | C1 and C3 calibrated in all 10 correct-null cells. |
+| D2 robustness | C1: calibrated under M1 (δ 0.2, 0.3) and R1 + F1; *unsafe* under M4 (8.3%) and M4 + F1; *inconclusive* on the unmasked mixture's null genes. C3: calibrated in every robustness cell run in 2B. |
+| D3 real difference | Met by C3 − C1 in 6 of 7 moderate, strong, and clustered cells; by masking in AC(10, 0.05) (and F1fg in AC(5, 0.1)); by F3 in A(10, 0.1) with indels. Not met by C1 − C0, C4 − C1, or masking in any uniform cell. |
+| D4 one start in the null grid | Failed in 1 of 12 audited cells (M4, C1: 3 changed calls). B2 ran with three starts. |
+| D5 triple hits | No D3 difference, no class improved: Double is enough. |
+| D6 masking | Calibrates corrupted nulls; non-inferior in clean and 3 of 4 corrupted cells; *inferior* in AC(10, 0.05); inconclusive in AC(5, 0.1) and A(10, 0.1) + R1. Therefore a sensitivity analysis only, with both results reported. |
+| D7 F3 | Makes M4 calibrated (1.7%), but is not shown non-inferior with indels under selection (−10.8, interval −17.2 to −4.4): not a candidate. True alignment calibrated (2.0%): M4's excess is alignment error. |
+| D8 conservative rule | In 2B, C3 and C1∧C3, with and without F1, calibrated in every null-like cell; MA not (inconclusive on M4 and the unmasked mixture). Across both stages only the masked versions qualify: unmasked C3 was *unsafe* on corrupted segments in 2A (24-28%). |
+| D9 mixture | Unmasked FDP 70-77% for C1, C3, MA; masked 0 false of 0-2 discoveries. |
+
 ## Recommendations, where the evidence supports one
 
-For the maintainer. None changes a default; masking is a validation script, not a dndsR feature.
+For the maintainer. None changes a default; masking is a validation script, not a dndsR feature. **The maintainer approved these on 2026-11-14 (US Eastern), with the wording in [DECISIONS.md](../dev/DECISIONS.md):** C1 is the preferred standard configuration, with no default change; three starts; no routine triple hits; masking strictly as a sensitivity analysis, reporting both; C3 + F1 as an experimental conservative sensitivity option, not a preferred genome-wide method; no model averaging as a safeguard; no preferred masking scope, and F3 stays experimental.
 
-1. **Use `--multiple-hits Double` (C1) rather than plain BUSTED (C0) whenever multinucleotide changes are possible.** C0 fails under them (97% in 2A). C1 is calibrated under every null tested except realigned indels, and its power cost against C0 is not material by D3. *Supported.*
+1. **Use `--multiple-hits Double` (C1) rather than plain BUSTED (C0) whenever multinucleotide changes are possible.** C0 fails under them (97% in 2A). C1 is calibrated under correct nulls and multinucleotide changes, though not under realigned indels or unmasked alignment corruption, and its power cost against C0 is not material by D3. *Supported.*
 2. **Use three starts combined by likelihood** (`--extra-seeds 2,3`, reading `lrt_best_fits`) for any inference under selection, and report the seeds. One start is enough for correct nulls, but not for M4 (D4) or under selection. *Supported.*
 3. **Triple hits are not needed** in the settings tested (D5). *Supported.*
 4. **Run masking as a sensitivity analysis, not a filter or a default.** Report results with and without it. A gene that is significant only unmasked, with a flagged foreground window, is a likely artifact. A gene that is significant only unmasked, with no corruption evidence but a block of divergent codons, may be clustered selection. The D6 rule gives this outcome: masking calibrates corrupted nulls but is inferior for clustered selection. *Supported.* Unmasked genome-wide scans are not trustworthy if the alignments may carry corrupted segments: 77% false discoveries in the mixture.
-5. **For conservative genome-wide scans, C3 + F1 (or C1∧C3 + F1)** is calibrated in every null-like cell where it was run, in 2A and 2B. It costs 14-25 points of power at moderate and strong selection. *Supported, with the limit that C3 + F1 was not fitted on M4.*
-6. **Model averaging is not a substitute for BUSTED-E or for masking** here: it tracks C1, and is not calibrated on M4 or in the unmasked mixture (D8). *Supported.*
+5. **C3 + F1 (or C1∧C3 + F1) as an experimental, conservative sensitivity analysis**, not a preferred genome-wide method. It is calibrated in every null-like cell where it was run, in 2A and 2B. But its power penalty is severe: 14-25 points at moderate, strong, and clustered selection, and near zero power at weak selection. *Supported, with the limit that C3 + F1 on realigned indels was tested only in 2A, with one start and 150 genes.*
+6. **Model averaging is not a substitute for BUSTED-E or for masking** here: it tracks C1, and is not shown calibrated on M4 or in the unmasked mixture (both inconclusive, D8). *Supported.*
 7. **No recommendation** on all-sequence against foreground-only masking (the evidence does not separate them), or on F3 (not non-inferior, D7). Weak selection is out of reach of a five-taxon test under every configuration.
 
 ## Limits
