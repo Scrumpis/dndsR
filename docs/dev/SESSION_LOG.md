@@ -7,7 +7,8 @@ Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 - **Session:** `5e80dd8b-3ab2-4679-a25e-00f0d7dc3366`
 - **Done:** `tools/dev/check.sh --rcmd-check`, with `tools/dev/rcmd-check.sh`, closes channel message 3's second point. Five `feat/*` pre-push cases added to `test-safeguards.sh`. Channel message 8; messages 3 and 5 marked answered.
 - **Verified, after `fda5dbe`, v0.4.0 image:** `check.sh --rcmd-check` on Slurm: tests 196, 0 failed; imports, skill ok; R CMD check `Status: OK`. Safeguards and tutorial crashed there, because `git` itself dies with "Illegal instruction" on those compute nodes, so they were rerun on the login node. Tutorial OK. Safeguards: 96 passed, 1 failed, the known stale installed `pre-push` copy.
-- **Not done:** nothing pushed. Message 7, items 1 and 2, still wait on the MK side. The maintainer still needs to rerun `tools/dev/setup.sh`.
+- **Then:** the maintainer pushed `9ed47af`. At their request, agents now rerun `tools/dev/setup.sh` after every sync (git-policy, `CLAUDE.md`, `AGENTS.md`, RUNBOOK), only when the hook sources match `origin/dev`. Ran it here: safeguards 97 passed, 0 failed. The release plan for the next session is at the top of `STATUS.md`.
+- **Not done:** message 7, items 1 and 2, still wait on the MK side. No merge, tag, or release.
 
 ## 2026-11-14 (late): stage 2 decisions, report audit, real-genome rerun, readiness
 

@@ -4,6 +4,7 @@
   - Nothing local and unpushed: fast-forward (`git merge --ff-only origin/dev`).
   - Unpushed commits that nothing cites: rebase them onto `origin/dev`, or merge; either is fine.
   - Unpushed commits whose identity matters, because a frozen study, a provenance file, a results root, or a document cites the commit: **merge, do not rebase**. A rebase gives them new hashes and breaks those references.
+  - Then run `tools/dev/setup.sh` (safe to repeat), so the installed git hooks match the synced sources. Hook copies do not update themselves, and `test-safeguards.sh` fails on a stale one. Install only hooks that are on `origin/dev`: if `git diff --quiet origin/dev -- tools/dev/githooks tools/dev/check-public-safe.sh` fails, stop and report instead of running it.
   - Then read `docs/dev/channels/` and `docs/dev/handoffs/` before the first edit, so messages from another side are seen before code is written.
 - `main` is protected. `dev` holds all development. Tags and releases are immutable.
 - Agents may commit to `dev`, but the maintainer does all pushing. Report the exact push command at the end of the work.

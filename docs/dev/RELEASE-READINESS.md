@@ -9,7 +9,7 @@
 | `R-CMD-check`: macOS, Windows, Ubuntu release, oldrel, devel | CI at `b65bf8b` | Pass. Windows failed at `3a62ad2` and `60339ce` on a test expectation (path separators); fixed in the test, `be1a7fa` |
 | `install`, `skill`, `container` | CI at `b65bf8b` | Pass. `container` failed once at `3a62ad2`, in the documented-installer step, and passed at the next two commits with the same code; logs need a login, so the cause is unconfirmed |
 | `R CMD check --as-cran` on the tarball, local development image (HyPhy, KaKs_Calculator) | Local at `3a62ad2` | 0 errors, 0 warnings, 2 notes (new submission; no pandoc) |
-| `tools/dev/check.sh` | Local at `b65bf8b` | Tests 195, 0 failed; imports, skill ok. Safeguards: 1 failure, this clone's installed `pre-push` hook predates PR #8's change: the maintainer reruns `tools/dev/setup.sh` |
+| `tools/dev/check.sh` | Local at `b65bf8b`; again after `fda5dbe` with `--rcmd-check` | At `b65bf8b`: tests 195, 0 failed; safeguards 1 failure (stale installed `pre-push` copy). After `fda5dbe`: tests 196, 0 failed; R CMD check `Status: OK`; tutorial OK; after `setup.sh`, safeguards 97 passed, 0 failed |
 | v0.4.0 against `dev`, real genomes, data read-only, the same v0.4.0 image for both (`tools/dev/validation/`, results outside Git) | Public *A. thaliana*–*A. lyrata* pair and two unpublished pairs, at `b65bf8b` | Every CDS FASTA, CDS QC table, dN/dS table, and annotated table **byte-identical** to v0.4.0. Differences: the new `_dnds_reliability.tsv`; provenance records `dnds_method` and the development version; logs differ in times and process IDs. On the public pair, `compare-versions.R` with gffread 0.12.9: every CDS compared matches gffread (0 differ, 83 not comparable by name, as before); the same 22,149 pairs with the same partners; all 22,094 comparable dN/dS values identical. Details: [public-genome.md](../validation/public-genome.md#v040-against-dev) |
 | Phylogenetic calibration, stages 2A and 2B | Simulation, `3603efc` | Reported: `docs/validation/phylo-calibration-stage2b.md`; guidance approved by the maintainer |
 
@@ -20,7 +20,7 @@
 1. **McDonald-Kreitman: keep experimental, or hold back.** Its method and output columns changed on 2026-11-14 (PR #8: allele-aware classes, BED needs ALT in column 4, `snps_midfold` and `div_steps_midfold` removed). It is tested on designed examples only, not on real population data. Real-data testing and the maintainer's approval come before it is released as anything but experimental. Open integration point: SNP-file errors appear only after dN/dS (channel message 7).
 2. **Phylogenetic module: still experimental.** The calibration covers one five-taxon tree in simulation. No published image includes HyPhy, and the release that carries the module is an open decision. `p_adj` corrects `p_value`, not the recommended `p_best_fits`; whether to add a corrected column is open (`DECISIONS.md`).
 3. **Author metadata.** Confirm the second author's preferred name and optional ORCID before publication (`CITATION.cff`, `.zenodo.json`, `DESCRIPTION`).
-4. **Maintainer steps.** Rerun `tools/dev/setup.sh`; choose the version number; then `RELEASE.md` (merge, tag, image, digests in the docs). Each needs the maintainer's approval.
+4. **Maintainer steps.** Choose the version number; then `RELEASE.md` (merge, tag, image, digests in the docs). Each needs the maintainer's approval.
 
 ### Not blocking, but open
 

@@ -18,9 +18,23 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 | `main` | `957cfe1` | `v0.4.0` |
 | `dev` | See `git log` | `main` was merged into it at `3f86d42`, by the maintainer |
 
+## Resume here: the next release
+
+Agreed with the maintainer at the end of the 2026-11-15 session. The maintainer is waiting for the MK maintainer's final pull request, and then merges `dev` to `main`. When resumed:
+
+1. Sync, run `tools/dev/setup.sh`, and read the MK channel for new messages. Message 7, items 1 (SNP-file pre-check before dN/dS) and 2 (stale `.mk_read_snps` comment), wait on the MK side.
+2. Once the MK pull request is merged into `dev`: review it for integration only (not its method), run `tools/dev/check.sh --rcmd-check`, rerun the real-genome comparison (`tools/dev/validation/`, results outside Git), and update `RELEASE-READINESS.md`.
+3. Decisions for the maintainer, before the merge to `main`:
+   - Does MK ship marked experimental? They have said it stays experimental until tested on real data and approved by them.
+   - Does the phylogenetic module ship in this release, marked experimental? Agent recommendation: yes; it is complete as experimental, with documented limits (one five-taxon tree in simulation). `tools/Dockerfile` already installs HyPhy 2.5.103, so the next published image is the first to run it.
+   - Whether to add a BH-corrected `p_best_fits` column (an output change, needs approval; not a release blocker while the docs explain `p_adj`). Dropping members and duplication-aware orthology are v1.0 questions.
+   - The second author's preferred name and optional ORCID (`CITATION.cff`, `.zenodo.json`, `DESCRIPTION`).
+   - The version number.
+4. Then `RELEASE.md`, each step with the maintainer's approval: merge to `main`, tag, image, digests in the docs, release assets.
+
 ## Next
 
-1. The maintainer pushes `dev`, which swaps the v0.4.0 digest into `README.md`, `INSTALL.md`, the tutorial, and the skill (RELEASE.md step 3), and merges it to `main` by pull request when convenient. Until then, `main`'s documents name the v0.3.0 image, which has the same dependencies.
+1. Done: the maintainer pushed `dev`, which swaps the v0.4.0 digest into `README.md`, `INSTALL.md`, the tutorial, and the skill (RELEASE.md step 3), and merges it to `main` by pull request when convenient. Until then, `main`'s documents name the v0.3.0 image, which has the same dependencies.
 2. The v0.4.0 GitHub release has no assets. RELEASE.md step 4 expects the workflow's `release-manifest.json` and skill tarball attached; the maintainer can attach them from the `publish` run, 41565720097.
 3. This software is frozen for the Chenopodium analysis, which needs no rerun: `verify_release_equivalence.sh` reports the analysis's software identical to `v0.4.0`. Its work and results live outside this repository, and nothing from them comes here.
 4. For v1.0.0: `docs/dev/ROADMAP-1.0.md`. Do not start it for the current manuscript.

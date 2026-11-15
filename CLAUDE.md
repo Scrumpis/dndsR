@@ -26,7 +26,7 @@ Validation evidence and its limits are in `docs/validation/`. Say which claims y
 - **The integration agent** (the project maintainer's) owns everything else: core dndsR, general comparison-file handling in every command (including how the optional `snp_file`/`snp_side` columns are read), CI, containers, the phylogenetic module (BUSTED), and release infrastructure.
 - A change that touches both, such as the comparison-file interface or what an MK error message says about it, is agreed in the channel `docs/dev/channels/mcdonald-kreitman.md` before it is committed.
 - Findings about an area you do not own go in a channel message or a handoff, never in its code. Only the project maintainer's own words are maintainer rulings: do not record one side's choice, or an agent's recommendation, as one.
-- **Start every session by syncing, before any edit**, as `.claude/rules/git-policy.md` describes. Then list `docs/dev/channels/` and `docs/dev/handoffs/` and read what is addressed to you or covers files you will change. Details: `.claude/rules/channels.md`, `.claude/rules/handoffs.md`.
+- **Start every session by syncing, before any edit**, as `.claude/rules/git-policy.md` describes, then run `tools/dev/setup.sh` so the installed hooks match. Then list `docs/dev/channels/` and `docs/dev/handoffs/` and read what is addressed to you or covers files you will change. Details: `.claude/rules/channels.md`, `.claude/rules/handoffs.md`.
 
 ## Non-negotiable rules
 
@@ -41,7 +41,7 @@ Details are in `.claude/rules/`.
 
 ## Development
 
-- Set up a clone once: `tools/dev/setup.sh`.
+- Set up a clone with `tools/dev/setup.sh`, and rerun it after every sync (it is safe to repeat).
 - Keep dependencies declared in `DESCRIPTION`, and in `tools/Dockerfile` and `tools/environment.yml` when needed. The HPC default R lacks many dependencies, so run package code in the pinned container (see the runbook).
 - Regenerate `man/` and `NAMESPACE` with roxygen2 rather than editing them by hand. roxygen2 is not in the current image.
 - Before committing, run `tools/dev/check.sh`, which runs the package tests, tutorial, safeguards, and skill validation side by side. Use `--fast` while developing. CI runs `R CMD check`.

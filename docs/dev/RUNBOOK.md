@@ -4,7 +4,9 @@
 
 ```
 cd <clone>
-tools/dev/setup.sh                 # safe to repeat
+git fetch https://github.com/Scrumpis/dndsR.git '+refs/heads/*:refs/remotes/origin/*'   # or: git fetch origin
+git merge --ff-only origin/dev     # see git-policy for unpushed commits
+tools/dev/setup.sh                 # after every sync: reinstalls the hooks; safe to repeat
 git status && git log --oneline -5
 tools/dev/audit-report.sh          # sessions so far
 claude --continue                  # or: claude --resume <session-id>
@@ -102,7 +104,7 @@ Tracked, public-safe records: `STATUS.md`, `DECISIONS.md`, and `SESSION_LOG.md` 
 |---|---|---|
 | GitHub ruleset `protect_main` (active) | On `main`: no deletion or force-push, pull request with 0 approvals, required `R-CMD-check`, `validate`, `conda`, and `build-and-test` | Repository admins may be able to bypass it; the public API does not show bypass actors. |
 | GitHub ruleset `protect_dev` (active) | On `dev`: no deletion or force-push | The same bypass limit. |
-| Git hooks, sourced from `tools/dev/githooks` and copied to `.git/hooks` | Commits and ref updates on `main`; bringing `main` into `dev` by merge or rebase; rewriting pushed `dev`; moving or deleting tags; pushing anything but a fast-forward of `dev`; unsafe staged files; the skill gate | Local to a clone. Rerun `tools/dev/setup.sh` after hooks change, because copies do not update themselves (`test-safeguards.sh` detects stale copies). `--no-verify` skips the commit and push hooks. `-c core.hooksPath=...` skips all of them. Cherry-picks from `main` are not detected. |
+| Git hooks, sourced from `tools/dev/githooks` and copied to `.git/hooks` | Commits and ref updates on `main`; bringing `main` into `dev` by merge or rebase; rewriting pushed `dev`; moving or deleting tags; pushing anything but a fast-forward of `dev`; unsafe staged files; the skill gate | Local to a clone. Agents rerun `tools/dev/setup.sh` after every sync (git-policy), because copies do not update themselves (`test-safeguards.sh` detects stale copies). `--no-verify` skips the commit and push hooks. `-c core.hooksPath=...` skips all of them. Cherry-picks from `main` are not detected. |
 | Claude Code guard and `permissions` in `.claude/` | Denies agent pushes and bypass flags, publishing, and reconciliation with `main` | Pattern matching only; commands hidden in scripts or `Rscript -e` can evade it. It reads the whole command text, so a heredoc that merely mentions a blocked command is also denied: write such text with the file tools. Only applies inside Claude Code. |
 
 `protect_tags` is also active; a tag ruleset's rules are not readable without a login. Fast-forward merges to local `main` are blocked by the hooks, so read `origin/main` after `git fetch` instead. When the maintainer deliberately updates local `main`, use `git -c core.hooksPath=/dev/null ...`; the guard stops agents from doing so.
