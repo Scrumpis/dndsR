@@ -13,12 +13,29 @@ mk <- function(name) get(paste0(".mk_", name), envir = asNamespace("dndsR"))
 
 # ---------- codon classifier ----------
 
-test_that("codon path classifier averages over all shortest paths", {
-  expect_equal(mk("classify_codon")("GCT", "GCC"), c(1, 0))   # 1-codon syn
-  expect_equal(mk("classify_codon")("GCT", "GTT"), c(0, 1))   # 1-codon nonsyn
-  expect_equal(mk("classify_codon")("CTT", "TTA"), c(1, 1))   # 2 paths, both mixed
-  expect_equal(mk("classify_codon")("AAA", "TTT"), c(0.25, 2.75)) # one path hits a stop codon
-  expect_equal(mk("classify_codon")("GGT", "GGT"), c(0, 0))
+# Expected values below are enumerated independently from the standard genetic code
+# (all 3 alternatives per changed position, all shortest paths), not from dndsR.
+
+test_that("codon degeneracy classes follow the genetic code", {
+  deg <- mk("syn_alternatives")
+  expect_equal(deg("GGT", 3L), 3L)   # Gly GGN: 4-fold
+  expect_equal(deg("GGT", 1L), 0L)   # Gly: 0-fold
+  expect_equal(deg("GAA", 3L), 1L)   # Glu GAR: 2-fold
+  expect_equal(deg("ATT", 3L), 2L)   # Ile ATH: 3-fold
+  expect_equal(deg("ATG", 1L), 0L)   # Met: 0-fold
+})
+
+test_that("codon path classifier averages 4-fold, 0-fold, and mid-fold steps", {
+  cc <- mk("classify_codon")
+  expect_equal(cc("GCT", "GCC"), c(1, 0, 0))          # Ala GCN, 4-fold
+  expect_equal(cc("GCT", "GTT"), c(0, 1, 0))          # Ala -> Val, 0-fold
+  expect_equal(cc("GAA", "GAG"), c(0, 0, 1))          # Glu GAR, 2-fold
+  expect_equal(cc("ATT", "ATC"), c(0, 0, 1))          # Ile ATH, 3-fold
+  # Two differences: both paths give one 0-fold and one mid-fold step.
+  expect_equal(cc("CTT", "TTA"), c(0.5, 0.5, 1))
+  # Three differences: no 4-fold step is possible, and one step is mid-fold.
+  expect_equal(cc("AAA", "TTT"), c(0, 2, 1))
+  expect_equal(cc("GGT", "GGT"), c(0, 0, 0))
 })
 
 test_that("divergence walk excludes SNPs and stops, and detects frame shifts", {
@@ -32,6 +49,11 @@ test_that("divergence walk excludes SNPs and stops, and detects frame shifts", {
   # A reference gap inside a codon breaks the frame for everything after it.
   w <- mk("pair_walk")("ATG-CTGCTTAA", "ATGGCTGCTTAA", integer(0))
   expect_equal(unname(w["frame_ok"]), 0)
+  # Every differing position lands in exactly one class: 4-fold, 0-fold, or mid-fold.
+  # Glu GAA -> Phe TTT, three differences; enumerated independently: 0.25, 2, 0.75.
+  w <- mk("pair_walk")("ATGGAA", "ATGTTT", integer(0))
+  expect_equal(unname(w[c("ds", "dn", "mid")]), c(0.25, 2, 0.75))
+  expect_equal(sum(unname(w[c("ds", "dn", "mid")])), 3)
 })
 
 # ---------- SNP parsing ----------
@@ -160,6 +182,24 @@ test_that("SNP mapping and polymorphism counting on the mini genome", {
   poly <- mk("poly_counts")(snps, map, hits)
   expect_equal(poly$gA[["ps"]], 1L)
   expect_equal(poly$gA[["pn"]], 1L)
+  expect_equal(poly$gA[["mid"]], 0L)
+})
+
+test_that("polymorphisms at 2- and 3-fold sites are excluded from Pn and Ps", {
+  # A hand-built map keeps this independent of genome extraction: codons are
+  # ATG (Met), GAA (Glu, 2-fold at position 3), ATT (Ile, 3-fold), TAA (stop).
+  map <- list(seq = c(g1 = "ATGGAAATTTAAGGT"))
+  # CDS indices: 4 = GAA pos 1 (0-fold), 6 = GAA pos 3 (2-fold),
+  #              9 = ATT pos 3 (3-fold), 10 = TAA pos 1 (stop), 15 = GGT pos 3 (4-fold)
+  hits <- data.frame(gene = rep("g1", 5), snp_i = 1:5,
+                     cds_idx = c(4L, 6L, 9L, 10L, 15L))
+  snps <- data.frame(chrom = "c", pos = 1:5, ref = NA_character_, alt = NA_character_,
+                     stringsAsFactors = FALSE)
+  poly <- mk("poly_counts")(snps, map, hits)$g1
+  expect_equal(poly[["pn"]], 1L)      # GAA position 1 is 0-fold
+  expect_equal(poly[["ps"]], 1L)      # GGT position 3 is 4-fold
+  expect_equal(poly[["mid"]], 2L)     # GAA position 3 and ATT position 3
+  expect_equal(poly[["dropped"]], 1L) # the stop codon
 })
 
 test_that("snp_side = subject counts the subject's SNPs and excludes its codons", {
@@ -260,9 +300,14 @@ test_that("calculate_dnds computes the MK table alongside dN/dS", {
   mk_tbl <- utils::read.delim("example_AvB/example_AvB_mk.tsv")
   g04 <- mk_tbl[mk_tbl$query_id == "spA_g04", ]
   expect_equal(g04$pn, 0L)
-  expect_equal(g04$ps, 1L)
-  expect_equal(g04$dn, 8)   # designed: spA-vs-spB g04 has 8 nonsyn substitutions
-  expect_equal(g04$ds, 40)
+  expect_equal(g04$ps, 1L)   # the chosen codon is 4-fold degenerate
+  # The designed pair has 48 differing codon positions. Each is counted in exactly
+  # one class, so the three columns must add up to 48 whatever the split is.
+  expect_equal(g04$dn + g04$ds + g04$div_steps_midfold, 48)
+  expect_gt(g04$dn, 0)
+  expect_gt(g04$ds, 0)
+  expect_gt(g04$div_steps_midfold, 0)   # 2-/3-fold sites are excluded, not dropped
+  expect_equal(g04$snps_midfold, 0L)
   expect_equal(g04$codons_excluded_polymorphic, 1L)
   pooled <- utils::read.delim("example_AvB/example_AvB_mk_pooled.tsv")
   expect_equal(pooled$ps, 1L)
@@ -288,6 +333,15 @@ test_that("BED sites are classified by codon degeneracy", {
   poly <- mk("poly_counts")(bed_snps, map, hits)
   expect_equal(poly$gA[["ps"]], 1L)
   expect_equal(poly$gA[["pn"]], 1L)
+  expect_equal(poly$gA[["mid"]], 0L)
+  # VCF and BED now share one rule, so the same two sites give the same counts.
+  vcf_snps <- data.frame(chrom = bed_snps$chrom, pos = bed_snps$pos,
+                         ref = substr(g$genome, bed_snps$pos, bed_snps$pos),
+                         alt = c("C", "C"), stringsAsFactors = FALSE)
+  vpoly <- mk("poly_counts")(vcf_snps, map, mk("map_snps")(vcf_snps, map)$hits)$gA
+  expect_equal(vpoly[["pn"]], poly$gA[["pn"]])
+  expect_equal(vpoly[["ps"]], poly$gA[["ps"]])
+  expect_equal(vpoly[["mid"]], poly$gA[["mid"]])
 })
 
 # ---------- .mk_run: validation and 1-to-1 enforcement (no orthologr needed) ----------
