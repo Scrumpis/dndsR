@@ -53,7 +53,7 @@ The first three commands do not account for gene length or dS, and `go_enrichmen
 
 ## McDonald-Kreitman test
 
-When the comparison file names a SNP file and the genome its coordinates belong to (`snp_file`, `snp_side`), `calculate_dnds` also counts polymorphism and divergence for a 2×2 McDonald-Kreitman test on 1:1 orthologs, reusing the codon alignments it just built. Only bi-allelic SNPs are used, multi-base codons are path-averaged, and codons carrying a SNP are excluded from divergence. Method and checks: [mcdonald-kreitman.md](mcdonald-kreitman.md).
+When the comparison file names a SNP file and the genome its coordinates belong to (`snp_file`, `snp_side`), `calculate_dnds` also counts polymorphism and divergence for a 2×2 McDonald-Kreitman test on 1:1 orthologs, reusing the codon alignments it just built. Sites are classified by codon degeneracy: 4-fold positions are synonymous, 0-fold nonsynonymous, and 2- and 3-fold positions are excluded from both classes and counted separately. Only bi-allelic SNPs are used, multi-base codons are path-averaged, and codons carrying a SNP are excluded from divergence. dndsR does no SNP filtering; filter calls with `bcftools` first. Method and checks: [mcdonald-kreitman.md](mcdonald-kreitman.md).
 
 ## Reporting a dndsR analysis
 

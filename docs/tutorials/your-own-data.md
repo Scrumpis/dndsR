@@ -66,6 +66,15 @@ dndsr dnds_contrast -c comparison_file.txt --contrast-file contrast_file.txt
 
 To ask whether selection shapes a gene's polymorphism as well as its divergence, add a within-species SNP set. It must use the coordinates of one of the two genomes in the comparison: the genome FASTA and GFF3 for that side, already in the comparison file, are used to place each SNP in its codon.
 
+**Filter the SNP calls first.** dndsR applies no filtering: it ignores `FILTER`, quality, depth, allele count, and genotypes, so a fixed site or a low-quality call is counted as a polymorphism. Use `bcftools`:
+
+```
+bcftools +fill-tags calls.vcf.gz -- -t AC,AN -Oz -o calls_tagged.vcf.gz   # only if AC/AN are missing
+bcftools view -f PASS -v snps -m2 -M2 -i 'AC>=2 && AC<AN' calls_tagged.vcf.gz -Oz -o snps.vcf.gz
+```
+
+`AC>=2` suits a population VCF; one diploid sample has at most `AC = 2`, so it keeps only heterozygous sites. Filter BED input the same way before converting it.
+
 Add two columns to the comparison file: `snp_file`, a VCF (`.vcf`, `.vcf.gz`) or BED (`.bed`, `.bed.gz`), and `snp_side`, `query` or `subject`. In a headerless file they are columns 6 and 7.
 
 ```
@@ -81,7 +90,7 @@ dndsr calculate_dnds -c comparison_file.txt -t 40
 - `<comparison>_mk.tsv`: one row per 1:1 pair, with `pn`, `ps`, `dn`, `ds`, `alpha`, `neutrality_index`, `dos`, `fisher_p`, `fisher_q`.
 - `<comparison>_mk_pooled.tsv`: the same statistics from the summed counts, one row for the whole comparison.
 
-Only bi-allelic SNPs are used: multiallelic records, indels, and genotype columns are ignored. Codons carrying a SNP are left out of the divergence counts. dN/dS cached from unchanged inputs skips the test; add `--overwrite` to recompute both.
+Only bi-allelic SNPs are used: multiallelic records, indels, and genotype columns are ignored. Each site is classified by codon degeneracy, the same way for VCF and BED: 4-fold positions count as synonymous, 0-fold as nonsynonymous, and 2- and 3-fold positions are excluded from both classes (they appear as `snps_midfold` and `div_steps_midfold`). Codons carrying a SNP are left out of the divergence counts. dN/dS cached from unchanged inputs skips the test; add `--overwrite` to recompute both.
 
 Before trusting a table, check the run's messages. dndsR stops when no contig of the SNP file matches the chosen genome, when a VCF `##contig` length disagrees with the FASTA, or when more than 10% of REF alleles disagree with the genome. Those checks catch a SNP file from the wrong assembly, but not one that shares contig names and lengths, so confirm the source. Method, counting rules, and limits: [McDonald-Kreitman](../mcdonald-kreitman.md).
 
