@@ -18,6 +18,7 @@ calculate_dnds(
   cds_suffix = "_CDS.fasta",
   protein_suffix = "_AA.fasta",
   comp_cores = 4,
+  unique_pairs = FALSE,
   aligner = "diamond",
   sensitivity_mode = "fast",
   dnds_method = "Comeron",
@@ -83,6 +84,13 @@ Default \code{"_AA.fasta"}.}
 
 \item{comp_cores}{Integer number of CPU cores to pass to \code{orthologr::dNdS()} as
 \code{comp_cores}. Default 4.}
+
+\item{unique_pairs}{Logical. In batch mode, skip a comparison whose two genomes
+already appeared in the file, in either order. A multi-species file that lists every
+ordered pair, such as \code{A_v_B} and \code{B_v_A}, then runs each unordered pair once, which
+halves the work and avoids a second, direction-dependent estimate of the same pair.
+The first row for a pair is kept and the later ones are reported. Default \code{FALSE},
+which runs every row as written.}
 
 \item{aligner}{Character. Aligner passed to \code{orthologr::dNdS()} (e.g. \code{"diamond"} or \code{"blast"}).
 If \code{"diamond"}, the \code{diamond} binary must be available on \code{PATH}.}

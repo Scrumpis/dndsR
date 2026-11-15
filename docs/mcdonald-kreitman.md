@@ -56,6 +56,14 @@ A polymorphic site counts once however many samples carry it. Each site is class
 
 The class is therefore a property of the allele, not of a degeneracy table, and swapping `snp_side` does not change it for a given SNP file on its own genome.
 
+## Several species
+
+MK is a per-pair test, so a multi-species study is a list of pairs. Put one row per pair in the comparison file: `k` species need `k(k-1)/2` rows. Give `snp_file` and `snp_side` on a row only when that pair has polymorphism data; a row without them contributes no MK table.
+
+A file that lists every ordered pair, such as `A_v_B` and `B_v_A`, would otherwise run the same two genomes twice. Add `--unique-pairs` and the run keeps the first row for each unordered pair, reports the ones it skipped, and does the work once. The pair is identified by its two FASTA paths, not by the comparison name, so `A_v_B` and `B_v_A` count as one pair while `A_v_B` and `A_v_C` do not.
+
+The same SNP file can back several rows, for example a focal species against three outgroups with `snp_side = query` in each. Divergence is allele-aware and symmetric, so the counts follow the pair, not the row order.
+
 ## Divergence counted
 
 Dn and Ds come from the same PAL2NAL codon alignments `orthologr::dNdS()` produced, one aligned codon at a time:
