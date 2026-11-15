@@ -79,7 +79,7 @@ A complete run on public genomes, with measured time and memory: [docs/tutorials
 
 ## 4b. Selection tests across species (experimental, development code only)
 
-`phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests: does any site show dN/dS above 1 on chosen foreground branches? They are not in v0.4.0. Use them only if `dndsr --help` lists `phylo_prepare`, and tell the user they are experimental, unreleased, and not calibrated as a selection pipeline. They need MAFFT (in the dndsR image) and HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs HyPhy with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
+`phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests: does any site show dN/dS above 1 on chosen foreground branches? They are not in v0.4.0. Use them only if `dndsr --help` lists `phylo_prepare`, and tell the user they are experimental and unreleased, and calibrated only in simulation on one five-taxon tree. They need MAFFT (in the dndsR image) and HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs HyPhy with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
 
 ```
 dndsr phylo_example
@@ -97,7 +97,7 @@ Success ends with `All 11 phylogenetic example checks passed.` On real data the 
 - `foreground_unidentifiable` (mathematical) means the requested branches cannot be separated from other history with the taxa present; `foreground_partly_unidentifiable` and `foreground_incomplete` are conservative policy. dndsR never relabels a branch.
 - Gene-tree discordance is reported (`gt_*` columns, `gene_tree_discordant_near_foreground`), not corrected.
 - Results depend on `--seed`, `--hyphy-cpu`, and slightly on the processor (with or without AVX-512); the first two are recorded in `busted/busted_provenance.json`, so record the processor too. `--extra-seeds` shows the spread; it never changes `p_value`. Genes near the threshold can change call with the seed.
-- Keep HyPhy's defaults unless the user asks; `--error-sink Yes` (BUSTED-E) is experimental.
+- The defaults are HyPhy's. Simulation recommends `--multiple-hits Double` and `--extra-seeds 2,3`, reading `lrt_best_fits` and `p_best_fits`; `p_adj` corrects only `p_value`. Tell the user, and do not change settings without their choice. `--error-sink Yes` (BUSTED-E) is an experimental conservative check with a large power cost. Alignment errors cause most false positives: point out `dissimilar_window` flags. Masking them is a sensitivity analysis, not a dndsR feature. Evidence and limits: [docs/phylo-methods.md](../../docs/phylo-methods.md#calibration-in-simulation).
 - Methods and limits: [docs/phylo-methods.md](../../docs/phylo-methods.md).
 
 ## 5. Interpret honestly

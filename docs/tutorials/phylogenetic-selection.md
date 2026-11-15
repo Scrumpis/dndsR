@@ -2,7 +2,7 @@
 
 `phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests of whether some sites evolved with dN/dS above 1 on branches you choose. You do not build alignments or HyPhy inputs by hand. This is separate from dndsR's pairwise dN/dS. Read [phylo-methods.md](../phylo-methods.md) before interpreting results.
 
-**Status: experimental and unreleased.** Development version 0.4.0.9000; v0.4.0 does not have it. dndsR prepares inputs as designed and reproduces HyPhy run directly ([evidence](../validation/phylo-prepare.md)), but the pipeline has not been calibrated as a selection test.
+**Status: experimental and unreleased.** Development version 0.4.0.9000; v0.4.0 does not have it. dndsR prepares inputs as designed and reproduces HyPhy run directly ([evidence](../validation/phylo-prepare.md)), A simulation study on one five-taxon tree recommends `--multiple-hits Double` and three starts, and treats masking as a sensitivity analysis; the defaults are unchanged. See [calibration](../phylo-methods.md#calibration-in-simulation) before choosing settings.
 
 ## 1. Get dndsR and HyPhy
 
