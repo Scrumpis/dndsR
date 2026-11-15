@@ -57,11 +57,9 @@ Written when the comparison has `snp_file` and `snp_side` columns. Method, input
 |---|---|
 | `query_id`, `subject_id` | The pair |
 | `reference_side` | `query` or `subject`: whose SNPs were counted |
-| `pn`, `ps` | Polymorphic nonsynonymous (0-fold) and synonymous (4-fold) sites |
-| `dn`, `ds` | Divergent nonsynonymous (0-fold) and synonymous (4-fold) differences, path-averaged and so possibly fractional |
+| `pn`, `ps` | Polymorphic nonsynonymous and synonymous sites, by the amino-acid effect of the ALT allele |
+| `dn`, `ds` | Divergent nonsynonymous and synonymous differences, path-averaged and so possibly fractional |
 | `dn_int`, `ds_int` | `round()` of the above, the counts Fisher's test uses |
-| `snps_midfold` | Polymorphisms at 2- and 3-fold sites, excluded from `pn` and `ps` |
-| `div_steps_midfold` | Divergence steps at 2- and 3-fold sites, excluded from `dn` and `ds` |
 | `codons_used` | Aligned codons counted for divergence |
 | `codons_excluded_polymorphic` | Codons left out because they carry a SNP |
 | `alpha` | `1 - (ds * pn) / (dn * ps)` |
@@ -70,7 +68,7 @@ Written when the comparison has `snp_file` and `snp_side` columns. Method, input
 | `fisher_p` | Fisher's exact test on `[pn, ps; dn_int, ds_int]`, NA when a margin is zero |
 | `fisher_q` | Benjamini-Hochberg across the finite p-values in the file |
 
-`<comparison>_mk_pooled.tsv` has one row: `comparison`, `reference_side`, `n_pairs`, the summed `pn`, `ps`, `dn`, `ds`, `dn_int`, `ds_int`, `snps_midfold`, `div_steps_midfold`, `codons_used`, `codons_excluded_polymorphic`, and `alpha`, `neutrality_index`, `dos`, `fisher_p` recomputed from the sums.
+`<comparison>_mk_pooled.tsv` has one row: `comparison`, `reference_side`, `n_pairs`, the summed `pn`, `ps`, `dn`, `ds`, `dn_int`, `ds_int`, `codons_used`, `codons_excluded_polymorphic`, and `alpha`, `neutrality_index`, `dos`, `fisher_p` recomputed from the sums.
 
 ## append_annotations
 

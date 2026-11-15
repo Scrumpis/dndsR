@@ -6,9 +6,10 @@
 #   <comp>_mk_pooled.tsv one row summed over all pairs
 #
 # Method, in brief (see docs/mcdonald-kreitman.md for the full description):
-#  * Sites are classified by codon degeneracy, for both input formats: 4-fold
-#    positions count as synonymous and 0-fold positions as nonsynonymous. 2- and
-#    3-fold positions are excluded from both classes and counted separately.
+#  * Sites are classified by their allele, as in the original McDonald-Kreitman
+#    test: a polymorphism is Ps when its ALT leaves the amino acid unchanged and Pn
+#    when it changes it; a fixed difference is Ds or Dn by the same rule. VCF gives
+#    the ALT allele; a BED file gives it in column 4.
 #  * Dn/Ds are counted from the same pal2nal codon alignments orthologr used, one
 #    codon at a time, with multi-site codons averaged over all shortest mutational
 #    paths (equal weight). Codons with gaps, non-ACGT bases, a stop codon on either
@@ -34,7 +35,6 @@
 }
 
 .mk_classify_cache <- new.env(parent = emptyenv())
-.mk_degeneracy_cache <- new.env(parent = emptyenv())
 
 .mk_permutations <- function(v) {
   if (length(v) <= 1L) return(list(v))
@@ -45,71 +45,39 @@
   out
 }
 
-#' Count the synonymous alternatives at one codon position
+#' Classify a codon pair as synonymous and nonsynonymous differences
 #'
-#' Uses the standard genetic code. 3 means the position is 4-fold degenerate and
-#' every change is synonymous; 0 means it is 0-fold and every change is
-#' nonsynonymous; 1 or 2 means a 2- or 3-fold position, where the effect of a
-#' change depends on the allele.
-#'
-#' @param codon Three-letter codon, pure ACGT and not a stop.
-#' @param pos Position in the codon, 1 to 3.
-#' @return Integer 0 to 3.
-#' @keywords internal
-.mk_syn_alternatives <- function(codon, pos) {
-  key <- paste0(codon, ".", pos)
-  hit <- .mk_degeneracy_cache[[key]]
-  if (!is.null(hit)) return(hit)
-  ref <- .mk_aa(codon)
-  bases <- c("A", "C", "G", "T")
-  bases <- bases[bases != substr(codon, pos, pos)]
-  n <- sum(vapply(bases, function(b) {
-    .mk_aa(paste0(substr(codon, 1L, pos - 1L), b, substr(codon, pos + 1L, 3L))) == ref
-  }, logical(1)))
-  assign(key, n, envir = .mk_degeneracy_cache)
-  n
-}
-
-#' Classify a codon pair into 4-fold, 0-fold, and mid-fold path averages
-#'
-#' Endpoints must be pure ACGT and neither may encode a stop codon; callers filter
-#' those out. Each step of a shortest mutational path is classified by the
-#' degeneracy of the position it changes in the codon it starts from: 4-fold
-#' positions count as synonymous, 0-fold positions as nonsynonymous, and 2- and
-#' 3-fold positions count in neither class. The walk starts from the SNP side's
-#' codon, so a divergent difference is classed from that codon; for 38 of 526
-#' single-difference codon pairs the other codon would give a different answer
-#' (always 0-fold against mid-fold, never 4-fold), which the docs state.
-#' A pathway that runs into a stop codon
-#' is discarded; if every pathway is discarded the change counts as zero. Returns
-#' c(synonymous, nonsynonymous, mid-fold) averaged over the surviving shortest
-#' paths (all one-base-per-step paths, so for a codon pair differing at k positions
-#' there are k! paths; the three values sum to k).
+#' Allele-aware, as the original McDonald-Kreitman test is: a difference counts as
+#' synonymous when it does not change the amino acid of the codon, nonsynonymous
+#' when it does. Endpoints must be pure ACGT and neither may encode a stop codon;
+#' callers filter those out. A codon pair that differs at more than one position is
+#' split over every shortest mutational path, each step compared with the codon it
+#' starts from; paths through a stop codon are discarded. Returns c(synonymous,
+#' nonsynonymous) averaged over the surviving paths, summing to the number of
+#' differing positions.
 #' @keywords internal
 .mk_classify_codon <- function(a, b) {
-  if (a == b) return(c(0, 0, 0))
+  if (a == b) return(c(0, 0))
   xa <- strsplit(a, "", fixed = TRUE)[[1]]
   xb <- strsplit(b, "", fixed = TRUE)[[1]]
   diff <- which(xa != xb)
-  if (length(diff) == 1L) {
-    deg <- .mk_syn_alternatives(a, diff)
-    return(if (deg == 3L) c(1, 0, 0) else if (deg == 0L) c(0, 1, 0) else c(0, 0, 1))
-  }
+  if (length(diff) == 1L) return(if (.mk_aa(a) == .mk_aa(b)) c(1, 0) else c(0, 1))
   key <- paste(a, b, sep = ":")
   cached <- .mk_classify_cache[[key]]
   if (!is.null(cached)) return(cached)
-  syn <- 0; nonsyn <- 0; mid <- 0; ok <- 0L
+  syn <- 0; nonsyn <- 0; ok <- 0L
   for (p in .mk_permutations(diff)) {
-    cur <- xa; s <- 0; n <- 0; m <- 0; ok_path <- TRUE
+    cur <- xa; aa_cur <- .mk_aa(a); s <- 0; n <- 0; ok_path <- TRUE
     for (pos in p) {
-      deg <- .mk_syn_alternatives(paste(cur, collapse = ""), pos)
       cur[pos] <- xb[pos]
-      if (.mk_aa(paste(cur, collapse = "")) == "*") { ok_path <- FALSE; break }
-      if (deg == 3L) s <- s + 1 else if (deg == 0L) n <- n + 1 else m <- m + 1
+      aa_next <- .mk_aa(paste(cur, collapse = ""))
+      if (aa_next == "*") { ok_path <- FALSE; break }
+      if (aa_next == aa_cur) s <- s + 1 else n <- n + 1
+      aa_cur <- aa_next
     }
-    if (ok_path) { syn <- syn + s; nonsyn <- nonsyn + n; mid <- mid + m; ok <- ok + 1L }
+    if (ok_path) { syn <- syn + s; nonsyn <- nonsyn + n; ok <- ok + 1L }
   }
-  res <- if (ok == 0L) c(0, 0, 0) else c(syn / ok, nonsyn / ok, mid / ok)
+  res <- if (ok == 0L) c(0, 0) else c(syn / ok, nonsyn / ok)
   assign(key, res, envir = .mk_classify_cache)
   res
 }
@@ -200,15 +168,31 @@
     contig_len <- hd$contig_len
   } else {
     raw <- data.table::fread(path, skip = hd$n_header, header = FALSE, sep = "\t",
-                             select = 1:3, showProgress = FALSE, data.table = FALSE,
-                             colClasses = list(character = 1:3))
+                             showProgress = FALSE, data.table = FALSE,
+                             colClasses = "character")
     if (ncol(raw) < 3L) stop("BED file needs at least 3 columns: ", path, call. = FALSE)
-    names(raw) <- c("chrom", "start", "end")
+    # Counting needs the allele: a BED file supplies it in column 4, which standard
+    # BED calls the name. Positions without it cannot be classed as Pn or Ps.
+    if (ncol(raw) < 4L) {
+      stop("A BED SNP file needs a fourth column with the alternative allele, one of ",
+           "A, C, G, T. Standard BED column 4 (the name) is read as that allele here, so ",
+           "write chrom, start, end, alt.", call. = FALSE)
+    }
+    if (ncol(raw) > 4L) raw <- raw[, 1:4, drop = FALSE]
+    names(raw) <- c("chrom", "start", "end", "alt")
     start <- suppressWarnings(as.integer(raw$start)); end <- suppressWarnings(as.integer(raw$end))
-    ok <- !is.na(start) & !is.na(end) & start >= 0L & end - start == 1L
+    alt <- toupper(trimws(raw$alt))
+    if (nrow(raw) && !any(grepl("^[ACGT]$", alt))) {
+      stop("A BED SNP file needs a fourth column with the alternative allele, one of ",
+           "A, C, G, T; none of the ", nrow(raw), " rows has one. Standard BED column 4 ",
+           "(the name) is read as that allele here, so write chrom, start, end, alt.",
+           call. = FALSE)
+    }
+    ok <- !is.na(start) & !is.na(end) & start >= 0L & end - start == 1L &
+      grepl("^[ACGT]$", alt)
     drop_n <- sum(!ok)
     out <- data.frame(chrom = raw$chrom[ok], pos = start[ok] + 1L,
-                      ref = NA_character_, alt = NA_character_, stringsAsFactors = FALSE)
+                      ref = NA_character_, alt = alt[ok], stringsAsFactors = FALSE)
     fmt <- "bed"
     contig_len <- NULL
   }
@@ -387,35 +371,39 @@
   list(hits = hits_df, excl = excl, audit = audit)
 }
 
-# Per-gene polymorphism counts from SNP hits. Both formats are classified the same
-# way, by the degeneracy of the changed position in the reference codon: 4-fold
-# counts as Ps, 0-fold as Pn, and 2-/3-fold positions are counted as mid-fold and
-# excluded from both. Reference codons that are not pure ACGT or encode a stop are
-# excluded from the counts.
+# Per-gene polymorphism counts from SNP hits, allele-aware: a site is Ps when its
+# ALT allele leaves the amino acid unchanged and Pn when it changes it, the way the
+# original McDonald-Kreitman test classifies a polymorphism. The ALT allele is on the
+# genome's strand, so it is complemented for a minus-strand gene before the codon is
+# rebuilt. Sites whose reference codon is not pure ACGT or encodes a stop are dropped,
+# and so is an ALT equal to the reference base (not a polymorphism).
 .mk_poly_counts <- function(snps, map, hits) {
   genes <- unique(hits$gene)
-  per <- lapply(genes, function(g) c(pn = 0L, ps = 0L, mid = 0L, dropped = 0L))
+  per <- lapply(genes, function(g) c(pn = 0L, ps = 0L, dropped = 0L))
   names(per) <- genes
   hl <- split(hits, hits$gene)
   for (g in names(hl)) {
     hh <- hl[[g]]
     seqg <- map$seq[[g]]
+    minus <- identical(map$strand[[g]], "-")
     for (r in seq_len(nrow(hh))) {
       idx <- hh$cds_idx[r]
       ci <- (idx - 1L) %/% 3L + 1L
       ph <- (idx - 1L) %% 3L
       codon <- substr(seqg, 3L * (ci - 1L) + 1L, 3L * (ci - 1L) + 3L)
-      if (!grepl("^[ACGT]{3}$", codon) || .mk_aa(codon) == "*") {
+      alt <- snps$alt[hh$snp_i[r]]
+      if (minus) alt <- chartr("ACGT", "TGCA", alt)
+      if (!grepl("^[ACGT]{3}$", codon) || .mk_aa(codon) == "*" || is.na(alt) ||
+          alt == substr(codon, ph + 1L, ph + 1L)) {
         per[[g]]["dropped"] <- per[[g]]["dropped"] + 1L
         next
       }
-      deg <- .mk_syn_alternatives(codon, ph + 1L)
-      if (deg == 3L) {
+      alt_codon <- paste0(substr(codon, 1L, ph), alt,
+                          substr(codon, ph + 2L, 3L))
+      if (.mk_aa(alt_codon) == .mk_aa(codon)) {
         per[[g]]["ps"] <- per[[g]]["ps"] + 1L
-      } else if (deg == 0L) {
-        per[[g]]["pn"] <- per[[g]]["pn"] + 1L
       } else {
-        per[[g]]["mid"] <- per[[g]]["mid"] + 1L
+        per[[g]]["pn"] <- per[[g]]["pn"] + 1L
       }
     }
   }
@@ -426,7 +414,7 @@
 # excl: sorted integer vector of reference CDS indices carrying a polymorphism.
 .mk_pair_walk <- function(ref_seq, other_seq, excl) {
   n <- nchar(ref_seq)
-  dn <- 0; ds <- 0; mid <- 0; n_diff <- 0L; n_excl <- 0L; n_stop <- 0L
+  dn <- 0; ds <- 0; n_diff <- 0L; n_excl <- 0L; n_stop <- 0L
   n_gap <- 0L; n_invalid <- 0L; n_used <- 0L
   frame_ok <- TRUE
   ci <- 0L # CDS index of the next reference base
@@ -460,9 +448,9 @@
     n_used <- n_used + 1L
     if (a == b) next
     res <- .mk_classify_codon(a, b)
-    ds <- ds + res[1]; dn <- dn + res[2]; mid <- mid + res[3]; n_diff <- n_diff + 1L
+    ds <- ds + res[1]; dn <- dn + res[2]; n_diff <- n_diff + 1L
   }
-  c(dn = dn, ds = ds, mid = mid, n_diff = n_diff, n_used = n_used, n_excl = n_excl,
+  c(dn = dn, ds = ds, n_diff = n_diff, n_used = n_used, n_excl = n_excl,
     n_stop = n_stop, n_gap = n_gap, n_invalid = n_invalid, frame_ok = as.numeric(frame_ok))
 }
 
@@ -622,12 +610,9 @@
     pc <- poly[[ref_gene]]
     pn <- if (is.null(pc)) 0L else as.integer(pc[["pn"]])
     ps <- if (is.null(pc)) 0L else as.integer(pc[["ps"]])
-    snps_mid <- if (is.null(pc)) 0L else as.integer(pc[["mid"]])
     rows[[i]] <- c(list(query_id = qid, subject_id = sid, reference_side = side,
                         pn = pn, ps = ps,
                         dn = unname(wk["dn"]), ds = unname(wk["ds"]),
-                        snps_midfold = snps_mid,
-                        div_steps_midfold = unname(wk["mid"]),
                         codons_used = unname(wk["n_used"]),
                         codons_excluded_polymorphic = unname(wk["n_excl"])),
                    as.list(.mk_stats(pn, ps, unname(wk["dn"]), unname(wk["ds"]))))
@@ -641,7 +626,6 @@
   out <- if (length(rows)) do.call(rbind.data.frame, c(rows, stringsAsFactors = FALSE)) else
     data.frame(query_id = character(), subject_id = character(), reference_side = character(),
                pn = integer(), ps = integer(), dn = numeric(), ds = numeric(),
-               snps_midfold = integer(), div_steps_midfold = numeric(),
                codons_used = integer(), codons_excluded_polymorphic = integer(),
                alpha = numeric(), neutrality_index = numeric(), dos = numeric(),
                fisher_p = numeric(), stringsAsFactors = FALSE)
@@ -649,13 +633,13 @@
     out$dn_int <- round(out$dn); out$ds_int <- round(out$ds)
     out$fisher_q <- .mk_bh(out$fisher_p)
     out <- out[, c("query_id", "subject_id", "reference_side", "pn", "ps", "dn", "ds",
-                   "dn_int", "ds_int", "snps_midfold", "div_steps_midfold",
+                   "dn_int", "ds_int",
                    "codons_used", "codons_excluded_polymorphic",
                    "alpha", "neutrality_index", "dos", "fisher_p", "fisher_q")]
   } else {
     out$dn_int <- integer(0); out$ds_int <- integer(0); out$fisher_q <- numeric(0)
     out <- out[, c("query_id", "subject_id", "reference_side", "pn", "ps", "dn", "ds",
-                   "dn_int", "ds_int", "snps_midfold", "div_steps_midfold",
+                   "dn_int", "ds_int",
                    "codons_used", "codons_excluded_polymorphic",
                    "alpha", "neutrality_index", "dos", "fisher_p", "fisher_q")]
   }
@@ -666,7 +650,6 @@
     comparison = comparison_name, reference_side = side, n_pairs = nrow(out),
     pn = sum_pn, ps = sum_ps, dn = sum_dn, ds = sum_ds,
     dn_int = round(sum_dn), ds_int = round(sum_ds),
-    snps_midfold = sum(out$snps_midfold), div_steps_midfold = sum(out$div_steps_midfold),
     codons_used = sum(out$codons_used), codons_excluded_polymorphic = sum(out$codons_excluded_polymorphic),
     alpha = unname(pooled_stats["alpha"]), neutrality_index = unname(pooled_stats["neutrality_index"]),
     dos = unname(pooled_stats["dos"]), fisher_p = unname(pooled_stats["fisher_p"]),
@@ -675,9 +658,8 @@
   f1 <- .mk_write_frame(out, file.path(comp_dir, paste0(comparison_name, "_mk.tsv")))
   f2 <- .mk_write_frame(pooled, file.path(comp_dir, paste0(comparison_name, "_mk_pooled.tsv")))
   message(sprintf(paste0("[%s] MK: %d pairs; Pn=%d Ps=%d Dn=%.2f Ds=%.2f (rounded %d/%d); ",
-                         "2-/3-fold excluded: %d SNP(s), %d divergence step(s); alpha=%s, NI=%s; wrote %s"),
+                         "alpha=%s, NI=%s; wrote %s"),
                   comparison_name, nrow(out), sum_pn, sum_ps, sum_dn, sum_ds, pooled$dn_int, pooled$ds_int,
-                  pooled$snps_midfold, sum(out$div_steps_midfold),
                   if (is.na(pooled$alpha)) "NA" else sprintf("%.4f", pooled$alpha),
                   if (is.na(pooled$neutrality_index)) "NA" else sprintf("%.4f", pooled$neutrality_index),
                   basename(f1)))
