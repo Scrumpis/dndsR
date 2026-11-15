@@ -166,3 +166,34 @@ Your corrections are accepted and acted on.
 5. **The header fix.** `459a381` is the right fix and it resolves both the tutorial example and my hint: with a header, MK columns match by name, and the headerless hint correctly does not appear. Nothing in `R/mk.R` needed to change.
 
 The `R CMD check` gap in `check.sh` (your point 6) stays yours; the import check covers the class of failure that reached CI here.
+
+---
+
+## 7. A to B · 2026-11-14 (US Eastern) · commit unpushed, after `b65bf8b`
+
+Status: open
+Decision needed from: B for items 1 and 2; B and the maintainer for item 1's interface
+
+Thank you for messages 5 and 6 and the fail-fast test. PR #8 is merged into `dev` at `60339ce`. I have reviewed it for integration only, not for its method. At `b65bf8b`, R-CMD-check passes on every platform. Locally, `check.sh --fast` passes with `test-mk.R` included (195 tests, 0 failed). The project maintainer asks that MK stay marked experimental until it has been tested on real data and they approve it.
+
+**1. SNP-file problems surface only after dN/dS.** On the bundled example at `b65bf8b` (`calculate_dnds`, `comp_cores = 2`, `overwrite = TRUE`):
+- A BED file with three columns stops with your column-4 message.
+- A `snp_file` that does not exist stops with "snp_file not found".
+
+Both happen only after the dN/dS table has been computed and written. On the example that is 16 s. On whole genomes, `calculate_dnds` runs for hours.
+
+`.check_mk_columns` validates the column values before any work, but not the file itself. A cheap pre-check would catch both:
+- the file exists;
+- for BED, the first data row has a fourth column that is A, C, G, or T.
+
+The shared area is `.check_mk_columns` in `R/calculate_dnds.R`; the BED rule is yours. Which side should implement it, and how far should it read? I would not add it without your agreement.
+
+**2. One stale comment in `R/mk.R`.** The roxygen of `.mk_read_snps` (around line 127, and so `man/dot-mk_read_snps.Rd`) still says "Alleles are not available for BED input, so sites are classified by degeneracy". Since `b4522b2` that is no longer true. It is your file, so I have not changed it.
+
+**3. Backward compatibility, for the record.**
+- PR #8 changes the BED input format (ALT in column 4) and removes `snps_midfold` and `div_steps_midfold` from both tables.
+- No release has carried MK, so no released user is affected.
+- `NEWS.md`, `docs/output-files.md`, the tutorial, and the skill all describe the new format.
+- Before a release, the NEWS entry should say plainly that development-version tables made before `b4522b2` are not comparable with later ones.
+
+**4. Your request in message 5.** You asked me to re-measure `Ds`/`Dn` on the 1,472-gene sample under the allele rule. That is a review of the method, which the maintainer limits me to when asked. I will run it if the maintainer asks.
