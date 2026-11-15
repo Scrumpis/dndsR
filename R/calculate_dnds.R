@@ -59,6 +59,12 @@
 #'
 #' @param comp_cores Integer number of CPU cores to pass to \code{orthologr::dNdS()} as
 #'   \code{comp_cores}. Default 4.
+#' @param unique_pairs Logical. In batch mode, skip a comparison whose two genomes
+#'   already appeared in the file, in either order. A multi-species file that lists every
+#'   ordered pair, such as `A_v_B` and `B_v_A`, then runs each unordered pair once, which
+#'   halves the work and avoids a second, direction-dependent estimate of the same pair.
+#'   The first row for a pair is kept and the later ones are reported. Default `FALSE`,
+#'   which runs every row as written.
 #' @param aligner Character. Aligner passed to \code{orthologr::dNdS()} (e.g. \code{"diamond"} or \code{"blast"}).
 #'   If \code{"diamond"}, the \code{diamond} binary must be available on \code{PATH}.
 #' @param sensitivity_mode Character. Passed to \code{orthologr::dNdS()} as \code{sensitivity_mode}.
@@ -118,6 +124,7 @@ calculate_dnds <- function(comparison_file = NULL,
                            cds_suffix = "_CDS.fasta",
                            protein_suffix = "_AA.fasta",
                            comp_cores = 4,
+                           unique_pairs = FALSE,
                            aligner = "diamond",
                            sensitivity_mode = "fast",
                            dnds_method = "Comeron",
@@ -597,7 +604,19 @@ calculate_dnds <- function(comparison_file = NULL,
     df <- .read_comparisons(comparison_file)
     .check_mk_columns(df)
 
-    for (i in seq_len(nrow(df))) {
+    keep <- seq_len(nrow(df))
+    if (isTRUE(unique_pairs)) {
+      key <- vapply(keep, function(i) .dnds_pair_identity(as.list(df[i, , drop = FALSE])), character(1))
+      first <- !duplicated(key) | is.na(key)
+      if (any(!first)) {
+        skipped <- df$comparison_name[keep[!first]]
+        message("unique_pairs = TRUE: skipping ", length(skipped), " comparison(s) whose genome pair ",
+                "was already run in the other direction: ", paste(skipped, collapse = ", "))
+      }
+      keep <- keep[first]
+    }
+
+    for (i in keep) {
       comp <- df$comparison_name[i]
       row  <- as.list(df[i, , drop = FALSE])
 
