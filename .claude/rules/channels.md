@@ -26,7 +26,7 @@ Then the message body: findings with evidence, what changed, what is asked. Keep
 
 ## At the start of a session
 
-List `docs/dev/channels/`. Read every channel whose `Covers` overlaps the files you are about to change, and every message addressed to your side that is still `open`.
+Sync the repository first (`git pull --rebase` on `dev`, see [git-policy](git-policy.md)), then list `docs/dev/channels/`. Read every channel whose `Covers` overlaps the files you are about to change, and every message addressed to your side that is still `open`. A message that arrived with the pull is the first thing to answer.
 
 ## Closing
 

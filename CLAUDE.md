@@ -23,7 +23,8 @@ Validation evidence and its limits are in `docs/validation/`. Say which claims y
 ## Owners and handoffs
 
 - The McDonald-Kreitman code (`R/mk.R`, `tests/testthat/test-mk.R`, `docs/mcdonald-kreitman.md`) is owned by its author, the MK maintainer, who develops it with their own agent. Other agents do not change it without the project maintainer's explicit authorization.
-- Findings about an area you do not own go in a handoff, never in its code. At the start of a session, list `docs/dev/handoffs/` and read what is addressed to you or covers files you will change. Decided handoffs are deleted, with the decision recorded in `docs/dev/DECISIONS.md`. Details: `.claude/rules/handoffs.md`.
+- **Start every session by syncing, before any edit:** `git fetch origin`, then `git pull --rebase` on `dev`, so work and messages that landed since your last session are in front of you. A rebase of your own unpushed commits is expected; resolve conflicts rather than merging.
+- Findings about an area you do not own go in a handoff or a channel message, never in its code. After the pull, list `docs/dev/channels/` and `docs/dev/handoffs/` and read what is addressed to you or covers files you will change. Decided handoffs are deleted, with the decision recorded in `docs/dev/DECISIONS.md`. Details: `.claude/rules/handoffs.md`, `.claude/rules/channels.md`.
 
 ## Non-negotiable rules
 
