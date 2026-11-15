@@ -76,7 +76,11 @@
 #' those out. Each step of a shortest mutational path is classified by the
 #' degeneracy of the position it changes in the codon it starts from: 4-fold
 #' positions count as synonymous, 0-fold positions as nonsynonymous, and 2- and
-#' 3-fold positions count in neither class. A pathway that runs into a stop codon
+#' 3-fold positions count in neither class. The walk starts from the SNP side's
+#' codon, so a divergent difference is classed from that codon; for 38 of 526
+#' single-difference codon pairs the other codon would give a different answer
+#' (always 0-fold against mid-fold, never 4-fold), which the docs state.
+#' A pathway that runs into a stop codon
 #' is discarded; if every pathway is discarded the change counts as zero. Returns
 #' c(synonymous, nonsynonymous, mid-fold) averaged over the surviving shortest
 #' paths (all one-base-per-step paths, so for a codon pair differing at k positions

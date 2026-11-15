@@ -33,8 +33,13 @@ test_that("codon path classifier averages 4-fold, 0-fold, and mid-fold steps", {
   expect_equal(cc("ATT", "ATC"), c(0, 0, 1))          # Ile ATH, 3-fold
   # Two differences: both paths give one 0-fold and one mid-fold step.
   expect_equal(cc("CTT", "TTA"), c(0.5, 0.5, 1))
-  # Three differences: no 4-fold step is possible, and one step is mid-fold.
+  # Three differences: enumerated independently from the genetic code, classing each
+  # step by the codon it starts from.
   expect_equal(cc("AAA", "TTT"), c(0, 2, 1))
+  # The class is read from the codon the walk starts from: AGA position 1 is 2-fold,
+  # GGA position 1 is 0-fold, so this pair is mid-fold one way and 0-fold the other.
+  expect_equal(cc("AGA", "GGA"), c(0, 0, 1))
+  expect_equal(cc("GGA", "AGA"), c(0, 1, 0))
   expect_equal(cc("GGT", "GGT"), c(0, 0, 0))
 })
 
@@ -187,16 +192,18 @@ test_that("SNP mapping and polymorphism counting on the mini genome", {
 
 test_that("polymorphisms at 2- and 3-fold sites are excluded from Pn and Ps", {
   # A hand-built map keeps this independent of genome extraction: codons are
-  # ATG (Met), GAA (Glu, 2-fold at position 3), ATT (Ile, 3-fold), TAA (stop).
+  # ATG (Met), GAA (Glu, 2-fold at position 3), ATT (Ile, 3-fold), TAA (stop),
+  # GGT (Gly, 4-fold at position 3 and 0-fold at position 1).
   map <- list(seq = c(g1 = "ATGGAAATTTAAGGT"))
   # CDS indices: 4 = GAA pos 1 (0-fold), 6 = GAA pos 3 (2-fold),
-  #              9 = ATT pos 3 (3-fold), 10 = TAA pos 1 (stop), 15 = GGT pos 3 (4-fold)
-  hits <- data.frame(gene = rep("g1", 5), snp_i = 1:5,
-                     cds_idx = c(4L, 6L, 9L, 10L, 15L))
-  snps <- data.frame(chrom = "c", pos = 1:5, ref = NA_character_, alt = NA_character_,
+  #              9 = ATT pos 3 (3-fold), 10 = TAA pos 1 (stop),
+  #              13 = GGT pos 1 (0-fold), 15 = GGT pos 3 (4-fold)
+  hits <- data.frame(gene = rep("g1", 6), snp_i = 1:6,
+                     cds_idx = c(4L, 6L, 9L, 10L, 13L, 15L))
+  snps <- data.frame(chrom = "c", pos = 1:6, ref = NA_character_, alt = NA_character_,
                      stringsAsFactors = FALSE)
   poly <- mk("poly_counts")(snps, map, hits)$g1
-  expect_equal(poly[["pn"]], 1L)      # GAA position 1 is 0-fold
+  expect_equal(poly[["pn"]], 2L)      # GAA position 1 and GGT position 1 are 0-fold
   expect_equal(poly[["ps"]], 1L)      # GGT position 3 is 4-fold
   expect_equal(poly[["mid"]], 2L)     # GAA position 3 and ATT position 3
   expect_equal(poly[["dropped"]], 1L) # the stop codon

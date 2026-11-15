@@ -5,6 +5,8 @@
 # Without it, also the slow tests and the tutorial, which is checked out from HEAD.
 # --serial runs the checks one at a time, for limited memory; combine with
 # DNDSR_TEST_CPUS=4 to cap the test workers too.
+# Always includes an import check: every pkg::fun in R/ must be declared in DESCRIPTION,
+# which is what R CMD check reports and what CI caught on 2026-11-14.
 # Exits nonzero if any check fails, and prints the end of its output.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
@@ -25,18 +27,20 @@ start() { # name, command...
   ( s=$SECONDS; "$@" >"$log/$name.log" 2>&1; rc=$?; echo "$rc $((SECONDS - s))" >"$log/$name.result" ) &
 }
 check_tests() { start tests "$here/run-tests.sh" $fast; }
+check_imports() { start imports "$here/in-container.sh" Rscript --vanilla "$here/check-imports.R" "$here/../.."; }
 check_skill() { start skill "$here/in-container.sh" Rscript --vanilla "$here/validate-skill.R" "$here/../.."; }
 check_safeguards() { start safeguards "$here/test-safeguards.sh"; }
 check_tutorial() { start tutorial "$here/test-tutorial.sh"; }
 
 if [ -n "$serial" ]; then
   # One check at a time: the low-memory route (limited RAM, WSL, a small laptop).
+  check_imports; wait
   check_tests; wait
   check_skill; wait
   check_safeguards; wait
   [ -n "$fast" ] || { check_tutorial; wait; }
 else
-  check_tests; check_skill; check_safeguards
+  check_imports; check_tests; check_skill; check_safeguards
   [ -n "$fast" ] || check_tutorial
   wait
 fi
