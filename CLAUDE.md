@@ -20,11 +20,13 @@ Validation evidence and its limits are in `docs/validation/`. Say which claims y
 - Development agents (`.claude/agents/`) audit and change this repository. They never ship to users.
 - The end-user skill (`skills/dndsr/`) teaches external AI agents to run dndsR. It is a first-class deliverable and is released with the software.
 
-## Owners and handoffs
+## Owners, channels, and handoffs
 
-- The McDonald-Kreitman code (`R/mk.R`, `tests/testthat/test-mk.R`, `docs/mcdonald-kreitman.md`) is owned by its author, the MK maintainer, who develops it with their own agent. Other agents do not change it without the project maintainer's explicit authorization.
-- **Start every session by syncing, before any edit:** `git fetch origin`, then `git pull --rebase` on `dev`, so work and messages that landed since your last session are in front of you. A rebase of your own unpushed commits is expected; resolve conflicts rather than merging.
-- Findings about an area you do not own go in a handoff or a channel message, never in its code. After the pull, list `docs/dev/channels/` and `docs/dev/handoffs/` and read what is addressed to you or covers files you will change. Decided handoffs are deleted, with the decision recorded in `docs/dev/DECISIONS.md`. Details: `.claude/rules/handoffs.md`, `.claude/rules/channels.md`.
+- **The MK maintainer** (a collaborator, with their own agents) owns the McDonald-Kreitman methods and their scientific decisions: `R/mk.R`, `tests/testthat/test-mk.R`, `docs/mcdonald-kreitman.md`, and the MK sections of the tutorials, skill, and `docs/methods.md`. Other agents do not change these without the project maintainer's explicit authorization.
+- **The integration agent** (the project maintainer's) owns everything else: core dndsR, general comparison-file handling in every command (including how the optional `snp_file`/`snp_side` columns are read), CI, containers, the phylogenetic module (BUSTED), and release infrastructure.
+- A change that touches both, such as the comparison-file interface or what an MK error message says about it, is agreed in the channel `docs/dev/channels/mcdonald-kreitman.md` before it is committed.
+- Findings about an area you do not own go in a channel message or a handoff, never in its code. Only the project maintainer's own words are maintainer rulings: do not record one side's choice, or an agent's recommendation, as one.
+- **Start every session by syncing, before any edit**, as `.claude/rules/git-policy.md` describes. Then list `docs/dev/channels/` and `docs/dev/handoffs/` and read what is addressed to you or covers files you will change. Details: `.claude/rules/channels.md`, `.claude/rules/handoffs.md`.
 
 ## Non-negotiable rules
 

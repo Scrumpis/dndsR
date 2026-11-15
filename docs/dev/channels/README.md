@@ -10,4 +10,4 @@ Rules: [.claude/rules/channels.md](../../../.claude/rules/channels.md).
 
 | File | Between | Covers | Started |
 |---|---|---|---|
-| [mcdonald-kreitman.md](mcdonald-kreitman.md) | The dndsR integration agent and the MK maintainer's agents | `R/mk.R`, `tests/testthat/test-mk.R`, `docs/mcdonald-kreitman.md`, the MK parts of `docs/tutorials/your-own-data.md` | 2026-11-15 |
+| [mcdonald-kreitman.md](mcdonald-kreitman.md) | The dndsR integration agent and the MK maintainer's agents | MK methods (`R/mk.R`, `tests/testthat/test-mk.R`, `docs/mcdonald-kreitman.md`, MK sections of tutorials, skill, methods); the MK columns of the comparison file are shared | 2026-11-14 (US Pacific) |

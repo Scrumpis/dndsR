@@ -2,6 +2,23 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-14: stage 2B main blocks, B2 launch, PR #7 integration, comparison-file headers
+
+- **Session:** `b6da01bb-9705-4b1a-b515-5e35c72e11b0` (continued)
+- **Done:**
+  - Stage 2B: the main blocks finished (101 of 101 units, 1,194.5 core-hours). D4 failed in one of 12 audited cells, so B2 was launched with 3 starts, as prespecified and approved.
+  - CI fixes and MK documentation corrections; a review of the MK code, in the channel `docs/dev/channels/mcdonald-kreitman.md`.
+  - PR #7 reviewed after merge.
+  - Fixed `calculate_dnds` ignoring a header row in comparison files (v0.2.0 to v0.4.0), with regression tests.
+  - Ownership and the git sync rule reconciled, at the maintainer's direction. Merging, not rebasing, now applies when a commit's identity is cited.
+  - `DECISIONS.md` records corrected: MK choices are the owner's, not maintainer rulings.
+  - Miles Roberts added to `CITATION.cff`, `.zenodo.json`, and `Authors@R`.
+- **Verified:**
+  - `check.sh`: 193 tests, 0 failed, 0 skipped.
+  - The new header tests fail on the old code and pass on the new.
+  - CI passed at `6b3245f`.
+- **Not done:** B2 is running; the 2A/2B report waits for it. The fail-fast regression test for PR #7 is requested from the MK side. `9880f07` (allele-aware MK, on the collaborator's branch) is not integrated, and was not reviewed. Nothing was pushed, merged to `main`, tagged, or published.
+
 ## 2026-11-14: P3 stage 2B smoke test and budget guard
 
 - **Session:** `b6da01bb-9705-4b1a-b515-5e35c72e11b0`, resuming `83fbd26d-6d94-4764-aee9-e34ca0f4eb72`

@@ -1,6 +1,10 @@
 # Git policy
 
-- **Before you edit anything, sync.** `git fetch origin`, then `git pull --rebase` on `dev` (or `git rebase origin/dev` when the pull refuses a divergent branch). A stale tree is how two agents overwrite each other: work lands on `dev` between sessions, and a rebase of your own unpushed commits is expected, not an error. Resolve conflicts; do not substitute a merge commit. Then read `docs/dev/channels/` and `docs/dev/handoffs/` before the first edit, so messages from another side are seen before code is written.
+- **Before you edit anything, sync.** Fetch `dev` from GitHub with the remote that works on this machine: check `git remote -v`, and if `git fetch origin` fails (for example an SSH key GitHub rejects), fetch over HTTPS, `git fetch https://github.com/Scrumpis/dndsR.git '+refs/heads/*:refs/remotes/origin/*'`. Then bring your local `dev` up to date:
+  - Nothing local and unpushed: fast-forward (`git merge --ff-only origin/dev`).
+  - Unpushed commits that nothing cites: rebase them onto `origin/dev`, or merge; either is fine.
+  - Unpushed commits whose identity matters, because a frozen study, a provenance file, a results root, or a document cites the commit: **merge, do not rebase**. A rebase gives them new hashes and breaks those references.
+  - Then read `docs/dev/channels/` and `docs/dev/handoffs/` before the first edit, so messages from another side are seen before code is written.
 - `main` is protected. `dev` holds all development. Tags and releases are immutable.
 - Agents may commit to `dev`, but the maintainer does all pushing. Report the exact push command at the end of the work.
 - Unless the maintainer authorizes it for this specific action, do not merge, rebase, or cherry-pick between `main` and `dev`; do not create, move, or delete release tags; do not publish releases or images; do not change GitHub settings.

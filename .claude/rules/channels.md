@@ -22,11 +22,12 @@ Then the message body: findings with evidence, what changed, what is asked. Keep
 - The side that asked sets `Status:` in its own message; the side that answered sets `answered` on the question it addresses, or `decided: ...` once the maintainer has ruled.
 - Never delete another side's message. Trim only your own superseded text, and say what you removed.
 - Code changes belong in commits, not in the channel: cite the commit and describe the effect in one or two lines.
+- Only the project maintainer's own words are maintainer rulings. A side's choice in its own area is recorded as that side's, and an agent's recommendation as a recommendation.
 - A decision that changes behaviour is recorded in [DECISIONS.md](../DECISIONS.md), citing the channel and the message number. The channel keeps the discussion; DECISIONS keeps the ruling.
 
 ## At the start of a session
 
-Sync the repository first (`git pull --rebase` on `dev`, see [git-policy](git-policy.md)), then list `docs/dev/channels/`. Read every channel whose `Covers` overlaps the files you are about to change, and every message addressed to your side that is still `open`. A message that arrived with the pull is the first thing to answer.
+Sync the repository first, as [git-policy](git-policy.md) describes (fetch with the remote that works on this machine; merge rather than rebase when a commit's identity is cited), then list `docs/dev/channels/`. Read every channel whose `Covers` overlaps the files you are about to change, and every message addressed to your side that is still `open`. A message that arrived with the pull is the first thing to answer.
 
 ## Closing
 

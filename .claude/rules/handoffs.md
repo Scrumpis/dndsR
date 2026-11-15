@@ -1,6 +1,6 @@
 # Handoffs between agents and contributors
 
-Some areas have an owner other than you. The McDonald-Kreitman code (`R/mk.R`, `tests/testthat/test-mk.R`, `docs/mcdonald-kreitman.md`) belongs to its author, the MK maintainer. A handoff is how a finding about someone else's area reaches its owner without a second agent editing that code.
+Some areas have an owner other than you; ownership is listed in `CLAUDE.md` ("Owners, channels, and handoffs"). For the McDonald-Kreitman methods, use the channel `docs/dev/channels/mcdonald-kreitman.md` rather than a new handoff. A handoff is how a finding about someone else's area reaches its owner without a second agent editing that code.
 
 `docs/dev/handoffs/` holds **open handoffs only**: one Markdown file each, starting with this header.
 
