@@ -24,8 +24,8 @@
 
 ### Not blocking, but open
 
-- `check.sh` does not run `R CMD check`; CI does, and the import check covers the failure that reached CI on 2026-11-14.
-- The `pre-push` hook now allows `feat/*` branches (PR #8); no safeguard test covers that path yet.
+- `check.sh` runs `R CMD check` only with `--rcmd-check` (`tools/dev/rcmd-check.sh`, added after `fda5dbe`); without it, CI is where check runs. At that commit, in the v0.4.0 image: `Status: OK`.
+- The `pre-push` hook's `feat/*` path (PR #8) is now covered by `test-safeguards.sh`: creating and fast-forwarding are allowed; force-pushing, deleting, and pushing to any other branch are blocked.
 
 
 ## v0.4.0 candidate

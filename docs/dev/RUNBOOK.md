@@ -37,6 +37,8 @@ All the checks, side by side, on the CPUs of a Slurm allocation:
 ```
 srun -c 8 --mem=24G --time=10 tools/dev/check.sh          # about 100 s: run before committing
 srun -c 8 --mem=24G --time=10 tools/dev/check.sh --fast   # leaves out the tutorial and slowest tests, while developing
+srun -c 8 --mem=24G --time=20 tools/dev/check.sh --rcmd-check   # adds R CMD check, as CI runs it: before a pull request
+tools/dev/rcmd-check.sh --as-cran                         # R CMD check alone; extra arguments go to it
 tools/dev/run-tests.sh --fast enrichment                  # only the files that match
 ```
 
@@ -50,6 +52,10 @@ DNDSR_TEST_CPUS=4 tools/dev/run-tests.sh --fast enrichment   # one filter at a t
 ```
 
 `--serial` runs the tests, skill, and safeguards (and the tutorial, without `--fast`) one after another instead of side by side.
+
+`--rcmd-check` builds the tarball and runs `R CMD check --no-manual` on it in the image, failing on an ERROR or WARNING as CI does. It catches what only check sees, such as a namespace note or a documentation mismatch. About 95 s alone, longer beside the tests.
+
+On some compute nodes `git` itself fails with "Illegal instruction", which stops the safeguards and the tutorial (both call `git`) before any test runs. Run those two on a login node: `tools/dev/test-safeguards.sh`, `tools/dev/test-tutorial.sh`.
 
 Runtime files can be recreated if purged: pull the image by the digest in `skills/dndsr/SKILL.md`. For the estimator comparison, create a micromamba environment with `paml` and `kakscalculator2` from bioconda, and for regenerating docs, install roxygen2 into `DNDSR_DEV_LIB`.
 

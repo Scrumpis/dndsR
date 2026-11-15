@@ -82,6 +82,14 @@ blocked "commit a transcript"         commit_file session.jsonl '{}'
 allowed "commit on dev"               git commit -q --allow-empty -m "allowed"
 allowed "software with Skill-Impact"  software -m "Skill-Impact: none - test"
 allowed "fast-forward push to dev"    git push -q origin dev
+# Feature branches for pull requests (PR #8): create and fast-forward only.
+allowed "create a feat/* branch"      git push -q origin HEAD:refs/heads/feat/test
+git commit -q --allow-empty -m "feature work"
+allowed "fast-forward push to feat/*" git push -q origin HEAD:refs/heads/feat/test
+blocked "force-push older feat/*"     git push -q -f origin HEAD~1:refs/heads/feat/test
+blocked "delete remote feat/*"        git push -q origin :refs/heads/feat/test
+blocked "push to another branch"      git push -q origin HEAD:refs/heads/other
+git reset -q --hard origin/dev
 allowed "fetch"                       git fetch -q origin
 allowed "pack-refs"                   git pack-refs --all
 allowed "gc"                          git gc -q

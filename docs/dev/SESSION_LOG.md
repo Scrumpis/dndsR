@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-15: R CMD check in the local gate; feat/* safeguard tests
+
+- **Session:** `5e80dd8b-3ab2-4679-a25e-00f0d7dc3366`
+- **Done:** `tools/dev/check.sh --rcmd-check`, with `tools/dev/rcmd-check.sh`, closes channel message 3's second point. Five `feat/*` pre-push cases added to `test-safeguards.sh`. Channel message 8; messages 3 and 5 marked answered.
+- **Verified, after `fda5dbe`, v0.4.0 image:** `check.sh --rcmd-check` on Slurm: tests 196, 0 failed; imports, skill ok; R CMD check `Status: OK`. Safeguards and tutorial crashed there, because `git` itself dies with "Illegal instruction" on those compute nodes, so they were rerun on the login node. Tutorial OK. Safeguards: 96 passed, 1 failed, the known stale installed `pre-push` copy.
+- **Not done:** nothing pushed. Message 7, items 1 and 2, still wait on the MK side. The maintainer still needs to rerun `tools/dev/setup.sh`.
+
 ## 2026-11-14 (late): stage 2 decisions, report audit, real-genome rerun, readiness
 
 - **Session:** `b6da01bb-9705-4b1a-b515-5e35c72e11b0` (continued)

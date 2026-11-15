@@ -5,16 +5,19 @@
 # Without it, also the slow tests and the tutorial, which is checked out from HEAD.
 # --serial runs the checks one at a time, for limited memory; combine with
 # DNDSR_TEST_CPUS=4 to cap the test workers too.
+# --rcmd-check adds R CMD check on the built tarball (tools/dev/rcmd-check.sh, about 95 s),
+# which catches what only check sees, such as a namespace note or a documentation mismatch.
 # Always includes an import check: every pkg::fun in R/ must be declared in DESCRIPTION,
 # which is what R CMD check reports and what CI caught on 2026-11-14.
 # Exits nonzero if any check fails, and prints the end of its output.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-fast=; serial=
+fast=; serial=; rcmd=
 for arg in "$@"; do
   case "$arg" in
     --fast) fast=--fast ;;
     --serial) serial=1 ;;
+    --rcmd-check) rcmd=1 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -31,6 +34,7 @@ check_imports() { start imports "$here/in-container.sh" Rscript --vanilla "$here
 check_skill() { start skill "$here/in-container.sh" Rscript --vanilla "$here/validate-skill.R" "$here/../.."; }
 check_safeguards() { start safeguards "$here/test-safeguards.sh"; }
 check_tutorial() { start tutorial "$here/test-tutorial.sh"; }
+check_rcmd() { start rcmdcheck "$here/rcmd-check.sh"; }
 
 if [ -n "$serial" ]; then
   # One check at a time: the low-memory route (limited RAM, WSL, a small laptop).
@@ -39,9 +43,11 @@ if [ -n "$serial" ]; then
   check_skill; wait
   check_safeguards; wait
   [ -n "$fast" ] || { check_tutorial; wait; }
+  [ -z "$rcmd" ] || { check_rcmd; wait; }
 else
   check_imports; check_tests; check_skill; check_safeguards
   [ -n "$fast" ] || check_tutorial
+  [ -z "$rcmd" ] || check_rcmd
   wait
 fi
 
