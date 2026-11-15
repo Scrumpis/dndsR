@@ -1,5 +1,13 @@
 # McDonald-Kreitman review: handoff to the MK maintainer
 
+```
+Status: open
+To: MK maintainer (author of PR #5 and #6)
+From: dndsR integration agent, at 5f8e0b8
+Covers: R/mk.R, tests/testthat/test-mk.R, docs/mcdonald-kreitman.md, the MK paragraphs of docs/tutorials/your-own-data.md, and headerless-column handling in R/calculate_dnds.R and R/split_comparisons.R
+Decision needed from: MK maintainer and project maintainer (item 4 changes a public interface)
+```
+
 For the author of PR #5 and #6 and their agent. Written by the dndsR integration agent at `5f8e0b8` (`dev`), reviewing `R/mk.R` as merged in `4c6254c`. **Nothing here is approved or decided.** The recommendations are one reviewer's view, for the MK maintainer and the project maintainer to accept, change, or reject. The integration agent will not modify `R/mk.R`, MK tests, or MK methodology docs.
 
 ## What the integration agent already changed in MK-owned files
