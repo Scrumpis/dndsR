@@ -3,6 +3,9 @@
 # looked for, which shows how the file was parsed. aligner = "blast" skips the DIAMOND
 # check, so these tests need no external software.
 
+# A path in a message, as a regular expression: Windows writes a backslash where others write /.
+sep_path <- function(dir, file) paste0(dir, "[/\\\\]", gsub(".", "\\.", file, fixed = TRUE))
+
 read_as <- function(lines) {
   dir <- withr::local_tempdir(.local_envir = parent.frame())
   f <- file.path(dir, "comparisons.txt")
@@ -16,8 +19,8 @@ read_as <- function(lines) {
 test_that("a headerless five-column file is read by position, as before", {
   msg <- read_as("c1 a.fa a.gff b.fa b.gff")
   expect_match(msg, "Sequence files not found for c1 ")
-  expect_match(msg, "c1/a_CDS.fasta", fixed = TRUE)
-  expect_match(msg, "c1/b_CDS.fasta", fixed = TRUE)
+  expect_match(msg, sep_path("c1", "a_CDS.fasta"))
+  expect_match(msg, sep_path("c1", "b_CDS.fasta"))
 })
 
 test_that("a header row is read as a header, not as a comparison", {
@@ -30,8 +33,8 @@ test_that("a header row is read as a header, not as a comparison", {
 test_that("header names, not positions, decide the columns", {
   msg <- read_as(c("comparison_name subject_fasta subject_gff query_fasta query_gff",
                    "c1 b.fa b.gff a.fa a.gff"))
-  expect_match(msg, "query_file:   .*c1/a_CDS.fasta")
-  expect_match(msg, "subject_file: .*c1/b_CDS.fasta")
+  expect_match(msg, paste0("query_file:   .*", sep_path("c1", "a_CDS.fasta")))
+  expect_match(msg, paste0("subject_file: .*", sep_path("c1", "b_CDS.fasta")))
 })
 
 test_that("an empty line before the header is skipped", {
