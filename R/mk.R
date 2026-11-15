@@ -122,12 +122,12 @@
 #' `snp_file` may be a VCF (optionally bgzipped/gzipped) or a BED file of single-base
 #' intervals. For VCF, only bi-allelic SNPs are kept: REF is a single ACGT base and there is
 #' exactly one ALT allele, also a single ACGT base. Multi-allelic records, indels, and
-#' symbolic alleles are dropped. For BED, only intervals of exactly one base are kept;
-#' coordinates are converted from 0-based half-open to 1-based. Alleles are not available
-#' for BED input, so sites are classified by degeneracy (see .mk_poly_counts).
+#' symbolic alleles are dropped. For BED, the alternative allele is read from column 4,
+#' only intervals of exactly one base are kept, and coordinates are converted from 0-based
+#' half-open to 1-based; a file with no usable allele in column 4 is refused.
 #'
-#' @return list with `pos` (1-based positions), `chrom`, `ref`, `alt` (single uppercase
-#'   ALT base, `NA` for BED), plus counts in `meta`.
+#' @return list with `pos` (1-based positions), `chrom`, `ref` (`NA` for BED), `alt`
+#'   (single uppercase ALT base), plus counts in `meta`.
 #' @keywords internal
 .mk_read_snps <- function(path) {
   if (!file.exists(path)) stop("snp_file not found: ", path, call. = FALSE)
