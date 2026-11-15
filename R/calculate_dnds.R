@@ -248,10 +248,12 @@ calculate_dnds <- function(comparison_file = NULL,
     # headerless schema inference: comparison_name, query_fasta, query_gff, subject_fasta,
     # subject_gff, and optionally snp_file and snp_side
     headerless_like <- !any(grepl("^(query_|subject_)", names(df)))
+    inferred_headerless <- FALSE
     if (!all(needed %in% names(df)) && headerless_like && ncol(df) >= 5) {
       names(df)[1:5] <- c("comparison_name", "query_fasta", "query_gff", "subject_fasta", "subject_gff")
       if (ncol(df) >= 6L) names(df)[6] <- "snp_file"
       if (ncol(df) >= 7L) names(df)[7] <- "snp_side"
+      inferred_headerless <- ncol(df) >= 6L
     }
 
     if (!all(needed %in% names(df))) {
@@ -265,8 +267,30 @@ calculate_dnds <- function(comparison_file = NULL,
         call. = FALSE
       )
     }
-    
+
+    attr(df, "headerless_mk") <- inferred_headerless
     df
+  }
+
+  # McDonald-Kreitman columns are opt-in. Check every row before any dN/dS work, so a
+  # half-specified pair fails at once instead of after the earlier comparisons have run.
+  .check_mk_columns <- function(df) {
+    if (!any(c("snp_file", "snp_side") %in% names(df))) return(invisible(NULL))
+    hint <- ""
+    if (isTRUE(attr(df, "headerless_mk"))) {
+      hint <- paste0(
+        "\nThis comparison file has no header, so column 6 is read as snp_file and column 7 ",
+        "as snp_side. Use 5 columns, or 7 with snp_file and snp_side, or add a header that ",
+        "names the columns.")
+    }
+    for (i in seq_len(nrow(df))) {
+      row <- as.list(df[i, , drop = FALSE])
+      tryCatch(
+        .mk_validate_snp_args(row[["snp_file"]], row[["snp_side"]], df$comparison_name[i]),
+        error = function(e) stop(conditionMessage(e), hint, call. = FALSE)
+      )
+    }
+    invisible(NULL)
   }
 
   # ---- helper: read FASTA-only list (comparison_name, query_seq, subject_seq) ----
@@ -569,6 +593,7 @@ calculate_dnds <- function(comparison_file = NULL,
 
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    .check_mk_columns(df)
 
     for (i in seq_len(nrow(df))) {
       comp <- df$comparison_name[i]

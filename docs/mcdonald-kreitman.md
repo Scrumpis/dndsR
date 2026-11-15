@@ -52,13 +52,15 @@ Genotype columns are ignored: only the count of SNP positions matters.
 
 A polymorphic site counts once however many samples carry it. Every site, VCF or BED, is classified the same way, by the degeneracy of the changed position in the reference codon: if all three alternative bases are synonymous the position is 4-fold and the site is a synonymous polymorphism (`Ps`); if none is, it is 0-fold and the site is nonsynonymous (`Pn`). 2- and 3-fold positions depend on the allele, so they are excluded from both classes and counted in `snps_midfold`. Sites whose reference codon is a stop are excluded.
 
+**Known limitation.** The class is read from the codon the count starts from, which for divergence is the `snp_side` species' codon. For 38 of 526 single-difference codon pairs (7.2%) the other codon gives a different answer — always 0-fold against mid-fold, never 4-fold; `AGA`→`GGA` at position 1 is one. On 1,472 public *A. thaliana*–*A. lyrata* genes that changes pooled `Dn` by 0.2% and `Ds` not at all, but `Dn` of 66% of genes, by up to 8 steps in one. Per-gene `Dn`, and so `alpha` and NI, can therefore move slightly when `snp_side` is swapped. Report `snp_side` with per-gene results.
+
 ## Divergence counted
 
 Dn and Ds come from the same PAL2NAL codon alignments `orthologr::dNdS()` produced, one aligned codon at a time:
 
 - Codons with a gap, a non-ACGT base, or a stop codon on either side are skipped.
 - A codon that carries a SNP in the SNP-side species is excluded from the divergence counts, so a site is not counted as both polymorphic and divergent.
-- Each difference is classified by the degeneracy of the position it changes, in the codon it starts from: a 4-fold position counts as a synonymous difference (`Ds`), a 0-fold position as nonsynonymous (`Dn`), and a 2- or 3-fold position counts in neither class (`div_steps_midfold`).
+- Each difference is classified by the degeneracy of the position it changes, in the codon it starts from: a 4-fold position counts as a synonymous difference (`Ds`), a 0-fold position as nonsynonymous (`Dn`), and a 2- or 3-fold position counts in neither class (`div_steps_midfold`). The limitation above applies.
 - A codon pair that differs at two or three positions is averaged over every shortest mutational path, with equal weight: each path steps through the intermediate codons, and a path that passes through a stop codon is discarded.
 
 Pairs whose query or subject gene appears in more than one pair are dropped, so only 1:1 orthologs are counted.
@@ -101,7 +103,8 @@ Columns: [output-files.md](output-files.md#mcdonald-kreitman).
 - One population sample, unweighted: no correction for sample size, allele frequencies, or slightly deleterious polymorphisms (no DoS-style filtering).
 - No SNP filtering of any kind: `FILTER`, quality, depth, allele count, and genotypes are ignored. Filter the VCF with `bcftools` first, as above.
 - Only biallelic SNPs are used; multiallelic and indel records are ignored.
-- 2- and 3-fold sites are excluded from `Pn`/`Ps` and `Dn`/`Ds`. This makes the classes unambiguous, at the cost of power: such sites are a substantial share of synonymous variation, so more genes have `Ps = 0`, `Ds = 0`, and an undefined `alpha` or neutrality index.
+- 2- and 3-fold sites are excluded from `Pn`/`Ps` and `Dn`/`Ds`. This makes the classes unambiguous, at the cost of power: on 1,472 public genes, 31.5% of divergence steps are mid-fold, so more genes have `Ps = 0`, `Ds = 0`, and an undefined `alpha` or neutrality index.
+- Per-gene `Dn` depends slightly on `snp_side`, as described under "SNPs used".
 - Codon-level only: SNPs outside CDS regions are counted nowhere.
 - 1:1 orthologs only. Genes in many-to-many pairs are dropped.
 - With few substitutions the test has little power; a non-significant result is not evidence of neutrality.
