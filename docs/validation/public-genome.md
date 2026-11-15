@@ -95,3 +95,17 @@ How much does choosing the longest isoform matter? Of 22,146 pairs, 10,576 (48%)
 Isoform choice rarely matters, but it matters noticeably for about a fifth of multi-isoform pairs, or roughly one in ten of all pairs. It seldom moves a gene across 1 here, partly because most genes here are far from 1. The longest isoform is typically close to the middle of the combinations: the median absolute difference from the median combination is 0.0025. This supports the longest-isoform default as reasonable, not as uniquely correct.
 
 Limits: this uses one genome pair with one alignment method, and most annotated isoforms in these two annotations come from automated pipelines.
+
+## v0.4.0 against dev
+
+Rerun on 2026-11-14 (US Eastern) before the next release: v0.4.0 (`957cfe1`) against `dev` at `b65bf8b`, both in the published v0.4.0 image, so only dndsR differs. Same inputs (SHA-256 prefixes above), data read-only, `tools/dev/validation/compare-versions.R` with gffread 0.12.9.
+
+| Check | Result |
+|---|---|
+| CDS FASTA, CDS QC, dN/dS, and annotated tables | Byte-identical between the versions |
+| CDS against gffread | Every gene compared matches (0 differ, in every gene class); 83 *A. lyrata* transcripts not comparable by name, as before |
+| Pairs | 22,149 in both, same partner in every pair |
+| dN/dS | 22,094 comparable pairs, every value identical; 206 above 1 in both |
+| New in `dev` | `AtAl_dnds_reliability.tsv`; provenance records `dnds_method` (Comeron) |
+
+The same rerun on two unpublished genome pairs also gave byte-identical tables. Those data and results stay outside this repository.

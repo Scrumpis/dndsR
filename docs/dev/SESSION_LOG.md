@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-14 (late): stage 2 decisions, report audit, real-genome rerun, readiness
+
+- **Session:** `b6da01bb-9705-4b1a-b515-5e35c72e11b0` (continued)
+- **Done:** the maintainer approved the stage 2 guidance; recorded in `DECISIONS.md` and carried into `docs/phylo-methods.md`, the tutorial, and the skill. The stage 2B report was audited against its tables and D1-D9: one wrong claim corrected (C3 + F1 *was* tested on realigned indels, in 2A only), plus smaller fixes. Channel message 7 reviews PR #8 for integration. v0.4.0 and `dev` rerun on real genomes. Next-release readiness written.
+- **Verified:** CI green at `b65bf8b` on every workflow. Real genomes (public pair and two unpublished pairs, same image, data read-only): every CDS, QC, dN/dS, and annotated table byte-identical to v0.4.0.
+- **Not done:** no release, merge, tag, or image. MK stays experimental. The maintainer reruns `tools/dev/setup.sh` for the stale `pre-push` hook copy.
+
 ## 2026-11-14: stage 2B main blocks, B2 launch, PR #7 integration, comparison-file headers
 
 - **Session:** `b6da01bb-9705-4b1a-b515-5e35c72e11b0` (continued)
