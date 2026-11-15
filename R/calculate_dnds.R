@@ -207,11 +207,12 @@ calculate_dnds <- function(comparison_file = NULL,
       con <- file(x, open = "r")
       on.exit(close(con), add = TRUE)
   
-      while (length(first_line) == 0) {
-        first_line <- readLines(con, n = 1)
-        if (length(first_line) == 0) break
-        first_line <- trimws(first_line)
-        if (first_line == "") first_line <- ""
+      # first non-blank line; the old loop never ran, so a header was read as data
+      repeat {
+        ln <- readLines(con, n = 1, warn = FALSE)
+        if (length(ln) == 0) break
+        first_line <- trimws(ln)
+        if (nzchar(first_line)) break
       }
   
       has_header <- FALSE
@@ -318,11 +319,12 @@ calculate_dnds <- function(comparison_file = NULL,
       con <- file(x, open = "r")
       on.exit(close(con), add = TRUE)
 
-      while (length(first_line) == 0) {
-        first_line <- readLines(con, n = 1)
-        if (length(first_line) == 0) break
-        first_line <- trimws(first_line)
-        if (first_line == "") first_line <- ""
+      # first non-blank line; the old loop never ran, so a header was read as data
+      repeat {
+        ln <- readLines(con, n = 1, warn = FALSE)
+        if (length(ln) == 0) break
+        first_line <- trimws(ln)
+        if (nzchar(first_line)) break
       }
 
       has_header <- FALSE
