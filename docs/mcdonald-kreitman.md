@@ -2,7 +2,7 @@
 
 The McDonald-Kreitman (MK) test compares polymorphism within a species with divergence between species. Under neutrality, the ratio of nonsynonymous to synonymous changes should be the same in both, so a 2×2 table of polymorphic and fixed differences, synonymous and nonsynonymous, can be tested with Fisher's exact test.
 
-dndsR runs the simplest form: counts only, no site-frequency weighting, on 1:1 orthologs. Sites are classified by codon degeneracy: 4-fold positions count as synonymous, 0-fold as nonsynonymous, and 2- and 3-fold positions are left out of both classes.
+dndsR runs the simplest form: counts only, no site-frequency weighting, on 1:1 orthologs. Sites are classified by their allele, as in the original test: a change counts as synonymous when it leaves the amino acid alone and nonsynonymous when it does not.
 
 ## Turning it on
 
@@ -46,13 +46,15 @@ One low-quality call can move a gene from `Pn` to `Ps`. The same applies to BED 
 
 ## SNPs used
 
-Only bi-allelic SNPs are used, in both the polymorphism counts and the divergence exclusion. In a VCF that means REF is a single A/C/G/T base and there is exactly one ALT allele, also a single A/C/G/T base, different from REF. Multi-allelic records, indels, symbolic alleles, and REF = ALT records are dropped. In a BED file, only 1-bp intervals are kept, and coordinates are read as 0-based half-open and converted to 1-based.
+Only bi-allelic SNPs are used, in both the polymorphism counts and the divergence exclusion. In a VCF that means REF is a single A/C/G/T base and there is exactly one ALT allele, also a single A/C/G/T base, different from REF. Multi-allelic records, indels, symbolic alleles, and REF = ALT records are dropped.
+
+A BED file must give the alternative allele in **column 4**, which standard BED calls the name: `chrom  start  end  alt`, with ALT one of A, C, G, T. A BED file without it is refused, because a polymorphism cannot be called synonymous or nonsynonymous without knowing its allele. Only 1-bp intervals are kept, and coordinates are read as 0-based half-open and converted to 1-based.
 
 Genotype columns are ignored: only the count of SNP positions matters.
 
-A polymorphic site counts once however many samples carry it. Every site, VCF or BED, is classified the same way, by the degeneracy of the changed position in the reference codon: if all three alternative bases are synonymous the position is 4-fold and the site is a synonymous polymorphism (`Ps`); if none is, it is 0-fold and the site is nonsynonymous (`Pn`). 2- and 3-fold positions depend on the allele, so they are excluded from both classes and counted in `snps_midfold`. Sites whose reference codon is a stop are excluded.
+A polymorphic site counts once however many samples carry it. Each site is classed by its own allele: reconstruct the codon with the ALT base and compare its amino acid with the reference codon's. Unchanged means a synonymous polymorphism (`Ps`), changed means nonsynonymous (`Pn`). This holds at 2-fold and 3-fold positions too — `GAA`→`GAG` is a synonymous polymorphism, `GAA`→`GAC` (Glu→Asp) is not. Sites whose reference codon is a stop, and ALT alleles equal to the reference base, are excluded.
 
-**Known limitation.** The class is read from the codon the count starts from, which for divergence is the `snp_side` species' codon. For 38 of 526 single-difference codon pairs (7.2%) the other codon gives a different answer — always 0-fold against mid-fold, never 4-fold; `AGA`→`GGA` at position 1 is one. On 1,472 public *A. thaliana*–*A. lyrata* genes that changes pooled `Dn` by 0.2% and `Ds` not at all, but `Dn` of 66% of genes, by up to 8 steps in one. Per-gene `Dn`, and so `alpha` and NI, can therefore move slightly when `snp_side` is swapped. Report `snp_side` with per-gene results.
+The class is therefore a property of the allele, not of a degeneracy table, and swapping `snp_side` does not change it for a given SNP file on its own genome.
 
 ## Divergence counted
 
@@ -60,7 +62,7 @@ Dn and Ds come from the same PAL2NAL codon alignments `orthologr::dNdS()` produc
 
 - Codons with a gap, a non-ACGT base, or a stop codon on either side are skipped.
 - A codon that carries a SNP in the SNP-side species is excluded from the divergence counts, so a site is not counted as both polymorphic and divergent.
-- Each difference is classified by the degeneracy of the position it changes, in the codon it starts from: a 4-fold position counts as a synonymous difference (`Ds`), a 0-fold position as nonsynonymous (`Dn`), and a 2- or 3-fold position counts in neither class (`div_steps_midfold`). The limitation above applies.
+- Each difference is classed the same way: synonymous when the amino acid does not change between the codon before the step and the codon after it (`Ds`), nonsynonymous when it does (`Dn`). The class is symmetric, so reading the pair in either direction gives the same counts.
 - A codon pair that differs at two or three positions is averaged over every shortest mutational path, with equal weight: each path steps through the intermediate codons, and a path that passes through a stop codon is discarded.
 
 Pairs whose query or subject gene appears in more than one pair are dropped, so only 1:1 orthologs are counted.
@@ -103,8 +105,8 @@ Columns: [output-files.md](output-files.md#mcdonald-kreitman).
 - One population sample, unweighted: no correction for sample size, allele frequencies, or slightly deleterious polymorphisms (no DoS-style filtering).
 - No SNP filtering of any kind: `FILTER`, quality, depth, allele count, and genotypes are ignored. Filter the VCF with `bcftools` first, as above.
 - Only biallelic SNPs are used; multiallelic and indel records are ignored.
-- 2- and 3-fold sites are excluded from `Pn`/`Ps` and `Dn`/`Ds`. This makes the classes unambiguous, at the cost of power: on 1,472 public genes, 31.5% of divergence steps are mid-fold, so more genes have `Ps = 0`, `Ds = 0`, and an undefined `alpha` or neutrality index.
-- Per-gene `Dn` depends slightly on `snp_side`, as described under "SNPs used".
+- Synonymous sites include 2-fold and 3-fold positions, which can be under weak selection for codon usage in some taxa. That is the standard MK convention, and it is the reason some studies restrict themselves to 4-fold sites and accept the power loss; this package does not.
+- A BED file must carry the ALT allele in column 4, and a BED name in that column is refused rather than guessed at.
 - Codon-level only: SNPs outside CDS regions are counted nowhere.
 - 1:1 orthologs only. Genes in many-to-many pairs are dropped.
 - With few substitutions the test has little power; a non-significant result is not evidence of neutrality.

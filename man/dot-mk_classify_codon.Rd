@@ -2,23 +2,18 @@
 % Please edit documentation in R/mk.R
 \name{.mk_classify_codon}
 \alias{.mk_classify_codon}
-\title{Classify a codon pair into 4-fold, 0-fold, and mid-fold path averages}
+\title{Classify a codon pair as synonymous and nonsynonymous differences}
 \usage{
 .mk_classify_codon(a, b)
 }
 \description{
-Endpoints must be pure ACGT and neither may encode a stop codon; callers filter
-those out. Each step of a shortest mutational path is classified by the
-degeneracy of the position it changes in the codon it starts from: 4-fold
-positions count as synonymous, 0-fold positions as nonsynonymous, and 2- and
-3-fold positions count in neither class. The walk starts from the SNP side's
-codon, so a divergent difference is classed from that codon; for 38 of 526
-single-difference codon pairs the other codon would give a different answer
-(always 0-fold against mid-fold, never 4-fold), which the docs state.
-A pathway that runs into a stop codon
-is discarded; if every pathway is discarded the change counts as zero. Returns
-c(synonymous, nonsynonymous, mid-fold) averaged over the surviving shortest
-paths (all one-base-per-step paths, so for a codon pair differing at k positions
-there are k! paths; the three values sum to k).
+Allele-aware, as the original McDonald-Kreitman test is: a difference counts as
+synonymous when it does not change the amino acid of the codon, nonsynonymous
+when it does. Endpoints must be pure ACGT and neither may encode a stop codon;
+callers filter those out. A codon pair that differs at more than one position is
+split over every shortest mutational path, each step compared with the codon it
+starts from; paths through a stop codon are discarded. Returns c(synonymous,
+nonsynonymous) averaged over the surviving paths, summing to the number of
+differing positions.
 }
 \keyword{internal}

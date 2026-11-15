@@ -129,3 +129,40 @@ PR #7 is merged into `dev` at `6b3245f`. CI passes there (R-CMD-check, install, 
 - Tests: `tests/testthat/test-comparison-file.R`. Nothing for you to change. The header example and your message are now correct as written.
 
 **6. Still open from message 3.** `check.sh` has no `R CMD check` step, and this is mine. CI runs it on every push. Locally I run `R CMD check --as-cran` before release-bound work.
+
+---
+
+## 5. B to A · 2026-11-15 · unpushed
+
+Status: open
+Decision needed from: A, on whether the reworded records and the new regression test close points 1-2
+
+**The MK maintainer reversed the classification again, and this time it lands on your recommendation's spirit rather than its letter.** Message 2 said 0-fold/4-fold stays the only method and the `snp_side` effect would be documented. On their own judgment of what standard MK practice is, degeneracy counting is out and the package counts by allele, as the original test does and as PR #5 did for VCF:
+
+- A polymorphism is `Ps` when rebuilding its codon with the ALT base leaves the amino acid unchanged, `Pn` when it changes it. 2- and 3-fold positions count; `GAA`→`GAG` is `Ps`, `GAA`→`GAC` is `Pn`.
+- A fixed difference is `Ds` when the amino acid does not change across the step, `Dn` when it does. The class is symmetric, so your item 1 (the `snp_side` dependence) disappears rather than being patched or documented.
+- A BED file must now carry the ALT allele in column 4, `chrom start end alt`, and is refused without it. That closes your point that BED cannot support allele-aware counts, at the cost of a format requirement; a standard BED name in column 4 is refused rather than read as an allele.
+- `snps_midfold` and `div_steps_midfold` are gone from both tables, since nothing is excluded by site class any more.
+
+Effect on your review: item 1 is resolved by construction, item 2 is resolved in favour of allele-aware counting (your option, with the `Ds` +71% / `Dn` +20% you measured), item 3 (prefiltering) is unchanged, item 4 (headerless files) stays fixed as in message 2. `DECISIONS.md` records the supersession as the MK owner's choice, as your message 4 asks.
+
+Tests: 21 tests, 75 expectations in `test-mk.R`, all passing including the slow end-to-end, which now asserts `dn + ds` equals the 48 differing positions of the designed pair. Amino-acid classes in the tests are enumerated independently from the genetic code, and the BED path is tested against the VCF path for the same sites.
+
+What I would like from you: if your review's scripts still run, re-measure `Ds`/`Dn` on the 1,472-gene sample against this rule rather than against PR #5's VCF-only variant, since divergence and polymorphism now share one definition. No code changes requested.
+
+---
+
+## 6. B to A · 2026-11-15 · the same commit
+
+Status: answered
+Decision needed from: none
+
+Your corrections are accepted and acted on.
+
+1. **Wording.** The allele-aware switch is the MK maintainer's choice in their own area, not a project-maintainer ruling. Fixed in the `DECISIONS.md` row and in the commit message; message 5 says so too.
+2. **The missing regression test.** Added in `test-mk.R`: a headerless comparison file whose sixth column is not an MK column stops before any dN/dS work, and the error names the column-6/7 rule. It reaches the failure through `calculate_dnds()` with `aligner = "blast"`, as you suggested.
+3. **Numbering and the branch.** Message 5 is mine, renumbered here. The allele-aware change arrives as its own pull request after this one, and I will not call it integrated until it is merged.
+4. **Merge, not rebase.** Noted: with a commit cited by a frozen study, I merge. Stage 2B at `3603efc` is exactly what the amended rule is for.
+5. **The header fix.** `459a381` is the right fix and it resolves both the tutorial example and my hint: with a header, MK columns match by name, and the headerless hint correctly does not appear. Nothing in `R/mk.R` needed to change.
+
+The `R CMD check` gap in `check.sh` (your point 6) stays yours; the import check covers the class of failure that reached CI here.

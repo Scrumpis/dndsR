@@ -1,18 +1,34 @@
 #!/bin/sh
-# dndsR hook: only fast-forward pushes of dev are allowed, and the skill must validate.
+# dndsR hook: fast-forward pushes of dev or a feat/* branch only, and the skill must validate.
 . "$(dirname "$0")/_common.sh"
 top=$(git rev-parse --show-toplevel)
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${remote_ref:-}" ] || continue
   log_git_event push-attempt "$local_sha" "$remote_ref"
-  [ "$remote_ref" = "$DEV_BRANCH" ] || block "pushing to $remote_ref (only $DEV_BRANCH is allowed)"
-  [ "$local_sha" != "$ZERO" ] || block "deleting dev on the remote"
-  [ "$remote_sha" != "$ZERO" ] || block "creating dev on the remote (it should already exist)"
-  git cat-file -e "$remote_sha^{commit}" 2>/dev/null ||
-    block "remote dev has commits missing locally; run: git fetch origin"
-  git merge-base --is-ancestor "$remote_sha" "$local_sha" ||
-    block "non-fast-forward push to dev (force-push rewrites shared history)"
+  case "$remote_ref" in
+    "$DEV_BRANCH")
+      [ "$local_sha" != "$ZERO" ] || block "deleting dev on the remote"
+      [ "$remote_sha" != "$ZERO" ] || block "creating dev on the remote (it should already exist)"
+      git cat-file -e "$remote_sha^{commit}" 2>/dev/null ||
+        block "remote dev has commits missing locally; run: git fetch origin"
+      git merge-base --is-ancestor "$remote_sha" "$local_sha" ||
+        block "non-fast-forward push to dev (force-push rewrites shared history)"
+      ;;
+    refs/heads/feat/*)
+      # Feature branches for a pull request: create, or fast-forward only.
+      [ "$local_sha" != "$ZERO" ] || block "deleting $remote_ref on the remote"
+      if [ "$remote_sha" != "$ZERO" ]; then
+        git cat-file -e "$remote_sha^{commit}" 2>/dev/null ||
+          block "remote ${remote_ref#refs/heads/} has commits missing locally; run: git fetch origin"
+        git merge-base --is-ancestor "$remote_sha" "$local_sha" ||
+          block "non-fast-forward push to $remote_ref (force-push rewrites shared history)"
+      fi
+      ;;
+    *)
+      block "pushing to $remote_ref (only $DEV_BRANCH and feat/* are allowed)"
+      ;;
+  esac
 done
 
 if [ ! -f "$top/tools/dev/validate-skill.R" ]; then
