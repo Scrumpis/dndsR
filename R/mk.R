@@ -282,8 +282,8 @@
   names(gr_parts) <- names(cds)
   cds_char <- as.character(cds)
   names(cds_char) <- names(cds)
-  list(pos = pos_list, strand = setNames(strand_v, names(cds)),
-       chrom = setNames(chrom_v, names(cds)),
+  list(pos = pos_list, strand = stats::setNames(strand_v, names(cds)),
+       chrom = stats::setNames(chrom_v, names(cds)),
        ranges = GenomicRanges::GRangesList(gr_parts),
        seq = cds_char)
 }

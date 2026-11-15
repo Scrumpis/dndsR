@@ -58,8 +58,26 @@ RUN R -q -e "options(warn=2, Ncpus=parallel::detectCores()); \
 ARG ORTHOLOGR_REF=06c3098adfba1e32135d904f72ea81a76902c664
 ARG METABLASTR_REF=02dad6daf9f4a0675317177ff434ae9bbcec535f
 ARG RDIAMOND_REF=d8b4006d5f2793ecf8b97a7560fa005b7a3420ee
-RUN R -q -e "options(repos = BiocManager::repositories()); remotes::install_github(c('drostlab/metablastr@${METABLASTR_REF}','drostlab/rdiamond@${RDIAMOND_REF}','drostlab/orthologr@${ORTHOLOGR_REF}'), upgrade='never'); \
-    missing <- c('metablastr','rdiamond','orthologr')[!vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE)]; \
+# Source archives of those commits from codeload.github.com, checked by SHA-256, then their
+# CRAN/Bioconductor dependencies and R CMD INSTALL in dependency order. This uses neither the
+# GitHub API (rate-limited without a token) nor any credential.
+ARG METABLASTR_SHA256=61a4c3eac5ec6218585fba068d336a140681a2e75b799e132d02949c6b1f2303
+ARG RDIAMOND_SHA256=1172107720a0935163a0429515dbc76d455c26bda1de684c4c39ff61fd8a763f
+ARG ORTHOLOGR_SHA256=037a53d2a0da203f459c333f5215d0eb4cde699ccd88585a744fa523065fe6fa
+RUN set -eux; \
+  d=$(mktemp -d); cd "$d"; \
+  for spec in "metablastr ${METABLASTR_REF} ${METABLASTR_SHA256}" "rdiamond ${RDIAMOND_REF} ${RDIAMOND_SHA256}" "orthologr ${ORTHOLOGR_REF} ${ORTHOLOGR_SHA256}"; do \
+    set -- $spec; \
+    curl -fsSL --retry 5 --retry-all-errors -o "$1.tar.gz" "https://codeload.github.com/drostlab/$1/tar.gz/$2"; \
+    echo "$3  $1.tar.gz" | sha256sum -c -; \
+    tar -xzf "$1.tar.gz"; \
+    R -q -e "options(warn = 2, repos = BiocManager::repositories()); \
+      deps <- setdiff(remotes::local_package_deps('$1-$2', dependencies = NA), c(rownames(installed.packages()), 'R', 'metablastr', 'rdiamond')); \
+      if (length(deps)) install.packages(deps)"; \
+    R CMD INSTALL "$1-$2"; \
+  done; \
+  cd /; rm -rf "$d"; \
+  R -q -e "missing <- c('metablastr','rdiamond','orthologr')[!vapply(c('metablastr','rdiamond','orthologr'), requireNamespace, logical(1), quietly=TRUE)]; \
     if (length(missing)) stop('Missing GitHub packages after install: ', paste(missing, collapse=', '))"
 
 # Final sanity check
