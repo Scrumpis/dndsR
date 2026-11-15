@@ -295,6 +295,119 @@ test_that("a headerless comparison file with a non-MK sixth column stops before 
   expect_false(file.exists(file.path(dir, "cmp1")))
 })
 
+# ---------- statistics ----------
+
+test_that("alpha, the neutrality index and DoS are the textbook ratios", {
+  st <- mk("stats")(pn = 10, ps = 30, dn = 5, ds = 15)
+  # alpha = 1 - (ds*pn)/(dn*ps) = 1 - 150/150 = 0; NI is its inverse ratio = 1.
+  expect_equal(unname(st["alpha"]), 0)
+  expect_equal(unname(st["neutrality_index"]), 1)
+  # DoS = pn/(pn+ps) - dn/(dn+ds) = 0.25 - 0.25.
+  expect_equal(unname(st["dos"]), 0)
+  # A twofold excess of nonsynonymous divergence: alpha = 1 - (2*10)/(20*30) = 2/3.
+  st <- mk("stats")(pn = 10, ps = 30, dn = 20, ds = 40)
+  expect_equal(unname(st["alpha"]), 1 - (40 * 10) / (20 * 30))
+  expect_equal(unname(st["neutrality_index"]), (10 * 40) / (30 * 20))
+})
+
+test_that("alpha and NI are NA when their denominator is zero, DoS is not", {
+  st <- mk("stats")(pn = 0, ps = 5, dn = 0, ds = 3)
+  expect_true(is.na(st["alpha"]))
+  expect_true(is.na(st["neutrality_index"]))
+  expect_equal(unname(st["dos"]), 0)
+  st <- mk("stats")(pn = 4, ps = 0, dn = 3, ds = 2)
+  expect_true(is.na(st["alpha"]))   # ps = 0
+  expect_equal(unname(st["dos"]), 1 - 3 / 5)
+  # Non-finite divergence gives nothing at all.
+  st <- mk("stats")(pn = 1, ps = 1, dn = NaN, ds = 1)
+  expect_true(all(is.na(st)))
+})
+
+test_that("Fisher's test uses the rounded divergence counts", {
+  # Table 3 0 / 0 3: the exact two-sided p is 2 * 1/C(6,3) = 2/20 = 0.1.
+  expect_equal(mk("fisher")(3, 0, 0, 3), 0.1)
+  # [1 0; 0 1] is as balanced as it gets: p = 1.
+  expect_equal(mk("fisher")(1, 0, 0, 1), 1)
+  # No synonymous divergence at all leaves an empty column: the table carries no
+  # information about the ratio, so p is 1, not 0.
+  expect_equal(mk("fisher")(3, 0, 3, 0), 1)
+  # Fractional divergence is rounded first: 0.5 rounds to even, so 0, and the
+  # margin is empty.
+  expect_true(is.na(mk("fisher")(3, 0, 0.5, 0.5)))
+  expect_equal(mk("fisher")(3, 0, 1.4, 0), mk("fisher")(3, 0, 1, 0))
+})
+
+test_that("Benjamini-Hochberg adjusts over the finite p-values only", {
+  q <- mk("bh")(c(0.01, 0.04, NA, 0.03))
+  # m = 3: 0.01*3/1 = 0.03, 0.03*3/2 = 0.045, 0.04*3/3 = 0.04, then monotone
+  # from the largest down: 0.04, min(0.045, 0.04) = 0.04, min(0.03, 0.04) = 0.03.
+  expect_equal(q, c(0.03, 0.04, NA, 0.04))
+  expect_equal(mk("bh")(c(NA_real_, NA_real_)), c(NA_real_, NA_real_))
+})
+
+test_that("permutations enumerate every shortest path once", {
+  p <- mk("permutations")(1:3)
+  expect_length(p, 6L)
+  expect_equal(length(unique(vapply(p, paste, "", collapse = ""))), 6L)
+  expect_true(all(vapply(p, function(x) identical(sort(x), 1:3), logical(1))))
+  expect_length(mk("permutations")(2L), 1L)
+  expect_identical(mk("permutations")(integer(0)), list(integer(0)))
+})
+
+# ---------- SNP file details ----------
+
+test_that("gzipped SNP files are read, and alleles are upper-cased", {
+  vcf <- file.path(tempdir(), "gz.vcf.gz")
+  con <- gzfile(vcf, "wt")
+  writeLines(c("##fileformat=VCFv4.2", "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+               "chr1\t10\t.\ta\tg\t.\t.\t.",
+               "chr1\t20\t.\tC\tT\t.\t.\t."), con)
+  close(con)
+  sn <- mk("read_snps")(vcf)
+  expect_equal(sn$snps$pos, c(10L, 20L))
+  expect_equal(sn$snps$ref, c("A", "C"))
+  expect_equal(sn$snps$alt, c("G", "T"))
+})
+
+test_that("a header-only SNP file is empty, not an error", {
+  vcf <- file.path(tempdir(), "empty.vcf")
+  writeLines(c("##fileformat=VCFv4.2", "#CHROM\tPOS\tID\tREF\tALT"), vcf)
+  sn <- mk("read_snps")(vcf)
+  expect_equal(nrow(sn$snps), 0L)
+  expect_equal(sn$meta$n_kept, 0L)
+  expect_equal(sn$meta$format, "vcf")
+})
+
+test_that("BED intervals are checked and the allele is upper-cased", {
+  bed <- file.path(tempdir(), "coords.bed")
+  writeLines(c("chr1\t99\t100\ta",     # keep, lower-case allele
+               "chr1\t100\t99\tC",      # reversed interval -> drop
+               "chr1\t50\t52\tG"), bed) # 2 bp -> drop
+  sn <- mk("read_snps")(bed)
+  expect_equal(sn$snps$pos, 100L)
+  expect_equal(sn$snps$alt, "A")
+  expect_equal(sn$meta$n_dropped, 2L)
+})
+
+test_that("duplicate positions are dropped once, across the whole file", {
+  bed <- file.path(tempdir(), "dups.bed")
+  writeLines(c("chr1\t99\t100\tA", "chr1\t99\t100\tC", "chr2\t99\t100\tG"), bed)
+  sn <- mk("read_snps")(bed)
+  expect_equal(paste(sn$snps$chrom, sn$snps$pos), c("chr1 100", "chr2 100"))
+  expect_equal(sn$meta$n_duplicates, 1L)
+})
+
+test_that("a SNP outside the CDS maps to no gene", {
+  skip_if_not_installed("txdbmaker")
+  g <- mini_genome()
+  map <- mk("cds_map")(g$gff, g$fasta, g$cds_fa)
+  snps <- data.frame(chrom = "chrM", pos = c(1L, 500L), ref = NA_character_, alt = "A",
+                     stringsAsFactors = FALSE)
+  mapped <- mk("map_snps")(snps, map)
+  expect_equal(nrow(mapped$hits), 0L)
+  expect_length(mapped$excl, 0L)
+})
+
 # ---------- SNP-side validation ----------
 
 test_that("snp_file without snp_side (and vice versa) is an error", {
