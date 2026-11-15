@@ -17,7 +17,8 @@ Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
   - `check.sh`: 193 tests, 0 failed, 0 skipped.
   - The new header tests fail on the old code and pass on the new.
   - CI passed at `6b3245f`.
-- **Not done:** B2 is running; the 2A/2B report waits for it. The fail-fast regression test for PR #7 is requested from the MK side. `9880f07` (allele-aware MK, on the collaborator's branch) is not integrated, and was not reviewed. Nothing was pushed, merged to `main`, tagged, or published.
+- **Then:** B2 finished (14 of 14, 281.1 core-hours; stage 2B 1,475.5 of 1,806), and the stage 2A/2B report was written (`docs/validation/phylo-calibration-stage2b.md`). PR #8 (MK allele-aware, the MK owner's) was merged on GitHub; its records were tidied. A Windows-only test failure in the new header tests (path separators) was fixed in the tests.
+- **Not done:** PR #8's MK science was not reviewed (the MK owner's area); its fail-fast test, requested in channel message 4, is in. The safeguard check reports this clone's pre-push hook copy as stale after PR #8: the maintainer reruns `tools/dev/setup.sh`. Nothing was pushed, merged to `main`, tagged, or published.
 
 ## 2026-11-14: P3 stage 2B smoke test and budget guard
 

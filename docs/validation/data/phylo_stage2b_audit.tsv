@@ -1,0 +1,13 @@
+unit	genes	positives_1	positives_3	changed	class_1	class_3	pass
+B1__b_N0_L25__C1__none__s123	300	2	2	0	calibrated	calibrated	TRUE
+B1__b_N0_L25__C3__none__s123	300	0	0	0	calibrated	calibrated	TRUE
+B1__b_N0_L50_div2__C1__none__s123	300	0	1	1	calibrated	calibrated	TRUE
+B1__b_N0_L50_div2__C3__none__s123	300	0	0	0	calibrated	calibrated	TRUE
+B1__b_N1_L50__C1__none__s123	300	0	0	0	calibrated	calibrated	TRUE
+B1__b_N1_L50__C3__none__s123	300	0	0	0	calibrated	calibrated	TRUE
+B1__b_M1_d02__C1__none__s123	300	6	6	0	calibrated	calibrated	TRUE
+B1__b_M1_d02__C3__none__s123	300	0	0	0	calibrated	calibrated	TRUE
+B1__b_R1_At__C1__mask__s123	300	3	3	0	calibrated	calibrated	TRUE
+B1__b_R1_At__C3__mask__s123	300	0	0	0	calibrated	calibrated	TRUE
+B6__b_M4__C1__none__s123	300	26	25	3	unsafe	unsafe	FALSE
+B6__b_M4__C3__none__s123	300	0	1	1	calibrated	calibrated	TRUE
