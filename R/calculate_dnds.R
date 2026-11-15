@@ -18,7 +18,9 @@
 #'   (\code{"query"} or \code{"subject"}, whose genome shares the SNP coordinates).
 #'   When they are present, \code{<comparison>_mk.tsv} and \code{<comparison>_mk_pooled.tsv}
 #'   are written beside the dN/dS outputs. See \code{docs/mcdonald-kreitman.md}.
-#'   Additional columns are allowed and ignored.
+#'   Additional columns are allowed and ignored in a file with a header row. In a
+#'   headerless file, columns 6 and 7 are read as \code{snp_file} and \code{snp_side},
+#'   so a headerless file should have exactly 5 columns, or 7 for MK.
 #'
 #'   Notes:
 #'   - query_gff/subject_gff are accepted for consistency with other dndsR steps; MK needs the

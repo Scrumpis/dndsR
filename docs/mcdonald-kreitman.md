@@ -34,11 +34,15 @@ dndsR does no SNP filtering. It does not look at `FILTER`, quality, depth, allel
 # 1. Only if AC/AN are missing, add them first.
 bcftools +fill-tags calls.vcf.gz -- -t AC,AN -Oz -o calls_tagged.vcf.gz
 
-# 2. PASS calls, SNPs only, bi-allelic, seen at least twice, not fixed in the sample.
+# 2. PASS calls, SNPs only, bi-allelic, ALT seen at least twice (no singletons), not fixed in the sample.
 bcftools view -f PASS -v snps -m2 -M2 -i 'AC>=2 && AC<AN' calls_tagged.vcf.gz -Oz -o snps.vcf.gz
 ```
 
-`AC>=2` suits a population VCF; with a single diploid sample the maximum is 2, so it keeps only heterozygous sites. A site fixed for the ALT allele is not a polymorphism, and one low-quality call can move a gene from `Pn` to `Ps`. The same applies to BED input: filter first, then convert.
+`AC<AN` drops sites where every sampled allele is ALT: those are fixed in the sample, not polymorphisms. `AC>=2` also drops singletons (ALT seen once). That is a frequency filter, and a choice: it removes some sequencing errors and some rare, often slightly deleterious, variants, which changes `Pn` and `Ps`. To keep singletons, use `-i 'AC>=1 && AC<AN'`. Report which you used.
+
+With a single diploid sample, `AN` is 2, so `AC>=2 && AC<AN` keeps nothing. Use `-i 'AC>=1 && AC<AN'` (or, equivalently there, `-i 'GT="het"'`), which keeps its heterozygous sites. One individual gives few polymorphisms, and the MK test has little power with them.
+
+One low-quality call can move a gene from `Pn` to `Ps`. The same applies to BED input: filter first, then convert.
 
 ## SNPs used
 

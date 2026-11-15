@@ -73,7 +73,7 @@ bcftools +fill-tags calls.vcf.gz -- -t AC,AN -Oz -o calls_tagged.vcf.gz   # only
 bcftools view -f PASS -v snps -m2 -M2 -i 'AC>=2 && AC<AN' calls_tagged.vcf.gz -Oz -o snps.vcf.gz
 ```
 
-`AC>=2` suits a population VCF; one diploid sample has at most `AC = 2`, so it keeps only heterozygous sites. Filter BED input the same way before converting it.
+`AC<AN` drops sites fixed for ALT in the sample. `AC>=2` also drops singletons, a frequency filter you choose; use `AC>=1 && AC<AN` to keep them. With a single diploid sample `AN` is 2, so `AC>=2 && AC<AN` keeps nothing: use `AC>=1 && AC<AN`, which keeps its heterozygous sites. See [mcdonald-kreitman.md](../mcdonald-kreitman.md#filter-your-snp-calls-first). Filter BED input the same way before converting it.
 
 Add two columns to the comparison file: `snp_file`, a VCF (`.vcf`, `.vcf.gz`) or BED (`.bed`, `.bed.gz`), and `snp_side`, `query` or `subject`. In a headerless file they are columns 6 and 7.
 
