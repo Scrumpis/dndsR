@@ -18,18 +18,15 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 | `main` | `957cfe1` | `v0.4.0` |
 | `dev` | See `git log` | `main` was merged into it at `3f86d42`, by the maintainer |
 
-## Resume here: the next release
+## Resume here: v0.5.0
 
-Updated 2026-11-20. The MK maintainer's PRs #9 and #10 are merged and reviewed for integration (channel message 9). The release plan of 2026-11-15 stands; what changed:
+Updated 2026-11-20. The maintainer set the next release as **v0.5.0** (`DECISIONS.md`): pairwise pipeline, alternative estimators, reliability flags, and, marked experimental, `phylo_prepare`/`phylo_busted` and McDonald-Kreitman. The version is bumped on `dev`; nothing is merged, tagged, or published.
 
-1. Done: sync; `check.sh --rcmd-check --regression` passes at `6fe718d` (tests 222, 0 failed, 4 skipped with reasons); whole-genome rerun of v0.4.0 against `9a5c758`, byte-identical (`RELEASE-READINESS.md`).
-2. `--unique-pairs` now works across every batch command and keeps rows with their own MK inputs (`d310f77`, maintainer's choice). Waiting on the MK side: message 9 asks them to update `docs/mcdonald-kreitman.md` and the skill's MK bullet; message 7, item 1 (SNP-file pre-check) is still theirs.
-3. Testing is tiered (`docs/dev/TESTING.md`, `6fe718d`). Routine changes run the tests and the 2-3 minute real-genome fixture (`tools/dev/regression.sh`); whole genomes only for releases or core changes. `regression.yaml`'s first run (at `4bf35cd`) failed only on locale-dependent file order, with every checksum equal; fixed in `92471e1`. Check that its next run passes. `extract_cds` and `calculate_dnds` now stop on sequence names DIAMOND would cut or rewrite (`c2e7233`).
-4. Fixed at the maintainer's instruction: genes and transcripts are always named by GFF3 `ID` (`DECISIONS.md`, 2026-11-20). Before, a GFF with unique gene symbols was named by symbol and lost its annotations, and Ensembl-style IDs were never found. Whole genomes: CDS, dN/dS, and annotated tables byte-identical to v0.4.0; only the `transcript` QC column of 84 chloroplast genes without `transcript_id` changed (`RELEASE-READINESS.md`).
-5. Still for the maintainer before the merge to `main`: MK experimental status, whether the phylogenetic module ships (experimental), the `p_best_fits` BH column, the second author's metadata, the version number, and the fixture's NCBI-licence assumption (`tools/dev/fixtures/README.md`).
-6. Then `RELEASE.md`, each step with the maintainer's approval.
-
-Scratch was at its file quota on 2026-11-20. With the maintainer's approval, the throwaway install tests (`dndsr-runtime/native`) and the micromamba package cache were deleted, and the calibration and validation roots `p3s2b`, `p3s2b_smoke`, `p3s2`, and `v1` were archived as `.tar` files beside where they were (verified with `tar --compare` before the loose files were removed). Logs: `dndsr-runtime/cleanup-2026-11-20.log`, `archive-2026-11-20.log`.
+1. Done: `p_best_fits_adj` (BH over `p_best_fits`, same family as `p_adj`, which is unchanged); docs, tutorial, and skill recommend `--multiple-hits Double --extra-seeds 2,3` and `p_best_fits_adj`; release labels; release notes draft (`release-notes-0.5.0.md`); readiness (`RELEASE-READINESS.md`).
+2. Blocking, for the maintainer: the second author's preferred name and ORCID; accepting the fixture's NCBI terms (`tools/dev/fixtures/README.md`). For the MK maintainer: the stale MK line in `skills/dndsr/references/gaps.md` (channel message 10).
+3. Then, with approval: `RELEASE.md` step 5 (clone commands to `--branch v0.5.0`), `tools/dev/test-agent.sh claude`, merge, tag, image, digests.
+4. Future, not in v0.5.0: lineage-level selection for a comparative project (`phylo_branch_omega`, `phylo_absrel`, `phylo_relax`, `phylo_summarize`). Review and recommended order: [phylo-lineage-plan.md](phylo-lineage-plan.md). First decision: the engine for branch ω (PAML, a new dependency, or HyPhy).
+5. Heavier commands go through Slurm, never the login node (maintainer, 2026-11-20).
 
 ## Next
 

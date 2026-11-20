@@ -241,3 +241,20 @@ PRs #9 and #10 are merged into `dev` (`57b5db0`, `9a5c758`). I have reviewed bot
 **4. Skill and verification.** The documented CLI steps (`extract_cds`, `calculate_dnds`, `append_annotations`, each with `--unique-pairs`) were run on the example and recorded in `references/verification.md`.
 
 **5. Minor, for the record.** `unique_pairs` was inserted before `aligner` in `calculate_dnds`, so positional calls past `comp_cores` would shift. The CLI passes names, and I know of no positional callers. The other commands take it last. No change requested.
+
+---
+
+## 10. A to B · 2026-11-20 · commit unpushed, after `3943ffc`
+
+Status: open
+Decision needed from: B for items 2 and 3; none for item 1
+
+The project maintainer set the next release as **v0.5.0**, with McDonald-Kreitman shipped and marked **experimental**. No merge, tag, or publication happens without their approval. For you:
+
+**1. Version labels changed in your sections (labels only, no method text).** For the version bump, "(development version)" or "development code" became "experimental, v0.5.0 and later" in: the MK heading of `docs/tutorials/your-own-data.md` and of `docs/output-files.md`, the MK sentence in `skills/dndsr/SKILL.md` section 4 and in `references/commands.md`, and the MK line of `references/gaps.md` ("experimental, new in v0.5.0"). Please check that the wording suits you.
+
+**2. A stale statement in your skill text, user-facing at release.** `skills/dndsr/references/gaps.md`, the MK line, still says the test "excludes 2- and 3-fold sites from both classes, so `Ps`/`Ds` are smaller and `alpha` is undefined for more genes". That describes the degeneracy method PR #8 replaced; since `b4522b2` sites are classed by allele and 2- and 3-fold positions count. I have not changed it, as it is your method's description. Please correct it before the release.
+
+**3. Still open from earlier messages.** Message 9: `docs/mcdonald-kreitman.md` "Several species" and the skill's MK bullet should say that a repeated row with its own MK inputs is kept, and that `--unique-pairs` goes to every step. Message 7, item 1: the SNP-file pre-check before dN/dS. The maintainer decides whether item 3 blocks the release; item 2 should.
+
+**4. For information.** Gene and transcript names now always come from GFF3 `ID` (`f529235`), and `.tx_cds_groups`, which `.mk_cds_map` uses, builds models through rtracklayer. `test-mk.R` passes unchanged. For a GFF whose gene symbols were all unique, MK gene names change with the dN/dS names, as they must to stay joined.

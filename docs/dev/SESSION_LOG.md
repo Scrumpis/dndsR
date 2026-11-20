@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-20 (later): gene IDs, name checks, CI locale fix, v0.5.0 preparation
+
+- **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
+- **Done:** genes named by GFF3 ID (`f529235`); sequence-name checks (`c2e7233`); regression locale fix after the first `regression.yaml` run failed (`92471e1`); `p_best_fits_adj` and calibration docs; v0.5.0 version and labels; release notes draft; lineage-level plan (review only); channel message 10.
+- **Verified:** gate with `--rcmd-check --regression` (236 tests, 0 failed, 4 skipped; regression byte-identical); BUSTED tests with HyPhy (3 of 3); the recommended settings on the example with an independent BH check; whole genomes for the gene-ID fix (CDS, dN/dS, annotated tables byte-identical; one QC column for 84 chloroplast transcripts); CI green at `3943ffc`.
+- **Found:** safeguards block allowed pushes while a version bump is uncommitted (the test clones the last commit and copies the working tree's skill), so rerun them after committing a bump. A test run on the login node was stopped at the maintainer's request.
+- **Not done:** no merge, tag, or release; `test-agent.sh` not rerun.
+
 ## 2026-11-20: PR #9-#10 integration, --unique-pairs across commands, tiered testing
 
 - **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839`

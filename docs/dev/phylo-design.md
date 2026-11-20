@@ -1,6 +1,6 @@
 # Phylogenetic selection module: design
 
-Approved by the maintainer on 2026-11-13: HyPhy as an external engine, BUSTED first, phases P0 and P1, then P2 after review (decisions below); stop before P3. The module is experimental and unreleased (development version 0.4.0.9000). This records the design and the P0 decisions. User documentation: [phylo-methods.md](../phylo-methods.md). Evidence: [phylo-busted-wrapper.md](../validation/phylo-busted-wrapper.md).
+Approved by the maintainer on 2026-11-13: HyPhy as an external engine, BUSTED first, phases P0 and P1, then P2 after review (decisions below); stop before P3. The module is experimental; it ships in v0.5.0 (`DECISIONS.md`, 2026-11-20). This records the design and the P0 decisions. User documentation: [phylo-methods.md](../phylo-methods.md). Evidence: [phylo-busted-wrapper.md](../validation/phylo-busted-wrapper.md).
 
 ## Scope and separation
 
@@ -81,8 +81,8 @@ Nothing else is repaired, masked, trimmed, or realigned.
 | P0 | Decisions, design | Done, this file and `DECISIONS.md` |
 | P1 | `phylo_busted` on user-supplied codon alignments, with optional gene trees; QC; provenance; example; tests; container and conda changes, not published | Done; see the validation page |
 | P2 | `phylo_prepare`: genomes or CDS and orthogroups to codon alignments and labelled trees, with QC, member and exclusion records, provenance, and a manifest; gene-tree discordance; multiple starts as diagnostics; outcome bases | Done; [phylo-prepare.md](../validation/phylo-prepare.md) |
-| P3 | Scientific calibration: simulation, published controls, optimizer variability and multistart policy, multiple-hit settings, BUSTED-E, discordance | Not started; awaiting review |
-| P4 | aBSREL: branch-level results and their correction | Not started |
+| P3 | Scientific calibration: simulation, published controls, optimizer variability and multistart policy, multiple-hit settings, BUSTED-E, discordance | Stages 2A and 2B done, guidance approved: [stage 2B](../validation/phylo-calibration-stage2b.md); `p_best_fits_adj` added 2026-11-20 |
+| P4 | aBSREL: branch-level results and their correction | Not started; reviewed with branch ω, RELAX, and summaries in [phylo-lineage-plan.md](phylo-lineage-plan.md) |
 | P5 | RELAX | Not started |
 | P6 | Enrichment over the tested set, and plots | Not started |
 

@@ -1,11 +1,15 @@
 # Release readiness
 
-## Next release candidate: `dev` at `9a5c758` and later (not yet a candidate)
+## v0.5.0 candidate: `dev` after `3943ffc`
 
-**Assessed 2026-11-14 (US Eastern). Not ready for release; blockers below.** 58 commits since v0.4.0. Version `0.4.0.9000`; no release number chosen.
+**Assessed 2026-11-20. Version set to 0.5.0 (`DESCRIPTION`, skill, `CITATION.cff`, NEWS); not merged, tagged, or published.** Scope (maintainer, `DECISIONS.md`): validated pairwise pipeline, alternative estimators, reliability flags; `phylo_prepare` and `phylo_busted` experimental; McDonald-Kreitman experimental. Release notes draft: [release-notes-0.5.0.md](release-notes-0.5.0.md).
 
 | Check | Run | Result |
 |---|---|---|
+| `check.sh --rcmd-check --regression`, Slurm, 8 CPUs, 48 GB, v0.4.0 image | This tree before commit | Tests 236, 0 failed, 0 errors, 4 skipped (HyPhy, KaKs_Calculator absent from the image); R CMD check ok; tutorial ok; skill ok; fixture regression byte-identical. Safeguards: 3 allowed pushes blocked, because the test clones the last commit (version 0.4.0.9000) and copies the working tree's skill (0.5.0); rerun after the commit, below |
+| BUSTED tests with HyPhy 2.5.103 (`test-phylo-busted.R`, the 3 tests the gate skips) | Slurm, this tree | 3 tests, 26 expectations, 0 failed, none skipped |
+| Recommended settings on the example, with HyPhy (`--multiple-hits Double --extra-seeds 2,3`) | Slurm, this tree | 8 tested, 3 starts; `p_adj` and `p_best_fits_adj` equal an independent BH (6.7e-16) |
+| CI at `3943ffc` (pushed) | GitHub | All five workflows pass, `regression` included; the container workflow's fixture step passes in the freshly built image |
 | `R-CMD-check`: macOS, Windows, Ubuntu release, oldrel, devel | CI at `b65bf8b` | Pass. Windows failed at `3a62ad2` and `60339ce` on a test expectation (path separators); fixed in the test, `be1a7fa` |
 | `install`, `skill`, `container` | CI at `b65bf8b` | Pass. `container` failed once at `3a62ad2`, in the documented-installer step, and passed at the next two commits with the same code; logs need a login, so the cause is unconfirmed |
 | `R CMD check --as-cran` on the tarball, local development image (HyPhy, KaKs_Calculator) | Local at `3a62ad2` | 0 errors, 0 warnings, 2 notes (new submission; no pandoc) |
@@ -16,20 +20,18 @@
 | Real-genome fixture regression (`tools/dev/regression.sh`, new, [TESTING.md](TESTING.md)) | v0.4.0 image, `9a5c758` plus this session's change, and v0.4.0 itself | Baseline made with the current tree; v0.4.0 reproduces every output it writes (508 pairs, 0 values changed). Fixture pairs equal the full-genome run's for all 503 shared pairs: `tools/dev/fixtures/README.md` |
 | Phylogenetic calibration, stages 2A and 2B | Simulation, `3603efc` | Reported: `docs/validation/phylo-calibration-stage2b.md`; guidance approved by the maintainer |
 
-**What changed for users since v0.4.0** (NEWS): the experimental phylogenetic commands; `--dnds-method` alternatives through KaKs_Calculator; the reliability table; the development McDonald-Kreitman test; header rows in comparison files now work. Pairwise results with default settings are unchanged, as shown above.
-
 ### Blocking the release
 
-1. **McDonald-Kreitman: keep experimental, or hold back.** Its method and output columns changed on 2026-11-14 (PR #8: allele-aware classes, BED needs ALT in column 4, `snps_midfold` and `div_steps_midfold` removed). It is tested on designed examples only, not on real population data. Real-data testing and the maintainer's approval come before it is released as anything but experimental. Open integration point: SNP-file errors appear only after dN/dS (channel message 7).
-2. **Phylogenetic module: still experimental.** The calibration covers one five-taxon tree in simulation. No published image includes HyPhy, and the release that carries the module is an open decision. `p_adj` corrects `p_value`, not the recommended `p_best_fits`; whether to add a corrected column is open (`DECISIONS.md`).
-3. **Author metadata.** Confirm the second author's preferred name and optional ORCID before publication (`CITATION.cff`, `.zenodo.json`, `DESCRIPTION`).
-4. **Maintainer steps.** Choose the version number; then `RELEASE.md` (merge, tag, image, digests in the docs). Each needs the maintainer's approval.
+1. **Second author's metadata.** Both authors are listed the same way in `DESCRIPTION`, `CITATION.cff`, and `.zenodo.json` (Miles Roberts, no ORCID). Confirm the preferred name and an optional ORCID. Maintainer.
+2. **Fixture redistribution.** NCBI places no restrictions on use or distribution, but submitters (TAIR/Araport, JGI) may claim rights NCBI cannot waive; quoted in `tools/dev/fixtures/README.md`. Accept, or keep the fixture out of the repository. Maintainer.
+3. **MK skill text is wrong.** `skills/dndsr/references/gaps.md` still describes the replaced degeneracy method ("excludes 2- and 3-fold sites"). MK maintainer, channel message 10.
+4. **Approval steps.** `RELEASE.md` "Before release" step 5 (clone commands to `--branch v0.5.0`) is left until the merge is approved, since those commands fail until the tag exists; then merge, tag, image, digests, each with approval.
 
-### Not blocking, but open
+### Not blocking, unless the maintainer says so
 
-- `check.sh` runs `R CMD check` only with `--rcmd-check` (`tools/dev/rcmd-check.sh`, added after `fda5dbe`); without it, CI is where check runs. At that commit, in the v0.4.0 image: `Status: OK`.
-- The `pre-push` hook's `feat/*` path (PR #8) is now covered by `test-safeguards.sh`: creating and fast-forwarding are allowed; force-pushing, deleting, and pushing to any other branch are blocked.
-
+- MK: message 9's documentation of `--unique-pairs` with MK rows, and message 7's SNP-file pre-check (MK maintainer).
+- `tools/dev/test-agent.sh claude` and a whole-genome rerun: not rerun. No pairwise code changed since the whole-genome rerun at `f529235`'s snapshot; `RELEASE.md` asks for the agent test before release.
+- The `mamba-org/setup-micromamba@v2` action runs on a deprecated Node.js version (CI warning only).
 
 ## v0.4.0 candidate
 
