@@ -6,8 +6,9 @@ on:
   push:
     branches: [dev]
     paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/regression.sh", "tools/dev/fixtures/**", "tools/dev/container-checks.sh", "tools/dev/run-package-tests.R", "tests/**", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
+  # Pull requests into dev too: a feature branch must pass in the image it will ship in.
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions: read-all

@@ -8,7 +8,7 @@ on:
       - "docs/**"
       - ".github/ISSUE_TEMPLATE/**"
   pull_request:
-    branches: [main, master]
+    branches: [main, master, dev]
 
 name: R-CMD-check.yaml
 
