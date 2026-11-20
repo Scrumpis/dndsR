@@ -2,6 +2,16 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-20: PR #9-#10 integration, --unique-pairs across commands, tiered testing
+
+- **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839`
+- **Synced:** fast-forward to `9a5c758` (PRs #9, #10), hooks reinstalled.
+- **Done:** PR #9 closes message 7, item 2. PR #10's `--unique-pairs` broke `append_annotations` on the skipped row and dropped reversed MK rows; fixed per the maintainer's choices (`d310f77`). Tiered testing with a public *A. thaliana*-*A. lyrata* fixture, regression runner, skip reasons, and CI (`6fe718d`). Channel message 9.
+- **Verified (v0.4.0 image):** `check.sh --rcmd-check --regression`: tests 222, 0 failed, 0 errors, 4 skipped (HyPhy, KaKs_Calculator absent); R CMD check, tutorial, safeguards, skill ok; fixture byte-identical. Whole genomes, v0.4.0 against `9a5c758`: CDS, QC, dN/dS, annotated tables byte-identical on all three pairs. Fixture: 503 of 503 shared pairs identical to the whole-genome run; v0.4.0 reproduces it.
+- **Found:** gene IDs switch between locus tag and symbol with the GFF's name uniqueness, and annotations then go missing (open question). 24 GB is too little for `check.sh` on 8 workers (OOM in `test-threads.R`); runbook says 48 GB. Host `python3` dies with "Illegal instruction" on some compute nodes; the fixture comparison runs in R in the image.
+- **Not done:** `regression.yaml` not yet run on GitHub. No end-to-end run with two SNP files for one pair. No push, merge, tag, or release.
+- **Cleanup (approved):** scratch file quota; see STATUS.
+
 ## 2026-11-15: R CMD check in the local gate; feat/* safeguard tests
 
 - **Session:** `5e80dd8b-3ab2-4679-a25e-00f0d7dc3366`

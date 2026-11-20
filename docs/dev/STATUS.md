@@ -20,17 +20,16 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 
 ## Resume here: the next release
 
-Agreed with the maintainer at the end of the 2026-11-15 session. The maintainer is waiting for the MK maintainer's final pull request, and then merges `dev` to `main`. When resumed:
+Updated 2026-11-20. The MK maintainer's PRs #9 and #10 are merged and reviewed for integration (channel message 9). The release plan of 2026-11-15 stands; what changed:
 
-1. Sync, run `tools/dev/setup.sh`, and read the MK channel for new messages. Message 7, items 1 (SNP-file pre-check before dN/dS) and 2 (stale `.mk_read_snps` comment), wait on the MK side.
-2. Once the MK pull request is merged into `dev`: review it for integration only (not its method), run `tools/dev/check.sh --rcmd-check`, rerun the real-genome comparison (`tools/dev/validation/`, results outside Git), and update `RELEASE-READINESS.md`.
-3. Decisions for the maintainer, before the merge to `main`:
-   - Does MK ship marked experimental? They have said it stays experimental until tested on real data and approved by them.
-   - Does the phylogenetic module ship in this release, marked experimental? Agent recommendation: yes; it is complete as experimental, with documented limits (one five-taxon tree in simulation). `tools/Dockerfile` already installs HyPhy 2.5.103, so the next published image is the first to run it.
-   - Whether to add a BH-corrected `p_best_fits` column (an output change, needs approval; not a release blocker while the docs explain `p_adj`). Dropping members and duplication-aware orthology are v1.0 questions.
-   - The second author's preferred name and optional ORCID (`CITATION.cff`, `.zenodo.json`, `DESCRIPTION`).
-   - The version number.
-4. Then `RELEASE.md`, each step with the maintainer's approval: merge to `main`, tag, image, digests in the docs, release assets.
+1. Done: sync; `check.sh --rcmd-check --regression` passes at `6fe718d` (tests 222, 0 failed, 4 skipped with reasons); whole-genome rerun of v0.4.0 against `9a5c758`, byte-identical (`RELEASE-READINESS.md`).
+2. `--unique-pairs` now works across every batch command and keeps rows with their own MK inputs (`d310f77`, maintainer's choice). Waiting on the MK side: message 9 asks them to update `docs/mcdonald-kreitman.md` and the skill's MK bullet; message 7, item 1 (SNP-file pre-check) is still theirs.
+3. Testing is tiered (`docs/dev/TESTING.md`, `6fe718d`). Routine changes run the tests and the 2-3 minute real-genome fixture (`tools/dev/regression.sh`); whole genomes only for releases or core changes. `regression.yaml` is new and has not yet run on GitHub: check its first run after the push.
+4. New open question for the maintainer: gene IDs depend on whether any gene `Name` repeats in the GFF, and `append_annotations` then misses genes (`DECISIONS.md`). Not a regression; present in v0.4.0.
+5. Still for the maintainer before the merge to `main`: MK experimental status, whether the phylogenetic module ships (experimental), the `p_best_fits` BH column, the second author's metadata, the version number, and the fixture's NCBI-licence assumption (`tools/dev/fixtures/README.md`).
+6. Then `RELEASE.md`, each step with the maintainer's approval.
+
+Scratch was at its file quota on 2026-11-20. With the maintainer's approval, the throwaway install tests (`dndsr-runtime/native`) and the micromamba package cache were deleted, and the calibration and validation roots `p3s2b`, `p3s2b_smoke`, `p3s2`, and `v1` were archived as `.tar` files beside where they were (verified with `tar --compare` before the loose files were removed). Logs: `dndsr-runtime/cleanup-2026-11-20.log`, `archive-2026-11-20.log`.
 
 ## Next
 

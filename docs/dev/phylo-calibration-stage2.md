@@ -98,7 +98,7 @@ Stage 2B then takes the retained configurations to the full study's scope: 1,000
 - Seeds: simulation seeds in the scenario table, HyPhy seeds 1, 2, and 3.
 - Resumable: each unit writes its outputs and then a `DONE` marker holding a hash of its specification. A rerun skips completed units and redoes incomplete ones.
 - Raw results kept outside the repository: simulated and filtered alignments, results tables, provenance, logs, and each unit's HyPhy folder (JSON for every start) as a tarball.
-- Results root: `dndsr-runtime/p3s2` on the HPC scratch space. Only summaries and the report come into the repository.
+- Results root: `dndsr-runtime/p3s2` on the HPC scratch space. Only summaries and the report come into the repository. Archived on 2026-11-20, unchanged, as `dndsr-runtime/p3s2.tar` to save scratch file quota (`tar -xf p3s2.tar` restores it; `tar --compare` was clean before the loose files were removed).
 
 ## Change log
 
