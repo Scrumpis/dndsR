@@ -28,7 +28,7 @@ If `dndsr --help` lists commands, go to step 3. Without containers, use the test
 Tell the user first: this downloads 1.3 GB, and writes to `~/.config/dndsr`, `~/.dndsr/rlib`, and `~/.local/bin`. The image holds dependencies; dndsR is installed from the clone, which must stay in place. Replace `singularity` with `apptainer` if that is what is available (untested).
 
 ```
-git clone --branch v0.4.0 https://github.com/Scrumpis/dndsR
+git clone --branch v0.5.0 https://github.com/Scrumpis/dndsR
 cd dndsR
 singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:f1b42d9d338b406ec23daca1bb146ed0329db29d21a24a6871158996aa0572da
 tools/dndsr-install install --engine singularity --sif dndsr.sif
@@ -81,7 +81,7 @@ A complete run on public genomes, with measured time and memory: [docs/tutorials
 
 ## 4b. Selection tests across species (experimental, v0.5.0 and later)
 
-`phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests: does any site show dN/dS above 1 on chosen foreground branches? They are not in v0.4.0. Use them only if `dndsr --help` lists `phylo_prepare`, and tell the user they are experimental and unreleased, and calibrated only in simulation on one five-taxon tree. They need MAFFT (in the dndsR image) and HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs HyPhy with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
+`phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests: does any site show dN/dS above 1 on chosen foreground branches? They are new in v0.5.0. Use them only if `dndsr --help` lists `phylo_prepare`, and tell the user they are experimental, and calibrated only in simulation on one five-taxon tree. They need MAFFT (in the dndsR image) and HyPhy 2.5.103, which published images up to v0.4.0 lack; the tested route installs HyPhy with micromamba and binds it into the container. Steps: [docs/tutorials/phylogenetic-selection.md](../../docs/tutorials/phylogenetic-selection.md).
 
 ```
 dndsr phylo_example

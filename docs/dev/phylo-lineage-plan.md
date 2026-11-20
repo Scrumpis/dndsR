@@ -1,6 +1,6 @@
 # Lineage-level selection: architecture review and plan
 
-Review only, 2026-11-20. Nothing here is implemented, and none of it is in v0.5.0. The motivating question: compare lineage-level selection with LTR activity and genome expansion or contraction across species, accounting for branch length, sampling, and phylogenetic nonindependence. Read with [phylo-design.md](phylo-design.md).
+Review only, 2026-11-20. Nothing here is implemented, and none of it is in v0.5.0. The maintainer set the order on 2026-11-20: PAML branch models, then lineage summaries, aBSREL, and RELAX (`DECISIONS.md`). The motivating question: compare lineage-level selection with LTR activity and genome expansion or contraction across species, accounting for branch length, sampling, and phylogenetic nonindependence. Read with [phylo-design.md](phylo-design.md).
 
 ## What already exists and can be reused
 
@@ -28,6 +28,16 @@ Checked by reading `R/phylo_*.R` at `3943ffc`.
 - **Sampling.** Each branch is estimated from a different set of orthogroups, because of missing taxa and pruning. Branch comparisons must report and, where possible, condition on that set.
 - **Ascertainment.** Only single-copy orthogroups are tested. Genome expansion and contraction are about gene families that are rarely single-copy, so lineages with more duplication are under-represented. This bears directly on the LTR and genome-size question and must be stated or addressed (duplication-aware orthology is an open v1.0 question).
 - **Nonindependence.** Branch-level traits share ancestry. dndsR should export a tidy branch table (species-tree branch, ω and its uncertainty, dS, counts) that fits phylogenetic comparative tools such as phylogenetic generalised least squares in established R packages (for example `phylolm`, `caper`), rather than reimplement comparative regression. LTR activity and genome size per branch (for example from ancestral reconstruction) come from outside dndsR.
+
+## HyPhy alternative to PAML branch models (checked 2026-11-20)
+
+Read in HyPhy 2.5.103's own analysis files (`share/hyphy/TemplateBatchFiles`), not run:
+
+- **aBSREL's baseline stage** fits "MG94xREV with separate omega for each branch": one dN/dS per branch, no site-to-site variation, a local model (`terms.local`), and writes each branch's "Baseline MG94xREV omega ratio" to its JSON. That is the closest HyPhy analogue of PAML's free-ratio model (`model = 1`).
+- It is **not the same model.** MG94 and GY94 (codeml) define ω on different scales and differ in codon frequencies (MG94's nucleotide-position frequencies against codeml's `CodonFreq` options), so the same data can give different per-branch ω. Equivalence would have to be shown, not assumed, on simulated alignments with known per-branch ω and on real orthogroups, with agreement criteria fixed in advance.
+- PAML's **two-ratio and multi-ratio branch models** (`model = 2`, with marked lineages) have no standard HyPhy counterpart: `FitModel.bf` and `SingleOmega.bf` fit one ω for the whole tree, and `TestBranchDNDS.bf` is a legacy interactive script.
+
+So PAML stays first, as decided. The aBSREL baseline is a candidate cross-check, used as a substitute only after an equivalence study.
 
 ## Recommended order (a recommendation, not a decision)
 
