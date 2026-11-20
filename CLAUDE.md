@@ -10,7 +10,7 @@ Verified by reading the code on `dev`:
 - `R/cli_main.R` finds commands by looking for `cli_*` functions in the namespace. `R/cli_parse.R` parses arguments. `inst/scripts/dndsr` calls `dndsR::cli_main()`.
 - `calculate_dnds()` wraps `orthologr::dNdS()`. Its defaults are `aligner = "diamond"`, `sensitivity_mode = "fast"`, and `dnds_method = "Comeron"`, which stays the default for v0.3.0.
 - The published image (v0.2.0) holds dependencies only: `tools/dndsr-install` installs dndsR from the clone into a host R library and creates a `dndsr` shim that runs it in the container. `tools/Dockerfile` now also installs dndsR in the image, for future releases.
-- Tests are in `tests/testthat/`. Expected values come from outside dndsR. `dndsr verify_example` is the user-facing check. Real-genome comparisons are in `tools/dev/validation/`, and should be rerun before a release.
+- Tests are in `tests/testthat/`. Expected values come from outside dndsR. `dndsr verify_example` is the user-facing check. `tools/dev/regression.sh` runs the whole pipeline on a small public real-genome fixture (`tools/dev/fixtures/`) in minutes. Whole-genome comparisons are in `tools/dev/validation/`, and are rerun before a release or after a core change, not for routine changes: [docs/dev/TESTING.md](docs/dev/TESTING.md).
 - Workflows in `.github/workflows/` run on `dev` and pull requests. `publish.yaml` publishes only from approved tags, and is off until enabled.
 
 Validation evidence and its limits are in `docs/validation/`. Say which claims you verified and which are assumptions.

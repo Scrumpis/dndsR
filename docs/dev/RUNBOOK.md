@@ -37,12 +37,16 @@ tools/dev/run-tests.sh
 All the checks, side by side, on the CPUs of a Slurm allocation:
 
 ```
-srun -c 8 --mem=24G --time=10 tools/dev/check.sh          # about 100 s: run before committing
+srun -c 8 --mem=48G --time=10 tools/dev/check.sh          # about 3 min: run before committing
 srun -c 8 --mem=24G --time=10 tools/dev/check.sh --fast   # leaves out the tutorial and slowest tests, while developing
-srun -c 8 --mem=24G --time=20 tools/dev/check.sh --rcmd-check   # adds R CMD check, as CI runs it: before a pull request
+srun -c 8 --mem=48G --time=20 tools/dev/check.sh --rcmd-check   # adds R CMD check, as CI runs it: before a pull request
+srun -c 8 --mem=48G --time=20 tools/dev/check.sh --regression   # adds the real-genome fixture regression: changes to R/
+srun -c 8 --mem=32G --time=15 tools/dev/regression.sh --threads 8   # the fixture regression alone, about 2 min
 tools/dev/rcmd-check.sh --as-cran                         # R CMD check alone; extra arguments go to it
 tools/dev/run-tests.sh --fast enrichment                  # only the files that match
 ```
+
+Which checks a change needs, and when whole genomes are rerun: [TESTING.md](TESTING.md). With 8 workers, 24 GB is no longer enough: on 2026-11-20 an orthologr worker was killed for memory (`test-threads.R`, an `unserialize` error), so ask for 48 GB. A compute node's `/tmp` is its own, so give `regression.sh --keep` a folder on shared storage to inspect a run from the login node.
 
 Test files run in parallel, using `SLURM_CPUS_PER_TASK`, or `DNDSR_TEST_CPUS`. A file runs on one worker, so the longest file sets the wall time: keep slow tests in files of their own. `R CMD check` still runs them one at a time.
 

@@ -1,0 +1,42 @@
+# Real-genome fixture regression (docs/dev/TESTING.md, tier 2): the full pipeline on
+# ~540 public Arabidopsis genes, in the pinned release image, compared byte for byte
+# with the committed baseline. Runs when code that can change results changes.
+name: regression
+
+on:
+  push:
+    branches: [dev]
+    paths: ["R/**", "DESCRIPTION", "NAMESPACE", "tools/Dockerfile", "tools/dev/regression.sh", "tools/dev/in-container.sh", "tools/dev/fixtures/**", ".github/workflows/regression.yaml"]
+  pull_request:
+    paths: ["R/**", "DESCRIPTION", "NAMESPACE", "tools/Dockerfile", "tools/dev/regression.sh", "tools/dev/in-container.sh", "tools/dev/fixtures/**", ".github/workflows/regression.yaml"]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: apptainer
+          create-args: -c conda-forge apptainer=1.5.4
+
+      - name: Allow user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # The image the baseline was made in. Change it only with a new baseline.
+      - name: Pull the pinned image
+        shell: bash -el {0}
+        run: apptainer pull "$RUNNER_TEMP/dndsr.sif" docker://scrumpis/dndsr@sha256:f1b42d9d338b406ec23daca1bb146ed0329db29d21a24a6871158996aa0572da
+
+      - name: Run the fixture regression
+        shell: bash -el {0}
+        run: |
+          set -o pipefail
+          export DNDSR_SIF="$RUNNER_TEMP/dndsr.sif" DNDSR_DEV_LIB="$RUNNER_TEMP/rlib"
+          tools/dev/regression.sh --threads 4 | tee "$RUNNER_TEMP/regression.txt"
+          grep -E '^(pipeline|regression):' "$RUNNER_TEMP/regression.txt" >> "$GITHUB_STEP_SUMMARY"

@@ -17,6 +17,18 @@ wall <- system.time(
                           reporter = "summary", stop_on_failure = FALSE)
 )[["elapsed"]]
 d <- as.data.frame(r)
+# Name every skipped test and its reason, so a skip is never silent. A file-level skip
+# (a missing tool or package) is reported once per file, as testthat records it.
+skips <- do.call(rbind, lapply(r, function(t) {
+  s <- Filter(function(e) inherits(e, "expectation_skip"), t$results)
+  if (!length(s)) return(NULL)
+  data.frame(file = t$file, test = t$test,
+             reason = sub("^Reason: ", "", vapply(s, conditionMessage, ""))[1])
+}))
+if (!is.null(skips) && nrow(skips)) {
+  cat("\nSKIPPED (file: test: reason)\n")
+  cat(sprintf("SKIP %s: %s: %s\n", skips$file, skips$test, skips$reason), sep = "")
+}
 cat(sprintf("\nRESULT tests=%d expectations=%d failed=%d errors=%d skipped=%d wall=%.0fs\n",
             nrow(d), sum(d$nb), sum(d$failed), sum(d$error), sum(d$skipped), wall))
 if (sum(d$failed) + sum(d$error) > 0L) {

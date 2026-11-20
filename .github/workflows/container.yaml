@@ -5,7 +5,7 @@ name: container
 on:
   push:
     branches: [dev]
-    paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/container-checks.sh", "tools/dev/run-package-tests.R", "tests/**", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
+    paths: ["tools/Dockerfile", "tools/dndsr-install", "tools/dev/regression.sh", "tools/dev/fixtures/**", "tools/dev/container-checks.sh", "tools/dev/run-package-tests.R", "tests/**", "R/**", "DESCRIPTION", "NAMESPACE", "inst/**", ".dockerignore", ".github/workflows/container.yaml"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -74,6 +74,18 @@ jobs:
           mkdir -p work-apptainer
           cd work-apptainer
           apptainer exec --cleanenv --bind "$PWD" --bind "$GITHUB_WORKSPACE" --pwd "$PWD" ../dndsr.sif bash "$GITHUB_WORKSPACE/tools/dev/container-checks.sh" "$version"
+
+      # Informative only: this image is freshly built, so its dependencies can differ from
+      # the pinned image the baseline was made in. A difference here is a dependency
+      # change to look at (docs/dev/TESTING.md), not a failure of the code.
+      - name: Fixture regression in the freshly built image (informative)
+        continue-on-error: true
+        shell: bash -el {0}
+        run: |
+          set -o pipefail
+          export DNDSR_SIF="$PWD/dndsr.sif" DNDSR_DEV_LIB="$RUNNER_TEMP/rlib-fixture"
+          tools/dev/regression.sh --threads 4 2>&1 | tee "$RUNNER_TEMP/fixture.txt"
+          grep -E '^(pipeline|regression|pairs|dN|dS|dNdS)' "$RUNNER_TEMP/fixture.txt" >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Test the documented installer with Apptainer
         shell: bash -el {0}

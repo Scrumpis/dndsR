@@ -7,17 +7,20 @@
 # DNDSR_TEST_CPUS=4 to cap the test workers too.
 # --rcmd-check adds R CMD check on the built tarball (tools/dev/rcmd-check.sh, about 95 s),
 # which catches what only check sees, such as a namespace note or a documentation mismatch.
+# --regression adds the real-genome fixture regression (tools/dev/regression.sh, about 2-4 min):
+# the full pipeline on ~540 public Arabidopsis genes, compared with the committed baseline.
 # Always includes an import check: every pkg::fun in R/ must be declared in DESCRIPTION,
 # which is what R CMD check reports and what CI caught on 2026-11-14.
 # Exits nonzero if any check fails, and prints the end of its output.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-fast=; serial=; rcmd=
+fast=; serial=; rcmd=; regress=
 for arg in "$@"; do
   case "$arg" in
     --fast) fast=--fast ;;
     --serial) serial=1 ;;
     --rcmd-check) rcmd=1 ;;
+    --regression) regress=1 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -35,6 +38,7 @@ check_skill() { start skill "$here/in-container.sh" Rscript --vanilla "$here/val
 check_safeguards() { start safeguards "$here/test-safeguards.sh"; }
 check_tutorial() { start tutorial "$here/test-tutorial.sh"; }
 check_rcmd() { start rcmdcheck "$here/rcmd-check.sh"; }
+check_regression() { start regression "$here/regression.sh" --threads "${DNDSR_TEST_CPUS:-${SLURM_CPUS_PER_TASK:-4}}"; }
 
 if [ -n "$serial" ]; then
   # One check at a time: the low-memory route (limited RAM, WSL, a small laptop).
@@ -44,10 +48,12 @@ if [ -n "$serial" ]; then
   check_safeguards; wait
   [ -n "$fast" ] || { check_tutorial; wait; }
   [ -z "$rcmd" ] || { check_rcmd; wait; }
+  [ -z "$regress" ] || { check_regression; wait; }
 else
   check_imports; check_tests; check_skill; check_safeguards
   [ -n "$fast" ] || check_tutorial
   [ -z "$rcmd" ] || check_rcmd
+  [ -z "$regress" ] || check_regression
   wait
 fi
 
@@ -57,5 +63,6 @@ for f in "$log"/*.result; do
   if [ "$rc" = 0 ]; then printf 'ok    %-11s %4ss\n' "$name" "$secs"
   else printf 'FAIL  %-11s %4ss\n' "$name" "$secs"; tail -25 "$log/$name.log"; failed=1; fi
 done
-grep -h '^RESULT' "$log/tests.log" || true
+grep -hE '^(SKIP|RESULT) ' "$log/tests.log" || true
+[ -z "$regress" ] || grep -hE '^(pipeline|regression):' "$log/regression.log" || true
 exit "$failed"

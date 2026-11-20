@@ -1,6 +1,6 @@
 # Release readiness
 
-## Next release candidate: `dev` at `b65bf8b` and later (not yet a candidate)
+## Next release candidate: `dev` at `9a5c758` and later (not yet a candidate)
 
 **Assessed 2026-11-14 (US Eastern). Not ready for release; blockers below.** 58 commits since v0.4.0. Version `0.4.0.9000`; no release number chosen.
 
@@ -11,6 +11,8 @@
 | `R CMD check --as-cran` on the tarball, local development image (HyPhy, KaKs_Calculator) | Local at `3a62ad2` | 0 errors, 0 warnings, 2 notes (new submission; no pandoc) |
 | `tools/dev/check.sh` | Local at `b65bf8b`; again after `fda5dbe` with `--rcmd-check` | At `b65bf8b`: tests 195, 0 failed; safeguards 1 failure (stale installed `pre-push` copy). After `fda5dbe`: tests 196, 0 failed; R CMD check `Status: OK`; tutorial OK; after `setup.sh`, safeguards 97 passed, 0 failed |
 | v0.4.0 against `dev`, real genomes, data read-only, the same v0.4.0 image for both (`tools/dev/validation/`, results outside Git) | Public *A. thaliana*–*A. lyrata* pair and two unpublished pairs, at `b65bf8b` | Every CDS FASTA, CDS QC table, dN/dS table, and annotated table **byte-identical** to v0.4.0. Differences: the new `_dnds_reliability.tsv`; provenance records `dnds_method` and the development version; logs differ in times and process IDs. On the public pair, `compare-versions.R` with gffread 0.12.9: every CDS compared matches gffread (0 differ, 83 not comparable by name, as before); the same 22,149 pairs with the same partners; all 22,094 comparable dN/dS values identical. Details: [public-genome.md](../validation/public-genome.md#v040-against-dev) |
+| v0.4.0 against `dev`, real genomes again, after PRs #9 and #10 (data read-only, same v0.4.0 image, the v0.4.0 outputs of the row above reused as the baseline; its provenance confirmed: run log and provenance say `957cfe1` and dndsR 0.4.0, inputs match their recorded SHA-256) | Public pair and two unpublished pairs, at `9a5c758` | Every CDS FASTA, CDS QC table, dN/dS table, and annotated table **byte-identical** to v0.4.0 on all three pairs (7 and 13 files). Differences: the reliability tables v0.4.0 does not write; provenance (version, method); logs (times, process IDs). Checksums of both sets are kept beside the results, outside Git. `compare-versions.R` against gffread was not rerun: the CDS are byte-identical to those it checked at `b65bf8b` |
+| Real-genome fixture regression (`tools/dev/regression.sh`, new, [TESTING.md](TESTING.md)) | v0.4.0 image, `9a5c758` plus this session's change, and v0.4.0 itself | Baseline made with the current tree; v0.4.0 reproduces every output it writes (508 pairs, 0 values changed). Fixture pairs equal the full-genome run's for all 503 shared pairs: `tools/dev/fixtures/README.md` |
 | Phylogenetic calibration, stages 2A and 2B | Simulation, `3603efc` | Reported: `docs/validation/phylo-calibration-stage2b.md`; guidance approved by the maintainer |
 
 **What changed for users since v0.4.0** (NEWS): the experimental phylogenetic commands; `--dnds-method` alternatives through KaKs_Calculator; the reliability table; the development McDonald-Kreitman test; header rows in comparison files now work. Pairwise results with default settings are unchanged, as shown above.

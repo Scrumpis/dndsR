@@ -6,7 +6,7 @@ Each release links one git tag, one `software-version` in the skill, one image d
 
 1. `git fetch origin`, with `dev` clean and pushed, and CI green on `dev`, including the container workflow.
 2. Update `Version` in `DESCRIPTION`, `metadata.software-version` in the skill, `version` in `CITATION.cff`, and `NEWS.md`.
-3. Regenerate docs with roxygen2. Run `tools/dev/test-safeguards.sh`, `tools/dev/run-tests.sh`, `tools/dev/test-tutorial.sh`, and `tools/dev/test-agent.sh claude`. Repeat the old-against-current comparison in `tools/dev/validation/` on real genomes if CDS, pairing, annotation, or enrichment code changed. Keep unpublished results outside Git.
+3. Regenerate docs with roxygen2. Run `tools/dev/test-safeguards.sh`, `tools/dev/run-tests.sh`, `tools/dev/test-tutorial.sh`, and `tools/dev/test-agent.sh claude`. Run the real-genome fixture regression, `tools/dev/regression.sh`, which must pass byte for byte or with a recorded baseline change. Repeat the old-against-current comparison in `tools/dev/validation/` on whole genomes (tier 3 in [TESTING.md](TESTING.md)) if CDS, pairing, estimation, annotation, or enrichment code changed, or the dependencies did. Keep unpublished results outside Git.
 4. Build the package and run `R CMD check` on the tarball.
 5. On `dev`, point clone commands at `--branch vX.Y.Z`, and confirm versions match, so that the tag's own documents are right. Tag promptly after merging, because the clone command does not work until the tag exists.
 
