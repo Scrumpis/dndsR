@@ -29,8 +29,22 @@ if (!is.null(skips) && nrow(skips)) {
   cat("\nSKIPPED (file: test: reason)\n")
   cat(sprintf("SKIP %s: %s: %s\n", skips$file, skips$test, skips$reason), sep = "")
 }
-cat(sprintf("\nRESULT tests=%d expectations=%d failed=%d errors=%d skipped=%d wall=%.0fs\n",
-            nrow(d), sum(d$nb), sum(d$failed), sum(d$error), sum(d$skipped), wall))
+result <- sprintf("RESULT tests=%d expectations=%d failed=%d errors=%d skipped=%d wall=%.0fs",
+                  nrow(d), sum(d$nb), sum(d$failed), sum(d$error), sum(d$skipped), wall)
+cat("\n", result, "\n", sep = "")
+# In GitHub Actions, the result and every skip become public annotations, since logs need a login.
+if (nzchar(Sys.getenv("GITHUB_ACTIONS"))) {
+  cat(sprintf("::notice title=Package tests::%s\n", result))
+  if (!is.null(skips) && nrow(skips)) {
+    cat(sprintf("::warning title=Skipped test::%s: %s: %s\n", skips$file, skips$test, skips$reason), sep = "")
+  }
+}
+# DNDSR_FAIL_ON_SKIP=1: in an image that has every tool, a skipped test is a failure.
+if (identical(Sys.getenv("DNDSR_FAIL_ON_SKIP"), "1") && sum(d$skipped) > 0L) {
+  if (nzchar(Sys.getenv("GITHUB_ACTIONS"))) cat("::error title=Tests skipped where every tool should be present::see the Skipped test warnings\n")
+  cat("FAIL: ", sum(d$skipped), " test(s) skipped with DNDSR_FAIL_ON_SKIP=1\n", sep = "")
+  quit(status = 1L, save = "no")
+}
 if (sum(d$failed) + sum(d$error) > 0L) {
   bad <- d[d$failed > 0L | d$error, c("file", "test")]
   if (nzchar(Sys.getenv("GITHUB_ACTIONS"))) {

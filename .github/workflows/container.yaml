@@ -51,7 +51,9 @@ jobs:
         run: |
           mkdir -p work-tests
           chmod 777 work-tests
-          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -v "$PWD/work-tests:/work" -v "$PWD:/repo:ro" -w /work dndsr:test \
+          # This image has HyPhy, KaKs_Calculator, and every R dependency, so no test may skip.
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/work -e GITHUB_ACTIONS -e DNDSR_FAIL_ON_SKIP=1 \
+            -v "$PWD/work-tests:/work" -v "$PWD:/repo:ro" -w /work dndsr:test \
             Rscript /repo/tools/dev/run-package-tests.R /repo/tests/testthat
 
       # The same rootless Apptainer route an HPC user can have, from conda-forge.

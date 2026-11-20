@@ -64,6 +64,17 @@ pass "dnds_contrast" dndsr dnds_contrast -c two_comparisons.txt --contrast-file 
 pass "contrast output" test -s contrast/AvB_vs_AvC_global_q_vs_q_dnds_contrast.tsv
 cd .. || exit 1
 
+echo "== Another dN/dS method, through KaKs_Calculator"
+pass "copy the example for YN" dndsr example -o yn
+cd yn || exit 1
+pass "extract_cds" dndsr extract_cds -c comparison_file.txt
+pass "calculate_dnds --dnds-method YN" dndsr calculate_dnds -c comparison_file.txt -t 2 --dnds-method YN
+pass "YN table: 32 pairs, values from KaKs_Calculator, method recorded" Rscript -e '
+  d <- utils::read.delim("example_AvB/example_AvB_dnds.tsv")
+  p <- jsonlite::read_json("example_AvB/example_AvB_dnds_provenance.json")
+  stopifnot(nrow(d) == 32L, sum(is.finite(d$dS)) >= 30L, identical(p$dnds_method, "YN"))'
+cd .. || exit 1
+
 echo "== Documented phylogenetic workflow (experimental)"
 pass "MAFFT runs" sh -c 'mafft --version 2>&1 | grep -q v7'
 pass "copy the phylogenetic example" dndsr phylo_example -o phylo
@@ -71,6 +82,12 @@ cd phylo || exit 1
 pass "phylo_prepare from genomes" dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file orthogroup_table.tsv --species-tree-file species_tree.nwk --foreground-file foreground.tsv -t 4
 pass "phylo_busted from the prepared folder" dndsr phylo_busted --prepared-dir prepared -t 4
 pass "verify_phylo_example: 11 checks" sh -c 'dndsr verify_phylo_example 2>&1 | grep -q "All 11 phylogenetic example checks passed"'
+# The settings the calibration recommends (docs/phylo-methods.md): double hits, three starts.
+pass "phylo_busted, recommended settings" dndsr phylo_busted --prepared-dir prepared --run-name recommended -t 4 --multiple-hits Double --extra-seeds 2,3
+pass "p_best_fits_adj is BH over p_best_fits for the 8 tested" Rscript -e '
+  r <- utils::read.delim("recommended/recommended_results.tsv"); t <- r$status == "tested"
+  stopifnot(sum(t) == 8L, all(r$n_starts[t] == 3L), !anyNA(r$p_best_fits_adj[t]), all(is.na(r$p_best_fits_adj[!t])),
+            isTRUE(all.equal(r$p_best_fits_adj[t], stats::p.adjust(r$p_best_fits[t], "BH"))))'
 cd .. || exit 1
 pass "copy the alignment example" dndsr phylo_example --type alignments -o phylo_aln
 cd phylo_aln || exit 1
