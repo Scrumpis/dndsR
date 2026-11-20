@@ -13,6 +13,10 @@ extra=()
 if [ -n "${DNDSR_HYPHY:-}" ]; then
   extra=(--bind "$(dirname "$(dirname "$DNDSR_HYPHY")")" --env "DNDSR_HYPHY=$DNDSR_HYPHY")
 fi
+# Optional PAML codeml outside the image, likewise: DNDSR_CODEML=<env>/bin/codeml
+if [ -n "${DNDSR_CODEML:-}" ]; then
+  extra+=(--bind "$(dirname "$(dirname "$DNDSR_CODEML")")" --env "DNDSR_CODEML=$DNDSR_CODEML")
+fi
 run() {
   "$engine" exec --cleanenv --bind "$root" --bind "$DNDSR_DEV_LIB" --bind "$PWD" "${extra[@]}" \
     --env "R_LIBS_USER=$DNDSR_DEV_LIB" --env "DNDSR_REPO=$root" "$DNDSR_SIF" "$@"

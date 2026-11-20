@@ -93,7 +93,7 @@ phylo_prepare <- function(orthogroup_file,
   mafft_version <- .mafft_version(mafft_bin)
 
   tree <- .phylo_read_species_tree(species_tree_file)
-  hyp <- .phylo_read_foreground(foreground_file, tree)
+  hyp <- .phylo_read_foreground(foreground_file, tree, allow_reference = TRUE) # reference rows serve phylo_relax
   run_dir <- file.path(output_dir, run_name)
   for (d in c("alignments", "proteins", "trees")) dir.create(file.path(run_dir, d), recursive = TRUE, showWarnings = FALSE)
   if (!is.null(gene_tree_dir)) dir.create(file.path(run_dir, "gene_trees"), showWarnings = FALSE)

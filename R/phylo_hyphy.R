@@ -129,8 +129,142 @@
       ), .hyphy_rate_classes(unc[["Rate Distributions"]]$Test, "fg"),
       .hyphy_rate_classes(unc[["Rate Distributions"]]$Background, "bg"))
     }
+  ),
+  absrel = list(
+    hyphy_name = "absrel",
+    unit = "branch",
+    defaults = list(srv = "No", multiple_hits = "None", genetic_code = "Universal"),
+    choices = list(srv = c("Yes", "No"), multiple_hits = c("None", "Double", "Double+Triple"), genetic_code = "Universal"),
+    args = function(s, alignment, tree, output) {
+      c("--alignment", shQuote(alignment), "--tree", shQuote(tree), "--branches", "FG", "--code", s$genetic_code,
+        "--srv", s$srv, "--multiple-hits", shQuote(s$multiple_hits), "--output", shQuote(output))
+    },
+    required = c("test results", "fits", "tested", "branch attributes", "input"),
+    parse = function(j) {
+      br <- .absrel_branches(j)
+      t <- br[br$tested_by_hyphy & !is.na(br$p_holm), , drop = FALSE]
+      if (!nrow(t)) stop("HyPhy JSON has no aBSREL test")
+      list(
+        n_branches_tested = nrow(t),
+        n_branches_holm_005 = sum(t$p_holm <= 0.05),
+        # Holm controls the family-wise error within the gene, so its smallest value is a valid
+        # p-value for "some tested branch evolved under episodic positive selection".
+        p_value = min(t$p_holm),
+        branch_min_p = t$branch[which.min(t$p_holm)],
+        lnl_baseline = .json_num(j$fits[["Baseline MG94xREV"]][["Log Likelihood"]]),
+        lnl_adaptive = .json_num(j$fits[["Full adaptive model"]][["Log Likelihood"]])
+      )
+    },
+    parse_branches = function(j) .absrel_branches(j),
+    map = function(hyp, present, gene_tree, mode, ctx) {
+      if (isTRUE(ctx$all_branches)) .phylo_map_all_tested(hyp, present, gene_tree, mode) else .phylo_map_foreground(hyp, present, gene_tree, mode)
+    },
+    adjust_branches = function(branches, results) .absrel_adjust(branches, results),
+    testing = list(
+      within_gene = "p_holm: HyPhy's Holm-Bonferroni correction across the branches tested in each orthogroup; p_value (per orthogroup) is its smallest value, and p_adj applies BH to p_value across orthogroups",
+      per_lineage = "p_bh_lineage: BH over p_raw, across the tested orthogroups in which that species-tree branch was tested (one family per species-tree branch)"
+    )
+  ),
+  relax = list(
+    hyphy_name = "relax",
+    unit = "gene",
+    defaults = list(models = "All", rates = 3L, srv = "No", multiple_hits = "None", grid_size = 250L,
+                    starting_points = 1L, genetic_code = "Universal"),
+    choices = list(models = c("All", "Minimal"), srv = c("Yes", "No"), multiple_hits = c("None", "Double", "Double+Triple"),
+                   genetic_code = "Universal"),
+    args = function(s, alignment, tree, output) {
+      c("--alignment", shQuote(alignment), "--tree", shQuote(tree), "--test", "TEST", "--reference", "REFERENCE",
+        "--code", s$genetic_code, "--models", s$models, "--rates", s$rates, "--srv", s$srv,
+        "--multiple-hits", shQuote(s$multiple_hits), "--grid-size", s$grid_size, "--starting-points", s$starting_points,
+        "--output", shQuote(output))
+    },
+    required = c("test results", "fits", "tested", "input"),
+    parse = function(j) {
+      tr <- j[["test results"]]
+      k <- .json_num(tr[["relaxation or intensification parameter"]])
+      if (is.na(k) || is.null(tr[["p-value"]])) stop("HyPhy JSON lacks the RELAX test")
+      alt <- j$fits[["RELAX alternative"]]
+      sep <- j$fits[["MG94xREV with separate rates for branch sets"]][["Rate Distributions"]]
+      sep_omega <- function(set) {
+        x <- sep[[sprintf("non-synonymous/synonymous rate ratio for *%s*", set)]]
+        if (is.null(x)) NA_real_ else as.numeric(x[[1]][[1]])
+      }
+      c(list(
+        k = k,
+        direction = if (k > 1) "intensification" else if (k < 1) "relaxation" else "none",
+        # HyPhy bounds k to [0, 50]; a value at a bound is an extreme fit, not a measured size.
+        k_at_bound = k <= 1e-6 || k >= 49.99,
+        lrt = .json_num(tr$LRT),
+        p_value = .json_num(tr[["p-value"]]),
+        lnl_alternative = .json_num(alt[["Log Likelihood"]]),
+        lnl_null = .json_num(j$fits[["RELAX null"]][["Log Likelihood"]]),
+        mg94_omega_test = sep_omega("Test"),
+        mg94_omega_reference = sep_omega("Reference")
+      ), .hyphy_rate_classes(alt[["Rate Distributions"]]$Test, "test"),
+      .hyphy_rate_classes(alt[["Rate Distributions"]]$Reference, "ref"))
+    },
+    map = function(hyp, present, gene_tree, mode, ctx) .phylo_map_relax(hyp, ctx$hyp_ref, present, gene_tree, mode),
+    testing = list(note = "RELAX tests whether omega classes on test branches are scaled by k relative to reference branches: k < 1 relaxation, k > 1 intensification. It is not a test of positive selection.")
   )
 )
+
+#' Number from a JSON value, `NA` when absent
+#' @keywords internal
+.json_num <- function(x) if (is.null(x) || !length(x)) NA_real_ else suppressWarnings(as.numeric(x[[1]]))
+
+#' Per-branch results of aBSREL
+#'
+#' Every branch has the baseline MG94xREV fit (one omega per branch, no site variation)
+#' and the adaptive model's rate classes; tested branches also have the likelihood ratio,
+#' HyPhy's uncorrected p-value, and HyPhy's Holm-Bonferroni p-value across the branches
+#' tested in this gene.
+#' @keywords internal
+.absrel_branches <- function(j) {
+  ba <- j[["branch attributes"]][["0"]]
+  tested <- j$tested[["0"]]
+  rows <- lapply(names(ba), function(b) {
+    x <- ba[[b]]
+    rd <- x[["Rate Distributions"]]
+    om <- if (length(rd)) vapply(rd, function(r) as.numeric(r[[1]]), numeric(1)) else numeric()
+    pr <- if (length(rd)) vapply(rd, function(r) as.numeric(r[[2]]), numeric(1)) else numeric()
+    data.frame(
+      branch = b,
+      tested_by_hyphy = identical(tolower(as.character(tested[[b]])), "test"),
+      baseline_omega = .json_num(x[["Baseline MG94xREV omega ratio"]]),
+      baseline_length = .json_num(x[["Baseline MG94xREV"]]),
+      adaptive_length = .json_num(x[["Full adaptive model"]]),
+      adaptive_dn = .json_num(x[["Full adaptive model (non-synonymous subs/site)"]]),
+      adaptive_ds = .json_num(x[["Full adaptive model (synonymous subs/site)"]]),
+      rate_classes = .json_num(x[["Rate classes"]]),
+      omega_max = if (length(om)) max(om) else NA_real_,
+      omega_max_prop = if (length(om)) pr[which.max(om)] else NA_real_,
+      lrt = .json_num(x[["LRT"]]),
+      p_raw = .json_num(x[["Uncorrected P-value"]]),
+      p_holm = .json_num(x[["Corrected P-value"]]),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, rows)
+}
+
+#' Benjamini-Hochberg per species-tree branch, across orthogroups (aBSREL)
+#'
+#' One family per species-tree branch (`species_tree_branches`): the tested orthogroups in
+#' which that branch was tested. Branches that exist only in a gene tree, or that merge
+#' several species-tree branches after pruning, form families of their own label.
+#' @keywords internal
+.absrel_adjust <- function(branches, results) {
+  tested_og <- results$orthogroup[results$status == "tested"]
+  ok <- branches$orthogroup %in% tested_og & !is.na(branches$p_raw) & !is.na(branches$species_tree_branches)
+  branches$p_bh_lineage <- NA_real_
+  branches$lineage_family_size <- NA_integer_
+  for (g in unique(branches$species_tree_branches[ok])) {
+    i <- which(ok & branches$species_tree_branches == g)
+    branches$p_bh_lineage[i] <- stats::p.adjust(branches$p_raw[i], method = "BH")
+    branches$lineage_family_size[i] <- length(i)
+  }
+  branches
+}
 
 #' Branches HyPhy reports as tested
 #' @keywords internal

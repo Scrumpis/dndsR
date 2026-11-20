@@ -4,20 +4,30 @@
 \alias{.phylo_read_foreground}
 \title{Read a foreground file and resolve it on the species tree}
 \usage{
-.phylo_read_foreground(path, tree)
+.phylo_read_foreground(path, tree, set = "test", allow_reference = FALSE)
 }
 \arguments{
 \item{path}{Foreground file.}
 
 \item{tree}{Species tree from \code{\link[=.phylo_read_species_tree]{.phylo_read_species_tree()}}.}
+
+\item{set}{Which rows to read: \code{"test"} (the foreground) or \code{"reference"}.}
+
+\item{allow_reference}{If \code{FALSE}, a file with reference rows is refused, because only
+RELAX uses a reference set.}
 }
 \value{
-A list describing the hypothesis on the reference tree.
+A list describing the hypothesis on the reference tree, or \code{NULL} when \code{set} is
+\code{"reference"} and the file has no reference rows.
 }
 \description{
 The file is tab-separated with columns \code{scope} and \code{taxa} (comma-separated). Scopes:
 \code{terminal} (the terminal branch of each listed taxon), \code{stem} (the branch leading to the
 most recent common ancestor of the listed taxa, which must form a clade), and \code{clade}
 (that stem and every branch below it). Rows are combined.
+}
+\details{
+An optional column \code{set} assigns each row to the \code{test} set (the default) or the
+\code{reference} set; reference rows are used only by \code{\link[=phylo_relax]{phylo_relax()}}.
 }
 \keyword{internal}

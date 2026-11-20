@@ -11,9 +11,10 @@
 
 \item{node_names}{Names for all nodes (tips first).}
 
-\item{node_fg}{Whether the branch above each node is labelled.}
+\item{node_fg}{Whether the branch above each node is labelled; or a character vector
+giving each node's tag as written (such as \code{"{TEST}"}, or \code{" #1"} for PAML), \code{""} for none.}
 
-\item{label}{HyPhy label written in braces.}
+\item{label}{HyPhy label written in braces, when \code{node_fg} is logical.}
 }
 \value{
 A Newick string without branch lengths.

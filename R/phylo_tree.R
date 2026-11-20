@@ -109,17 +109,36 @@
 #' most recent common ancestor of the listed taxa, which must form a clade), and `clade`
 #' (that stem and every branch below it). Rows are combined.
 #'
+#' An optional column `set` assigns each row to the `test` set (the default) or the
+#' `reference` set; reference rows are used only by [phylo_relax()].
+#'
 #' @param path Foreground file.
 #' @param tree Species tree from [.phylo_read_species_tree()].
-#' @return A list describing the hypothesis on the reference tree.
+#' @param set Which rows to read: `"test"` (the foreground) or `"reference"`.
+#' @param allow_reference If `FALSE`, a file with reference rows is refused, because only
+#'   RELAX uses a reference set.
+#' @return A list describing the hypothesis on the reference tree, or `NULL` when `set` is
+#'   `"reference"` and the file has no reference rows.
 #' @keywords internal
-.phylo_read_foreground <- function(path, tree) {
+.phylo_read_foreground <- function(path, tree, set = "test", allow_reference = FALSE) {
   if (!file.exists(path)) stop("Foreground file not found: ", path, call. = FALSE)
   spec <- utils::read.delim(path, colClasses = "character", strip.white = TRUE, comment.char = "#")
   names(spec) <- tolower(names(spec))
   if (!all(c("scope", "taxa") %in% names(spec)) || !nrow(spec)) {
     stop("The foreground file needs a header and columns 'scope' and 'taxa': ", path, call. = FALSE)
   }
+  spec$set <- if ("set" %in% names(spec)) tolower(ifelse(nzchar(spec$set), spec$set, "test")) else rep("test", nrow(spec))
+  bad_set <- setdiff(spec$set, c("test", "reference"))
+  if (length(bad_set)) stop("Unknown value in column 'set': ", paste(bad_set, collapse = ", "), ". Use test or reference.", call. = FALSE)
+  if (!allow_reference && any(spec$set == "reference")) {
+    stop("The foreground file has reference rows (column 'set'), which only phylo_relax uses: ", path, call. = FALSE)
+  }
+  spec <- spec[spec$set == set, , drop = FALSE]
+  if (!nrow(spec)) {
+    if (set == "reference") return(NULL)
+    stop("The foreground file has no test rows: ", path, call. = FALSE)
+  }
+  rownames(spec) <- NULL
   spec$scope <- tolower(spec$scope)
   bad_scope <- setdiff(spec$scope, c("terminal", "stem", "clade"))
   if (length(bad_scope)) {
@@ -178,6 +197,74 @@
        taxa = tree$tip.label, foreground_taxa = sort(unique(unlist(edges$descendants[edges$foreground]))))
 }
 
+#' A hypothesis with no foreground, for analyses of every branch
+#' @keywords internal
+.phylo_all_branches_hypothesis <- function(tree) {
+  desc <- .phylo_descendants(tree)
+  child <- tree$edge[, 2]
+  edges <- data.frame(child = child, name = c(tree$tip.label, .phylo_internal_names(tree))[child],
+                      foreground = FALSE, required = FALSE, stringsAsFactors = FALSE)
+  edges$rows <- replicate(length(child), integer(0), simplify = FALSE)
+  edges$descendants <- desc[child]
+  list(spec = data.frame(scope = character(), taxa = character(), set = character()), tree = tree, edges = edges,
+       clades = list(), taxa = tree$tip.label, foreground_taxa = character())
+}
+
+#' Map every branch of one orthogroup, all labelled as tested (aBSREL without a foreground)
+#' @keywords internal
+.phylo_map_all_tested <- function(hyp, present, gene_tree = NULL, gene_tree_mode = "topology") {
+  map <- .phylo_map_foreground(hyp, present, gene_tree, gene_tree_mode, require_foreground = FALSE)
+  if (!map$ok) return(map)
+  tp <- map$topology
+  tags <- rep("", length(tp$node_names)); tags[tp$child] <- "{FG}"
+  map$newick <- .phylo_write_newick(tp$tree, tp$node_names, tags)
+  map$branches$foreground <- TRUE
+  map
+}
+
+#' Map RELAX's test and reference branch sets onto one orthogroup
+#'
+#' Each set is mapped as a foreground hypothesis, with the same rules: it must be present
+#' and identifiable after pruning, or the orthogroup is excluded (reasons prefixed
+#' `reference_` for the reference set). The sets may not share a branch. Without reference
+#' rows, every branch outside the test set is the reference.
+#' @keywords internal
+.phylo_map_relax <- function(hyp_test, hyp_ref, present, gene_tree = NULL, gene_tree_mode = "topology") {
+  t <- .phylo_map_foreground(hyp_test, present, gene_tree, gene_tree_mode)
+  if (!t$ok) return(t)
+  tp <- t$topology
+  test <- t$branches$branch[t$branches$foreground]
+  if (is.null(hyp_ref)) {
+    ref <- setdiff(t$branches$branch, test)
+  } else {
+    r <- .phylo_map_foreground(hyp_ref, present, gene_tree, gene_tree_mode)
+    if (!r$ok) {
+      r$reason <- paste0("reference_", sub("^foreground_", "", r$reason))
+      r$detail <- paste("reference set:", r$detail)
+      return(r)
+    }
+    ref <- r$branches$branch[r$branches$foreground]
+    both <- intersect(test, ref)
+    if (length(both)) {
+      t$ok <- FALSE; t$reason <- "test_reference_overlap"; t$newick <- NA_character_; t$branches <- NULL
+      t$detail <- paste("after pruning, these branches are in both the test and the reference set:", paste(both, collapse = ","))
+      return(t)
+    }
+  }
+  if (!length(ref)) {
+    t$ok <- FALSE; t$reason <- "reference_absent"; t$newick <- NA_character_; t$branches <- NULL
+    t$detail <- "no reference branch remains"
+    return(t)
+  }
+  tags <- rep("", length(tp$node_names))
+  tags[match(test, tp$node_names)] <- "{TEST}"
+  tags[match(ref, tp$node_names)] <- "{REFERENCE}"
+  t$newick <- .phylo_write_newick(tp$tree, tp$node_names, tags)
+  t$branches$set <- ifelse(t$branches$branch %in% test, "test", ifelse(t$branches$branch %in% ref, "reference", "unclassified"))
+  t$info$n_reference_branches <- length(ref)
+  t
+}
+
 #' Basis of each exclusion or failure reason
 #'
 #' `mathematical`: the requested branches cannot be separated, or do not exist, in the
@@ -191,6 +278,9 @@
     foreground_unidentifiable = "mathematical", foreground_not_in_gene_tree = "mathematical",
     foreground_absent = "no_data",
     foreground_partly_unidentifiable = "policy", foreground_incomplete = "policy", foreground_branch_zero_length = "policy",
+    reference_unidentifiable = "mathematical", reference_not_in_gene_tree = "mathematical", test_reference_overlap = "mathematical",
+    reference_absent = "no_data", reference_partly_unidentifiable = "policy", reference_incomplete = "policy",
+    codeml_error = "software", codeml_output_invalid = "software", codeml_timeout = "software",
     multi_copy = "policy", too_few_taxa = "policy",
     cds_invalid = "data_quality", internal_stop = "data_quality", split_codon_gap = "data_quality",
     empty_sequence = "data_quality", terminal_stop = "data_quality", length_not_multiple_of_3 = "data_quality",
@@ -236,13 +326,22 @@
 #' @param present Taxa present in the orthogroup.
 #' @param gene_tree Optional `ape` phylo with tips named by taxon.
 #' @param gene_tree_mode `"topology"` or `"report"`.
+#' @param require_foreground If `FALSE`, every branch is background and no foreground
+#'   check applies: for analyses of all branches (free-ratio branch models, aBSREL without
+#'   a foreground). The topology and branch identities are those of the default.
 #' @return A list with `ok`, `reason`, `detail`, `newick` (labelled, unrooted, no branch
-#'   lengths), `branches` (one row per branch), and `info` (foreground and discordance
-#'   measures).
+#'   lengths), `branches` (one row per branch), `info` (foreground and discordance
+#'   measures), and `topology` (the unrooted tree, its node names, and the node below each
+#'   branch), so other labellings of the same branches can be written.
 #' @keywords internal
-.phylo_map_foreground <- function(hyp, present, gene_tree = NULL, gene_tree_mode = c("topology", "report")) {
+.phylo_map_foreground <- function(hyp, present, gene_tree = NULL, gene_tree_mode = c("topology", "report"),
+                                  require_foreground = TRUE) {
   gene_tree_mode <- match.arg(gene_tree_mode)
   present <- sort(intersect(hyp$taxa, present), method = "radix")
+  if (!require_foreground) {
+    hyp$edges$foreground <- FALSE
+    hyp$clades <- list()
+  }
   e <- hyp$edges
   e$key <- vapply(e$descendants, .phylo_split_key, character(1), present = present)
   fg_ref <- e[e$foreground, , drop = FALSE]
@@ -255,7 +354,7 @@
   status <- vapply(groups, function(g) if (all(g$foreground)) "fg" else if (any(g$foreground)) "mixed" else "bg", character(1))
   merged <- vapply(groups, function(g) paste(g$name, collapse = "+"), character(1))
 
-  if (!any(status %in% c("fg", "mixed"))) {
+  if (require_foreground && !any(status %in% c("fg", "mixed"))) {
     return(fail("foreground_absent", "no foreground taxon is present"))
   }
   if (any(status == "mixed")) {
@@ -267,7 +366,7 @@
     return(fail("foreground_partly_unidentifiable", paste0(
       "some requested branches remain separable, but testing only them would narrow the hypothesis; ", joined)))
   }
-  for (i in seq_len(nrow(hyp$spec))) {
+  for (i in seq_len(if (require_foreground) nrow(hyp$spec) else 0L)) {
     mine <- fg_ref[vapply(fg_ref$rows, function(r) i %in% r, logical(1)), , drop = FALSE]
     gone <- is.na(mine$key)
     if (all(gone)) {
@@ -340,22 +439,24 @@
     stringsAsFactors = FALSE
   )
   list(ok = TRUE, reason = NA_character_, detail = NA_character_, newick = newick,
-       branches = branches[order(!branches$foreground, branches$branch), , drop = FALSE], info = info)
+       branches = branches[order(!branches$foreground, branches$branch), , drop = FALSE], info = info,
+       topology = list(tree = lab$tree, node_names = node_names, child = lab$child, keys = lab$keys, present = present))
 }
 
 #' Write a topology in Newick with HyPhy branch labels
 #'
 #' @param tree `ape` phylo.
 #' @param node_names Names for all nodes (tips first).
-#' @param node_fg Whether the branch above each node is labelled.
-#' @param label HyPhy label written in braces.
+#' @param node_fg Whether the branch above each node is labelled; or a character vector
+#'   giving each node's tag as written (such as `"{TEST}"`, or `" #1"` for PAML), `""` for none.
+#' @param label HyPhy label written in braces, when `node_fg` is logical.
 #' @return A Newick string without branch lengths.
 #' @keywords internal
 .phylo_write_newick <- function(tree, node_names, node_fg, label = "FG") {
   root <- ape::Ntip(tree) + 1L
   kids <- split(tree$edge[, 2], factor(tree$edge[, 1], levels = seq_along(node_names)))
   write_node <- function(v) {
-    tag <- if (node_fg[v]) paste0("{", label, "}") else ""
+    tag <- if (is.character(node_fg)) node_fg[v] else if (node_fg[v]) paste0("{", label, "}") else ""
     if (v <= ape::Ntip(tree)) return(paste0(node_names[v], tag))
     inner <- paste(vapply(kids[[v]], write_node, character(1)), collapse = ",")
     if (v == root) paste0("(", inner, ");") else paste0("(", inner, ")", node_names[v], tag)

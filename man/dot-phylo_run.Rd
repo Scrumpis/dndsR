@@ -22,7 +22,8 @@
   hyphy,
   extra_seeds = NULL,
   gene_tree_mode = NULL,
-  prepared_dir = NULL
+  prepared_dir = NULL,
+  all_branches = FALSE
 )
 }
 \description{

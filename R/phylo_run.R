@@ -65,7 +65,10 @@
   json_path <- file.path(dir, paste0(ctx$method, ".json"))
   parsed <- tryCatch({
     j <- .hyphy_read_json(json_path, m$required)
-    list(values = m$parse(j), tested = .hyphy_tested_branches(j))
+    labels <- unlist(j$tested[["0"]])
+    list(values = m$parse(j), tested = .hyphy_tested_branches(j),
+         reference = sort(names(labels)[tolower(labels) == "reference"], method = "radix"),
+         branch_values = if (is.null(m$parse_branches)) NULL else m$parse_branches(j))
   }, error = function(e) conditionMessage(e))
   if (is.character(parsed)) return(list(ok = FALSE, reason = "hyphy_output_invalid", detail = parsed))
   log <- file.path(dir, "hyphy.log")
@@ -127,12 +130,21 @@
   results
 }
 
-#' Analyse one orthogroup
+#' Prepare one orthogroup for an analysis: alignment QC, gene tree, branch mapping
+#'
+#' Shared by every phylogenetic method. `map_fun(hyp, present, gene_tree, mode)` maps the
+#' hypothesis onto this orthogroup's branches (default: the foreground hypothesis). Against
+#' a phylo_prepare folder, the tree must equal the one prepared: exactly, labels included,
+#' when `ctx$compare_labels` is `TRUE` (BUSTED, which uses the prepared labels), otherwise
+#' in topology only, since other analyses label branches their own way.
+#'
+#' @return A list. Either `done` (a finished outcome for an excluded or failed orthogroup),
+#'   or `base`, `aln`, `info`, `flags`, `map`, `fg`, `seq_qc`, and `present`.
 #' @keywords internal
-.phylo_one <- function(og, file, ctx) {
+.phylo_og_setup <- function(og, file, ctx, map_fun = NULL) {
   base <- list(orthogroup = og, stage = "analysis", alignment_md5 = unname(tools::md5sum(file)))
   done <- function(status, reason, detail, extra = list(), branches = NULL, sequences = NULL) {
-    list(row = .phylo_outcome(base, status, reason, detail, extra), branches = branches, sequences = sequences)
+    list(done = list(row = .phylo_outcome(base, status, reason, detail, extra), branches = branches, sequences = sequences))
   }
   aln <- .phylo_read_alignment(file)
   qc <- .phylo_check_alignment(aln, ctx$hyp$taxa, ctx$min_taxa, ctx$terminal_stops)
@@ -150,13 +162,21 @@
     if (is.null(g$tree)) return(done(g$status, g$reason, g$detail, info, sequences = seq_qc))
     gene_tree <- g$tree
   }
-  map <- .phylo_map_foreground(ctx$hyp, present, gene_tree, ctx$gene_tree_mode)
+  map <- if (is.null(map_fun)) .phylo_map_foreground(ctx$hyp, present, gene_tree, ctx$gene_tree_mode) else
+    map_fun(ctx$hyp, present, gene_tree, ctx$gene_tree_mode, ctx)
   info <- c(info, map$info)
   if (!map$ok) return(done("excluded", map$reason, map$detail, info, sequences = seq_qc))
   fg <- sort(map$branches$branch[map$branches$foreground], method = "radix")
   if (!is.null(ctx$prepared_tree_dir)) {
     expected <- file.path(ctx$prepared_tree_dir, paste0(og, ".nwk"))
-    if (!file.exists(expected) || !identical(readLines(expected, warn = FALSE), map$newick)) {
+    same <- if (!file.exists(expected)) FALSE else {
+      prepared <- readLines(expected, warn = FALSE)
+      if (isFALSE(ctx$compare_labels)) {
+        unlabel <- function(x) gsub("\\{[A-Za-z]+\\}| #[0-9]+", "", x)
+        identical(unlabel(prepared), unlabel(map$newick))
+      } else identical(prepared, map$newick)
+    }
+    if (!same) {
       return(done("failed", "prepared_tree_mismatch", paste("the labelled tree differs from the one phylo_prepare wrote:", expected), info, sequences = seq_qc))
     }
   }
@@ -165,6 +185,20 @@
   if (isTRUE(map$info$gt_missing_species_splits > 0)) flags <- c(flags, "gene_tree_discordant")
   if (isTRUE(map$info$gt_discordant_near_foreground)) flags <- c(flags, "gene_tree_discordant_near_foreground")
   info <- c(info, list(n_fg_branches = length(fg), fg_branches = paste(fg, collapse = ",")))
+  list(done = NULL, base = base, aln = aln, info = info, flags = flags, map = map, fg = fg, seq_qc = seq_qc, present = present,
+       gene_tree = gene_tree)
+}
+
+#' Analyse one orthogroup
+#' @keywords internal
+.phylo_one <- function(og, file, ctx) {
+  m <- .hyphy_methods[[ctx$method]]
+  st <- .phylo_og_setup(og, file, ctx, m$map)
+  if (!is.null(st$done)) return(st$done)
+  base <- st$base; aln <- st$aln; info <- st$info; flags <- st$flags; map <- st$map; fg <- st$fg; seq_qc <- st$seq_qc
+  done <- function(status, reason, detail, extra = list(), branches = NULL, sequences = NULL) {
+    list(row = .phylo_outcome(base, status, reason, detail, extra), branches = branches, sequences = sequences)
+  }
 
   dir <- file.path(ctx$run_dir, "hyphy", og)
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
@@ -181,7 +215,6 @@
   reuse <- !ctx$overwrite && file.exists(record_path) &&
     identical(paste(readLines(record_path, warn = FALSE), collapse = "\n"), record_json)
   branches <- cbind(orthogroup = og, map$branches, stringsAsFactors = FALSE)
-  m <- .hyphy_methods[[ctx$method]]
   start_dirs <- c(dir, file.path(dir, paste0("start_seed", ctx$extra_seeds)))
   if (!reuse) {
     unlink(c(record_path, file.path(dir, paste0(ctx$method, ".json"))))
@@ -206,7 +239,19 @@
       return(done("failed", "label_mismatch", paste0("HyPhy tested ", paste(s$tested, collapse = ","), "; dndsR labelled ", paste(fg, collapse = ",")),
                   info, branches, seq_qc))
     }
+    if (!is.null(map$branches$set)) {
+      ref <- sort(map$branches$branch[map$branches$set == "reference"], method = "radix")
+      if (!identical(s$reference, ref)) {
+        return(done("failed", "label_mismatch", paste0("HyPhy used reference ", paste(s$reference, collapse = ","),
+                                                       "; dndsR labelled ", paste(ref, collapse = ",")), info, branches, seq_qc))
+      }
+    }
     starts[[k]] <- s
+  }
+  bv <- starts[[1]]$branch_values
+  if (!is.null(bv)) {
+    bv <- bv[match(branches$branch, bv$branch), setdiff(names(bv), "branch"), drop = FALSE]
+    branches <- cbind(branches, bv, stringsAsFactors = FALSE)
   }
   if (!reuse) writeLines(record_json, record_path)
   if (starts[[1]]$refit) flags <- c(flags, "hyphy_refit_after_negative_lrt")
@@ -220,13 +265,14 @@
   list(row = row, branches = branches, sequences = seq_qc)
 }
 
-#' Run a HyPhy method over a folder of orthogroup alignments
+#' Resolve the inputs of an analysis: a phylo_prepare folder, or explicit files
+#'
+#' With `prepared_dir`, the alignments, species tree, and foreground come from
+#' phylo_prepare's manifest, and must be unchanged since. `require_foreground = FALSE`
+#' allows explicit inputs without a foreground file (analyses of all branches).
 #' @keywords internal
-.phylo_run <- function(method, alignment_dir, species_tree_file, foreground_file, gene_tree_dir,
-                       output_dir, run_name, settings, seed, hyphy_cpu, threads, min_taxa,
-                       terminal_stops, overwrite, hyphy, extra_seeds = NULL,
-                       gene_tree_mode = NULL, prepared_dir = NULL) {
-  .need_ape()
+.phylo_resolve_inputs <- function(prepared_dir, alignment_dir, species_tree_file, foreground_file, gene_tree_dir,
+                                  gene_tree_mode, require_foreground = TRUE) {
   prepared <- NULL
   if (!is.null(prepared_dir)) {
     if (!is.null(alignment_dir) || !is.null(species_tree_file) || !is.null(foreground_file)) {
@@ -246,10 +292,27 @@
     if (is.null(gene_tree_dir)) gene_tree_dir <- prepared$gene_tree_dir
     if (is.null(gene_tree_mode)) gene_tree_mode <- prepared$gene_tree_mode
   }
-  if (is.null(gene_tree_mode)) gene_tree_mode <- "topology" else if (is.null(alignment_dir) || is.null(species_tree_file) || is.null(foreground_file)) {
+  if (is.null(gene_tree_mode)) gene_tree_mode <- "topology"
+  if (is.null(alignment_dir) || is.null(species_tree_file) || (require_foreground && is.null(foreground_file))) {
     stop("Give prepared_dir (from phylo_prepare), or alignment_dir, species_tree_file, and foreground_file.", call. = FALSE)
   }
   if (!is.null(gene_tree_dir) && !dir.exists(gene_tree_dir)) stop("Gene tree folder not found: ", gene_tree_dir, call. = FALSE)
+  list(prepared = prepared, alignment_dir = alignment_dir, species_tree_file = species_tree_file,
+       foreground_file = foreground_file, gene_tree_dir = gene_tree_dir, gene_tree_mode = gene_tree_mode)
+}
+
+#' Run a HyPhy method over a folder of orthogroup alignments
+#' @keywords internal
+.phylo_run <- function(method, alignment_dir, species_tree_file, foreground_file, gene_tree_dir,
+                       output_dir, run_name, settings, seed, hyphy_cpu, threads, min_taxa,
+                       terminal_stops, overwrite, hyphy, extra_seeds = NULL,
+                       gene_tree_mode = NULL, prepared_dir = NULL, all_branches = FALSE) {
+  .need_ape()
+  m <- .hyphy_methods[[method]]
+  inp <- .phylo_resolve_inputs(prepared_dir, alignment_dir, species_tree_file, foreground_file, gene_tree_dir, gene_tree_mode,
+                               require_foreground = !all_branches)
+  prepared <- inp$prepared; alignment_dir <- inp$alignment_dir; species_tree_file <- inp$species_tree_file
+  foreground_file <- inp$foreground_file; gene_tree_dir <- inp$gene_tree_dir; gene_tree_mode <- inp$gene_tree_mode
   gene_tree_mode <- match.arg(gene_tree_mode, c("topology", "report"))
   terminal_stops <- match.arg(terminal_stops, c("mask", "exclude"))
   seed <- as.integer(seed); hyphy_cpu <- as.integer(hyphy_cpu); threads <- max(1L, as.integer(threads))
@@ -258,6 +321,9 @@
   if (is.na(seed)) stop("seed must be an integer.", call. = FALSE)
   if (anyNA(extra_seeds) || seed %in% extra_seeds || anyDuplicated(extra_seeds)) {
     stop("extra_seeds must be distinct integers, different from seed.", call. = FALSE)
+  }
+  if (length(extra_seeds) && method != "busted") {
+    stop("extra_seeds is available for phylo_busted only; use starting_points for HyPhy's own restarts.", call. = FALSE)
   }
   if (is.na(hyphy_cpu) || hyphy_cpu < 1L) stop("hyphy_cpu must be a positive integer.", call. = FALSE)
   if (is.na(min_taxa) || min_taxa < 3L) stop("min_taxa must be at least 3.", call. = FALSE)
@@ -268,7 +334,17 @@
     message("Note: HyPhy ", version, " has not been checked with dndsR, which was validated with ", .hyphy_validated_version, ".")
   }
   tree <- .phylo_read_species_tree(species_tree_file)
-  hyp <- .phylo_read_foreground(foreground_file, tree)
+  hyp_ref <- NULL
+  if (all_branches) {
+    hyp <- .phylo_all_branches_hypothesis(tree)
+  } else {
+    hyp <- .phylo_read_foreground(foreground_file, tree, allow_reference = TRUE)
+    hyp_ref <- .phylo_read_foreground(foreground_file, tree, set = "reference", allow_reference = TRUE)
+    if (!is.null(hyp_ref) && method != "relax") {
+      message("Note: the foreground file's reference rows are used only by phylo_relax; ", method, " ignores them.")
+      hyp_ref <- NULL
+    }
+  }
   files <- .phylo_list_alignments(alignment_dir)
   if (!length(files) && is.null(prepared)) stop("No alignments (.fa, .fas, .fasta, .fna) in ", alignment_dir, call. = FALSE)
   run_dir <- file.path(output_dir, run_name)
@@ -276,7 +352,8 @@
   ctx <- list(method = method, hyp = hyp, settings = settings, seed = seed, extra_seeds = extra_seeds,
               hyphy_cpu = hyphy_cpu, hyphy_version = version, bin = bin, run_dir = run_dir, min_taxa = min_taxa,
               terminal_stops = terminal_stops, overwrite = isTRUE(overwrite), gene_tree_dir = gene_tree_dir,
-              gene_tree_mode = gene_tree_mode, aliases = NULL,
+              gene_tree_mode = gene_tree_mode, aliases = NULL, hyp_ref = hyp_ref, all_branches = all_branches,
+              compare_labels = method == "busted",
               prepared_tree_dir = if (is.null(prepared)) NULL else prepared$tree_dir)
   message(sprintf("[%s] %d orthogroups, HyPhy %s, %d at a time with %d HyPhy thread(s) each%s", method, length(files), version,
                   threads, hyphy_cpu, if (length(extra_seeds)) sprintf(", %d starts each", 1L + length(extra_seeds)) else ""))
@@ -302,6 +379,7 @@
     results <- results[, c(rest[seq_len(at)], "p_best_fits_adj", rest[-seq_len(at)]), drop = FALSE]
   }
   branches <- .phylo_bind_rows(lapply(res, `[[`, "branches"))
+  if (!is.null(m$adjust_branches) && nrow(branches)) branches <- m$adjust_branches(branches, results)
   sequences <- .phylo_bind_rows(lapply(res, `[[`, "sequences"))
 
   out_file <- function(what, ext = "tsv") file.path(run_dir, sprintf("%s_%s.%s", run_name, what, ext))
@@ -324,12 +402,13 @@
     min_taxa = min_taxa, terminal_stops = terminal_stops,
     gene_tree_mode = if (is.null(gene_tree_dir)) NA_character_ else gene_tree_mode,
     species_tree = list(path = species_tree_file, md5 = unname(tools::md5sum(species_tree_file))),
-    foreground = list(path = foreground_file, md5 = unname(tools::md5sum(foreground_file)),
-                      hypothesis = hyp$spec, foreground_taxa = hyp$foreground_taxa),
+    foreground = if (is.null(foreground_file)) list(all_branches = TRUE) else
+      list(path = foreground_file, md5 = unname(tools::md5sum(foreground_file)), hypothesis = hyp$spec,
+           foreground_taxa = hyp$foreground_taxa, reference = if (is.null(hyp_ref)) NULL else hyp_ref$spec),
     gene_tree_dir = gene_tree_dir, alignment_dir = alignment_dir, prepared_dir = prepared_dir,
     prepared_provenance_md5 = if (is.null(prepared)) NULL else prepared$provenance_md5,
-    multiple_testing = list(method = "BH", family = "orthogroups with status 'tested' in this run, under one foreground hypothesis and one set of settings",
-                            family_size = sum(tested)),
+    multiple_testing = c(list(method = "BH", family = "orthogroups with status 'tested' in this run, under one foreground hypothesis and one set of settings",
+                              family_size = sum(tested)), m$testing),
     counts = as.list(table(label)), exclusions_by_basis = as.list(table(results$exclusion_basis[!tested])),
     tested_orthogroups_per_taxon = as.list(presence),
     ascertainment = "Only single-copy orthogroups that pass QC and keep the foreground identifiable are tested. Excluded and failed orthogroups are listed with reasons; conclusions apply to the tested set only."

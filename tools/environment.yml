@@ -8,6 +8,7 @@ dependencies:
   - r-base=4.5
   - diamond=2.1
   - hyphy=2.5.103
+  - paml=4.10.10
   - kakscalculator2=2.0.1
   - mafft=7.526
   - r-cli

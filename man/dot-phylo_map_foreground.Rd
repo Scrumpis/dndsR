@@ -8,7 +8,8 @@
   hyp,
   present,
   gene_tree = NULL,
-  gene_tree_mode = c("topology", "report")
+  gene_tree_mode = c("topology", "report"),
+  require_foreground = TRUE
 )
 }
 \arguments{
@@ -19,11 +20,16 @@
 \item{gene_tree}{Optional \code{ape} phylo with tips named by taxon.}
 
 \item{gene_tree_mode}{\code{"topology"} or \code{"report"}.}
+
+\item{require_foreground}{If \code{FALSE}, every branch is background and no foreground
+check applies: for analyses of all branches (free-ratio branch models, aBSREL without
+a foreground). The topology and branch identities are those of the default.}
 }
 \value{
 A list with \code{ok}, \code{reason}, \code{detail}, \code{newick} (labelled, unrooted, no branch
-lengths), \code{branches} (one row per branch), and \code{info} (foreground and discordance
-measures).
+lengths), \code{branches} (one row per branch), \code{info} (foreground and discordance
+measures), and \code{topology} (the unrooted tree, its node names, and the node below each
+branch), so other labellings of the same branches can be written.
 }
 \description{
 Branches of the species tree that join after pruning become one branch. A requested
