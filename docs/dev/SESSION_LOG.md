@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-20 (final): v0.5.0 release preparation
+
+- **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
+- **Done:** maintainer decisions recorded; fixture notice; clone references to `v0.5.0`; CI now fails on any skipped test in the release image and runs KaKs_Calculator and the recommended BUSTED settings in it; interim-image and g03 documentation from the agent test; channel message 11; HyPhy checked for a branch-model equivalent (aBSREL baseline MG94 per-branch ω is the closest, not equivalent without a study).
+- **Verified:** agent test 7 of 7 at `010ab1e` (6 of 7 at `1ea7faf`, a wording miss); `check.sh` with the tutorial; the new container checks against this tree on Slurm.
+- **Not done:** push (the guard refuses agent pushes, even when asked); CI on the candidate; the MK `gaps.md` fix.
+
 ## 2026-11-20 (later): gene IDs, name checks, CI locale fix, v0.5.0 preparation
 
 - **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)

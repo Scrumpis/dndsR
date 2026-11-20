@@ -20,13 +20,13 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 
 ## Resume here: v0.5.0
 
-Updated 2026-11-20. The maintainer set the next release as **v0.5.0** (`DECISIONS.md`): pairwise pipeline, alternative estimators, reliability flags, and, marked experimental, `phylo_prepare`/`phylo_busted` and McDonald-Kreitman. The version is bumped on `dev`; nothing is merged, tagged, or published.
+Updated 2026-11-20. The maintainer approved the v0.5.0 scope and its preparation; the checklist is in [RELEASE-READINESS.md](RELEASE-READINESS.md). Nothing is merged, tagged, or published.
 
-1. Done: `p_best_fits_adj` (BH over `p_best_fits`, same family as `p_adj`, which is unchanged); docs, tutorial, and skill recommend `--multiple-hits Double --extra-seeds 2,3` and `p_best_fits_adj`; release labels; release notes draft (`release-notes-0.5.0.md`); readiness (`RELEASE-READINESS.md`).
-2. Blocking, for the maintainer: the second author's preferred name and ORCID; accepting the fixture's NCBI terms (`tools/dev/fixtures/README.md`). For the MK maintainer: the stale MK line in `skills/dndsr/references/gaps.md` (channel message 10).
-3. Then, with approval: `RELEASE.md` step 5 (clone commands to `--branch v0.5.0`), `tools/dev/test-agent.sh claude`, merge, tag, image, digests.
-4. Future, not in v0.5.0: lineage-level selection for a comparative project (`phylo_branch_omega`, `phylo_absrel`, `phylo_relax`, `phylo_summarize`). Review and recommended order: [phylo-lineage-plan.md](phylo-lineage-plan.md). First decision: the engine for branch ω (PAML, a new dependency, or HyPhy).
-5. Heavier commands go through Slurm, never the login node (maintainer, 2026-11-20).
+1. After the maintainer pushes `dev`: read the container workflow's annotations on the pushed commit (public API, `check-runs/<job>/annotations`). It must show `Package tests` with `skipped=0` and no `Skipped test` warning, because `DNDSR_FAIL_ON_SKIP=1` now makes any skip fail in the freshly built image, and the new container checks run KaKs_Calculator (`--dnds-method YN`) and `phylo_busted` with the recommended settings. All workflows must pass.
+2. The MK maintainer corrects the MK line in `skills/dndsr/references/gaps.md` (channel message 11); then CI again on that commit.
+3. Then, with approval: merge to `main`, tag `v0.5.0`, image, digests, release, Zenodo (`RELEASE.md`).
+4. Separate from v0.5.0: lineage-level work in the maintainer's order, PAML branch models first ([phylo-lineage-plan.md](phylo-lineage-plan.md)); aBSREL's baseline per-branch ω is a candidate cross-check, not a substitute, until an equivalence study.
+5. Heavier commands go through Slurm, never the login node. Agents do not push (the guard refuses even when asked); give the maintainer the command.
 
 ## Next
 

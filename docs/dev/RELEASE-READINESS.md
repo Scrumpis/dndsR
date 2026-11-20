@@ -1,8 +1,35 @@
 # Release readiness
 
-## v0.5.0 candidate: `dev` after `3943ffc`
+## v0.5.0 candidate: `dev` at `010ab1e` and its records commit
 
-**Assessed 2026-11-20. Version set to 0.5.0 (`DESCRIPTION`, skill, `CITATION.cff`, NEWS); not merged, tagged, or published.** Scope (maintainer, `DECISIONS.md`): validated pairwise pipeline, alternative estimators, reliability flags; `phylo_prepare` and `phylo_busted` experimental; McDonald-Kreitman experimental. Release notes draft: [release-notes-0.5.0.md](release-notes-0.5.0.md).
+**Assessed 2026-11-20. Ready to merge once the two items under "Blocking" are done; the maintainer approved the scope, the push of `dev`, the clone references, and the agent test.** Not merged, tagged, or published. Release notes draft: [release-notes-0.5.0.md](release-notes-0.5.0.md).
+
+### Checklist
+
+| Step | State |
+|---|---|
+| Version 0.5.0 in `DESCRIPTION`, skill, `CITATION.cff`; NEWS | Done (`0d00046`) |
+| `p_best_fits_adj`, independently tested; docs reconciled with the calibration | Done (`0d00046`) |
+| Clone references `--branch v0.5.0` (RELEASE.md step 5) | Done (`1ea7faf`); they fail until the tag exists, as approved |
+| Interim image documented as v0.4.0, without HyPhy and KaKs_Calculator | Done (`010ab1e`); the digest is replaced after publication (publish step 3) |
+| Fixture kept, attributed, outside dndsR's license | Done (`1ea7faf`, `tools/dev/fixtures/atal/NOTICE.md`) |
+| Second author's metadata | Kept provisionally, no ORCID (maintainer) |
+| Local gate: `check.sh --rcmd-check --regression` | Pass before `0d00046` (236 tests, 0 failed, 4 skipped for HyPhy and KaKs_Calculator); `check.sh` with the tutorial at `010ab1e`'s tree: pass |
+| Safeguards | 97 of 97 after the version bump |
+| HyPhy tests and the recommended settings, with HyPhy | Pass (3 of 3; independent BH check) |
+| New container checks (KaKs_Calculator through `--dnds-method YN`; `phylo_busted` with the recommended settings) | Pass against this tree on Slurm, with the tools from Bioconda |
+| Agent test (`test-agent.sh claude`) | 7 of 7 at `010ab1e` |
+| Whole-genome regression | Not needed: no pairwise code changed since the rerun of the gene-ID fix (`f529235`), and the fixture is byte-identical |
+| **CI on the exact candidate**, including the container workflow with `DNDSR_FAIL_ON_SKIP=1` | **Pending the push.** Read its annotations after the push: `Package tests` notice with `skipped=0`, no `Skipped test` warning |
+| MK `gaps.md` correction | **Pending the MK maintainer** (channel message 11) |
+| Merge `dev` to `main`, tag, image, digests, GitHub release, Zenodo | Waiting for approval (`RELEASE.md`, "Publish, once authorized") |
+
+### Blocking
+
+1. CI green on the pushed candidate, with the container workflow showing that no test skipped in the freshly built image.
+2. The MK maintainer's correction of the MK line in `skills/dndsr/references/gaps.md`; then rerun CI on that commit.
+
+### Evidence
 
 | Check | Run | Result |
 |---|---|---|
@@ -20,17 +47,9 @@
 | Real-genome fixture regression (`tools/dev/regression.sh`, new, [TESTING.md](TESTING.md)) | v0.4.0 image, `9a5c758` plus this session's change, and v0.4.0 itself | Baseline made with the current tree; v0.4.0 reproduces every output it writes (508 pairs, 0 values changed). Fixture pairs equal the full-genome run's for all 503 shared pairs: `tools/dev/fixtures/README.md` |
 | Phylogenetic calibration, stages 2A and 2B | Simulation, `3603efc` | Reported: `docs/validation/phylo-calibration-stage2b.md`; guidance approved by the maintainer |
 
-### Blocking the release
-
-1. **Second author's metadata.** Both authors are listed the same way in `DESCRIPTION`, `CITATION.cff`, and `.zenodo.json` (Miles Roberts, no ORCID). Confirm the preferred name and an optional ORCID. Maintainer.
-2. **Fixture redistribution.** NCBI places no restrictions on use or distribution, but submitters (TAIR/Araport, JGI) may claim rights NCBI cannot waive; quoted in `tools/dev/fixtures/README.md`. Accept, or keep the fixture out of the repository. Maintainer.
-3. **MK skill text is wrong.** `skills/dndsr/references/gaps.md` still describes the replaced degeneracy method ("excludes 2- and 3-fold sites"). MK maintainer, channel message 10.
-4. **Approval steps.** `RELEASE.md` "Before release" step 5 (clone commands to `--branch v0.5.0`) is left until the merge is approved, since those commands fail until the tag exists; then merge, tag, image, digests, each with approval.
-
-### Not blocking, unless the maintainer says so
+### Not blocking
 
 - MK: message 9's documentation of `--unique-pairs` with MK rows, and message 7's SNP-file pre-check (MK maintainer).
-- `tools/dev/test-agent.sh claude` and a whole-genome rerun: not rerun. No pairwise code changed since the whole-genome rerun at `f529235`'s snapshot; `RELEASE.md` asks for the agent test before release.
 - The `mamba-org/setup-micromamba@v2` action runs on a deprecated Node.js version (CI warning only).
 
 ## v0.4.0 candidate
