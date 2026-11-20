@@ -2,7 +2,7 @@
 
 `phylo_prepare` and `phylo_busted` test orthogroups of several species for episodic positive selection on chosen branches, using HyPhy's BUSTED. This is separate from dndsR's pairwise dN/dS: different inputs, a different question, and its own outputs. Tutorial: [tutorials/phylogenetic-selection.md](tutorials/phylogenetic-selection.md).
 
-**Status: experimental and unreleased** (development version 0.4.0.9000; not in v0.4.0). dndsR prepares inputs as designed and reproduces HyPhy run directly, exactly, on synthetic examples ([wrapper](validation/phylo-busted-wrapper.md), [preparation](validation/phylo-prepare.md)). That is engineering correctness. A simulation study then measured false positives and power for several settings: [calibration](#calibration-in-simulation) below. It covers one five-taxon tree with one foreground clade, on simulated data, so its rates do not carry over to other datasets.
+**Status: experimental, new in v0.5.0.** dndsR prepares inputs as designed and reproduces HyPhy run directly, exactly, on synthetic examples ([wrapper](validation/phylo-busted-wrapper.md), [preparation](validation/phylo-prepare.md)). That is engineering correctness. A simulation study then measured false positives and power for several settings: [calibration](#calibration-in-simulation) below. It covers one five-taxon tree with one foreground clade, on simulated data, so its rates do not carry over to other datasets. The module is tested software with a calibration in one configuration: not untested, and not validated for real biological inference across arbitrary phylogenies.
 
 ## What BUSTED tests
 
@@ -14,7 +14,7 @@ By default, synonymous rates vary among sites (BUSTED-S, Wisotsky et al. 2020, *
 |---|---|---|
 | Input | Two genomes | One codon alignment per orthogroup, a species tree, a foreground |
 | Output | A point estimate per gene pair | A likelihood-ratio test per orthogroup |
-| A "positive" | dN/dS above 1, a threshold on an estimate | p_adj below your chosen level |
+| A "positive" | dN/dS above 1, a threshold on an estimate | A corrected p-value below your chosen level: `p_best_fits_adj` with the recommended three starts, otherwise `p_adj` |
 | Uncertainty | None attached | A p-value, corrected across orthogroups |
 
 A significant BUSTED result and a pairwise dN/dS above 1 are not interchangeable, and one does not confirm the other.
@@ -103,14 +103,15 @@ An orthogroup without a gene tree, when gene trees are given, is excluded (`gene
 ## Statistics
 
 - `p_value` is HyPhy's: a 50:50 mixture of chi-square distributions with 0 and 2 degrees of freedom. When the likelihood ratio is 0, p is exactly 0.5, so many genes share that value.
-- `p_adj` is Benjamini-Hochberg across every orthogroup tested in the run. Excluded and failed orthogroups are not in the family. Compare `family_size` with the number you started with.
+- `p_adj` is Benjamini-Hochberg over `p_value` across every orthogroup tested in the run. Excluded and failed orthogroups are not in the family. Compare `family_size` with the number you started with.
+- With extra starts, `p_best_fits_adj` is Benjamini-Hochberg over `p_best_fits`, across the same family. Any failed start makes its orthogroup `failed`, so every tested orthogroup has a `p_best_fits`. Under the recommended settings (below), report `p_best_fits_adj`; `p_adj` keeps its meaning, the primary start alone.
 - Each run tests one foreground hypothesis. Separate runs are separate families.
 
 ## Reproducibility and multiple starts
 
 HyPhy optimizes from random starting values, and its result depends on them and on its thread count. dndsR always sets both (`--seed`, default 1; `--hyphy-cpu`, default 1), and records them; the same HyPhy build on the same kind of processor then gives identical results. HyPhy's arithmetic differs slightly between processors with and without AVX-512: on the examples, identical on Intel Skylake and AMD Genoa (AVX-512), and on AMD Rome and Milan (AVX2), with two of eight runs differing between the two groups, by up to 0.005 in the likelihood ratio ([evidence](validation/phylo-prepare.md#processors)). Record the processor with your results. MAFFT runs on one thread. A different seed can change a gene's likelihood ratio: on one simulated gene, from 7.0 to 8.8 over 20 seeds.
 
-`--extra-seeds 2,3,4` runs independent further starts and reports, as diagnostics only: `n_starts`, `lrt_min_starts`, `lrt_max_starts`, the best alternative and null log-likelihoods found (`lnl_unconstrained_best`, `lnl_null_best`; where HyPhy skipped the constrained fit for lack of evidence, that start's unconstrained fit counts as a null point), the likelihood ratio between them (`lrt_best_fits`, `p_best_fits`), and whether the primary start found each best. **`p_value` and `p_adj` always come from `--seed`.** dndsR never chooses the largest likelihood ratio. The calibration below recommends three starts read through `lrt_best_fits` and `p_best_fits`. `p_adj` corrects `p_value` only, so correct `p_best_fits` yourself (Benjamini-Hochberg over the same `tested` orthogroups) when you use it.
+`--extra-seeds 2,3` runs independent further starts and reports: `n_starts`, `lrt_min_starts`, `lrt_max_starts`, the best alternative and null log-likelihoods found (`lnl_unconstrained_best`, `lnl_null_best`; where HyPhy skipped the constrained fit for lack of evidence, that start's unconstrained fit counts as a null point), the likelihood ratio between them (`lrt_best_fits`, `p_best_fits`, and its correction `p_best_fits_adj`), and whether the primary start found each best. **`p_value` and `p_adj` always come from `--seed` alone.** dndsR never picks the largest likelihood ratio of any single start: `lrt_best_fits` compares the best alternative fit with the best null fit. The calibration below recommends three starts read through `lrt_best_fits`, `p_best_fits`, and `p_best_fits_adj`.
 
 ## Alignment checks reported
 
@@ -140,10 +141,16 @@ A two-stage simulation study, with criteria fixed before any job ran, measured f
 - **One configuration.** Five taxa, one tree, one foreground clade (two species), simulated under a model close to BUSTED's. Rates do not generalize to other trees, taxon numbers, foregrounds, or real data.
 - **Words used precisely.** A procedure is *calibrated* where the 95% upper bound of its false-positive rate is at most the nominal 5%. A rate far below 5% means a *conservative* test, which costs power. The false discovery proportion of the study's genome-like mixture is one simulated realization, not an expected FDR. Power is per gene, before correction.
 
-What it found, and what the maintainer approved as guidance (no default changed):
+What it found, and what the maintainer approved as guidance (no default changed). In short, run
+
+```
+dndsr phylo_busted --prepared-dir <dir> --multiple-hits Double --extra-seeds 2,3
+```
+
+report `p_best_fits_adj`, and check flagged alignments before believing any positive:
 
 - **Use `--multiple-hits Double`** as the standard configuration. Without it, multinucleotide changes gave 97% false positives; with it, 0-2%. Correct nulls were calibrated (0-1.3%), and the power cost against the default was small.
-- **Use three starts**, `--extra-seeds 2,3`, and read `lrt_best_fits` and `p_best_fits`. One start missed the best fit under selection, changing up to 15% of calls. Even with three, about 6% of calls near the threshold differed between two independent runs: treat a gene near α as uncertain, and report the seeds.
+- **Use three starts**, `--extra-seeds 2,3`, and read `lrt_best_fits`, `p_best_fits`, and the corrected `p_best_fits_adj`. One start missed the best fit under selection, changing up to 15% of calls. Even with three, about 6% of calls near the threshold differed between two independent runs: treat a gene near α as uncertain, and report the seeds.
 - **Triple hits** (`Double+Triple`) added nothing, so they are not recommended routinely.
 - **Alignment errors are the main threat.** One misaligned or mis-annotated segment in a foreground sequence gave 89-92% false positives under the default and under `Double`, and 24-28% under BUSTED-E. In a simulated genome, 77% of discoveries after BH were such genes. Realigned indels gave 8%, mostly from alignment error.
 - **Masking flagged windows is a sensitivity analysis, not a filter.** Masking the `dissimilar_window` segments removed those false positives, at no cost under selection spread along the gene. But it removed 20 points of power when the selected sites formed one block, because a block of genuine change looks like an error. dndsR does not mask. The study masked with a development script, `tools/dev/validation/phylo-windows.py`, which is not a supported command. Report results with and without masking. A gene significant only unmasked, with a flagged foreground window, is a likely artifact. No preferred masking scope (all sequences or foreground only) emerged, and masking around gaps stays experimental.

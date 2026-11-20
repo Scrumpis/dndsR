@@ -74,7 +74,7 @@ dndsr dnds_contrast -c comparison_file.txt --contrast-file contrast_file.txt
 
 `dnds_summary` and `dnds_contrast` read `--regions-bed` as BED by default: 0-based start, end not included. Use `--regions-coord gff1` with `dnds_contrast` for 1-based inclusive coordinates.
 
-## 6. McDonald-Kreitman test (development version)
+## 6. McDonald-Kreitman test (experimental, v0.5.0 and later)
 
 To ask whether selection shapes a gene's polymorphism as well as its divergence, add a within-species SNP set. It must use the coordinates of one of the two genomes in the comparison: the genome FASTA and GFF3 for that side, already in the comparison file, are used to place each SNP in its codon.
 

@@ -99,6 +99,34 @@
        primary_null_is_best = abs(null_points[1] - best_null) < 1e-6)
 }
 
+#' Benjamini-Hochberg correction across the orthogroups tested in a run
+#'
+#' `p_adj` corrects `p_value`, from the primary start, as always. With several starts,
+#' `p_best_fits_adj` corrects `p_best_fits`, from the best alternative and best null fits
+#' across starts (the stage 2 recommendation), over the same family: every orthogroup with
+#' status `tested`. Any failed start makes an orthogroup `failed`, so every tested one has
+#' `p_best_fits` when starts were added. Excluded and failed orthogroups get `NA`.
+#'
+#' @param results One row per orthogroup, with `status`, `p_value`, and, after several
+#'   starts, `p_best_fits`.
+#' @return `results` with `p_adj`, `p_adj_method`, `family_size`, and, when `p_best_fits`
+#'   is present, `p_best_fits_adj`.
+#' @keywords internal
+.phylo_adjust <- function(results) {
+  tested <- results$status == "tested"
+  # With nothing tested (every orthogroup excluded or failed), there is no p_value column.
+  bh <- function(p) {
+    out <- rep(NA_real_, nrow(results))
+    if (!is.null(p) && any(tested)) out[tested] <- stats::p.adjust(p[tested], method = "BH")
+    out
+  }
+  results$p_adj <- bh(results$p_value)
+  results$p_adj_method <- "BH"
+  results$family_size <- sum(tested)
+  if ("p_best_fits" %in% names(results)) results$p_best_fits_adj <- bh(results$p_best_fits)
+  results
+}
+
 #' Analyse one orthogroup
 #' @keywords internal
 .phylo_one <- function(og, file, ctx) {
@@ -262,15 +290,17 @@
   }
   results <- .phylo_bind_rows(rows)
   results <- results[order(results$orthogroup, method = "radix"), , drop = FALSE]
+  results <- .phylo_adjust(results)
   tested <- results$status == "tested"
-  results$p_adj <- NA_real_
-  results$p_adj[tested] <- stats::p.adjust(results$p_value[tested], method = "BH")
-  results$p_adj_method <- "BH"
-  results$family_size <- sum(tested)
   results$method <- method
   first <- c("orthogroup", "method", "status", "stage", "reason", "exclusion_basis", "detail", "n_taxa", "n_codons",
              "taxa_absent", "n_fg_branches", "fg_branches", "lrt", "p_value", "p_adj", "p_adj_method", "family_size")
   results <- results[, c(intersect(first, names(results)), setdiff(names(results), first)), drop = FALSE]
+  if ("p_best_fits_adj" %in% names(results)) {   # beside p_best_fits, which it corrects
+    rest <- setdiff(names(results), "p_best_fits_adj")
+    at <- match("p_best_fits", rest)
+    results <- results[, c(rest[seq_len(at)], "p_best_fits_adj", rest[-seq_len(at)]), drop = FALSE]
+  }
   branches <- .phylo_bind_rows(lapply(res, `[[`, "branches"))
   sequences <- .phylo_bind_rows(lapply(res, `[[`, "sequences"))
 
@@ -289,8 +319,8 @@
     ape = version_of("ape"), hyphy_version = version, hyphy_validated_version = .hyphy_validated_version,
     hyphy_path = bin, settings = settings, random_seed = seed, extra_seeds = extra_seeds, hyphy_cpu = hyphy_cpu,
     reproducibility = paste("Results are reproducible for the same HyPhy build, settings, random_seed, and hyphy_cpu.",
-                            "threads only sets how many orthogroups run at once. Extra seeds give diagnostics only;",
-                            "p_value and p_adj always come from random_seed."),
+                            "threads only sets how many orthogroups run at once. p_value and p_adj always come",
+                            "from random_seed; with extra seeds, p_best_fits and p_best_fits_adj combine every start."),
     min_taxa = min_taxa, terminal_stops = terminal_stops,
     gene_tree_mode = if (is.null(gene_tree_dir)) NA_character_ else gene_tree_mode,
     species_tree = list(path = species_tree_file, md5 = unname(tools::md5sum(species_tree_file))),

@@ -6,7 +6,7 @@ Every command is also an R function with the same name and options, except `exam
 |---|---|
 | `split_comparisons` | Split genomes by subgenome or haplotype and write a new comparison file |
 | `extract_cds` | Extract CDS or proteins from FASTA and GFF3 |
-| `calculate_dnds` | Calculate dN/dS with `orthologr`. `--dnds-method` is `Comeron` (default), `NG`, `LWL`, `LPB`, `MLWL`, `YN`, or `MYN`; the others need KaKs_Calculator, which images up to v0.4.0 lack. Development code also runs a McDonald-Kreitman test when the comparison row has `snp_file` and `snp_side` |
+| `calculate_dnds` | Calculate dN/dS with `orthologr`. `--dnds-method` is `Comeron` (default), `NG`, `LWL`, `LPB`, `MLWL`, `YN`, or `MYN`; the others need KaKs_Calculator, which images up to v0.4.0 lack. From v0.5.0 it also runs an experimental McDonald-Kreitman test when the comparison row has `snp_file` and `snp_side` |
 | `append_annotations` | Add GFF attributes and coordinates to dN/dS results |
 | `ipr_enrichment` | InterPro term enrichment under positive selection |
 | `go_enrichment` | Gene Ontology enrichment with topGO |
@@ -16,8 +16,8 @@ Every command is also an R function with the same name and options, except `exam
 | `dnds_summary` | dN/dS distributions and statistics, optionally by region |
 | `dnds_contrast` | Contrasts between comparisons |
 | `dnds_state_contrast` | Contrasts of selection states between groups; `--level gene` is disabled |
-| `phylo_prepare` | Codon alignments and labelled trees from genomes or CDS and orthogroups. Experimental, not in v0.4.0; needs MAFFT |
-| `phylo_busted` | HyPhy BUSTED tests across species on chosen branches, corrected across orthogroups. Experimental, not in v0.4.0; needs HyPhy 2.5.103 |
+| `phylo_prepare` | Codon alignments and labelled trees from genomes or CDS and orthogroups. Experimental, v0.5.0 and later; needs MAFFT |
+| `phylo_busted` | HyPhy BUSTED tests across species on chosen branches, corrected across orthogroups. Experimental, v0.5.0 and later; needs HyPhy 2.5.103 |
 | `phylo_example` | Copy a bundled phylogenetic example (`--type genomes`, the default, or `alignments`) |
 | `verify_phylo_example` | Check a phylogenetic example against its design and HyPhy run directly |
 | `example` | Copy the bundled example to a folder |
@@ -32,7 +32,7 @@ Every command is also an R function with the same name and options, except `exam
 | `-o`, `--output-dir` | Output directory |
 | `-v`, `--verbose` | Verbose logging |
 | `-w`, `--warnings` | `off`, `summary`, or `all` |
-| `--unique-pairs` | Development code. With `-c`, skip a row that repeats an earlier genome pair, in either order, unless it carries its own McDonald-Kreitman inputs. Give it to every step of one analysis |
+| `--unique-pairs` | v0.5.0 and later. With `-c`, skip a row that repeats an earlier genome pair, in either order, unless it carries its own McDonald-Kreitman inputs. Give it to every step of one analysis |
 
 Option and command names accept `-` or `_` as separators. Unknown options are errors.
 

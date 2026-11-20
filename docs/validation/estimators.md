@@ -168,7 +168,7 @@ Ratio of dndsR's value to yn00's (or `ng86.py`'s), medians and shares within 5%,
 
 ## Reliability flags
 
-`calculate_dnds` writes `<comparison>_dnds_reliability.tsv` beside the dN/dS table (development code). The dN/dS table is unchanged. The flags are warnings, not filters, and the thresholds are rules of thumb tied to the evidence below, not optimized cut-offs. The counts are NG86 on the codon alignment that every method used. `tests/testthat/test-dnds-reliability.R` checks them against hand counts and against `ng86.py` on the designed example (g09: 40 synonymous and 8 nonsynonymous differences, 230.0833 synonymous sites).
+`calculate_dnds` writes `<comparison>_dnds_reliability.tsv` beside the dN/dS table (v0.5.0 and later). The dN/dS table is unchanged. The flags are warnings, not filters, and the thresholds are rules of thumb tied to the evidence below, not optimized cut-offs. The counts are NG86 on the codon alignment that every method used. `tests/testthat/test-dnds-reliability.R` checks them against hand counts and against `ng86.py` on the designed example (g09: 40 synonymous and 8 nonsynonymous differences, 230.0833 synonymous sites).
 
 | Flag | Criterion | Basis |
 |---|---|---|

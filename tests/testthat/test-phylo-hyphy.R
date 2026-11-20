@@ -207,3 +207,28 @@ test_that("the CLI finds the phylogenetic commands and keeps paths and choices a
   expect_identical(p$seed, 7L)
   expect_error(cli_main(c("phylo_busted", "--foregrund-file", "x")), "--foregrund-file")
 })
+
+test_that("p_adj and p_best_fits_adj are BH over the tested orthogroups, computed by hand", {
+  adjust <- get(".phylo_adjust", envir = asNamespace("dndsR"))
+  r <- data.frame(orthogroup = c("A", "B", "C", "D", "E"),
+                  status = c("tested", "tested", "excluded", "tested", "failed"),
+                  p_value = c(0.01, 0.04, NA, 0.03, NA),
+                  p_best_fits = c(0.02, 0.5, NA, 0.001, NA))
+  out <- adjust(r)
+  # m = 3. p_value sorted 0.01, 0.03, 0.04: 0.01*3/1 = 0.03; 0.03*3/2 = 0.045; 0.04*3/3 = 0.04;
+  # monotone from the top: 0.04, min(0.045, 0.04) = 0.04, min(0.03, 0.04) = 0.03.
+  expect_equal(out$p_adj, c(0.03, 0.04, NA, 0.04, NA))
+  # p_best_fits sorted 0.001, 0.02, 0.5: 0.003; 0.02*3/2 = 0.03; 0.5. Already monotone.
+  expect_equal(out$p_best_fits_adj, c(0.03, 0.5, NA, 0.003, NA))
+  expect_identical(out$family_size, c(3L, 3L, 3L, 3L, 3L))
+  # p_adj is unchanged by the presence of p_best_fits: the same as without starts.
+  expect_identical(adjust(r[, c("orthogroup", "status", "p_value")])$p_adj, out$p_adj)
+  expect_false("p_best_fits_adj" %in% names(adjust(r[, c("orthogroup", "status", "p_value")])))
+})
+
+test_that("the correction leaves NA when nothing was tested", {
+  adjust <- get(".phylo_adjust", envir = asNamespace("dndsR"))
+  out <- adjust(data.frame(orthogroup = c("A", "B"), status = c("failed", "excluded")))
+  expect_identical(out$p_adj, c(NA_real_, NA_real_))
+  expect_identical(out$family_size, c(0L, 0L))
+})

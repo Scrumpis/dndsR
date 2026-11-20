@@ -6,7 +6,7 @@ All outputs for a comparison go in `<output_dir>/<comparison_name>/`. Contrasts 
 
 | File | Contents |
 |---|---|
-| `<genome>_CDS.fasta` | One CDS per gene (or per transcript with `--group-by tx`), named by its GFF3 `ID` without a type prefix such as `gene-`, `rna-`, or `gene:`, whatever its `Name` (development code; before, a file whose gene symbols were all unique was named by symbol) |
+| `<genome>_CDS.fasta` | One CDS per gene (or per transcript with `--group-by tx`), named by its GFF3 `ID` without a type prefix such as `gene-`, `rna-`, or `gene:`, whatever its `Name` (from v0.5.0; before, a file whose gene symbols were all unique was named by symbol) |
 | `<genome>_AA.fasta` | Translated proteins, with `--export-proteins` |
 | `<genome>_CDS_qc.tsv` | One row per gene or transcript, including those not written |
 | `*_extract_cds.log` | Log for each genome |
@@ -27,7 +27,7 @@ QC columns: `id`, `transcript` (the isoform used), `n_isoforms`, `length_nt`, `m
 
 `<comparison>_dnds_provenance.json` records versions, parameters, and MD5 hashes of the CDS inputs.
 
-`<comparison>_dnds_reliability.tsv` (development version) has one row per pair, in the same order. It flags estimates to treat with care and changes no value: the dN/dS table is written exactly as without it.
+`<comparison>_dnds_reliability.tsv` (v0.5.0 and later) has one row per pair, in the same order. It flags estimates to treat with care and changes no value: the dN/dS table is written exactly as without it.
 
 | Column | Meaning |
 |---|---|
@@ -47,7 +47,7 @@ QC columns: `id`, `transcript` (the isoform used), `n_isoforms`, `length_nt`, `m
 
 Evidence for the criteria: [validation/estimators.md](validation/estimators.md), "Reliability flags".
 
-### McDonald-Kreitman (development version)
+### McDonald-Kreitman (experimental, v0.5.0 and later)
 
 Written when the comparison has `snp_file` and `snp_side` columns. Method, inputs, and checks: [mcdonald-kreitman.md](mcdonald-kreitman.md).
 
@@ -156,7 +156,8 @@ Results columns:
 | `fg_omega_<k>`, `fg_prop_<k>`, `bg_omega_<k>`, `bg_prop_<k>` | ω and weight of HyPhy's rate class k (its class k-1) on foreground and background branches, unconstrained model. Classes are not sorted |
 | `tree_length` | Sum of branch lengths in the unconstrained model |
 | `n_starts` | Starts run: 1, or more with `--extra-seeds` |
-| `start_seeds`, `lrt_min_starts`, `lrt_max_starts`, `lnl_unconstrained_best`, `lnl_null_best`, `lrt_best_fits`, `p_best_fits`, `primary_unconstrained_is_best`, `primary_null_is_best` | Diagnostics across starts, with `--extra-seeds` only. They never change `p_value` or `p_adj` |
+| `start_seeds`, `lrt_min_starts`, `lrt_max_starts`, `lnl_unconstrained_best`, `lnl_null_best`, `lrt_best_fits`, `p_best_fits`, `primary_unconstrained_is_best`, `primary_null_is_best` | Across starts, with `--extra-seeds` only. `lrt_best_fits` and `p_best_fits` compare the best alternative and best null fits. They never change `p_value` or `p_adj` |
+| `p_best_fits_adj` | Benjamini-Hochberg over `p_best_fits` across the tested orthogroups (the `p_adj` family), with `--extra-seeds` only. The value to report under the recommended three starts (v0.5.0 and later) |
 | `gt_missing_species_splits`, `gt_extra_splits`, `gt_missing_splits`, `gt_discordant_near_foreground`, `gene_tree_mode` | With gene trees: species-tree branches absent from the gene tree, gene-tree branches absent from the species tree, which are missing, and whether one is or touches a foreground branch |
 | `terminal_stops_masked`, `max_gap_fraction`, `max_ambiguous_codon_fraction`, `gappy_column_fraction`, `median_p_distance`, `max_p_distance`, `dissimilar_windows` | Alignment QC |
 | `qc_flags` | Flags separated by `;`. See [phylo-methods.md](phylo-methods.md#alignment-checks-reported) |

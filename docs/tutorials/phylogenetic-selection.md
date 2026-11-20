@@ -2,7 +2,7 @@
 
 `phylo_prepare` and `phylo_busted` go from genomes and orthogroups to HyPhy BUSTED tests of whether some sites evolved with dN/dS above 1 on branches you choose. You do not build alignments or HyPhy inputs by hand. This is separate from dndsR's pairwise dN/dS. Read [phylo-methods.md](../phylo-methods.md) before interpreting results.
 
-**Status: experimental and unreleased.** Development version 0.4.0.9000; v0.4.0 does not have it. dndsR prepares inputs as designed and reproduces HyPhy run directly ([evidence](../validation/phylo-prepare.md)), A simulation study on one five-taxon tree recommends `--multiple-hits Double` and three starts, and treats masking as a sensitivity analysis; the defaults are unchanged. See [calibration](../phylo-methods.md#calibration-in-simulation) before choosing settings.
+**Status: experimental, new in v0.5.0.** dndsR prepares inputs as designed and reproduces HyPhy run directly ([evidence](../validation/phylo-prepare.md)). A simulation study on one five-taxon tree recommends `--multiple-hits Double` and three starts, and treats masking as a sensitivity analysis; the defaults are unchanged. See [calibration](../phylo-methods.md#calibration-in-simulation) before choosing settings.
 
 ## 1. Get dndsR and HyPhy
 
@@ -99,8 +99,11 @@ OG04's gene tree differs from the species tree away from the foreground, and OG0
 ```
 dndsr phylo_prepare --genome-file genomes.tsv --orthogroup-file Orthogroups.tsv \
   --species-tree-file species.nwk --foreground-file foreground.tsv -t 16 -o results
-dndsr phylo_busted --prepared-dir results/prepared -o results -t 16
+dndsr phylo_busted --prepared-dir results/prepared -o results -t 16 \
+  --multiple-hits Double --extra-seeds 2,3
 ```
+
+These are the settings the [calibration](../phylo-methods.md#calibration-in-simulation) recommends, not HyPhy's defaults, which the example above used: `--multiple-hits Double` keeps multinucleotide changes from posing as selection (97% false positives without it in simulation, 0-2% with it), and `--extra-seeds 2,3` runs three starts. Report `p_best_fits_adj`, the Benjamini-Hochberg correction of `p_best_fits` (best alternative against best null fit over the three starts), not `p_adj`, which uses the first start only. A gene near your threshold remains uncertain: about 6% of calls near it differed between independent runs. None of this protects against alignment errors, the main source of false positives in the calibration; look at alignments flagged `dissimilar_window` before believing a result.
 
 `-t` sets how many orthogroups run at once; each HyPhy run uses `--hyphy-cpu` threads (default 1). Results do not depend on `-t`, but do depend on `--seed` and `--hyphy-cpu`, which are recorded. A finished orthogroup is not rerun unless its inputs, settings, or HyPhy change; `--overwrite` forces it.
 

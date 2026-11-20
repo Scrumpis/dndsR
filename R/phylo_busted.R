@@ -7,8 +7,11 @@
 #' analysis from pairwise dN/dS: a significant BUSTED result is not the same as, and cannot
 #' be compared with, a pairwise dN/dS above 1.
 #'
-#' Experimental and unreleased. It reproduces HyPhy run directly; it has not been
-#' calibrated as a selection pipeline. See `docs/phylo-methods.md`.
+#' Experimental (new in v0.5.0). It reproduces HyPhy run directly. Its false-positive rate
+#' and power were calibrated only in simulation, on one five-taxon tree with one
+#' foreground, which recommends \code{multiple_hits = "Double"} and three starts
+#' (\code{extra_seeds = 2:3}). It is not calibrated for arbitrary phylogenies or real data.
+#' See `docs/phylo-methods.md`.
 #'
 #' @section Inputs:
 #' Either \code{prepared_dir}, the output folder of [phylo_prepare()], or all of:
@@ -63,8 +66,12 @@
 #' count. dndsR always sets the seed (\code{seed}) and threads per HyPhy run
 #' (\code{hyphy_cpu}), and records both. \code{extra_seeds} runs further independent starts
 #' and reports their spread and the best likelihoods found (\code{lrt_best_fits},
-#' \code{p_best_fits}), as diagnostics only: \code{p_value} and \code{p_adj} always come
-#' from \code{seed}. The largest likelihood ratio is never chosen automatically.
+#' \code{p_best_fits}), and \code{p_best_fits_adj}, Benjamini-Hochberg over
+#' \code{p_best_fits} across the same tested orthogroups as \code{p_adj}. The stage 2
+#' calibration recommends three starts and reading \code{p_best_fits} and
+#' \code{p_best_fits_adj} (\code{docs/phylo-methods.md}). \code{p_value} and \code{p_adj}
+#' always come from \code{seed} alone, as before. The largest likelihood ratio from a single
+#' start is never chosen.
 #'
 #' @section Outputs:
 #' In \code{file.path(output_dir, run_name)}: \code{<run_name>_results.tsv} (one row per

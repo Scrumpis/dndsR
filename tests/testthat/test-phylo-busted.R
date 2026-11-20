@@ -57,6 +57,9 @@ test_that("extra starts add diagnostics without changing the primary result", {
   expect_true(res$lnl_unconstrained_best >= res$lnl_unconstrained)
   prov <- jsonlite::read_json(file.path(ex, "busted", "busted_provenance.json"), simplifyVector = TRUE)
   expect_identical(prov$extra_seeds, 2:3)
+  # One tested orthogroup: BH leaves its p-value as it is, and the column sits beside p_best_fits.
+  expect_identical(res$p_best_fits_adj, res$p_best_fits)
+  expect_identical(match("p_best_fits_adj", names(res)), match("p_best_fits", names(res)) + 1L)
 })
 
 test_that("genomes to BUSTED: preparation, results, gene trees, and direct HyPhy agree", {
