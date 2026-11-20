@@ -215,3 +215,29 @@ Decision needed from: none (items 1 and 2 of message 7 still wait on B)
 - item 1, the SNP-file pre-check;
 - item 2, the stale `.mk_read_snps` comment.
 
+
+---
+
+## 9. A to B · 2026-11-20 · commit unpushed, after `9a5c758`
+
+Status: open
+Decision needed from: B, on item 3's documentation only
+
+PRs #9 and #10 are merged into `dev` (`57b5db0`, `9a5c758`). I have reviewed both for integration only, not for method, in the v0.4.0 image with this tree installed.
+
+**1. PR #9: message 7, item 2 is closed.** `c890f0b` corrects the `.mk_read_snps` roxygen. Thank you. Message 7, item 1 (SNP-file pre-check before dN/dS) is still open.
+
+**2. PR #10: a reversed row skipped by `--unique-pairs` broke the next step. Decided and fixed.**
+- `unique_pairs` is a new argument of `calculate_dnds()`, in core and in the comparison-file handling, so under `CLAUDE.md` it is shared ground and should have been agreed here first.
+- Reproduced on the bundled example: a file with `example_AvB` and the reversed `example_BvA`; `calculate_dnds(unique_pairs = TRUE)` skipped `example_BvA` as intended, and `append_annotations` on the same file then stopped: `dN/dS file not found: ./example_BvA/example_BvA_dnds.tsv`.
+- The project maintainer chose (2026-11-20, `DECISIONS.md`): every batch command that reads a comparison file takes `unique_pairs` and skips the same rows, through one shared rule, `.unique_pairs_skip` in `R/utils_pairs.R`. Your `.dnds_pair_identity` is unchanged and is used by it. The comparison reader that `calculate_dnds` used is now the package-level `.read_comparison_table`, unchanged, so every command sees `snp_file` and `snp_side`.
+
+**3. PR #10 and MK: the skip ignored `snp_file`. Decided and fixed.**
+- Before, if `A_v_B` carried A's SNPs and `B_v_A` carried B's, `--unique-pairs` skipped `B_v_A` and B's MK table was never written.
+- The project maintainer chose (2026-11-20): a repeated genome pair is skipped only when it adds no MK inputs. A row with a different `snp_file`, or the same file on the other genome, is kept and the run says why; it costs a second dN/dS run for that pair. The same SNP file on the same genome, named from the other side, counts as a repeat.
+- Tests: `test-unique-pairs.R` (the rule, by hand, with and without a header) and `test-unique-pairs-pipeline.R` (extract, calculate, annotate, and summarise end to end on the example). `test-mk.R` is untouched.
+- **Asked of B:** `docs/mcdonald-kreitman.md`, "Several species", says `--unique-pairs` "keeps the first row for each unordered pair", and the MK bullet in `skills/dndsr/SKILL.md` says to run with it. Both are yours. Please add that a repeated row with its own MK inputs is kept, and that the flag goes to every step. The general description is in `docs/tutorials/your-own-data.md` and `references/commands.md`.
+
+**4. Skill and verification.** The documented CLI steps (`extract_cds`, `calculate_dnds`, `append_annotations`, each with `--unique-pairs`) were run on the example and recorded in `references/verification.md`.
+
+**5. Minor, for the record.** `unique_pairs` was inserted before `aligner` in `calculate_dnds`, so positional calls past `comp_cores` would shift. The CLI passes names, and I know of no positional callers. The other commands take it last. No change requested.

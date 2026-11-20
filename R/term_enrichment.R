@@ -75,6 +75,10 @@
 #'   In batch mode, workers are applied across (comparison, side) jobs.
 #'   On Windows, runs sequentially (no forking).
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return (Invisibly) a character vector of output TSV paths.
 #'   In batch mode, this includes all comparisons. In single mode, paths for that file.
 #'   TSV columns include: term, term_type, side, pos_count, nonpos_count, pos_total,
@@ -114,7 +118,8 @@ term_enrichment <- function(dnds_annot_file = NULL,
                             term_metadata = NULL,
                             keep_unmatched_ids = TRUE,
                             verbose = TRUE,
-                            threads = 4) {
+                            threads = 4,
+                            unique_pairs = FALSE) {
 
   sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
   fdr_method <- match.arg(fdr_method)
@@ -641,6 +646,7 @@ term_enrichment <- function(dnds_annot_file = NULL,
   # ---- batch vs single ----
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    df <- .drop_comparisons(df, .unique_pairs_skip(comparison_file, unique_pairs, "term_enrichment"))
 
     jobs <- expand.grid(
       i = seq_len(nrow(df)),

@@ -32,6 +32,10 @@
 #' Verbose messages can be enabled with \code{options(dndsR.verbose = TRUE)} (or
 #' \code{options(dndsR.cli.verbose = TRUE)}).
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return In single mode: a data.frame (unless \code{output_file} is provided, in which
 #'   case the output path is returned). In batch mode: (invisibly) a character vector
 #'   of output paths.
@@ -45,7 +49,8 @@ append_annotations <- function(dnds_file = NULL,
                                output_dir = getwd(),
                                custom = NULL,
                                threads = NULL,
-                               overwrite = FALSE) {
+                               overwrite = FALSE,
+                               unique_pairs = FALSE) {
 
   ## ---------- lightweight verbose helper ----------
   vmsg <- function(...) {
@@ -513,6 +518,7 @@ append_annotations <- function(dnds_file = NULL,
 
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    df <- .drop_comparisons(df, .unique_pairs_skip(comparison_file, unique_pairs, "append_annotations"))
     vmsg(sprintf("Batch mode: %d comparison(s). Using threads=%d per comparison.", nrow(df), threads))
     out_paths <- character(0)
     for (i in seq_len(nrow(df))) {

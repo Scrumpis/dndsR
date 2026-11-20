@@ -56,6 +56,10 @@
 #' @param threads Maximum parallel workers across comparisons and sides (forked; default 1).
 #' @param verbose If `TRUE`, reports what was tested.
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return Invisibly, the paths of the TSV files written. Columns: `term`, `term_type`, `ontology`,
 #'   `term_name`, `threshold`, `universe`, `pos_total`, `total_count`, `pos_count`, `expected` (positive genes
 #'   predicted from length and dS, after the floor), `obs_over_expected`, `fisher_p` (without adjustment, for
@@ -73,7 +77,8 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
                                  min_total = 10,
                                  min_pos = 2,
                                  threads = 1,
-                                 verbose = TRUE) {
+                                 verbose = TRUE,
+                                 unique_pairs = FALSE) {
   terms <- match.arg(terms, choices = c("go", "ipr"), several.ok = TRUE)
   sides <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
   ontologies <- match.arg(ontologies, choices = c("BP", "MF", "CC"), several.ok = TRUE)
@@ -87,7 +92,7 @@ covariate_enrichment <- function(dnds_annot_file = NULL,
   } else {
     comparisons <- utils::read.table(comparison_file, header = FALSE, sep = "", quote = "\"", comment.char = "",
                                      stringsAsFactors = FALSE, strip.white = TRUE, blank.lines.skip = TRUE)
-    names_found <- setdiff(comparisons[[1]], "comparison_name")
+    names_found <- setdiff(comparisons[[1]], c("comparison_name", .unique_pairs_skip(comparison_file, unique_pairs, "covariate_enrichment")))
     file.path(output_dir, names_found, paste0(names_found, "_dnds_annot.tsv"))
   }
   missing_files <- files[!file.exists(files)]

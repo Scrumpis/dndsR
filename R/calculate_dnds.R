@@ -186,99 +186,8 @@ calculate_dnds <- function(comparison_file = NULL,
     }
   }
 
-  # ---- helper: read comparison table (whitespace-delimited) ----
-  .read_comparisons <- function(x) {
-
-    # ---- helper: read whitespace-delimited ----
-    read_ws <- function(hdr) {
-      utils::read.table(
-        x,
-        header = hdr,
-        sep = "",
-        quote = "\"",
-        stringsAsFactors = FALSE,
-        comment.char = "",
-        strip.white = TRUE,
-        blank.lines.skip = TRUE,
-        check.names = FALSE
-      )
-    }
-  
-    # ---- data.frame passthrough ----
-    if (is.data.frame(x)) {
-      df <- x
-    } else {
-  
-      # ---- peek first non-empty line to detect header ----
-      first_line <- ""
-      con <- file(x, open = "r")
-      on.exit(close(con), add = TRUE)
-  
-      # first non-blank line; the old loop never ran, so a header was read as data
-      repeat {
-        ln <- readLines(con, n = 1, warn = FALSE)
-        if (length(ln) == 0) break
-        first_line <- trimws(ln)
-        if (nzchar(first_line)) break
-      }
-  
-      has_header <- FALSE
-      if (nzchar(first_line)) {
-        toks <- strsplit(first_line, "\\s+")[[1]]
-        has_header <- any(toks %in% c(
-          "comparison_name",
-          "query_fasta", "subject_fasta",
-          "query_gff", "subject_gff"
-        ))
-      }
-  
-      df <- read_ws(has_header)
-    }
-  
-    # ---- ensure comparison_name exists ----
-    if (!("comparison_name" %in% names(df))) {
-      if (ncol(df) >= 1) {
-        names(df)[1] <- "comparison_name"
-      }
-    }
-  
-    if (!("comparison_name" %in% names(df))) {
-      stop(
-        "comparison_file must include a 'comparison_name' column ",
-        "(or be headerless with comparison_name in column 1).",
-        call. = FALSE
-      )
-    }
-
-    # ensure required columnts exist
-    needed <- c("comparison_name", "query_fasta", "subject_fasta", "query_gff", "subject_gff")
-
-    # headerless schema inference: comparison_name, query_fasta, query_gff, subject_fasta,
-    # subject_gff, and optionally snp_file and snp_side
-    headerless_like <- !any(grepl("^(query_|subject_)", names(df)))
-    inferred_headerless <- FALSE
-    if (!all(needed %in% names(df)) && headerless_like && ncol(df) >= 5) {
-      names(df)[1:5] <- c("comparison_name", "query_fasta", "query_gff", "subject_fasta", "subject_gff")
-      if (ncol(df) >= 6L) names(df)[6] <- "snp_file"
-      if (ncol(df) >= 7L) names(df)[7] <- "snp_side"
-      inferred_headerless <- ncol(df) >= 6L
-    }
-
-    if (!all(needed %in% names(df))) {
-      stop(
-        paste0(
-          "comparison_file must include columns:\n",
-          "* comparison_name, query_fasta, query_gff, subject_fasta, subject_gff\n",
-          "For FASTA-only batch execution, use seq_list_file with columns:\n",
-          "* comparison_name, query_seq, subject_seq"
-        ),
-        call. = FALSE
-      )
-    }
-
-    attr(df, "headerless_mk") <- inferred_headerless
-    df
-  }
+  # ---- comparison table: shared reader in utils_pairs.R ----
+  .read_comparisons <- .read_comparison_table
 
   # McDonald-Kreitman columns are opt-in. Check every row before any dN/dS work, so a
   # half-specified pair fails at once instead of after the earlier comparisons have run.
@@ -604,17 +513,8 @@ calculate_dnds <- function(comparison_file = NULL,
     df <- .read_comparisons(comparison_file)
     .check_mk_columns(df)
 
-    keep <- seq_len(nrow(df))
-    if (isTRUE(unique_pairs)) {
-      key <- vapply(keep, function(i) .dnds_pair_identity(as.list(df[i, , drop = FALSE])), character(1))
-      first <- !duplicated(key) | is.na(key)
-      if (any(!first)) {
-        skipped <- df$comparison_name[keep[!first]]
-        message("unique_pairs = TRUE: skipping ", length(skipped), " comparison(s) whose genome pair ",
-                "was already run in the other direction: ", paste(skipped, collapse = ", "))
-      }
-      keep <- keep[first]
-    }
+    keep <- which(!as.character(df$comparison_name) %in%
+                    .unique_pairs_skip(df, unique_pairs, "calculate_dnds"))
 
     for (i in keep) {
       comp <- df$comparison_name[i]

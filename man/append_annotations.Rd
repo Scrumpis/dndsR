@@ -13,7 +13,8 @@ append_annotations(
   output_dir = getwd(),
   custom = NULL,
   threads = NULL,
-  overwrite = FALSE
+  overwrite = FALSE,
+  unique_pairs = FALSE
 )
 }
 \arguments{
@@ -43,6 +44,11 @@ uses \code{options(dndsR.threads)} or \code{DNDSR_THREADS}; defaults to 1.}
 
 \item{overwrite}{Logical; in batch mode, skip a comparison if output exists unless
 \code{TRUE}. Default \code{FALSE}.}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 }
 \value{
 In single mode: a data.frame (unless \code{output_file} is provided, in which

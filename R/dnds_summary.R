@@ -249,6 +249,10 @@
 #' @param ci_method One of "normal" (mean +/- 1.96*SE) or "bootstrap" for 95% CI.
 #' @param n_boot Number of bootstrap resamples if ci_method = "bootstrap" (default 1000).
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return Invisibly, in single mode: path to summary TSV.
 #'         In batch mode: vector of summary TSV paths.
 #' @export
@@ -265,7 +269,8 @@ dnds_summary <- function(dnds_annot_file = NULL,
                          max_dnds         = 10,
                          make_plots       = TRUE,
                          ci_method        = c("normal", "bootstrap"),
-                         n_boot           = 1000) {
+                         n_boot           = 1000,
+                         unique_pairs = FALSE) {
 
   ci_method <- match.arg(ci_method)
   sides     <- match.arg(sides, choices = c("query", "subject"), several.ok = TRUE)
@@ -517,6 +522,7 @@ dnds_summary <- function(dnds_annot_file = NULL,
   # Batch vs single
   if (!is.null(comparison_file)) {
     df   <- .read_comparisons(comparison_file)
+    df   <- .drop_comparisons(df, .unique_pairs_skip(comparison_file, unique_pairs, "dnds_summary"))
     outs <- character(0)
 
     for (i in seq_len(nrow(df))) {

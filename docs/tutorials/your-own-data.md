@@ -32,6 +32,18 @@ dndsr calculate_dnds -c comparison_file.txt -t 40
 dndsr append_annotations -c comparison_file.txt -t 8
 ```
 
+### Several species, or a file with reversed pairs
+
+A file may list the same two genomes twice, for example `A_v_B` and then `B_v_A`. Every row runs as written unless you add `--unique-pairs`. With it, a row that repeats an earlier genome pair, in either order, is skipped, and its name is reported. A repeated row with its own McDonald-Kreitman inputs (a different `snp_file`, or the same file on the other genome) is kept, so its MK table is written. Pass `--unique-pairs` to every step that reads the file, so that each step skips the same rows:
+
+```
+dndsr extract_cds -c comparison_file.txt -t 8 --unique-pairs
+dndsr calculate_dnds -c comparison_file.txt -t 40 --unique-pairs
+dndsr append_annotations -c comparison_file.txt -t 8 --unique-pairs
+```
+
+Without the flag, a later step stops on the first row that has no dN/dS output, and names it. In a contrast file, name only comparisons that ran.
+
 ## 4. Check before you interpret
 
 - **Look at exclusions** in `<comparison>/<genome>_CDS_qc.tsv`. Many exclusions usually mean an annotation or FASTA problem.

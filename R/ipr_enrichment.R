@@ -135,6 +135,10 @@
 #'     \url{https://ftp.ebi.ac.uk/pub/databases/interpro/current_release/ParentChildTreeFile.txt}
 #' }
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return In single mode: (invisibly) list of output TSV paths.
 #'   In batch mode: (invisibly) vector of output TSV paths across comparisons.
 #'   Each TSV includes enrichment statistics plus InterPro metadata columns:
@@ -184,7 +188,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
                            tree_path = NULL,
                            tree_url = NULL,
                            tree_timeout_s = 120,
-                           threads = 4) {
+                           threads = 4,
+                           unique_pairs = FALSE) {
 
   sides <- intersect(unique(as.character(sides)), c("query","subject"))
   if (!length(sides)) stop("sides must include at least one of: 'query','subject'")
@@ -1178,7 +1183,8 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
     iprs_all <- character(0)
 
     if (!is.null(comparison_file)) {
-      df_cf <- .read_comparisons(comparison_file)
+      df_cf <- .drop_comparisons(.read_comparisons(comparison_file),
+                                 .unique_pairs_skip(comparison_file, unique_pairs, "ipr_enrichment"))
 
       files_seen <- 0L
       for (i in seq_len(nrow(df_cf))) {
@@ -1606,6 +1612,7 @@ ipr_enrichment <- function(dnds_annot_file = NULL,
   # ---------- batch vs single (PARALLELIZED LIKE go_enrichment) ----------
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    df <- .drop_comparisons(df, .unique_pairs_skip(comparison_file, unique_pairs, "ipr_enrichment"))
 
     jobs <- expand.grid(
       i = seq_len(nrow(df)),

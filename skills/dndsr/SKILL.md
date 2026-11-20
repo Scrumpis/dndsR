@@ -67,6 +67,8 @@ dndsr dnds_ideogram -c comparison_file.txt
 dndsr dnds_summary -c comparison_file.txt --regions-bed regions.bed
 ```
 
+If the comparison file lists the same two genomes twice, in either order, development code can skip the repeats: pass `--unique-pairs` to every step that reads the file, or later steps stop on the skipped row's missing output. A repeated row with its own `snp_file` is kept. Details: [docs/tutorials/your-own-data.md](../../docs/tutorials/your-own-data.md).
+
 `calculate_dnds` can take many hours on whole genomes, so on a cluster use the scheduler. Commands and options: [references/commands.md](references/commands.md). Output columns: [docs/output-files.md](../../docs/output-files.md).
 
 Check `<comparison>/<genome>_CDS_qc.tsv` for exclusions, and the number of pairs in `<comparison>_dnds.tsv`, before interpreting results. `calculate_dnds` reports undefined, low-dS, high-dS, and outlier pairs: pass that on to the user.

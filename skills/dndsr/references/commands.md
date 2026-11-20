@@ -32,6 +32,7 @@ Every command is also an R function with the same name and options, except `exam
 | `-o`, `--output-dir` | Output directory |
 | `-v`, `--verbose` | Verbose logging |
 | `-w`, `--warnings` | `off`, `summary`, or `all` |
+| `--unique-pairs` | Development code. With `-c`, skip a row that repeats an earlier genome pair, in either order, unless it carries its own McDonald-Kreitman inputs. Give it to every step of one analysis |
 
 Option and command names accept `-` or `_` as separators. Unknown options are errors.
 

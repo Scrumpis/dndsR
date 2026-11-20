@@ -721,6 +721,10 @@
 #' @param gene_out_dir Character. Batch + gene mode only: directory name under \code{output_dir}
 #' where gene-level results are written (default: \code{"gene_level_state_contrast"}).
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return Invisibly returns a list. In single mode:
 #' \code{list(results = <data.frame>, paths = <character>)}.
 #' In batch mode:
@@ -780,7 +784,8 @@ dnds_state_contrast <- function(level            = c("pairwise", "gene"),
                                 gene_group_col    = NULL,
                                 agg_fun           = c("median", "mean"),
                                 min_pairs         = 2,
-                                gene_out_dir      = "gene_level_state_contrast") {
+                                gene_out_dir      = "gene_level_state_contrast",
+                                unique_pairs = FALSE) {
 
   level      <- match.arg(level)
   # Gene level gives results that look real but carry no information: see
@@ -1144,6 +1149,7 @@ dnds_state_contrast <- function(level            = c("pairwise", "gene"),
   # ---- batch mode ----
   if (!is.null(comparison_file)) {
     cf <- .read_comparisons(comparison_file)
+    cf <- .drop_comparisons(cf, .unique_pairs_skip(comparison_file, unique_pairs, "dnds_state_contrast"))
     outs_all  <- list()
     paths_all <- character(0)
     gene_all  <- list()

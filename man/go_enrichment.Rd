@@ -30,6 +30,7 @@ go_enrichment(
   verbose = FALSE,
   threads = 4,
   adjust_scope = c("global", "per_ontology"),
+  unique_pairs = FALSE,
   ...
 )
 }
@@ -97,6 +98,11 @@ On Windows, runs sequentially (no forking).}
 \item{adjust_scope}{"global" (default) corrects once across every tested term in all requested
 \code{ontologies}, separately for each comparison and side. "per_ontology" corrects each
 ontology alone. Output records it as \code{adjust_scope}, with the family size in \code{n_tested}.}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 
 \item{...}{Additional arguments passed on to 'topGO::runTest()', e.g. \code{score},
 \code{ties.method}, etc. Core arguments \code{object}, \code{algorithm}, and \code{statistic}

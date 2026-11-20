@@ -41,6 +41,10 @@
 #' Existing CDS outputs without a QC table were made by dndsR before 0.3.0 and are
 #' regenerated, because those versions could assemble exons incorrectly.
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return A list (or list-of-lists in batch) with paths to CDS/protein files and metadata.
 #' @export
 extract_cds <- function(comparison_name = NULL,
@@ -58,7 +62,8 @@ extract_cds <- function(comparison_name = NULL,
                         genetic_code = 1L,
                         keep_internal_stops = FALSE,
                         cds_suffix = "_CDS.fasta",
-                        protein_suffix = "_AA.fasta") {
+                        protein_suffix = "_AA.fasta",
+                        unique_pairs = FALSE) {
 
   group_by <- match.arg(group_by)
 
@@ -283,6 +288,7 @@ extract_cds <- function(comparison_name = NULL,
   # ---- batch vs single ----
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    df <- .drop_comparisons(df, .unique_pairs_skip(comparison_file, unique_pairs, "extract_cds"))
 
     # Build unique genome extraction tasks
     q <- data.frame(

@@ -66,6 +66,10 @@
 #' are ignored. Chromosome labels are kept \emph{raw} by default; optional
 #' normalization flags can be used to strip site-specific prefixes/suffixes.
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return Invisibly, a character vector of output file paths written.
 #' @export
 dnds_ideogram <- function(dnds_annot_file = NULL,
@@ -94,6 +98,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
                           # GFF parsing
                           restrict_gff_to_gene   = FALSE,
                           verbose          = TRUE,
+                          unique_pairs = FALSE,
                           ...) {
 
   sides <- match.arg(sides, choices = c("query","subject"), several.ok = TRUE)
@@ -588,6 +593,7 @@ dnds_ideogram <- function(dnds_annot_file = NULL,
 
   if (!is.null(comparison_file)) {
     df <- .read_comparisons(comparison_file)
+    df <- .drop_comparisons(df, .unique_pairs_skip(comparison_file, unique_pairs, "dnds_ideogram"))
     for (i in seq_len(nrow(df))) {
       comp <- df$comparison_name[i]
       comp_dir <- file.path(output_dir, comp)

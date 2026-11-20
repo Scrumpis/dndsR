@@ -34,7 +34,8 @@ term_enrichment(
   term_metadata = NULL,
   keep_unmatched_ids = TRUE,
   verbose = TRUE,
-  threads = 4
+  threads = 4,
+  unique_pairs = FALSE
 )
 }
 \arguments{
@@ -117,6 +118,11 @@ If FALSE, rows without a metadata NAME are dropped.}
 \item{threads}{Integer; maximum number of parallel workers (forked processes; default 4).
 In batch mode, workers are applied across (comparison, side) jobs.
 On Windows, runs sequentially (no forking).}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 }
 \value{
 (Invisibly) a character vector of output TSV paths.

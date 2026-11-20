@@ -269,6 +269,10 @@
 #' @param dedup_keys What to do if focal merge keys are duplicated within A or B:
 #'   "error" (default) stops with a message; "first" keeps first occurrence.
 #'
+#' @param unique_pairs Logical. In batch mode, skip the comparisons that
+#'   `calculate_dnds(unique_pairs = TRUE)` skips: a later row naming the same two
+#'   genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+#'   same value to every step of one analysis. Default `FALSE`, which uses every row.
 #' @return Invisibly, a character vector of summary TSV paths (one per contrast).
 #' @export
 dnds_contrast <- function(dnds_annot_file_a = NULL,
@@ -289,7 +293,8 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
                           make_plots        = TRUE,
                           pos_threshold     = 1,
                           drop_zero_deltas  = FALSE,
-                          dedup_keys        = c("error", "first")) {
+                          dedup_keys        = c("error", "first"),
+                          unique_pairs = FALSE) {
 
   ci_method     <- match.arg(ci_method)
   regions_coord <- match.arg(regions_coord)
@@ -653,6 +658,7 @@ dnds_contrast <- function(dnds_annot_file_a = NULL,
   # Batch modes using comparison_file
   if (!is.null(comparison_file)) {
     comps      <- .read_comparisons(comparison_file)
+    comps      <- .drop_comparisons(comps, .unique_pairs_skip(comparison_file, unique_pairs, "dnds_contrast"))
     comp_names <- comps$comparison_name
 
     # NOTE: Keep output subdir name as "contrast" to avoid breaking existing paths/workflows.

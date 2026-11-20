@@ -18,7 +18,8 @@ dnds_summary(
   max_dnds = 10,
   make_plots = TRUE,
   ci_method = c("normal", "bootstrap"),
-  n_boot = 1000
+  n_boot = 1000,
+  unique_pairs = FALSE
 )
 }
 \arguments{
@@ -53,6 +54,11 @@ when regions_bed is provided (default TRUE).}
 \item{ci_method}{One of "normal" (mean +/- 1.96*SE) or "bootstrap" for 95\% CI.}
 
 \item{n_boot}{Number of bootstrap resamples if ci_method = "bootstrap" (default 1000).}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 }
 \value{
 Invisibly, in single mode: path to summary TSV.

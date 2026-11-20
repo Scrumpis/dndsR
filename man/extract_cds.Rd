@@ -20,7 +20,8 @@ extract_cds(
   genetic_code = 1L,
   keep_internal_stops = FALSE,
   cds_suffix = "_CDS.fasta",
-  protein_suffix = "_AA.fasta"
+  protein_suffix = "_AA.fasta",
+  unique_pairs = FALSE
 )
 }
 \arguments{
@@ -61,6 +62,11 @@ that is not a multiple of 3 are left out of the outputs and listed in the QC tab
 \item{cds_suffix}{Filename suffix for CDS FASTA outputs. Default "_CDS.fasta".}
 
 \item{protein_suffix}{Filename suffix for AA FASTA outputs. Default "_AA.fasta".}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 }
 \value{
 A list (or list-of-lists in batch) with paths to CDS/protein files and metadata.

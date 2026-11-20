@@ -23,7 +23,8 @@ dnds_contrast(
   make_plots = TRUE,
   pos_threshold = 1,
   drop_zero_deltas = FALSE,
-  dedup_keys = c("error", "first")
+  dedup_keys = c("error", "first"),
+  unique_pairs = FALSE
 )
 }
 \arguments{
@@ -67,6 +68,11 @@ Default FALSE (keep zeros; ties handled by wilcox.test).}
 
 \item{dedup_keys}{What to do if focal merge keys are duplicated within A or B:
 "error" (default) stops with a message; "first" keeps first occurrence.}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 }
 \value{
 Invisibly, a character vector of summary TSV paths (one per contrast).

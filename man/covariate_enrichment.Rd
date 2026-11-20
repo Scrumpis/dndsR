@@ -17,7 +17,8 @@ covariate_enrichment(
   min_total = 10,
   min_pos = 2,
   threads = 1,
-  verbose = TRUE
+  verbose = TRUE,
+  unique_pairs = FALSE
 )
 }
 \arguments{
@@ -49,6 +50,11 @@ applied after correction, and changes which rows are written, not their p-values
 \item{threads}{Maximum parallel workers across comparisons and sides (forked; default 1).}
 
 \item{verbose}{If \code{TRUE}, reports what was tested.}
+
+\item{unique_pairs}{Logical. In batch mode, skip the comparisons that
+\code{calculate_dnds(unique_pairs = TRUE)} skips: a later row naming the same two
+genomes, in either order, with no McDonald-Kreitman inputs of its own. Pass the
+same value to every step of one analysis. Default \code{FALSE}, which uses every row.}
 }
 \value{
 Invisibly, the paths of the TSV files written. Columns: \code{term}, \code{term_type}, \code{ontology},
