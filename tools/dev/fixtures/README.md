@@ -36,7 +36,7 @@ Full hashes are printed by the build command below. NCBI states that it places n
 
 Organelle sequences are left out, as the public tutorial removes them before dndsR. `build-atal-fixture.py` then cuts each chosen gene with 1,000 bases on each side, merges windows that overlap, and keeps every feature whose top-level gene lies wholly inside a window, so neighbours, isoforms, UTRs, pseudogenes, and non-coding genes stay as annotated. Both scripts use the Python standard library and no dndsR code.
 
-**Repeated gene symbols are deliberate.** Bioconductor names a gene by its `Name` when every `Name` in the file is unique, and by its `ID` otherwise. The whole *A. thaliana* GFF repeats 168 symbols, so dndsR names genes by locus tag (`AT1G01010`). A subset without a repeat is named by symbol instead (`NAC001`), and `append_annotations` then misses those genes (201 of 502 in a test build): an open issue in `docs/dev/DECISIONS.md`. The shared symbols keep the fixture on the whole-genome path.
+**Repeated gene symbols are deliberate.** Up to v0.4.0, Bioconductor named a gene by its `Name` when every `Name` in the file was unique, and by its `ID` otherwise; the whole *A. thaliana* GFF repeats 168 symbols, so it was named by locus tag, and a subset without a repeat was named by symbol, which `append_annotations` could not find (201 of 502 pairs in a test build). dndsR now always names by `ID` (`DECISIONS.md`, 2026-11-20), and the shared symbols keep the fixture comparable with v0.4.0, whose baseline it reproduces.
 
 ## Evidence that it is faithful
 

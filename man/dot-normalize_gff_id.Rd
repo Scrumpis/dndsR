@@ -10,11 +10,14 @@
 \item{x}{Identifiers.}
 }
 \value{
-Identifiers without a leading \verb{gene-}, \verb{rna-}, \verb{transcript-}, \verb{cds-}, or \verb{exon-}.
+Identifiers without a leading \code{gene}, \code{rna}, \code{transcript}, \code{cds}, \code{CDS}, or
+\code{exon} followed by \code{-} or \code{:}.
 }
 \description{
-RefSeq annotations use IDs such as \code{gene-AT1G01010} and \code{rna-NM_099983.2}. Bioconductor
-drops these prefixes when it builds gene models, so \code{extract_cds()} names sequences
-without them, and lookups in a GFF must do the same.
+RefSeq annotations use IDs such as \code{gene-AT1G01010} and \code{rna-NM_099983.2}, and Ensembl
+uses \code{gene:AT1G01010}, \code{transcript:AT1G01010.1}, and \code{CDS:AT1G01010.1}. \code{extract_cds()}
+names genes and transcripts by their ID without this prefix, and every lookup in a GFF
+(\code{append_annotations()}, \code{dnds_ideogram()}, \code{phylo_prepare()}) uses the same function,
+so the names agree.
 }
 \keyword{internal}

@@ -49,7 +49,8 @@ On Windows, runs sequentially (no forking).}
 
 \item{group_by}{How CDS are grouped and named. \code{"gene"} (default) writes one CDS per
 gene: the longest isoform with a valid CDS, named by gene ID. \code{"tx"}
-writes every transcript, named by transcript ID.}
+writes every transcript, named by transcript ID. IDs are the GFF3 \code{ID} attribute
+without a type prefix such as \verb{gene-} or \verb{gene:}, whatever the \code{Name} attribute holds.}
 
 \item{export_proteins}{If TRUE, also write translated proteins as AA FASTA.}
 

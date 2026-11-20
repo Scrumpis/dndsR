@@ -32,6 +32,7 @@ Imports:
     methods,
     parallel,
     Rsamtools,
+    rtracklayer,
     S4Vectors,
     scales,
     showtext,

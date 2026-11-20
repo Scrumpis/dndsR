@@ -24,7 +24,8 @@
 #' @param comparison_file Optional comparison table path or data.frame.
 #' @param group_by How CDS are grouped and named. `"gene"` (default) writes one CDS per
 #'   gene: the longest isoform with a valid CDS, named by gene ID. `"tx"`
-#'   writes every transcript, named by transcript ID.
+#'   writes every transcript, named by transcript ID. IDs are the GFF3 `ID` attribute
+#'   without a type prefix such as `gene-` or `gene:`, whatever the `Name` attribute holds.
 #' @param export_proteins If TRUE, also write translated proteins as AA FASTA.
 #' @param genetic_code Integer NCBI code used for translation and stop detection
 #'   (1 = Standard). dN/dS estimation itself assumes the standard code.

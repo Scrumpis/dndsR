@@ -23,7 +23,7 @@ Each pair is treated separately. dN/dS is reported as undefined (NA) where dS is
 
 ## Annotation
 
-`append_annotations` adds coordinates and terms from the GFF3 to each pair, matching gene IDs without prefixes such as `gene-` and `rna-`. Terms come from all attributes of the gene and its descendants, other than `ID` and `Parent`.
+`append_annotations` adds coordinates and terms from the GFF3 to each pair, matching gene IDs without prefixes such as `gene-`, `rna-`, or Ensembl's `gene:`, the same names `extract_cds` gives the CDS. Terms come from all attributes of the gene and its descendants, other than `ID` and `Parent`.
 
 ## Enrichment
 

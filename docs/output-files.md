@@ -6,7 +6,7 @@ All outputs for a comparison go in `<output_dir>/<comparison_name>/`. Contrasts 
 
 | File | Contents |
 |---|---|
-| `<genome>_CDS.fasta` | One CDS per gene (or per transcript with `--group-by tx`), named by ID |
+| `<genome>_CDS.fasta` | One CDS per gene (or per transcript with `--group-by tx`), named by its GFF3 `ID` without a type prefix such as `gene-`, `rna-`, or `gene:`, whatever its `Name` (development code; before, a file whose gene symbols were all unique was named by symbol) |
 | `<genome>_AA.fasta` | Translated proteins, with `--export-proteins` |
 | `<genome>_CDS_qc.tsv` | One row per gene or transcript, including those not written |
 | `*_extract_cds.log` | Log for each genome |

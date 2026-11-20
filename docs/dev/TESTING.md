@@ -37,6 +37,7 @@ The baseline is pinned to the image in `.github/workflows/regression.yaml` (the 
 | Reliability flags | `test-dnds-reliability.R` (hand counts); tier 2 |
 | Comparison files, headers, MK columns | `test-comparison-file.R` |
 | Reverse comparisons and `unique_pairs` | `test-unique-pairs.R` (the rule, including McDonald-Kreitman inputs that differ between rows); `test-unique-pairs-pipeline.R` (extract, calculate, annotate, and summarise end to end, the kept pair equal to a run of that row alone, and a missing output reported without the flag) |
+| Gene and transcript names, annotation lookup | `test-gene-ids.R`: RefSeq with unique and shared symbols, Ensembl, and gene-predictor GFF3, gene and transcript modes, each checked against hand-written IDs and found by `append_annotations` |
 | Annotation | `test-example-pipeline.R`; tier 2 on real RefSeq attributes |
 | Enrichment, contrasts, summaries | `test-enrichment-*.R`, `test-covariate-enrichment.R`, `test-statistics.R`, `test-example-contrast.R` |
 | CLI | `test-cli.R`; `tools/dev/test-tutorial.sh`; tier 2 runs through the CLI |

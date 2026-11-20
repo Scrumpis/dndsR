@@ -131,15 +131,18 @@
 
 #' Remove the type prefix from a GFF identifier
 #'
-#' RefSeq annotations use IDs such as `gene-AT1G01010` and `rna-NM_099983.2`. Bioconductor
-#' drops these prefixes when it builds gene models, so `extract_cds()` names sequences
-#' without them, and lookups in a GFF must do the same.
+#' RefSeq annotations use IDs such as `gene-AT1G01010` and `rna-NM_099983.2`, and Ensembl
+#' uses `gene:AT1G01010`, `transcript:AT1G01010.1`, and `CDS:AT1G01010.1`. `extract_cds()`
+#' names genes and transcripts by their ID without this prefix, and every lookup in a GFF
+#' (`append_annotations()`, `dnds_ideogram()`, `phylo_prepare()`) uses the same function,
+#' so the names agree.
 #'
 #' @param x Identifiers.
-#' @return Identifiers without a leading `gene-`, `rna-`, `transcript-`, `cds-`, or `exon-`.
+#' @return Identifiers without a leading `gene`, `rna`, `transcript`, `cds`, `CDS`, or
+#'   `exon` followed by `-` or `:`.
 #' @keywords internal
 .normalize_gff_id <- function(x) {
-  sub("^(gene|rna|transcript|cds|exon)-", "", x)
+  sub("^(gene|rna|transcript|cds|CDS|exon)[-:]", "", x)
 }
 
 #' Stop or report when dN/dS gene IDs are not found in a GFF
@@ -271,6 +274,37 @@
   invisible(counts)
 }
 
+#' Build gene models whose gene and transcript names are their GFF3 IDs
+#'
+#' `txdbmaker::makeTxDbFromGFF()` names a gene by its `gene_id` or `Name` attribute when
+#' those map one to one onto the IDs, and by its ID otherwise; transcripts by
+#' `transcript_id` or `Name`. So the names depended on the whole file: a RefSeq genome,
+#' which repeats some gene symbols, was named by locus tag, while a subset with unique
+#' symbols was named by symbol, and `append_annotations()`, which looks genes up by ID,
+#' then found none of them. Here every feature with an ID is named by that ID without its
+#' type prefix ([.normalize_gff_id()]), so names do not depend on other genes in the file.
+#' The same columns `makeTxDbFromGFF()` reads are imported, apart from `gene_id` and
+#' `transcript_id`, which only set names. A file without GFF3 `ID` and `Parent` columns
+#' (GTF-style) is read by `makeTxDbFromGFF()` as before.
+#'
+#' @param gff Path to a GFF3 file.
+#' @return A TxDb.
+#' @keywords internal
+.txdb_named_by_id <- function(gff) {
+  cols <- c("type", "phase", "ID", "Parent", "Name", "Dbxref", "exon_id", "protein_id", "geneID")
+  gr <- rtracklayer::import.gff(gff, format = "gff3", colnames = cols)
+  m <- S4Vectors::mcols(gr)
+  if (is.null(m$ID) || is.null(m$Parent) || all(is.na(m$ID))) {
+    return(txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character()))
+  }
+  name <- if (is.null(m$Name)) rep(NA_character_, nrow(m)) else as.character(m$Name)
+  has_id <- !is.na(m$ID) & nzchar(m$ID)
+  name[has_id] <- .normalize_gff_id(as.character(m$ID[has_id]))
+  m$Name <- name
+  S4Vectors::mcols(gr) <- m
+  txdbmaker::makeTxDbFromGRanges(gr)
+}
+
 #' Build per-transcript CDS GRanges from a GFF3
 #'
 #' Groups CDS features by transcript ID (or gene ID) and labels each transcript with a
@@ -290,7 +324,7 @@
 
   txdb <- tryCatch(
     withCallingHandlers(
-      txdbmaker::makeTxDbFromGFF(gff, format = "gff3", circ_seqs = character()),
+      .txdb_named_by_id(gff),
       warning = function(w) {
         msg <- conditionMessage(w)
         is_meta <- grepl(meta_pat, msg, fixed = TRUE)

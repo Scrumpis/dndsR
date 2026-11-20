@@ -194,6 +194,9 @@ test_that("RefSeq-style IDs connect sequences to their annotations", {
 test_that("identifier prefixes are removed only at the start", {
   expect_equal(.normalize_gff_id(c("gene-AT1", "rna-NM_1.2", "cds-NP_1", "mygene-1", "g1", NA)),
                c("AT1", "NM_1.2", "NP_1", "mygene-1", "g1", NA))
+  # Ensembl's type: prefixes, removed the same way.
+  expect_equal(.normalize_gff_id(c("gene:AT1G01010", "transcript:AT1G01010.1", "CDS:AT1G01010.1", "chr1:100")),
+               c("AT1G01010", "AT1G01010.1", "AT1G01010.1", "chr1:100"))
 })
 
 test_that("gene-level state contrast fails instead of returning meaningless values", {
