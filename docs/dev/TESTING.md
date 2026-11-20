@@ -19,7 +19,7 @@ Three tiers. Each change runs the cheapest tier that can detect what it could br
 
 `regression: PASS` means every output except logs and provenance is byte-identical to the baseline. On `FAIL`, the script prints the files that differ and, for the dN/dS table, pairs lost or new and the largest change per column; the work folder is kept for inspection.
 
-The baseline is pinned to the image in `.github/workflows/regression.yaml` (the v0.4.0 image). Compare two versions in the same image; a different image is a dependency comparison, not a code one.
+The baseline is pinned to the image in `.github/workflows/regression.yaml` (the v0.4.0 image). The script sets `LC_ALL=C`: the first CI run failed only because the runner's C locale sorted the checksum list differently from the `en_US` shell that made the baseline, with every checksum equal. Compare two versions in the same image; a different image is a dependency comparison, not a code one.
 
 **Changing the baseline** (`tools/dev/regression.sh --update`) is a change in recorded output. Do it only for an approved change in results, in the commit that makes the change, with the reason and the before and after summary in the commit message and `NEWS.md`.
 

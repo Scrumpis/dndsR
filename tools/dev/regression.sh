@@ -7,6 +7,9 @@
 # --update rewrites the baseline from this run; commit it only with a recorded reason
 # (docs/dev/TESTING.md). Uses the image's dependencies, so compare versions in one image.
 set -euo pipefail
+# One file order on every machine: sort follows the locale, and GitHub runners use C
+# while many HPC shells use en_US, which ordered the checksum list differently.
+export LC_ALL=C
 here=$(cd "$(dirname "$0")" && pwd)
 fix="$here/fixtures/atal"
 threads=4; keep=; update=
@@ -25,10 +28,18 @@ for f in Athaliana.fasta Athaliana.gff3 Alyrata.fasta Alyrata.gff3; do gzip -dc 
 echo "AtAl Athaliana.fasta Athaliana.gff3 Alyrata.fasta Alyrata.gff3" > "$work/comparison.txt"
 
 run() { "$here/in-container.sh" bash -c 'cd "$1" && shift && Rscript -e "dndsR::cli_main()" -- "$@"' _ "$work" "$@"; }
+# A failed step names itself and shows the end of its log, and the work is kept.
+step() {
+  local log=$1; shift
+  if ! "$@" >"$work/$log" 2>&1; then
+    echo "regression: FAIL, step '$2' stopped; end of $log:"; tail -n 30 "$work/$log"
+    echo "Work kept in: $work"; trap - EXIT; exit 1
+  fi
+}
 s=$SECONDS
-run extract_cds -c comparison.txt -o out -t "$threads" >"$work/extract.log" 2>&1
-DNDSR_NO_INSTALL=1 run calculate_dnds -c comparison.txt -o out -t "$threads" >"$work/calculate.log" 2>&1
-DNDSR_NO_INSTALL=1 run append_annotations -c comparison.txt -o out -t "$threads" >"$work/annotate.log" 2>&1
+step extract.log run extract_cds -c comparison.txt -o out -t "$threads"
+DNDSR_NO_INSTALL=1 step calculate.log run calculate_dnds -c comparison.txt -o out -t "$threads"
+DNDSR_NO_INSTALL=1 step annotate.log run append_annotations -c comparison.txt -o out -t "$threads"
 echo "pipeline: $((SECONDS - s)) s with $threads threads"
 
 # Outputs compared: every file except logs and provenance, which hold times and versions.
