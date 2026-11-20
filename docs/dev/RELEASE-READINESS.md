@@ -6,7 +6,7 @@
 
 | Check | Run | Result |
 |---|---|---|
-| `check.sh --rcmd-check --regression`, Slurm, 8 CPUs, 48 GB, v0.4.0 image | This tree before commit | Tests 236, 0 failed, 0 errors, 4 skipped (HyPhy, KaKs_Calculator absent from the image); R CMD check ok; tutorial ok; skill ok; fixture regression byte-identical. Safeguards: 3 allowed pushes blocked, because the test clones the last commit (version 0.4.0.9000) and copies the working tree's skill (0.5.0); rerun after the commit, below |
+| `check.sh --rcmd-check --regression`, Slurm, 8 CPUs, 48 GB, v0.4.0 image | This tree before commit | Tests 236, 0 failed, 0 errors, 4 skipped (HyPhy, KaKs_Calculator absent from the image); R CMD check ok; tutorial ok; skill ok; fixture regression byte-identical. Safeguards: 3 allowed pushes blocked, because the test clones the last commit (version 0.4.0.9000) and copies the working tree's skill (0.5.0). Rerun after committing the bump (`0d00046`, Slurm): 97 passed, 0 failed |
 | BUSTED tests with HyPhy 2.5.103 (`test-phylo-busted.R`, the 3 tests the gate skips) | Slurm, this tree | 3 tests, 26 expectations, 0 failed, none skipped |
 | Recommended settings on the example, with HyPhy (`--multiple-hits Double --extra-seeds 2,3`) | Slurm, this tree | 8 tested, 3 starts; `p_adj` and `p_best_fits_adj` equal an independent BH (6.7e-16) |
 | CI at `3943ffc` (pushed) | GitHub | All five workflows pass, `regression` included; the container workflow's fixture step passes in the freshly built image |
