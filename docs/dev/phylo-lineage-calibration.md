@@ -62,4 +62,6 @@ A smoke test of 10 genes per cell first, to measure run time. The full study is 
 
 ## Change log
 
-None yet.
+- 2026-11-20: smoke test, 10 genes per cell, all 27 units at `f7aeaea`, no failures. Projected cost of the full study from its timings: about 246 core-hours, dominated by free-ratio fits on 16 taxa (about 15 core-minutes per gene), under the 250 core-hour limit, so the full study was launched as designed (array 21467783), at the same commit, with no cells trimmed.
+- 2026-11-20: the full study filled the scratch file quota within about 20 minutes (1.0 million files): `phylo_branch_omega` kept about 140 files per orthogroup (each start's copies of the inputs, and codeml's auxiliary outputs). The array was cancelled, codeml's auxiliary files from this work were deleted (about 140,000), and the partial units, at `f7aeaea`, were discarded unread. The package was changed to keep about 25 files per orthogroup, with `keep_runs = FALSE` keeping none; the driver uses `keep_runs = FALSE` and archives HyPhy's folders per unit. No numerical code changed. The study restarts at the commit that makes this change; the smoke test's timings stand.
+

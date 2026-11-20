@@ -4,7 +4,15 @@
 \alias{.paml_ctl}
 \title{codeml control file for one model and one start}
 \usage{
-.paml_ctl(model, omega, fix_omega, kappa, codon_freq)
+.paml_ctl(
+  model,
+  omega,
+  fix_omega,
+  kappa,
+  codon_freq,
+  seqfile = "alignment.phy",
+  treefile = "tree.nwk"
+)
 }
 \description{
 Branch models only (\code{NSsites = 0}). \code{model}: 0 one omega, 1 free ratios, 2 two or more

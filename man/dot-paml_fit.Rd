@@ -4,7 +4,7 @@
 \alias{.paml_fit}
 \title{One model, every start: run (or reuse) codeml and keep the best fit}
 \usage{
-.paml_fit(ctx, dir, aln, tree_lines, model, tips)
+.paml_fit(ctx, dir, tree_lines, model, tips)
 }
 \description{
 One model, every start: run (or reuse) codeml and keep the best fit

@@ -59,6 +59,16 @@ test_that("phylo_branch_omega reproduces codeml run directly", {
       expect_equal(b$omega_free[b$branch == tip], direct_w, tolerance = 1e-3, label = paste(og, tip))
     }
   }
+  # Files kept: codeml's control file and main output per model and start, one alignment and
+  # one tree per model per orthogroup; none of codeml's auxiliary files.
+  kept <- list.files(file.path(ex, "branch_omega", "paml", "OG0001"), recursive = TRUE)
+  expect_false(any(basename(kept) %in% c("rst", "rst1", "rub", "lnf", "codeml.log")))
+  expect_lte(length(kept), 25L)
+  # keep_runs = FALSE leaves no codeml folder for a finished orthogroup.
+  lean <- suppressMessages(phylo_branch_omega(alignment_dir = file.path(ex, "alignments"), species_tree_file = file.path(ex, "species_tree.nwk"),
+                                              output_dir = ex, run_name = "lean", models = "M0", keep_runs = FALSE, threads = test_cores()))
+  expect_false(dir.exists(file.path(ex, "lean", "paml", "OG0001")))
+  expect_equal(lean$lnl_m0[lean$orthogroup == "OG0001"], res$lnl_m0[res$orthogroup == "OG0001"], tolerance = 1e-6)
   # OG0004 lacks spB: the foreground is spA's branch, merged with the clade's stem.
   b4 <- utils::read.delim(file.path(ex, "branch_omega", "branch_omega_branches.tsv"))
   b4 <- b4[b4$orthogroup == "OG0004" & b4$foreground, ]

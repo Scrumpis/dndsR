@@ -22,6 +22,7 @@ phylo_branch_omega(
   terminal_stops = c("mask", "exclude"),
   overwrite = FALSE,
   timeout = 3600,
+  keep_runs = TRUE,
   codeml = NULL
 )
 }
@@ -65,6 +66,11 @@ always exclude the orthogroup.}
 seeds, and version match a finished earlier run is not rerun.}
 
 \item{timeout}{Seconds allowed for one codeml run.}
+
+\item{keep_runs}{If \code{TRUE} (default), \verb{paml/<orthogroup>/} keeps codeml's control file
+and main output for every model and start, about 25 files per orthogroup, which lets
+an unchanged rerun reuse them. \code{FALSE} removes them once the results are in the
+tables, for genome-scale runs on file systems with file quotas.}
 
 \item{codeml}{Path to PAML's codeml, if not on \code{PATH}.}
 }

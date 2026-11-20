@@ -27,10 +27,15 @@ run Rscript --vanilla -e '
   a <- commandArgs(TRUE); suppressMessages(library(dndsR)); d <- a[1]; m <- a[2]; th <- as.integer(a[3])
   args <- list(alignment_dir = file.path(d, "sim", "alignments"), species_tree_file = file.path(d, "sim", "species_tree.nwk"),
                output_dir = d, threads = th)
-  if (m == "branch_omega") do.call(phylo_branch_omega, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"))))
+  if (m == "branch_omega") do.call(phylo_branch_omega, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"), keep_runs = FALSE)))
   if (m == "absrel") do.call(phylo_absrel, args)
   if (m == "relax") do.call(phylo_relax, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"), models = "Minimal")))
 ' "$out" "$method" "$SLURM_CPUS_PER_TASK"
+# One archive per unit instead of thousands of per-gene files (scratch has a file quota).
+for x in hyphy paml sim/alignments; do
+  [ -d "$out/$method/$x" ] && tar -czf "$out/$method/${x//\//_}.tar.gz" -C "$out/$method" "$x" && rm -rf "$out/$method/$x" || true
+done
+[ -d "$out/sim/alignments" ] && tar -czf "$out/sim/alignments.tar.gz" -C "$out/sim" alignments && rm -rf "$out/sim/alignments" || true
 printf 'cell\ttree\tn\tmethod\tsim_s\trun_s\tcpus\tcommit\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$cell" "$tree" "$n" "$method" \
   "$sim_s" "$((SECONDS - start - sim_s))" "$SLURM_CPUS_PER_TASK" "$(cat "$ROOT/lib/COMMIT")" > "$out/timing.tsv"
 touch "$out/DONE"

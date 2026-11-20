@@ -59,6 +59,10 @@
 #' @param omega_starts Initial omega values; each model is fitted from each.
 #' @param kappa_start Initial transition/transversion ratio.
 #' @param timeout Seconds allowed for one codeml run.
+#' @param keep_runs If `TRUE` (default), `paml/<orthogroup>/` keeps codeml's control file
+#'   and main output for every model and start, about 25 files per orthogroup, which lets
+#'   an unchanged rerun reuse them. `FALSE` removes them once the results are in the
+#'   tables, for genome-scale runs on file systems with file quotas.
 #' @param codeml Path to PAML's codeml, if not on `PATH`.
 #' @return Invisibly, the results table.
 #' @references Yang Z (2007) PAML 4: phylogenetic analysis by maximum likelihood. Mol Biol
@@ -83,6 +87,7 @@ phylo_branch_omega <- function(prepared_dir = NULL,
                                terminal_stops = c("mask", "exclude"),
                                overwrite = FALSE,
                                timeout = 3600,
+                               keep_runs = TRUE,
                                codeml = NULL) {
   .need_ape()
   terminal_stops <- match.arg(terminal_stops)
@@ -113,7 +118,7 @@ phylo_branch_omega <- function(prepared_dir = NULL,
   run_dir <- file.path(output_dir, run_name)
   dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
   settings <- list(models = models, codon_freq = names(cf), codon_freq_code = unname(cf), omega_starts = omega_starts,
-                   kappa_start = kappa_start, timeout = timeout)
+                   kappa_start = kappa_start, timeout = timeout, keep_runs = isTRUE(keep_runs))
   ctx <- list(method = "branch_omega", hyp = .phylo_all_branches_hypothesis(tree), hyp_fg = hyp_fg, settings = settings,
               bin = bin, version = version, run_dir = run_dir, min_taxa = min_taxa, terminal_stops = terminal_stops,
               overwrite = isTRUE(overwrite), gene_tree_dir = inp$gene_tree_dir, gene_tree_mode = gene_tree_mode,
@@ -180,7 +185,7 @@ phylo_branch_omega <- function(prepared_dir = NULL,
 
 #' One model, every start: run (or reuse) codeml and keep the best fit
 #' @keywords internal
-.paml_fit <- function(ctx, dir, aln, tree_lines, model, tips) {
+.paml_fit <- function(ctx, dir, tree_lines, model, tips) {
   s <- ctx$settings
   code <- c(M0 = 0L, free = 1L, two_ratio = 2L, two_ratio_null = 2L)[[model]]
   fix <- as.integer(model == "two_ratio_null")
@@ -191,22 +196,26 @@ phylo_branch_omega <- function(prepared_dir = NULL,
   for (k in seq_len(n_starts)) {
     d <- file.path(dir, model, sprintf("start%d", k))
     dir.create(d, recursive = TRUE, showWarnings = FALSE)
-    ctl <- .paml_ctl(code, if (fix == 1L) 1 else s$omega_starts[k], fix, s$kappa_start, s$codon_freq_code)
-    .paml_write_phylip(aln, file.path(d, "alignment.phy"))
-    writeLines(tree_lines, file.path(d, "tree.nwk"))
-    writeLines(ctl, file.path(d, "codeml.ctl"))
-    record <- paste(c(ctx$version, unname(tools::md5sum(file.path(d, c("alignment.phy", "tree.nwk", "codeml.ctl"))))), collapse = " ")
-    rec_path <- file.path(d, "record.txt")
+    ctl <- .paml_ctl(code, if (fix == 1L) 1 else s$omega_starts[k], fix, s$kappa_start, s$codon_freq_code,
+                     seqfile = "../../alignment.phy", treefile = "../tree.nwk")
+    # The record of inputs, version, and settings goes in the control file as a codeml
+    # comment, so an unchanged rerun can reuse the output without a separate file.
+    record <- paste("* dndsR record:", ctx$version, unname(tools::md5sum(file.path(dir, "alignment.phy"))),
+                    unname(tools::md5sum(file.path(dir, model, "tree.nwk"))))
+    ctl <- c(record, ctl)
+    ctl_path <- file.path(d, "codeml.ctl")
     mlc <- file.path(d, "codeml.mlc")
-    reuse <- !ctx$overwrite && file.exists(rec_path) && file.exists(mlc) && identical(readLines(rec_path, warn = FALSE), record)
+    reuse <- !ctx$overwrite && file.exists(ctl_path) && file.exists(mlc) && identical(readLines(ctl_path, warn = FALSE), ctl)
     if (!reuse) {
-      unlink(c(mlc, rec_path))
+      unlink(mlc)
+      writeLines(ctl, ctl_path)
       run <- .codeml_run(ctx$bin, d, s$timeout)
       if (run$timed_out) { errors <- c(errors, sprintf("start %d timed out after %d s", k, s$timeout)); next }
     }
     fit <- tryCatch(.codeml_parse(mlc, tips), error = function(e) conditionMessage(e))
-    if (is.character(fit)) { errors <- c(errors, sprintf("start %d: %s", k, fit)); next }
-    if (!reuse) writeLines(record, rec_path)
+    if (is.character(fit)) { unlink(mlc); errors <- c(errors, sprintf("start %d: %s", k, fit)); next }
+    # codeml's other outputs are not read; its log is kept only when a run fails.
+    unlink(file.path(d, .paml_aux_files))
     fit$start <- k
     fits[[length(fits) + 1L]] <- fit
   }
@@ -281,9 +290,13 @@ phylo_branch_omega <- function(prepared_dir = NULL,
   }
   if (is.null(branches$foreground)) branches$foreground <- NA
   fits <- list()
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  .paml_write_phylip(aln, file.path(dir, "alignment.phy"))
   for (model in models) {
     tree_lines <- .paml_tree_lines(tp$tree, if (model %in% c("two_ratio", "two_ratio_null")) two$marks else NULL)
-    fits[[model]] <- .paml_fit(ctx, dir, aln, tree_lines, model, tips)
+    dir.create(file.path(dir, model), showWarnings = FALSE)
+    writeLines(tree_lines, file.path(dir, model, "tree.nwk"))
+    fits[[model]] <- .paml_fit(ctx, dir, tree_lines, model, tips)
     if (!isTRUE(fits[[model]]$ok)) {
       if (model == "M0") return(done("failed", fits[[model]]$reason, fits[[model]]$detail, info, branches))
       if (model %in% c("two_ratio", "two_ratio_null")) two$status <- "failed"
@@ -337,6 +350,7 @@ phylo_branch_omega <- function(prepared_dir = NULL,
          n_branches = nrow(branches), n_branches_reliable = sum(branches$reliable_free %in% TRUE))
   )
   info$qc_flags <- paste(unique(flags), collapse = ";")
+  if (!isTRUE(ctx$settings$keep_runs)) unlink(dir, recursive = TRUE)
   list(row = .phylo_outcome(base, "tested", NA_character_, NA_character_, c(info, values)), branches = branches, sequences = seq_qc)
 }
 

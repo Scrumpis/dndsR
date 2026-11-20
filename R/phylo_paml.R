@@ -71,8 +71,8 @@
 #' ratios with `#1`-marked branches. `fix_omega = 1` with `model = 2` fixes the omega of
 #' the marked branches at `omega`.
 #' @keywords internal
-.paml_ctl <- function(model, omega, fix_omega, kappa, codon_freq) {
-  c("seqfile = alignment.phy", "treefile = tree.nwk", "outfile = codeml.mlc",
+.paml_ctl <- function(model, omega, fix_omega, kappa, codon_freq, seqfile = "alignment.phy", treefile = "tree.nwk") {
+  c(paste("seqfile =", seqfile), paste("treefile =", treefile), "outfile = codeml.mlc",
     "noisy = 0", "verbose = 1", "runmode = 0", "seqtype = 1",
     sprintf("CodonFreq = %d", codon_freq), "clock = 0", "aaDist = 0",
     sprintf("model = %d", model), "NSsites = 0", "icode = 0",
@@ -81,6 +81,10 @@
     "fix_alpha = 1", "alpha = 0", "Malpha = 0", "ncatG = 1",
     "getSE = 0", "RateAncestor = 0", "Small_Diff = .5e-6", "cleandata = 0", "method = 0")
 }
+
+#' codeml's auxiliary output files, which dndsR does not read
+#' @keywords internal
+.paml_aux_files <- c("rst", "rst1", "rub", "lnf", "2NG.t", "2NG.dN", "2NG.dS", "4fold.nuc", "rates", "codeml.log")
 
 #' Run codeml in its own folder
 #' @return A list with `status`, `timed_out`, and `log` (path).
