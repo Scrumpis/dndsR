@@ -18,6 +18,10 @@ Every command is also an R function with the same name and options, except `exam
 | `dnds_state_contrast` | Contrasts of selection states between groups; `--level gene` is disabled |
 | `phylo_prepare` | Codon alignments and labelled trees from genomes or CDS and orthogroups. Experimental, v0.5.0 and later; needs MAFFT |
 | `phylo_busted` | HyPhy BUSTED tests across species on chosen branches, corrected across orthogroups. Experimental, v0.5.0 and later; needs HyPhy 2.5.103 |
+| `phylo_branch_omega` | PAML codeml branch models: one omega per branch (free-ratio), foreground against background (two-ratio), with likelihood-ratio tests. Experimental, development code; needs PAML 4.10.10 (`--codeml`) |
+| `phylo_absrel` | HyPhy aBSREL: episodic positive selection per branch (`--branches all` or `foreground`), with per-gene and per-lineage corrections. Experimental, development code; needs HyPhy 2.5.103 |
+| `phylo_relax` | HyPhy RELAX: relaxation (`k < 1`) or intensification (`k > 1`) of selection on test against reference branches (column `set` in the foreground file). Experimental, development code; needs HyPhy 2.5.103 |
+| `phylo_summarize` | Lineage tables from the three runs above: pooled omega, coverage, diagnostics, matched lineage pairs, and branch identifiers for joining lineage traits. Experimental, development code |
 | `phylo_example` | Copy a bundled phylogenetic example (`--type genomes`, the default, or `alignments`) |
 | `verify_phylo_example` | Check a phylogenetic example against its design and HyPhy run directly |
 | `example` | Copy the bundled example to a folder |

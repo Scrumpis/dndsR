@@ -164,3 +164,45 @@ Results columns:
 | `alignment_md5`, `json`, `json_md5` | The input alignment's MD5, and HyPhy's JSON with its MD5 |
 
 Branches columns: `orthogroup`, `branch` (HyPhy's name), `terminal`, `taxa_side` (the smaller side of the branch's split of taxa), `foreground`, `species_tree_branches` (species-tree branches joined into this one, `+`-separated; internal ones are named by the tree's node labels or `mrca(x,y)`), `in_species_tree` (whether the branch exists in the pruned species tree), `topology_source` (`species_tree` or `gene_tree`).
+
+## phylo_branch_omega
+
+Experimental, development code. In `<output_dir>/<run_name>/` (default `branch_omega`). Methods and flags: [lineage-selection.md](lineage-selection.md).
+
+`_results.tsv`, one row per orthogroup:
+
+| Column | Meaning |
+|---|---|
+| `orthogroup`, `status`, `stage`, `reason`, `exclusion_basis`, `detail`, `n_taxa`, `n_codons`, `taxa_absent`, `qc_flags` | As for `phylo_busted`; flags add `starts_disagree:<model>`, `codeml_warning:<model>`, `lrt_negative:<test>`, `<model>_failed` |
+| `lnl_m0`, `np_m0`, `kappa_m0`, `omega_m0`, `tree_length_m0` | One-ratio model: log-likelihood, parameters, transition/transversion ratio, omega, tree length |
+| `lnl_free`, `np_free`, `lrt_free_vs_m0`, `df_free_vs_m0`, `p_free_vs_m0`, `p_adj_free_vs_m0` | Free-ratio model and its test against M0, BH across tested orthogroups |
+| `two_ratio_status`, `two_ratio_reason`, `n_fg_branches` | Whether the two-ratio model ran (`tested`, `excluded` with a reason when the foreground is not identifiable, `not_run` without a foreground) |
+| `lnl_two_ratio`, `omega_bg`, `omega_fg`, `lrt_two_vs_m0`, `p_two_vs_m0`, `p_adj_two_vs_m0` | Two-ratio model and its test against M0 |
+| `lnl_two_ratio_null`, `lrt_fg_omega_eq1`, `p_fg_omega_gt1`, `p_adj_fg_omega_gt1` | Foreground omega fixed at 1, and the one-sided test of foreground omega above 1 |
+| `lnl_spread_<model>`, `starts_at_best_<model>`, `starts_ok_<model>` | Optimizer diagnostics across starting omegas |
+| `n_branches`, `n_branches_reliable` | Branches, and those with reliable free-ratio estimates |
+
+`_branches.tsv`, one row per orthogroup and branch: `branch`, `terminal`, `taxa_side`, `species_tree_branches`, `in_species_tree`, `topology_source`, `foreground`; for each fitted model (`_m0`, `_free`, `_two`): `t` (branch length), `N`, `S` (sites), `omega`, `dN`, `dS`, `NdN`, `SdS` (expected substitutions); `flags` and `reliable_free`. `paml/<orthogroup>/<model>/start<k>/` keeps codeml's inputs and outputs.
+
+## phylo_absrel
+
+Experimental, development code. `_results.tsv`, one row per orthogroup: as for `phylo_busted`, with `n_branches_tested`, `n_branches_holm_005`, `p_value` (the smallest `p_holm`), `p_adj` (BH across orthogroups), `branch_min_p`, `lnl_baseline`, `lnl_adaptive`. `_branches.tsv`, one row per orthogroup and branch: the branch identity columns, `tested_by_hyphy`, `baseline_omega` and `baseline_length` (aBSREL's one-omega-per-branch MG94 fit), `adaptive_length`, `adaptive_dn`, `adaptive_ds`, `rate_classes`, `omega_max` and `omega_max_prop` (the largest omega class and its weight), `lrt`, `p_raw`, `p_holm` (Holm across the branches tested in the gene), `p_bh_lineage` and `lineage_family_size` (BH per species-tree branch across orthogroups).
+
+## phylo_relax
+
+Experimental, development code. `_results.tsv`, one row per orthogroup: as for `phylo_busted`, with `k`, `direction` (`relaxation` or `intensification`), `k_at_bound`, `lrt`, `p_value`, `p_adj`, `lnl_alternative`, `lnl_null`, `mg94_omega_test`, `mg94_omega_reference` (one omega per set), and the alternative model's classes (`test_omega_<k>`, `test_prop_<k>`, `ref_omega_<k>`, `ref_prop_<k>`). `_branches.tsv` adds `set` (`test`, `reference`, or `unclassified`).
+
+## phylo_summarize
+
+Experimental, development code. In `<output_dir>/<run_name>/` (default `summary`):
+
+| File | Contents |
+|---|---|
+| `_branch_ids.tsv` | One row per species-tree branch: `branch_id`, `tree_label`, `terminal`, `ape_node`, `parent_id`, `descendant_taxa`, `n_descendants`, `species_tree_length` |
+| `_species_tree_ids.nwk` | The species tree with internal nodes labelled by `tree_label` |
+| `_lineages.tsv` | One row per branch: `n_orthogroups_tested`, `n_estimated`, `n_merged_or_absent`, `n_reliable`, `n_pooled`, `pooled_omega` with `pooled_omega_lo` and `pooled_omega_hi` (bootstrap over orthogroups), `median_omega_reliable`, `q25_omega_reliable`, `q75_omega_reliable`, `frac_reliable_omega_gt1`, `median_ds`, `median_branch_length`, `sum_syn_changes`, `frac_high_ds`, `frac_few_synonymous`, `frac_omega_upper_bound`, `frac_zero_length`, `frac_starts_disagree`; with an aBSREL run, `absrel_n_tested`, `absrel_n_sig_lineage`, `absrel_n_sig_holm`, `absrel_median_baseline_omega` |
+| `_lineage_pairs.tsv` | Matched comparisons on shared reliable orthogroups: `branch_a`, `branch_b`, `n_shared`, `pooled_omega_a`, `pooled_omega_b`, `median_log2_ratio`, `n_a_higher`, `n_b_higher`, `sign_test_p`, `sign_test_p_adj` |
+| `_orthogroup_branches.tsv` | One row per orthogroup and branch: the free-ratio estimates with `branch_id` (empty for merged branches), flags, and `reliable` |
+| `_foreground.tsv` | Two-ratio summary: genes tested, significant with the foreground higher or lower, `p_fg_omega_gt1` count, median log2 foreground/background omega, pooled foreground and background omega |
+| `_relax.tsv` | RELAX summary: genes tested, significant relaxation and intensification, median log2 `k` |
+| `_provenance.json` | Inputs and their checksums, settings, and the definitions used |

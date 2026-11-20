@@ -25,7 +25,10 @@ fi
 mkdir -p tools .claude
 cp -a "$root/tools/dev" tools/
 cp -a "$root/skills" "$root/.agents" .; cp -a "$root/.claude/skills" .claude/; cp "$root/.gitignore" .
-mkdir -p docs/tutorials; cp -a "$root/docs/tutorials/." docs/tutorials/
+# The push hook validates the skill against R/cli_*.R, so copy R/ too: on a feature branch,
+# the skill names commands that dev's R/ does not have yet.
+rm -rf R; cp -a "$root/R" .
+mkdir -p docs; cp -a "$root/docs/." docs/ # the skill links documents outside docs/tutorials too
 git add -A; git commit -qm "test fixture"
 git push -q origin dev
 cp tools/dev/githooks/* tools/dev/check-public-safe.sh .git/hooks/

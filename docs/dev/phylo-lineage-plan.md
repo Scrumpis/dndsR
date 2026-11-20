@@ -1,6 +1,6 @@
 # Lineage-level selection: architecture review and plan
 
-Review only, 2026-11-20. Nothing here is implemented, and none of it is in v0.5.0. The maintainer set the order on 2026-11-20: PAML branch models, then lineage summaries, aBSREL, and RELAX (`DECISIONS.md`). The motivating question: compare lineage-level selection with LTR activity and genome expansion or contraction across species, accounting for branch length, sampling, and phylogenetic nonindependence. Read with [phylo-design.md](phylo-design.md).
+Review of 2026-11-20, kept for its reasoning. **Implemented since** on branch `feat/lineage-selection` (maintainer's instruction, 2026-11-20): user documentation in [../lineage-selection.md](../lineage-selection.md), calibration in [phylo-lineage-calibration.md](phylo-lineage-calibration.md). The review below is not updated. The maintainer set the order on 2026-11-20: PAML branch models, then lineage summaries, aBSREL, and RELAX (`DECISIONS.md`). The motivating question: compare lineage-level selection with LTR activity and genome expansion or contraction across species, accounting for branch length, sampling, and phylogenetic nonindependence. Read with [phylo-design.md](phylo-design.md).
 
 ## What already exists and can be reused
 

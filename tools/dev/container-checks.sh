@@ -34,6 +34,7 @@ pass "DIAMOND runs" diamond version
 pass "OrthoFinder runs" orthofinder -h
 pass "HyPhy 2.5.103 runs" sh -c 'hyphy --version | grep -q "2.5.103"'
 pass "KaKs_Calculator 2.0 runs" sh -c 'KaKs_Calculator -h | grep -q "Version: 2.0"'
+pass "PAML codeml 4.10.10 is present" sh -c 'command -v codeml && Rscript -e "stopifnot(dndsR:::.codeml_version(Sys.which(\"codeml\")) == \"4.10.10\")"'
 pass "ape loads" Rscript -e 'stopifnot(requireNamespace("ape", quietly = TRUE))'
 pass "required R packages load" Rscript -e 'for (p in c("dndsR","orthologr","Biostrings","GenomicFeatures","txdbmaker","pwalign","topGO","GO.db","IHW","qvalue","RIdeogram","lme4","testthat")) stopifnot(requireNamespace(p, quietly = TRUE))'
 if [ -n "$expected_version" ]; then
@@ -84,6 +85,28 @@ pass "phylo_busted from the prepared folder" dndsr phylo_busted --prepared-dir p
 pass "verify_phylo_example: 11 checks" sh -c 'dndsr verify_phylo_example 2>&1 | grep -q "All 11 phylogenetic example checks passed"'
 # The settings the calibration recommends (docs/phylo-methods.md): double hits, three starts.
 pass "phylo_busted, recommended settings" dndsr phylo_busted --prepared-dir prepared --run-name recommended -t 4 --multiple-hits Double --extra-seeds 2,3
+# Lineage-level analyses on the same prepared folder (docs/tutorials/lineage-selection.md).
+pass "phylo_branch_omega" dndsr phylo_branch_omega --prepared-dir prepared -t 4
+pass "phylo_absrel" dndsr phylo_absrel --prepared-dir prepared -t 4
+pass "phylo_relax" dndsr phylo_relax --prepared-dir prepared -t 4 --models Minimal
+pass "phylo_summarize" dndsr phylo_summarize --branch-omega-dir branch_omega --absrel-dir absrel --relax-dir relax
+pass "lineage outputs: 8 tested by each method, lineages and ids written" Rscript -e '
+  n <- function(f) sum(utils::read.delim(f)$status == "tested")
+  stopifnot(n("branch_omega/branch_omega_results.tsv") == 8L, n("absrel/absrel_results.tsv") == 8L, n("relax/relax_results.tsv") == 8L)
+  l <- utils::read.delim("summary/summary_lineages.tsv"); stopifnot(nrow(l) == 10L, any(is.finite(l$pooled_omega)))
+  stopifnot(file.exists("summary/summary_species_tree_ids.nwk"), nrow(utils::read.delim("summary/summary_branch_ids.tsv")) == 10L)'
+# The R block of docs/tutorials/lineage-selection.md section 4; keep the two the same.
+pass "lineage tutorial R block: join traits, fit nlme::gls with ape::corBrownian" Rscript -e '
+  lin <- read.delim("summary/summary_lineages.tsv")
+  traits <- read.delim("lineage_traits.tsv")
+  species <- merge(lin[lin$terminal, ], traits, by.x = "branch_id", by.y = "taxon")
+  species <- species[is.finite(species$pooled_omega), ]
+  tree <- ape::read.tree("summary/summary_species_tree_ids.nwk")
+  tree <- ape::drop.tip(tree, setdiff(tree$tip.label, species$branch_id))
+  tree$edge.length <- rep(1, nrow(tree$edge))
+  fit <- nlme::gls(log(pooled_omega) ~ ltr_fraction, data = species,
+                   correlation = ape::corBrownian(phy = tree, form = ~branch_id))
+  stopifnot(nrow(species) == 5L, is.finite(coef(fit)[["ltr_fraction"]]))'
 pass "p_best_fits_adj is BH over p_best_fits for the 8 tested" Rscript -e '
   r <- utils::read.delim("recommended/recommended_results.tsv"); t <- r$status == "tested"
   stopifnot(sum(t) == 8L, all(r$n_starts[t] == 3L), !anyNA(r$p_best_fits_adj[t]), all(is.na(r$p_best_fits_adj[!t])),

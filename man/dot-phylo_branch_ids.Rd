@@ -4,7 +4,12 @@
 \alias{.phylo_branch_ids}
 \title{Stable identifiers for every branch of the species tree}
 \usage{
-.phylo_branch_ids(tree)
+.phylo_branch_ids(tree, path = NULL)
+}
+\arguments{
+\item{tree}{Species tree from \code{\link[=.phylo_read_species_tree]{.phylo_read_species_tree()}}.}
+
+\item{path}{Its file, read again for branch lengths, matched by descendant taxa.}
 }
 \description{
 Stable identifiers for every branch of the species tree

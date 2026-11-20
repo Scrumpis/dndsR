@@ -43,6 +43,7 @@ The baseline is pinned to the image in `.github/workflows/regression.yaml` (the 
 | CLI | `test-cli.R`; `tools/dev/test-tutorial.sh`; tier 2 runs through the CLI |
 | McDonald-Kreitman (owned by the MK maintainer) | `test-mk.R` on designed sequences, with hand-derived counts and statistics |
 | Phylogenetic module (BUSTED) | `test-phylo-*.R`; direct HyPhy runs where HyPhy is installed |
+| Lineage-level analyses (`phylo_branch_omega`, `phylo_absrel`, `phylo_relax`, `phylo_summarize`) | `test-phylo-lineage.R` (parsers on stored codeml output, branch sets, corrections, pooled omega, ids, by hand); `test-phylo-lineage-engines.R` (codeml and HyPhy run directly on inputs prepared without dndsR); the container workflow runs all four on the genome example; calibration in simulation: `docs/dev/phylo-lineage-calibration.md` |
 
 ## Known gaps
 

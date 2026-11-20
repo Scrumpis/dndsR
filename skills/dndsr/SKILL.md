@@ -102,6 +102,22 @@ Success ends with `All 11 phylogenetic example checks passed.` On real data the 
 - The defaults are HyPhy's. Simulation recommends `--multiple-hits Double` and `--extra-seeds 2,3`, reading `lrt_best_fits`, `p_best_fits`, and its correction `p_best_fits_adj`; `p_adj` corrects only `p_value`, from the first start. Tell the user, and do not change settings without their choice. `--error-sink Yes` (BUSTED-E) is an experimental conservative check with a large power cost. Alignment errors cause most false positives: point out `dissimilar_window` flags. Masking them is a sensitivity analysis, not a dndsR feature. Evidence and limits: [docs/phylo-methods.md](../../docs/phylo-methods.md#calibration-in-simulation).
 - Methods and limits: [docs/phylo-methods.md](../../docs/phylo-methods.md).
 
+## 4c. Lineage-level selection (experimental, development code)
+
+To compare selection among lineages (for example against LTR activity or genome-size change), four commands run on the same `phylo_prepare` folder. Use them only if `dndsr --help` lists `phylo_branch_omega`; tell the user they are experimental and calibrated only in simulation. They need HyPhy 2.5.103 and PAML 4.10.10 (`--hyphy`, `--codeml`, or on `PATH`). Steps, with the example: [docs/tutorials/lineage-selection.md](../../docs/tutorials/lineage-selection.md); methods: [docs/lineage-selection.md](../../docs/lineage-selection.md).
+
+```
+dndsr phylo_branch_omega --prepared-dir prepared -t 4
+dndsr phylo_absrel --prepared-dir prepared -t 4
+dndsr phylo_relax --prepared-dir prepared -t 4 --models Minimal
+dndsr phylo_summarize --branch-omega-dir branch_omega --absrel-dir absrel --relax-dir relax
+```
+
+- They answer different questions: branch-model omega is gene-wide dN/dS per branch (not a test of positive selection; omega above 1 on a branch is not proof); aBSREL tests episodic positive selection per branch; RELAX tests relaxation or intensification, not positive selection. Do not merge their results into one claim.
+- For lineages, report `pooled_omega` with its interval, `n_pooled`, and the flag fractions from `summary_lineages.tsv`, and aBSREL counts by `p_bh_lineage`; never the mean of per-gene omega. Summaries are descriptive: a lineage difference is not evidence of adaptation or of a trait association. For trait hypotheses, point the user to a phylogenetic comparative model (`nlme::gls` with `ape::corBrownian`, `phylolm`, `caper`), using `summary_branch_ids.tsv` and `summary_species_tree_ids.nwk`.
+- Branches merged by pruning, including the two at the root, are left out of lineage summaries: advise an outgroup, and plainly labelled internal nodes in the species tree.
+- Only single-copy genes are tested, so gene families that expand or contract are under-represented. Say so when the question is about genome expansion.
+
 ## 5. Interpret honestly
 
 Read [docs/interpretation.md](../../docs/interpretation.md) before explaining results. The essentials:
