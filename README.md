@@ -20,7 +20,7 @@
 
 ## Quick start
 
-On Linux with Singularity or Apptainer (replace `singularity` with `apptainer` if needed). This takes a few minutes and a 1.3 GB download. The commands install into your home directory.
+On Linux with Singularity or Apptainer (replace `singularity` with `apptainer` if needed). This takes a few minutes and a 1.3 GB download. The commands install into your home directory. Until the v0.5.0 image is published and its digest added here, the digest below is the v0.4.0 image: it runs every pairwise command, but has neither HyPhy (for `phylo_busted`) nor KaKs_Calculator (for `--dnds-method` other than Comeron).
 
 ```
 git clone --branch v0.5.0 https://github.com/Scrumpis/dndsR

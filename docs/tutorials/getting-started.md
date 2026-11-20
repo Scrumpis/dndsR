@@ -13,7 +13,7 @@ cd dndsR
 
 ## 2. Get the container
 
-This digest always identifies the same image.
+This digest always identifies the same image. Until the v0.5.0 image is published and its digest added here, the digest below is the v0.4.0 image: it runs every pairwise command, but has neither HyPhy (for `phylo_busted`) nor KaKs_Calculator (for `--dnds-method` other than Comeron).
 
 ```
 singularity pull dndsr.sif docker://scrumpis/dndsr@sha256:f1b42d9d338b406ec23daca1bb146ed0329db29d21a24a6871158996aa0572da
@@ -79,9 +79,10 @@ cut -f1-5 example_AvB/example_AvB_dnds.tsv | head -5
 |---|---:|---:|---:|---|
 | g01 | 0 | 0 | NA | Identical sequences, so the ratio is undefined |
 | g02 | 0 | 0.14 | 0 | Only synonymous changes |
+| g03 | 0.04 | 0.008 | 5.7 | **Not a real ratio.** Designed with 30 nonsynonymous and no synonymous changes, so an independent count gives dS = 0 and an undefined ratio. The default Comeron method still reports a small dS, and so a large ratio. `example_AvB_dnds_reliability.tsv` flags it `few_synonymous_differences;low_ds` |
 | g20 | 0.09 | 0.02 | 5.6 | Designed with far more nonsynonymous changes |
 
-Small differences in dN and dS from the second decimal are expected between estimators, but the same version on the same input gives the same values.
+Before trusting any high ratio, look at its row in `example_AvB_dnds_reliability.tsv`: a flagged ratio may not be a ratio at all. Small differences in dN and dS from the second decimal are expected between estimators, but the same version on the same input gives the same values.
 
 ## 7. Verify
 

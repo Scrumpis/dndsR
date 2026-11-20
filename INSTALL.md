@@ -7,7 +7,7 @@
 | Conda or micromamba | R use on Linux, including HPC, with prebuilt packages | Tested from scratch on Linux |
 | Native R from CRAN and Bioconductor | When you manage your own R and system libraries | Failed on the tested HPC module; see below |
 
-The published image holds dependencies. `tools/dndsr-install` installs dndsR from your clone into a home-directory R library, so keep the clone in place.
+The published image holds dependencies. `tools/dndsr-install` installs dndsR from your clone into a home-directory R library, so keep the clone in place. Until the v0.5.0 image is published and its digest added here, the digest in these instructions is the v0.4.0 image: it runs every pairwise command, but has neither HyPhy (for `phylo_busted`) nor KaKs_Calculator (for `--dnds-method` other than Comeron).
 
 ## Singularity or Apptainer
 

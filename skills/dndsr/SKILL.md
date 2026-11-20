@@ -35,7 +35,7 @@ tools/dndsr-install install --engine singularity --sif dndsr.sif
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Pin digests rather than tags, because tags can move. To see published tags: `curl -s "https://hub.docker.com/v2/repositories/scrumpis/dndsr/tags?page_size=20"`. The Docker route is in [INSTALL.md](../../INSTALL.md) and is untested.
+Until the v0.5.0 image digest replaces it, the digest above is the v0.4.0 image, which lacks HyPhy and KaKs_Calculator: tell the user so before `phylo_busted` or another `--dnds-method`. Pin digests rather than tags, because tags can move. To see published tags: `curl -s "https://hub.docker.com/v2/repositories/scrumpis/dndsr/tags?page_size=20"`. The Docker route is in [INSTALL.md](../../INSTALL.md) and is untested.
 
 ## 3. Verify with the example
 

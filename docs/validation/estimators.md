@@ -123,7 +123,7 @@ Resampling measures noise, not bias, so coverage fails in the cases that matter 
 
 ## Other methods
 
-`calculate_dnds --dnds-method` also offers `NG`, `LWL`, `LPB`, `MLWL`, `YN`, and `MYN`, computed by KaKs_Calculator 2.0.1 on the codon alignments orthologr makes for every method. Comeron stays the default. KaKs_Calculator's `GY` is left out: on an example pair with no synonymous change it gave dS 0.00096 and dN/dS 50. `MLPB` is left out because no independent implementation was available to check it.
+`calculate_dnds --dnds-method` also offers `NG`, `LWL`, `LPB`, `MLWL`, `YN`, and `MYN`, computed by KaKs_Calculator 2.0.1 on the codon alignments orthologr makes for every method. Comeron stays the default. KaKs_Calculator's `GY` is left out: on an example pair with no synonymous change it gave dS 0.00096 and dN/dS 50. The default, Comeron, has the same kind of problem to a lesser degree (above): on that pair, g03 of the example, it gives dS 0.0077 and dN/dS 5.67 where the independent count gives dS 0, and the reliability table flags it. `MLPB` is left out because no independent implementation was available to check it.
 
 **What dndsR adds to KaKs_Calculator's output.**
 

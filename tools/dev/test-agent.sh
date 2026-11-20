@@ -51,7 +51,8 @@ if [ -n "$result" ]; then
 fi
 ok "the answer warns that a ratio above 1 is not proof" 'grep -Eiq "(not|never|no|isn.t|without).{0,60}(proof|prove|evidence|proves)|candidate" "$out/answer.md"'
 ok "the answer mentions dS caveats" 'grep -Eiq "\bdS\b" "$out/answer.md"'
-ok "the answer says the example is synthetic" 'grep -Eiq "synthetic|designed|simulated" "$out/answer.md"'
+# Wording varies: a run at 1ea7faf wrote "made-up gene pairs with known changes planted in them".
+ok "the answer says the example is synthetic" 'grep -Eiq "synthetic|designed|simulated|made[- ]up|artificial|constructed|planted" "$out/answer.md"'
 ok "the answer says the example does not validate real data" 'grep -Eiq "(your own|real|other).{0,40}(data|genome)" "$out/answer.md"'
 echo "passed $pass, failed $fail; answer in $out/answer.md"
 [ "$fail" -eq 0 ]

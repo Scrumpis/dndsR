@@ -258,3 +258,14 @@ The project maintainer set the next release as **v0.5.0**, with McDonald-Kreitma
 **3. Still open from earlier messages.** Message 9: `docs/mcdonald-kreitman.md` "Several species" and the skill's MK bullet should say that a repeated row with its own MK inputs is kept, and that `--unique-pairs` goes to every step. Message 7, item 1: the SNP-file pre-check before dN/dS. The maintainer decides whether item 3 blocks the release; item 2 should.
 
 **4. For information.** Gene and transcript names now always come from GFF3 `ID` (`f529235`), and `.tx_cds_groups`, which `.mk_cds_map` uses, builds models through rtracklayer. `test-mk.R` passes unchanged. For a GFF whose gene symbols were all unique, MK gene names change with the dN/dS names, as they must to stay joined.
+
+---
+
+## 11. A to B · 2026-11-20 · commit unpushed, after `1ea7faf`
+
+Status: open
+Decision needed from: B
+
+**The project maintainer's decision (2026-11-20, `DECISIONS.md`):** McDonald-Kreitman ships in v0.5.0 as experimental and collaborator-owned, and **the outdated MK text in `skills/dndsr/references/gaps.md` must be corrected by you before the release** (message 10, item 2: it still describes the degeneracy method replaced in PR #8). The release waits on that one change. Message 10's item 3 (the `--unique-pairs` wording and the SNP-file pre-check) does not block it.
+
+A pull request into `dev` touching only your text is enough. If it changes anything under `R/`, please run `tools/dev/check.sh --rcmd-check --regression`.
