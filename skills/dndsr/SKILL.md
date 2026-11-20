@@ -128,6 +128,7 @@ Report the version, commit, image digest, command, and the number of excluded ge
 - `command not found: dndsr`: add `~/.local/bin` to `PATH`, then run `hash -r`.
 - `Unknown command` or `Unknown option`: dndsR stops on typos. Run `dndsr --help` or `dndsr <command> --help`.
 - `Sequence files not found`: run `extract_cds` first, with the same `-o`.
+- `Some sequence names ... cannot be used` (development code): GFF3 IDs, which become sequence names, contain whitespace or start with an NCBI tag such as `gnl|` or `ref|`, which DIAMOND rewrites. Rename them in the GFF3, with their `Parent` references, or use `--group-by gene` if only transcript IDs are affected. Evidence: [docs/validation/known-issues.md](../../docs/validation/known-issues.md).
 - `jobs failed`: the message gives each error, and logs are in the comparison folder. Retry with `-t 1`, and check memory if a worker died.
 - Enrichment writes no table: a small dataset may lose terms to `--max-prop` (default 0.2), `--min-pos`, or `--min-total`. Read the log before relaxing them.
 - Singularity cannot start, for example without `/dev/fuse`: try Apptainer or the conda route. Report what you changed.

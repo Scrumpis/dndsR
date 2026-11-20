@@ -115,3 +115,40 @@ for (nm in names(styles)) {
     expect_match(out$q_attributes[match(st$genes[1], out$query_id)], "GO:0003677")
   })
 }
+
+# ---- Names DIAMOND and orthologr cannot use (docs/validation/known-issues.md) ----
+
+test_that("unusable sequence names are recognised, and usable ones are not", {
+  b <- dndsR:::.unsafe_seq_names(c("g 1", "g\t2", "gnl|JCVI|m.1", "ref|NM_1|", "gi|1|ref|g", "sp|P1|g",
+                                   "lcl|g1", "x|g1", "AT1G01010", "g;1", "gene:A", NA))
+  expect_setequal(b$whitespace, c("g 1", "g\t2"))
+  expect_setequal(b$ncbi_tag, c("gnl|JCVI|m.1", "ref|NM_1|", "gi|1|ref|g", "sp|P1|g"))
+  expect_length(dndsR:::.unsafe_seq_names("g 1", whitespace = FALSE)$whitespace, 0)
+})
+
+pipe_gff <- function(gene1, gene2, tx1, tx2) c(
+  sprintf("chr1\tp\tgene\t30\t269\t.\t+\t.\tID=%s", gene1),
+  sprintf("chr1\tp\tmRNA\t30\t269\t.\t+\t.\tID=%s;Parent=%s", tx1, gene1),
+  sprintf("chr1\tp\tCDS\t30\t89\t.\t+\t0\tParent=%s", tx1), sprintf("chr1\tp\tCDS\t120\t269\t.\t+\t0\tParent=%s", tx1),
+  sprintf("chr1\tp\tgene\t700\t999\t.\t-\t.\tID=%s", gene2),
+  sprintf("chr1\tp\tmRNA\t700\t999\t.\t-\t.\tID=%s;Parent=%s", tx2, gene2),
+  sprintf("chr1\tp\tCDS\t700\t999\t.\t-\t0\tParent=%s", tx2))
+
+test_that("extract_cds stops on gene IDs with whitespace, naming them", {
+  st <- list(lines = pipe_gff("gene A1", "gene A2", "t A1", "t A2"))
+  expect_error(run_style(st, "gene"), "contain whitespace, e.g. 'gene A1', 'gene A2'")
+})
+
+test_that("NCBI-tagged transcript IDs stop transcript mode, and gene mode still works", {
+  st <- list(lines = pipe_gff("gene-A1", "gene-A2", "rna-gnl|JCVI|mRNA.A1.1", "rna-gnl|JCVI|mRNA.A2.1"))
+  expect_error(run_style(st, "tx"), "NCBI database tag.*'gnl\\|JCVI\\|mRNA.A1.1'.*group_by = \"gene\"")
+  expect_setequal(names(run_style(st, "gene")$cds), c("A1", "A2"))
+})
+
+test_that("calculate_dnds stops on NCBI-tagged names before any alignment", {
+  dir <- withr::local_tempdir()
+  f <- file.path(dir, "q.fasta")
+  writeLines(c(">ref|g1| a description", "ATGAAATAA", ">ref|g2|", "ATGCCCTAA"), f)
+  expect_error(calculate_dnds(comparison_name = "c", query_seq = f, subject_seq = f, output_dir = dir, aligner = "blast"),
+               "start with an NCBI database tag.*'ref\\|g1\\|'")
+})

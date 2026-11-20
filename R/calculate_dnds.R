@@ -346,6 +346,13 @@ calculate_dnds <- function(comparison_file = NULL,
       )
     }
 
+    # Names DIAMOND would rewrite: checked here too, for CDS files not made by extract_cds.
+    # Only the first word: text after whitespace is a FASTA description.
+    for (f in c(q_in, s_in)) {
+      .stop_unsafe_seq_names(sub("[[:space:]].*$", "", names(Biostrings::fasta.seqlengths(f))), where = f,
+                             fix = "Rename these sequences, for example by removing the tag prefix.", whitespace = FALSE)
+    }
+
     # defaults you provide
     args <- list(
       query_file         = normalizePath(q_in),

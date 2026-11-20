@@ -204,6 +204,12 @@ extract_cds <- function(comparison_name = NULL,
       warning("No CDS matched chromosomes in FASTA for: ", out_base, call. = FALSE)
       return(res)
     }
+    .stop_unsafe_seq_names(
+      cds_groups2$gene, where = gff_path,
+      fix = paste0("Sequences are named by GFF3 ID. Rename these ", if (group_by == "tx") "transcript" else "gene",
+                   " IDs, and their Parent references, in the GFF3",
+                   if (group_by == "tx") ", or use group_by = \"gene\" if only transcript IDs are affected" else "",
+                   "."))
 
     vmsg("  - Extracting CDS sequences (", length(cds_groups2$cds), " transcripts)")
     all_cds <- GenomicFeatures::extractTranscriptSeqs(h$fafile, cds_groups2$cds)

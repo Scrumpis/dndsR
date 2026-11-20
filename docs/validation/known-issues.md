@@ -29,3 +29,16 @@ Interpretation limits and the estimator's bias are covered in [interpretation](.
 | `--threads` gives `append_annotations` no speedup, and `extract_cds` and the enrichment commands use at most 2 workers per comparison. See [thread scaling](performance.md) | Open |
 | `calculate_dnds` needs about 1 GB per core. Called from an R session that already ran the workflow, 32 cores was killed at 96 GB with an unclear error | Open; use fewer cores or a fresh session |
 | Windows runs sequentially and has not been tested | Open |
+
+## Sequence names
+
+Tested on a designed two-gene genome compared with itself through `extract_cds` and `calculate_dnds` (DIAMOND 2.1.14, orthologr 0.4.3, v0.4.0 image), with gene IDs `g<c>1` and `g<c>2` for each character `<c>`, at the commit that adds this section:
+
+| Names | Result before the check | Now |
+|---|---|---|
+| Containing a space or tab | Failed: "could not be translated properly" or "No orthologs could be found" | `extract_cds` stops and names them |
+| Starting with an NCBI database tag: `gnl\|JCVI\|g1`, `ref\|g1\|`, `sp\|P1\|g1` | Failed: "Please check the correct path to Comeron" | `extract_cds` and `calculate_dnds` stop and name them |
+| `gi\|1\|ref\|g1` | **No error, and an empty dN/dS table** | Stopped, as above |
+| `lcl\|g1`, `x\|g1`, and `\| / \ ; & $ `` ` `` ' " ( ) < > * ? [ ] { } ! # ~ ^ + = , @ % :` inside a name | Both pairs found, names intact | Unchanged |
+
+Other NCBI tags from NCBI's documented list (`tr`, `gb`, `emb`, `dbj`, and others) are refused too; they were not each tested. In the *A. thaliana* RefSeq annotation, 3,912 transcript IDs start with `rna-gnl|JCVI|`, but none of them has a CDS, so no CDS name is affected; gene IDs there and in *A. lyrata* contain none of these characters. `calculate_dnds` checks only the first word of each name, because text after whitespace in a FASTA header is a description; whether such descriptions work has not been tested.

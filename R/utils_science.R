@@ -305,6 +305,50 @@
   txdbmaker::makeTxDbFromGRanges(gr)
 }
 
+#' Sequence names that DIAMOND and orthologr cannot use
+#'
+#' Names become sequence IDs for DIAMOND and orthologr. Tested on a designed pair
+#' (`docs/validation/known-issues.md`): a name containing whitespace is cut at the
+#' whitespace, so names collide or vanish; a name that starts with an NCBI database tag,
+#' such as `gnl|JCVI|...`, `ref|...|`, `gi|...`, or `sp|...|`, is read by DIAMOND as a
+#' database identifier and rewritten, so the run fails or the dN/dS table comes out empty.
+#' `lcl|` (local) and `|` elsewhere in a name, and 28 other punctuation characters, work.
+#'
+#' @param x Names.
+#' @param whitespace Also report names containing whitespace.
+#' @return List with `whitespace` and `ncbi_tag`: the offending names.
+#' @keywords internal
+.unsafe_seq_names <- function(x, whitespace = TRUE) {
+  x <- unique(as.character(x[!is.na(x)]))
+  # NCBI FASTA defline database tags, from NCBI's documented list; lcl is local and works.
+  tag <- "^(gnl|ref|gi|sp|tr|gb|emb|dbj|pir|prf|pdb|pat|pgp|bbs|bbm|gim|tpg|tpe|tpd|gpp|nat)\\|"
+  ws <- if (whitespace) x[grepl("[[:space:]]", x)] else character(0)
+  list(whitespace = ws, ncbi_tag = setdiff(x[grepl(tag, x)], ws))
+}
+
+#' Stop with a clear message when sequence names cannot be used
+#'
+#' @param x Names, as they would be written to a CDS FASTA.
+#' @param where Where they come from, for the message.
+#' @param fix How to fix them, for the message.
+#' @param whitespace Passed to [.unsafe_seq_names()].
+#' @return `NULL`, invisibly, when every name is usable.
+#' @keywords internal
+.stop_unsafe_seq_names <- function(x, where, fix, whitespace = TRUE) {
+  bad <- .unsafe_seq_names(x, whitespace)
+  if (!length(bad$whitespace) && !length(bad$ncbi_tag)) return(invisible(NULL))
+  show <- function(v) paste0("'", utils::head(v, 5), "'", collapse = ", ")
+  stop(
+    "Some sequence names from ", where, " cannot be used, because DIAMOND and orthologr ",
+    "would lose or rewrite them, and the run would fail or return no pairs.",
+    if (length(bad$whitespace)) paste0("\n* ", length(bad$whitespace), " contain whitespace, e.g. ", show(bad$whitespace)),
+    if (length(bad$ncbi_tag)) paste0("\n* ", length(bad$ncbi_tag), " start with an NCBI database tag such as gnl| or ref|, e.g. ",
+                                     show(bad$ncbi_tag)),
+    "\n", fix,
+    call. = FALSE
+  )
+}
+
 #' Build per-transcript CDS GRanges from a GFF3
 #'
 #' Groups CDS features by transcript ID (or gene ID) and labels each transcript with a
