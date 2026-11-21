@@ -54,13 +54,20 @@ cell_omegas <- function(cell, tree, fg_nodes) {
     C0 = list(om = one(c(0.05, 0.3, 1.5)), prop = prop3),
     C1 = { o <- one(c(0.05, 0.3, 1.5)); o[fg_nodes] <- list(c(0.05, 0.3, 1.5)^0.5); list(om = o, prop = prop3) },
     C2 = { o <- one(c(0.05, 0.3, 1.5)); o[fg_nodes] <- list(c(0.05, 0.3, 1.5)^2); list(om = o, prop = prop3) },
+    # Follow-up study (docs/dev/phylo-lineage-followup.md).
+    D0 = { o <- one(0.2); o[fg_nodes] <- list(1); list(om = o, prop = 1) },
+    C0i = list(om = one(c(0.05, 0.3, 1.5)), prop = prop3, per_branch = TRUE),
     stop("Unknown cell: ", cell)
   )
+  if (is.null(out$per_branch)) out$per_branch <- FALSE
   out
 }
 
 #' One gene: every branch with its own omega classes; no synonymous rate variation
-sim_gene_nodes <- function(tree, n_sites, pi, kappa, om, prop) {
+#'
+#' A site's omega class is drawn once and kept on every branch, unless `per_branch`: then it
+#' is drawn afresh on each branch, as HyPhy's random-effects branch-site models assume.
+sim_gene_nodes <- function(tree, n_sites, pi, kappa, om, prop, per_branch = FALSE) {
   n_tip <- ape::Ntip(tree); root <- n_tip + 1L
   cls <- sample.int(length(prop), n_sites, TRUE, prob = prop)
   states <- vector("list", max(tree$edge))
@@ -69,6 +76,7 @@ sim_gene_nodes <- function(tree, n_sites, pi, kappa, om, prop) {
   for (e in seq_len(nrow(tr$edge))) {
     par <- tr$edge[e, 1]; ch <- tr$edge[e, 2]
     out <- integer(n_sites)
+    if (per_branch) cls <- sample.int(length(prop), n_sites, TRUE, prob = prop)
     for (k in unique(cls)) {
       idx <- which(cls == k)
       p <- p_matrix(kappa, om[[ch]][k], 1, 0, pi, tr$edge.length[e])
@@ -106,7 +114,7 @@ run_lineage_cell <- function(params_file, cell, tree_name, n, seed, out) {
   genes <- list()
   for (i in seq_len(n)) {
     id <- sprintf("%s_%s_%04d", cell, tree_name, i)
-    aln <- sim_gene_nodes(tree, 300L, pi, par$kappa, spec$om, spec$prop)
+    aln <- sim_gene_nodes(tree, 300L, pi, par$kappa, spec$om, spec$prop, spec$per_branch)
     dropped <- character()
     if (tree_name == "T16m") dropped <- sample(tree$tip.label, 4L)
     aln <- aln[setdiff(tree$tip.label, dropped), , drop = FALSE]

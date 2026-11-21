@@ -2,6 +2,8 @@
 # One unit of the lineage calibration (docs/dev/phylo-lineage-calibration.md): simulate a cell
 # on a tree with phylo-lineage-sim.R, then run the dndsR method on it, from a frozen library.
 #   sbatch --array=1-27 --export=ALL,ROOT=<results root>,N=<genes, optional> phylo-lineage-calibration.sb
+# UNITS=<file> (optional) replaces phylo-lineage-units.tsv. Optional columns: seed (default: the
+# array index) and settings (method arguments, "name=value;name=v1,v2"; "-" for none).
 # ROOT holds: lib/ (dndsR installed from one commit; lib/COMMIT), src/ (that commit's tree),
 # params.json, image.sif (or IMAGE=), envs/ (HyPhy and PAML; or ENVS=).
 #SBATCH --time=23:59:00
@@ -11,31 +13,39 @@
 set -euo pipefail
 : "${ROOT:?}"
 IMAGE=${IMAGE:-$ROOT/image.sif}; ENVS=${ENVS:-$ROOT/envs}
-units="$ROOT/src/tools/dev/validation/phylo-lineage-units.tsv"
+units=${UNITS:-$ROOT/src/tools/dev/validation/phylo-lineage-units.tsv}
 row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$units")
-read -r cell tree n method <<<"$row"
-n=${N:-$n}
+read -r cell tree n method seed settings <<<"$row"
+n=${N:-$n}; seed=${seed:-$SLURM_ARRAY_TASK_ID}; settings=${settings:--}
+[ "$seed" = "-" ] && seed=$SLURM_ARRAY_TASK_ID
 out="$ROOT/units/${cell}_${tree}"
+[ "$settings" != "-" ] && out="$out-$(printf '%s' "$settings" | tr -c 'A-Za-z0-9' '_')"
 [ -f "$out/DONE" ] && { echo "already done: $out"; exit 0; }
 rm -rf "$out"; mkdir -p "$out"
 run() { singularity exec --cleanenv --bind "$ROOT" --bind "$ENVS" --env R_LIBS_USER="$ROOT/lib" \
   --env PATH="$ENVS/hyphy-2.5.103/bin:$ENVS/ref/bin:/opt/conda/envs/tools/bin:/usr/local/bin:/usr/bin:/bin" "$IMAGE" "$@"; }
 start=$SECONDS
-run Rscript --vanilla "$ROOT/src/tools/dev/validation/phylo-lineage-sim.R" "$ROOT/params.json" "$cell" "$tree" "$n" "$SLURM_ARRAY_TASK_ID" "$out/sim"
+run Rscript --vanilla "$ROOT/src/tools/dev/validation/phylo-lineage-sim.R" "$ROOT/params.json" "$cell" "$tree" "$n" "$seed" "$out/sim"
 sim_s=$((SECONDS - start))
 run Rscript --vanilla -e '
   a <- commandArgs(TRUE); suppressMessages(library(dndsR)); d <- a[1]; m <- a[2]; th <- as.integer(a[3])
+  extra <- list()
+  if (!is.na(a[4]) && a[4] != "-") for (kv in strsplit(a[4], ";", fixed = TRUE)[[1]]) {
+    v <- strsplit(sub("^[^=]*=", "", kv), ",", fixed = TRUE)[[1]]
+    num <- suppressWarnings(as.numeric(v))
+    extra[[sub("=.*$", "", kv)]] <- if (all(!is.na(num))) num else v
+  }
   args <- list(alignment_dir = file.path(d, "sim", "alignments"), species_tree_file = file.path(d, "sim", "species_tree.nwk"),
                output_dir = d, threads = th)
-  if (m == "branch_omega") do.call(phylo_branch_omega, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"), keep_runs = FALSE)))
-  if (m == "absrel") do.call(phylo_absrel, args)
-  if (m == "relax") do.call(phylo_relax, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"), models = "Minimal")))
-' "$out" "$method" "$SLURM_CPUS_PER_TASK"
+  if (m == "branch_omega") do.call(phylo_branch_omega, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"), keep_runs = FALSE), extra))
+  if (m == "absrel") do.call(phylo_absrel, c(args, extra))
+  if (m == "relax") do.call(phylo_relax, c(args, list(foreground_file = file.path(d, "sim", "foreground.tsv"), models = "Minimal"), extra))
+' "$out" "$method" "$SLURM_CPUS_PER_TASK" "$settings"
 # One archive per unit instead of thousands of per-gene files (scratch has a file quota).
 for x in hyphy paml sim/alignments; do
   [ -d "$out/$method/$x" ] && tar -czf "$out/$method/${x//\//_}.tar.gz" -C "$out/$method" "$x" && rm -rf "$out/$method/$x" || true
 done
 [ -d "$out/sim/alignments" ] && tar -czf "$out/sim/alignments.tar.gz" -C "$out/sim" alignments && rm -rf "$out/sim/alignments" || true
-printf 'cell\ttree\tn\tmethod\tsim_s\trun_s\tcpus\tcommit\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$cell" "$tree" "$n" "$method" \
+printf 'cell\ttree\tn\tmethod\tseed\tsettings\tsim_s\trun_s\tcpus\tcommit\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$cell" "$tree" "$n" "$method" "$seed" "$settings" \
   "$sim_s" "$((SECONDS - start - sim_s))" "$SLURM_CPUS_PER_TASK" "$(cat "$ROOT/lib/COMMIT")" > "$out/timing.tsv"
 touch "$out/DONE"
