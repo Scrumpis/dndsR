@@ -1,0 +1,8 @@
+unit	cell	tree	n	codons	seed	methods	post	mask	settings
+L-S0	LS0	T8b	1000	300	201	branch_omega	none	no	branch_omega:models=M0,free
+L-S1	LS1	T8b	1000	300	202	branch_omega	none	no	branch_omega:models=M0,free
+L-S2	LS2	T8b	1000	300	203	branch_omega	none	no	branch_omega:models=M0,free
+L-G1	LG1	T8b	1000	300	204	branch_omega	none	no	branch_omega:models=M0,free
+L-P1	LG1	T8p	500	300	205	branch_omega	none	no	branch_omega:models=M0,free
+L-M1	LG1	T16m	400	300	206	branch_omega	none	no	branch_omega:models=M0,free
+L-A1	LA1	T8b	1000	300	207	branch_omega	none	no	branch_omega:models=M0,free

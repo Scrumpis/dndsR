@@ -1,6 +1,6 @@
 # Study L: lineage omega, its uncertainty, and its biases (design)
 
-Status: **draft for the maintainer's review; not run.** Motivated by the audit's exploratory findings E1-E3 ([validation-audit.md](validation-audit.md)), which used the first lineage study's outputs. Those genes are the *development set*: anything chosen on them (an interval method, a flag threshold) is confirmed here on new genes with new seeds, and the first study's record is not changed.
+Status: **approved by the maintainer 2026-11-21 (pilot first, then the full study if the pilot passes its gates, within about 290 core-hours); amended below before the pilot ran.** Motivated by the audit's exploratory findings E1-E3 ([validation-audit.md](validation-audit.md)), which used the first lineage study's outputs. Those genes are the *development set*: anything chosen on them (an interval method, a flag threshold) is confirmed here on new genes with new seeds, and the first study's record is not changed.
 
 ## Questions
 
@@ -49,3 +49,30 @@ New seeds 201-207, one per cell. Projected from measured times (M0 + free-ratio:
 ## Not covered
 
 Recombination, alignment error (study B), codon-usage variation between genes, real genomes (study E).
+
+## Amendments before the pilot (2026-11-21, before any run of this study)
+
+Made after the maintainer's approval, which asked that estimator validity come first: compare alternative, biologically interpretable estimators; establish whether any genome-wide lineage summary can be used in comparative trait models; and, if none can, document that rather than force a biased estimator into the stable API. Nothing below was chosen from results of this study.
+
+**Implementation.** `phylo-lineage-sim2.R` (cells `LS0`, `LS1`, `LS2`, `LG1`, `LA1`; it reuses `phylo-lineage-sim.R` without changing it), `phylo-lineage-study2.sb` (one unit per cell), units `phylo-study-L-units.tsv` (seeds 201-207 as designed) and `phylo-study-L-pilot-units.tsv` (40 genes per cell, seeds 291-297: development data, never pooled with the main runs). L-P1 and L-M1 use cell `LG1` on T8p and T16m.
+
+**Gene and branch effects.** omega of gene g, branch b, site class k is c_k x m_g x e_b: c_k the site classes (gamma: 8 equal classes, conditional means, mean 0.2), m_g lognormal with sd 0.7 on the log scale and mean 1, e_b lognormal with sd 0.5, one fixed draw per tree (seed 20261122). Population truth for a branch: 0.2 x e_b (m has mean 1). Each gene's own truth is written too (`gene_branch_truth.tsv`), so the estimand of a particular gene set (sample truth) and the population value are both available; L3 reports coverage of both.
+
+**L-A1, the ascertainment mechanism.** A duplicated gene makes its orthogroup `multi_copy`, which removes it from every lineage: that changes the gene population of all lineages alike and so cannot bias a contrast between lineages. The mechanism that can is lineage-specific loss: genes whose m_g lies in the top third of its distribution lose t1 with probability 0.5 (an absent taxon, `n_absent`), so t1's unmatched summary is computed on fewer fast-evolving genes. L4 compares t1 against t3, unmatched and matched (not against t2: when t1 is absent, t2 merges with their stem, so t2 is estimated on t1's gene set too).
+
+**Estimators compared** (all from the same M0 and free-ratio fits; criteria L1-L5 apply to each):
+
+| Name | Definition | Interpretation |
+|---|---|---|
+| `pool` | current `pooled_omega`: (sum NdN / sum N) / (sum SdS / sum S), high_ds excluded | ratio of pooled substitution counts per site |
+| `median` | median over genes of the branch's free-ratio omega | typical gene |
+| `rel` | `pool` of the branch divided by `pool` of M0 over the same genes | lineage omega relative to the tree-wide omega of its own gene set (cancels gene-set composition, which L4 tests) |
+| `pool_adj` | `pool`, with log branch dS as a covariate in the trait model (L5 only) | remedy by adjustment rather than by a new estimator |
+
+aBSREL's per-branch omega distribution was considered and not included: on the first study's B0 genes most branches fit a single class (for example `Rate Distributions [[0.21, 1]]`), so it has the same one-omega misspecification, and its baseline was already biased high (audit, E3).
+
+**L5, made concrete.** On L-P1 (T8p, branch lengths 0.005-0.25) and L-G1, with disjoint gene sets of 100: 10,000 trait draws per gene set, each trait correlated 0.5 with the part of log branch length that is uncorrelated with the true log omega of the branches (so that the trait is exactly unrelated to the truth, even though one fixed draw of branch effects can correlate with length by chance), plus normal noise; ordinary least squares across branches of log estimate on the trait, with and without log branch dS as a covariate; false-positive rate at 0.05. The trait's noise varies independently among branches, so the test has its nominal size when the estimator has no length-dependent bias; the same regression on the true omegas is reported as the reference.
+
+**Decision rule for the stable API (fixed now).** An estimator may be documented for comparative trait models only if it meets L2 (bias) and L5 (false positives at most 5%) on every cell with site or gene variation. If none does, but adjustment (`pool_adj`) meets L5, the documented use is the adjusted model, and the limitation is stated. If neither, the documentation says that no genome-wide single-number lineage omega from these models is safe for trait association, and the summary stays descriptive.
+
+**Pilot gates (fixed now; the full study starts only if all hold).** (1) every unit completes, with at least 95% of genes tested; (2) the simulator does what is planned: mean of m_g within 3 standard errors of 1, the gamma classes average 0.2, and in L-A1 t1 is absent only in genes above the cutoff (a logical check; the share, planned 16.7%, is reported, since 40 genes cannot pin it down); (3) on LS0 the pooled omega lies within 10% of 0.2 on every branch class (the first study found 3-6%); (4) measured cost per gene projects the full study at no more than 290 core-hours; if it projects above, the cells are run in the order L-G1, L-P1, L-S1, L-S2, L-A1, L-S0, L-M1 and the remainder reported as not run, without reducing any cell's genes.

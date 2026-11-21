@@ -1,0 +1,27 @@
+#!/bin/bash --login
+# Study N (docs/dev/enrichment-error-study.md): one array task runs one block of seeds of one
+# scenario: direct labels (enrichment-direct-labels.R), then every candidate test on them
+# (enrichment-methods.R; with the real go_enrichment() defaults when GO_DEFAULT_RUNS covers the run).
+#   sbatch --array=1-<blocks> --export=ALL,ROOT=<results root>,IMAGE=<sif>,BLOCKS=<blocks file> enrichment-direct.sb
+# BLOCKS: tab-separated scenario, first seed, number of runs, go_default runs (the first k of the block).
+# ROOT holds src/ (the frozen tree), lib/ (dndsR from it), inputs/AtAl_dnds_annot.tsv, inputs/go_ancestors.tsv.
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=6G
+#SBATCH --job-name=enrich-direct
+set -euo pipefail
+: "${ROOT:?}" "${IMAGE:?}" "${BLOCKS:?}"
+row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$BLOCKS")
+IFS=$'\t' read -r scenario first runs go_runs <<<"$row"
+v="$ROOT/src/tools/dev/validation"; out="$ROOT/runs/$scenario"; mkdir -p "$out"
+run() { singularity exec --cleanenv --bind "$ROOT" --env R_LIBS_USER="$ROOT/lib" ${GOENV:-} "$IMAGE" "$@"; }
+for ((k = 0; k < runs; k++)); do
+  s=$((first + k))
+  [ -s "$out/terms_$s.tsv" ] && continue
+  run Rscript --vanilla "$v/enrichment-direct-labels.R" "$ROOT/inputs/AtAl_dnds_annot.tsv" "$scenario" "$s" "$out/sim_$s.tsv.gz"
+  t0=$SECONDS
+  GOENV=""; [ "$k" -lt "$go_runs" ] && GOENV="--env DNDSR_GO_DEFAULT=1"
+  GOENV=$GOENV run Rscript --vanilla "$v/enrichment-methods.R" "$ROOT/inputs/AtAl_dnds_annot.tsv" "$ROOT/inputs/go_ancestors.tsv" "$out/sim_$s.tsv.gz" "$out/terms_$s.tmp"
+  mv "$out/terms_$s.tmp" "$out/terms_$s.tsv"
+  printf '%s\t%s\t%s\n' "$scenario" "$s" "$((SECONDS - t0))" >> "$ROOT/timing_$SLURM_ARRAY_TASK_ID.tsv"
+done

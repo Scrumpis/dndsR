@@ -1,0 +1,8 @@
+unit	cell	tree	n	codons	seed	methods	post	mask	settings
+R-N16-pilot	C0	T16	10	300	491	relax	none	no	-
+R-N8-pilot	C0	T8b	10	300	492	relax	none	no	-
+R-N5-pilot	C0	T5	10	300	493	relax	none	no	-
+R-K05-pilot	C1	T16	10	300	494	relax	none	no	-
+R-K2-pilot	C2	T16	10	300	495	relax	none	no	-
+RD-L1000-pilot	C0	T16	10	1000	496	relax	none	no	-
+RD-L3000-pilot	C0	T16	10	3000	497	relax	none	no	-

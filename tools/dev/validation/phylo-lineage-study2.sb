@@ -1,0 +1,84 @@
+#!/bin/bash --login
+# One unit of studies L, B, or R-D: simulate with phylo-lineage-sim2.R, add errors, run dndsR
+# methods, from a frozen library. Generalizes phylo-lineage-calibration.sb (unchanged).
+#   sbatch --array=<rows> --export=ALL,ROOT=<results root>,UNITS=<units file>[,N=<genes>] phylo-lineage-study2.sb
+# Units file columns (tab-separated, header):
+#   unit cell tree n codons seed methods post mask settings
+#   methods  comma-separated: branch_omega, absrel, relax, busted
+#   post     none | corrupt:<kind>:<taxon> | pool:<taxon=rate,...> | prepare (realign the indel cell's CDS)
+#   mask     no | yes (also run every method on phylo-windows.py "mask" alignments, as <method>_mask)
+#   settings per method, "method:name=value;name=v1,v2|method:..." or "-"
+# ROOT holds lib/ (dndsR from one commit; lib/COMMIT), src/ (that commit's tree), params.json,
+# inputs/fg_segments.tsv (stage 2B's empirical segment lengths); IMAGE= and ENVS= as before.
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=24G
+#SBATCH --job-name=dndsR-study2
+set -euo pipefail
+: "${ROOT:?}" "${UNITS:?}" "${IMAGE:?}" "${ENVS:?}"
+row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$UNITS")
+IFS=$'\t' read -r unit cell tree n codons seed methods post mask settings <<<"$row"
+n=${N:-$n}
+v="$ROOT/src/tools/dev/validation"
+out="$ROOT/units/$unit"
+[ -f "$out/DONE" ] && { echo "already done: $out"; exit 0; }
+rm -rf "$out"; mkdir -p "$out"
+run() { singularity exec --cleanenv --bind "$ROOT" --bind "$ENVS" --env R_LIBS_USER="$ROOT/lib" \
+  --env PATH="$ENVS/hyphy-2.5.103/bin:$ENVS/ref/bin:/opt/conda/envs/tools/bin:/usr/local/bin:/usr/bin:/bin" "$IMAGE" "$@"; }
+start=$SECONDS
+run Rscript --vanilla "$v/phylo-lineage-sim2.R" "$ROOT/params.json" "$cell" "$tree" "$n" "$seed" "$out/sim" "$codons"
+data="$out/sim/alignments"
+case "$post" in
+  none) ;;
+  prepare)
+    (cd "$out/sim" && run Rscript --vanilla -e 'suppressMessages(library(dndsR)); phylo_prepare(orthogroup_file = "orthogroup_table.tsv",
+       cds_file = "cds_table.tsv", species_tree_file = "species_tree.nwk", foreground_file = "foreground.tsv", output_dir = ".",
+       threads = as.integer(commandArgs(TRUE)[1]))' "$SLURM_CPUS_PER_TASK" > "$out/sim/prepare.log" 2>&1)
+    data="$out/sim/prepared/alignments" ;;
+  corrupt:*)
+    IFS=: read -r _ kind taxon <<<"$post"
+    run python3 -I "$v/phylo-windows.py" corrupt "$data" "$out/sim/corrupted" "$kind" "$taxon" "$ROOT/inputs/fg_segments.tsv" "$((seed + 100))"
+    data="$out/sim/corrupted" ;;
+  pool:*)
+    run python3 -I "$v/phylo-windows.py" corrupt-pool "$data" "$out/sim/corrupted" "${post#pool:}" "$ROOT/inputs/fg_segments.tsv" "$((seed + 100))"
+    data="$out/sim/corrupted" ;;
+  *) echo "unknown post: $post"; exit 1 ;;
+esac
+run python3 -I "$v/phylo-windows.py" profile "$data" "$out/sim/windows_profile.tsv"
+[ "$mask" = yes ] && run python3 -I "$v/phylo-windows.py" filter "$data" "$out/sim/masked" mask
+sim_s=$((SECONDS - start))
+timing="method\tinput\tseconds"
+for m in ${methods//,/ }; do
+  inputs="$data"; [ "$mask" = yes ] && inputs="$data $out/sim/masked"
+  for in_dir in $inputs; do
+    name=$m; [ "$in_dir" = "$out/sim/masked" ] && name=${m}_mask
+    t0=$SECONDS
+    run Rscript --vanilla -e '
+      a <- commandArgs(TRUE); suppressMessages(library(dndsR)); d <- a[1]; m <- a[2]; th <- as.integer(a[3]); aln <- a[4]; name <- a[5]
+      extra <- list()
+      for (blk in strsplit(a[6], "|", fixed = TRUE)[[1]]) if (startsWith(blk, paste0(m, ":")))
+        for (kv in strsplit(sub("^[^:]*:", "", blk), ";", fixed = TRUE)[[1]]) {
+          v <- strsplit(sub("^[^=]*=", "", kv), ",", fixed = TRUE)[[1]]; num <- suppressWarnings(as.numeric(v))
+          extra[[sub("=.*$", "", kv)]] <- if (all(!is.na(num))) num else v
+        }
+      args <- list(alignment_dir = aln, species_tree_file = file.path(d, "sim", "species_tree.nwk"), output_dir = d, run_name = name, threads = th)
+      fg <- list(foreground_file = file.path(d, "sim", "foreground.tsv"))
+      if (m == "branch_omega") do.call(phylo_branch_omega, c(args, fg, list(keep_runs = FALSE), extra))
+      if (m == "absrel") do.call(phylo_absrel, c(args, extra))
+      if (m == "relax") do.call(phylo_relax, c(args, fg, list(models = "Minimal"), extra))
+      if (m == "busted") do.call(phylo_busted, c(args, fg, extra))
+    ' "$out" "$m" "$SLURM_CPUS_PER_TASK" "$in_dir" "$name" "${settings:--}"
+    timing="$timing\n$name\t$in_dir\t$((SECONDS - t0))"
+    for x in hyphy paml; do
+      [ -d "$out/$name/$x" ] && tar -czf "$out/$name/$x.tar.gz" -C "$out/$name" "$x" && rm -rf "$out/$name/$x" || true
+    done
+  done
+done
+# One archive per folder of alignments (scratch has a file quota).
+for x in alignments corrupted masked prepared cds; do
+  [ -d "$out/sim/$x" ] && tar -czf "$out/sim/$x.tar.gz" -C "$out/sim" "$x" && rm -rf "$out/sim/$x" || true
+done
+printf "$timing\n" > "$out/method_seconds.tsv"
+printf 'unit\tcell\ttree\tn\tcodons\tseed\tmethods\tpost\tmask\tsim_s\trun_s\tcpus\tcommit\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "$unit" "$cell" "$tree" "$n" "$codons" "$seed" "$methods" "$post" "$mask" "$sim_s" "$((SECONDS - start - sim_s))" "$SLURM_CPUS_PER_TASK" "$(cat "$ROOT/lib/COMMIT")" > "$out/timing.tsv"
+touch "$out/DONE"

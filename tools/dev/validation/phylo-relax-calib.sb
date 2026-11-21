@@ -1,0 +1,29 @@
+#!/bin/bash --login
+# Study R-D: the calibration set of one RELAX dataset (docs/dev/relax-bootstrap-study.md, stage 1).
+# Samples K tested genes of a finished phylo-lineage-study2.sb RELAX unit (seed fixed below), takes
+# the alignment and tree dndsR gave HyPhy, and runs phylo-relax-boot.sb on them (B replicates each,
+# simulated from each gene's fitted RELAX null). HyPhy's own statistics are not changed.
+#   sbatch --export=ALL,UNIT=<unit folder>,OUT=<dir>,K=50,B=20,HYPHY=<hyphy>,V=<validation scripts dir> phylo-relax-calib.sb
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=24G
+#SBATCH --job-name=relax-calib
+set -euo pipefail
+: "${UNIT:?}" "${OUT:?}" "${HYPHY:?}" "${V:?}"
+K=${K:-50}; B=${B:-20}
+mkdir -p "$OUT/genes"
+# The sample: K tested genes, chosen by a seed derived from the unit's name (not from results).
+seed=$(( $(basename "$UNIT" | cksum | cut -d' ' -f1) % 100000 ))
+awk -F'\t' 'NR == 1 {for (i = 1; i <= NF; i++) h[$i] = i; next} $h["status"] == "tested" {print $h["orthogroup"]}' "$UNIT/relax/relax_results.tsv" \
+  | sort > "$OUT/tested.txt"
+python3 -I -c "import random,sys; g=open(sys.argv[1]).read().split(); random.Random(int(sys.argv[2])).shuffle(g); print('\n'.join(sorted(g[:int(sys.argv[3])])))" \
+  "$OUT/tested.txt" "$seed" "$K" > "$OUT/sample.txt"
+for g in $(cat "$OUT/sample.txt"); do
+  mkdir -p "$OUT/genes/$g"
+  tar -xzf "$UNIT/relax/hyphy.tar.gz" -C "$OUT/genes/$g" --strip-components=2 "hyphy/$g/alignment.fas" "hyphy/$g/tree.nwk"
+done
+GENES=$(ls -d "$OUT"/genes/*/ | sed 's#/$##' | tr '\n' ' ') OUT="$OUT/boot" B="$B" HYPHY="$HYPHY" BF="$V/relax-null-sim.bf" \
+  bash "$V/phylo-relax-boot.sb"
+# Replicate alignments are large in number; keep one archive.
+tar -czf "$OUT/boot_replicates.tar.gz" -C "$OUT" boot && find "$OUT/boot" -mindepth 2 -name 'sim' -type d -prune -exec rm -rf {} +
+echo "sample seed $seed" > "$OUT/DONE"
