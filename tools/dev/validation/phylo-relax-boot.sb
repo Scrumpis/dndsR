@@ -1,0 +1,41 @@
+#!/bin/bash --login
+# RELAX parametric bootstrap, pilot (development genes only). Per gene: RELAX with --save-fit;
+# K constrained to 1 and refitted; B alignments simulated from that null; RELAX on each.
+#   sbatch --export=ALL,GENES="<gene dirs with alignment.fas, tree.nwk>",OUT=<dir>,B=20,HYPHY=<hyphy>,BF=<relax-null-sim.bf> relax-boot.sb
+#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=24G
+#SBATCH --job-name=relax-boot
+set -euo pipefail
+relax() { # alignment tree out.json [fit]
+  local extra=""; [ -n "${4:-}" ] && extra="--save-fit $4"
+  "$HYPHY" CPU=1 ENV=RANDOM_SEED=1 relax --alignment "$1" --tree "$2" --test TEST --reference REFERENCE --code Universal --models Minimal \
+    --rates 3 --srv No --multiple-hits None --grid-size 250 --starting-points 1 $extra --output "$3" > "$3.log" 2>&1 || echo "failed $3"
+}
+export -f relax; export HYPHY
+for g in $GENES; do
+  n=$(basename "$g"); d="$OUT/$n"; mkdir -p "$d/sim"
+  s=$(date +%s); relax "$g/alignment.fas" "$g/tree.nwk" "$d/observed.json" "$d/fit.bf"
+  sed "s|@FIT@|$d/fit.bf|; s|@OUT@|$d/sim/rep|; s|@NSIM@|$B|" "$BF" > "$d/sim.bf"
+  seed=$(( $(printf '%s' "$n" | cksum | cut -d' ' -f1) % 100000 ))
+  (cd "$d" && "$HYPHY" CPU=1 ENV=RANDOM_SEED=$seed "$d/sim.bf" > "$d/sim.log" 2>&1)
+  t1=$(date +%s)
+  seq 1 "$B" | xargs -P "$SLURM_CPUS_PER_TASK" -I{} bash -c "relax $d/sim/rep{}.fas $g/tree.nwk $d/sim/rep{}.json"
+  echo -e "$n\t$((t1 - s))\t$(( $(date +%s) - t1 ))\t$seed" >> "$OUT/timing.tsv"
+done
+python3 - "$OUT" > "$OUT/boot.tsv" <<'PY'
+import json, os, sys, glob, re
+o = sys.argv[1]; print("orthogroup\trep\tlrt\tlnl_null\tlnl_alternative\tk")
+for d in sorted(glob.glob(os.path.join(o, "*/"))):
+    g = os.path.basename(d.rstrip("/"))
+    files = [("observed", os.path.join(d, "observed.json"))] + sorted(((re.search(r"rep(\d+)", f).group(1), f) for f in glob.glob(os.path.join(d, "sim", "rep*.json"))), key=lambda x: int(x[0]))
+    for r, f in files:
+        try:
+            j = json.load(open(f)); t = j["test results"]; fi = j["fits"]
+            print(f"{g}\t{r}\t{t['LRT']}\t{fi['RELAX null']['Log Likelihood']}\t{fi['RELAX alternative']['Log Likelihood']}\t{t['relaxation or intensification parameter']}")
+        except Exception:
+            print(f"{g}\t{r}\tNA\tNA\tNA\tNA")
+    s = open(os.path.join(d, "sim.log")).read(); m = re.search(r"NULL_LNL\s+(\S+)", s)
+    print(f"{g}\trefit_null\t{m.group(1) if m else 'NA'}\tNA\tNA\tNA")
+PY
+echo DONE
