@@ -46,10 +46,10 @@ test_that("phylo_branch_omega reproduces codeml run directly", {
     m0 <- best(og, 0, "tree_codeml.nwk", c(0.4, 0.1, 2))
     fr <- best(og, 1, "tree_codeml.nwk", c(0.4, 0.1, 2))
     tw <- best(og, 2, "tree_codeml_fg.nwk", c(0.4, 0.1, 2))
-    expect_equal(r$lnl_m0, m0$lnl, tolerance = 1e-3, scale = 1, label = paste(og, "M0"))
+    expect_lt(abs(r$lnl_m0 - m0$lnl), 1e-3, label = paste(og, "M0"))
     expect_equal(r$omega_m0, m0$omega, tolerance = 1e-3, label = paste(og, "omega M0"))
-    expect_equal(r$lnl_free, fr$lnl, tolerance = 1e-3, scale = 1, label = paste(og, "free"))
-    expect_equal(r$lnl_two_ratio, tw$lnl, tolerance = 1e-3, scale = 1, label = paste(og, "two-ratio"))
+    expect_lt(abs(r$lnl_free - fr$lnl), 1e-3, label = paste(og, "free"))
+    expect_lt(abs(r$lnl_two_ratio - tw$lnl), 1e-3, label = paste(og, "two-ratio"))
     expect_equal(c(r$omega_bg, r$omega_fg), tw$omega, tolerance = 1e-3, label = paste(og, "omegas"))
     # Terminal-branch omega from codeml's own labelled tree, against dndsR's branch table.
     b <- utils::read.delim(file.path(ex, "branch_omega", "branch_omega_branches.tsv"))
