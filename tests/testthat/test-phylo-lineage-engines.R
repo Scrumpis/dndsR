@@ -22,8 +22,13 @@ run_in <- function(dir, bin, args) {
 test_that("phylo_branch_omega reproduces codeml run directly", {
   bin <- tryCatch(dndsR:::.codeml_path(), error = function(e) NULL)
   skip_if(is.null(bin), "codeml not found")
-  res <- suppressMessages(phylo_branch_omega(alignment_dir = file.path(ex, "alignments"), species_tree_file = file.path(ex, "species_tree.nwk"),
-                                             foreground_file = file.path(ex, "foreground.tsv"), output_dir = ex, threads = test_cores()))
+  expect_warning(res <- suppressMessages(phylo_branch_omega(alignment_dir = file.path(ex, "alignments"), species_tree_file = file.path(ex, "species_tree.nwk"),
+                                             foreground_file = file.path(ex, "foreground.tsv"), output_dir = ex, threads = test_cores())),
+                 "Calibration: p_free_vs_m0")
+  tags <- unique(res$calibration[res$status == "tested"])
+  expect_length(tags, 1)
+  expect_match(tags, "p_free_vs_m0:not_established_in_simulation", fixed = TRUE)
+  expect_identical(grepl("p_fg_omega_gt1:", tags, fixed = TRUE), any(!is.na(res$p_fg_omega_gt1[res$status == "tested"])))
   ctl <- function(model, omega, fix, tree) c("seqfile = alignment.phy", paste("treefile =", tree), "outfile = out.mlc", "noisy = 0",
     "verbose = 1", "runmode = 0", "seqtype = 1", "CodonFreq = 2", "clock = 0", "aaDist = 0", paste("model =", model), "NSsites = 0",
     "icode = 0", "fix_kappa = 0", "kappa = 2", paste("fix_omega =", fix), paste("omega =", omega), "fix_alpha = 1", "alpha = 0",
@@ -113,8 +118,9 @@ test_that("phylo_absrel reproduces aBSREL run directly", {
 
 test_that("phylo_relax reproduces RELAX run directly", {
   bin <- hyphy_bin()
-  res <- suppressMessages(phylo_relax(alignment_dir = file.path(ex, "alignments"), species_tree_file = file.path(ex, "species_tree.nwk"),
-                                      foreground_file = file.path(ex, "foreground.tsv"), output_dir = ex, threads = test_cores(), models = "Minimal"))
+  expect_warning(res <- suppressMessages(phylo_relax(alignment_dir = file.path(ex, "alignments"), species_tree_file = file.path(ex, "species_tree.nwk"),
+                                      foreground_file = file.path(ex, "foreground.tsv"), output_dir = ex, threads = test_cores(), models = "Minimal")),
+                 "Calibration: RELAX")
   for (og in ogs) {
     d <- withr::local_tempdir(); file.copy(file.path(direct, og, c("alignment.fas", "tree_relax.nwk")), d)
     run_in(d, bin, c("CPU=1", "ENV=RANDOM_SEED=1", "relax", "--alignment", "alignment.fas", "--tree", "tree_relax.nwk",

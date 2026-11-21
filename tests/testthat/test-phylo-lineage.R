@@ -125,3 +125,38 @@ test_that("matched lineage pairs use only shared, reliable orthogroups", {
   expect_equal(p$median_log2_ratio, 1)
   expect_equal(p$pooled_omega_b, (2 / 200) / (2 / 100)) # g4 is not shared, so not counted
 })
+
+test_that("lineage coverage separates merged from absent branches", {
+  # Three tested orthogroups. g1 has spA and spB; in g2, spB is missing, so spA joins the
+  # clade's stem (merged); in g3, spA is missing (absent) and spB joins the stem.
+  br <- data.frame(orthogroup = c("g1", "g1", "g1", "g2", "g3"),
+                   species_tree_branches = c("spA", "spB", "ab", "spA+ab", "spB+ab"),
+                   in_species_tree = TRUE, t_free = 0.1, N_free = 600, S_free = 200, dN_free = 0.01, dS_free = 0.05,
+                   NdN_free = 6, SdS_free = 10, omega_free = 0.2, flags = "", reliable_free = TRUE)
+  res <- data.frame(orthogroup = c("g1", "g2", "g3"), status = "tested", qc_flags = "")
+  ids <- data.frame(branch_id = c("spA", "spB", "ab"))
+  out <- dndsR:::.phylo_summarize_omega(list(results = res, branches = br), ids, bootstrap = 0, seed = 1)$lineages
+  out <- out[match(ids$branch_id, out$branch_id), ]
+  expect_identical(out$n_estimated, c(1L, 1L, 1L))
+  expect_identical(out$n_merged, c(1L, 1L, 2L))
+  expect_identical(out$n_absent, c(1L, 1L, 0L))
+  expect_identical(out$n_merged_or_absent, out$n_merged + out$n_absent)
+})
+
+test_that("known calibration problems are flagged on tested rows of the outputs that have them", {
+  res <- data.frame(orthogroup = c("g1", "g2"), status = c("tested", "excluded"), p_value = c(0.01, NA))
+  out <- dndsR:::.calibration_column(res, "relax")
+  expect_identical(out$calibration, c("p_value:anticonservative_in_simulation", NA))
+  expect_match(names(dndsR:::.calibration_notes("relax", res))[1], "p_value")
+  expect_warning(dndsR:::.calibration_warn("relax", res), "Calibration")
+  # A branch-model run without the free-ratio model has no p_free_vs_m0, so no flag for it.
+  bo <- data.frame(orthogroup = "g1", status = "tested", p_two_vs_m0 = 0.2, p_free_vs_m0 = NA_real_)
+  expect_false("calibration" %in% names(dndsR:::.calibration_column(bo, "branch_omega")))
+  expect_null(dndsR:::.calibration_notes("branch_omega", bo))
+  # Both branch-model tests flagged when both were computed, in a fixed order.
+  bo2 <- data.frame(orthogroup = "g1", status = "tested", p_free_vs_m0 = 0.2, p_fg_omega_gt1 = 0.4)
+  expect_identical(dndsR:::.calibration_column(bo2, "branch_omega")$calibration,
+                   "p_free_vs_m0:not_established_in_simulation;p_fg_omega_gt1:not_established_in_simulation")
+  # BUSTED's outputs are unchanged.
+  expect_false("calibration" %in% names(dndsR:::.calibration_column(res, "busted")))
+})

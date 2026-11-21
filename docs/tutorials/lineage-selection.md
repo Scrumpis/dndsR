@@ -2,7 +2,7 @@
 
 From species genomes, orthogroups, and a species tree to branch-level dN/dS, branch tests of episodic selection, tests of relaxed or intensified selection, and one table per lineage that you can join to lineage traits such as LTR activity or genome-size change. Read [lineage-selection.md](../lineage-selection.md) for what each method tests before interpreting anything.
 
-**Status: experimental, development code.** dndsR reproduces codeml and HyPhy run directly; the methods' error rates were measured only in simulation ([results](../validation/phylo-lineage-calibration.md)), where RELAX on 16 taxa and the free-ratio test with missing taxa gave more false positives than their level. The example below is synthetic: its numbers show how to read the outputs, not anything about real genomes.
+**Status: experimental, development code.** dndsR reproduces codeml and HyPhy run directly; the methods' error rates were measured only in simulation ([results](../validation/phylo-lineage-calibration.md)), where RELAX on 16 taxa gave more false positives than its level, and two branch-model tests were close to theirs without being shown calibrated. Results tables flag those tests in a `calibration` column. The example below is synthetic: its numbers show how to read the outputs, not anything about real genomes.
 
 ## 1. Get dndsR, HyPhy, and PAML
 
@@ -86,7 +86,7 @@ This joins five species (spF has no estimate) and fits a phylogenetic generalise
 
 ## 5. Your own data
 
-1. **Genomes or CDS, and orthogroups**, as in the [phylogenetic tutorial](phylogenetic-selection.md#5-your-own-data).
+1. **Genomes or CDS, and orthogroups**, as in the [phylogenetic tutorial](phylogenetic-selection.md#5-your-own-data). Only orthogroups with exactly one gene per species present are analysed; `phylo_prepare` excludes the rest with the reason `multi_copy` (listed in its summary, with counts in its provenance). **This matters for questions about genome evolution**: gene families that duplicate or are lost, the turnover that genome expansion is partly made of, are excluded, and more of them in lineages with more duplication. Every lineage result describes single-copy genes only, a sample that is not random with respect to gene-family turnover. Report how many orthogroups were excluded as not single-copy beside any lineage conclusion; dndsR does not analyse gene-family size or turnover.
 2. **A rooted species tree with an outgroup and labelled internal nodes**, for example `((((spA,spB)ab,spC)abc,(spD,spE)de)ingroup,spF);`. The labels become branch identifiers everywhere. The two branches at the root join in every analysis and cannot be attributed to one lineage, so keep lineages of interest away from the root.
 3. **A foreground file** for the two-ratio model and RELAX, decided before you look at results. For RELAX, add a column `set`; rows with `reference` give the reference set, otherwise every other branch is the reference:
 

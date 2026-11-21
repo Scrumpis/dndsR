@@ -2,7 +2,7 @@
 
 Four commands compare selection among the branches of a species tree, from the same `phylo_prepare` folder: `phylo_branch_omega` (PAML codeml branch models), `phylo_absrel` (HyPhy aBSREL), `phylo_relax` (HyPhy RELAX), and `phylo_summarize`, which turns their per-gene results into one row per lineage. Tutorial: [tutorials/lineage-selection.md](tutorials/lineage-selection.md). BUSTED, for episodic selection on a fixed foreground, is in [phylo-methods.md](phylo-methods.md).
 
-**Status: experimental, new in this release.** dndsR reproduces each engine run directly ([evidence](validation/phylo-lineage.md)). Their error rates and estimates were measured only in simulation, on five designed trees ([calibration](#calibration-in-simulation)): aBSREL's tests held their level everywhere, the branch-model tests were close to it, and RELAX on 16 taxa and the free-ratio test with missing taxa were anticonservative. The methods the methods have run on one small set of public Brassicaceae genes, which shows they work on real data, not that their conclusions are right. They are not validated for biological inference across arbitrary phylogenies.
+**Status: experimental, new in this release.** dndsR reproduces each engine run directly ([evidence](validation/phylo-lineage.md)). Their error rates and estimates were measured only in simulation, on five designed trees ([calibration](#calibration-in-simulation)): aBSREL's tests held their level everywhere, the branch-model tests were close to it, RELAX on 16 taxa was anticonservative, reproducibly, and the calibration of `p_fg_omega_gt1` at a foreground omega of 1 and of `p_free_vs_m0` with missing taxa is not established. Those outputs carry a `calibration` flag in every results table. The methods have run on one small set of public Brassicaceae genes, which shows they work on real data, not that their conclusions are right. They are not validated for biological inference across arbitrary phylogenies.
 
 ## Which question each answers
 
@@ -14,6 +14,16 @@ Four commands compare selection among the branches of a species tree, from the s
 | `phylo_summarize` | Across genes, how do lineages compare? | Species-tree branch | A description of the genes tested on that branch | Evidence of adaptation, or of a trait association |
 
 A single number rarely represents selection on a lineage. Gene-wide omega mixes purifying selection at most sites with whatever happens at a few; episodic selection (aBSREL) and relaxation (RELAX) are separate questions with separate models, and they can disagree for good reasons.
+
+## Three kinds of output
+
+Keep them apart when reporting:
+
+| Kind | Outputs | What it is | Uncertainty given |
+|---|---|---|---|
+| **Model-based estimates**, per gene | `omega_m0`, `omega_bg`, `omega_fg` (codeml); `omega_free` per branch; aBSREL's `baseline_omega`; RELAX's `k` and omega classes | A maximum-likelihood value under a model that is certainly simplified. Not a test | None per gene. Free-ratio omegas are noisy (see calibration) and are for exploration |
+| **Tests**, per gene or per branch in a gene | `p_two_vs_m0`, `p_free_vs_m0`, `p_fg_omega_gt1` and their `p_adj_*`; aBSREL `p_raw`, `p_holm`, `p_value`, `p_adj`, `p_bh_lineage`; RELAX `p_value`, `p_adj` | A likelihood-ratio test of one stated null, with a nominal error rate that holds only as far as the calibration shows (some do not hold it: `calibration` column) | p-values, corrected as stated |
+| **Descriptive summaries**, per lineage | Everything in `phylo_summarize`'s tables: `pooled_omega` and its interval, medians, counts of significant genes, matched pairs | Summaries over genes of the estimates and tests above. Not tests of lineage hypotheses: genes are not independent, and a lineage difference is not evidence of adaptation or of a trait association | Bootstrap intervals over orthogroups; sign-test p-values described as descriptive |
 
 ## Branch identity
 
@@ -70,7 +80,7 @@ Lineage-level hypotheses ("lineages with more LTR activity have higher omega") n
 - **Single-copy genes only.** `phylo_prepare` excludes orthogroups with paralogs. Gene families that expand or contract, the ones genome expansion is made of, are therefore under-represented, and more so in lineages with more duplication. Conclusions about genome expansion from these tables apply to the single-copy genes tested.
 - **Branch length.** Short branches carry few substitutions, so their omega is noisy; long branches saturate. The flags and the dS columns show both; neither is corrected.
 - **Model assumptions.** Branch models assume one omega per branch for all sites; site-to-site variation is ignored (it is measured in the calibration). aBSREL and RELAX assume the tree, the codon model, and correct alignments. Multinucleotide substitutions, alignment errors, and misassigned orthologs inflate positives, as in the BUSTED calibration ([phylo-methods.md](phylo-methods.md#calibration-in-simulation)).
-- **Calibration.** RELAX was anticonservative on 16 taxa (9% at 0.05) and the free-ratio test with missing taxa (8%): treat single-gene positives from them with caution. Single-gene free-ratio estimates are noisy even when unflagged; compare lineages through pooled values.
+- **Calibration.** RELAX's `p_value` was anticonservative on 16 taxa (8.3-9.3% at 0.05 in every check); `p_fg_omega_gt1` at omega exactly 1 (5.5-6.8%) and `p_free_vs_m0` with missing taxa (8%, then 4% in a replicate) are not established as calibrated. Rows carry the `calibration` flag; treat single-gene positives from them with caution. Single-gene free-ratio estimates are noisy even when unflagged; compare lineages through pooled values.
 - **Gene-tree discordance** is reported per orthogroup (`gene_tree_discordant`), not corrected.
 - **Ascertainment.** Only orthogroups that pass QC are analysed; counts by reason are in each run's provenance.
 
@@ -78,9 +88,9 @@ Lineage-level hypotheses ("lineages with more LTR activity have higher omega") n
 
 Design fixed before any simulation: [dev/phylo-lineage-calibration.md](dev/phylo-lineage-calibration.md). Full results: [validation/phylo-lineage-calibration.md](validation/phylo-lineage-calibration.md). Simulated codon data, five trees of 5 to 16 taxa, 300 codons per gene; false-positive rates at 0.05 with 95% intervals:
 
-- **aBSREL**: `p_raw` 1.5-2.6% per branch, gene `p_value` 1.7-4.0%, `p_bh_lineage` under 0.1%. Calibrated on every tree. Power on a branch with 10% of sites at omega 10: 72-79% by `p_holm`, 93-96% by `p_bh_lineage`.
-- **Branch models**: `p_two_vs_m0` 3.3-7.0% and `p_free_vs_m0` 4.0-6.7% with all taxa, none significantly above 5%, also when omega varies among sites; **`p_free_vs_m0` 8.0% (5.2-11.7) when taxa are missing from genes**. Benjamini-Hochberg-corrected tests: no false positive. `p_fg_omega_gt1` never fired on purifying genes, but its size at a foreground omega of exactly 1 was not measured. Power of `p_two_vs_m0` for foreground 0.6 against 0.2: 98-100%; of `p_fg_omega_gt1` for 1.5: 78%.
-- **RELAX** (`Minimal`): 5.0% on 8 taxa, 7.0% on 5, **9.0% (6.0-12.8) on 16 taxa: anticonservative**. Power: 59-62% for k = 0.5, 35-38% for k = 2, with the direction of `k` right in 95-100% of detections.
+- **aBSREL**: `p_raw` 1.5-2.6% per branch, gene `p_value` 1.7-4.0%, `p_bh_lineage` under 0.1%. `p_raw` and `p_bh_lineage` met the size criterion on every tree; the gene-level `p_value` on T5 only, and was consistent with 5% elsewhere. Power on a branch with 10% of sites at omega 10: 72-79% by `p_holm`, 93-96% by `p_bh_lineage`.
+- **Branch models**: `p_two_vs_m0` 3.3-7.0% and `p_free_vs_m0` 4.0-6.7% with all taxa, none significantly above 5%, also when omega varies among sites; `p_free_vs_m0` 8.0% (5.2-11.7) when taxa are missing from genes, not reproduced in a follow-up (4.0%, 2.1-6.9; 6.0% of the 600), so calibration there is not established. Benjamini-Hochberg-corrected tests: no false positive. `p_fg_omega_gt1` never fired on purifying genes, and at a foreground omega of exactly 1, its boundary, it gave 6.8% (4.9-9.2) on 8 taxa and 5.5% (3.8-7.6) on 16: close to 5%, calibration not established (not tested with missing taxa). Power of `p_two_vs_m0` for foreground 0.6 against 0.2: 98-100%; of `p_fg_omega_gt1` for 1.5: 78%.
+- **RELAX** (`Minimal`): 5.0% on 8 taxa, 7.0% on 5, **9.0% (6.0-12.8) on 16 taxa: anticonservative**, reproduced in a follow-up with new genes (8.3%), with sites' classes drawn per branch as RELAX assumes (8.5%), with HyPhy run directly (9.0%), and with the best of three seeds (9.3%). Its likelihood-ratio statistic is larger than chi-square(1) assumes (mean 1.28); dndsR does not correct it. Power: 59-62% for k = 0.5, 35-38% for k = 2, with the direction of `k` right in 95-100% of detections.
 - **Estimates**: a single unflagged free-ratio omega is off by a median of 1.3- to 1.4-fold, and more than 2-fold in about one case in five; flagged ones by 8-fold or more, but the flags fire on at most 2.5% of branches. The **pooled omega** is within 3-6% of the truth on a typical branch (at most 15%), better than the median of per-gene values and far better than their mean, which reached 5-fold on a short branch.
 
 These are properties under the simulation model. Alignment and orthology errors, multinucleotide substitutions, and gene-tree discordance, which are not simulated here, inflate false positives on real data.

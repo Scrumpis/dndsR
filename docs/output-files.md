@@ -181,6 +181,7 @@ Experimental, development code. In `<output_dir>/<run_name>/` (default `branch_o
 | `lnl_two_ratio_null`, `lrt_fg_omega_eq1`, `p_fg_omega_gt1`, `p_adj_fg_omega_gt1` | Foreground omega fixed at 1, and the one-sided test of foreground omega above 1 |
 | `lnl_spread_<model>`, `starts_at_best_<model>`, `starts_ok_<model>` | Optimizer diagnostics across starting omegas |
 | `n_branches`, `n_branches_reliable` | Branches, and those with reliable free-ratio estimates |
+| `calibration` | On tested rows, the tests in this table whose calibration in simulation is a known problem, as `<output>:<code>` separated by `;`: `p_free_vs_m0:not_established_in_simulation`, `p_fg_omega_gt1:not_established_in_simulation`. Present only when those tests were computed. Explanation in the run's warning and `_provenance.json` (`calibration`), evidence in [validation/phylo-lineage-calibration.md](validation/phylo-lineage-calibration.md) |
 
 `_branches.tsv`, one row per orthogroup and branch: `branch`, `terminal`, `taxa_side`, `species_tree_branches`, `in_species_tree`, `topology_source`, `foreground`; for each fitted model (`_m0`, `_free`, `_two`): `t` (branch length), `N`, `S` (sites), `omega`, `dN`, `dS`, `NdN`, `SdS` (expected substitutions); `flags` and `reliable_free`. `paml/<orthogroup>/<model>/start<k>/` keeps codeml's inputs and outputs.
 
@@ -190,7 +191,7 @@ Experimental, development code. `_results.tsv`, one row per orthogroup: as for `
 
 ## phylo_relax
 
-Experimental, development code. `_results.tsv`, one row per orthogroup: as for `phylo_busted`, with `k`, `direction` (`relaxation` or `intensification`), `k_at_bound`, `lrt`, `p_value`, `p_adj`, `lnl_alternative`, `lnl_null`, `mg94_omega_test`, `mg94_omega_reference` (one omega per set), and the alternative model's classes (`test_omega_<k>`, `test_prop_<k>`, `ref_omega_<k>`, `ref_prop_<k>`). `_branches.tsv` adds `set` (`test`, `reference`, or `unclassified`).
+Experimental, development code. `_results.tsv`, one row per orthogroup: as for `phylo_busted`, with `k`, `direction` (`relaxation` or `intensification`), `k_at_bound`, `lrt`, `p_value`, `p_adj`, `lnl_alternative`, `lnl_null`, `mg94_omega_test`, `mg94_omega_reference` (one omega per set), and the alternative model's classes (`test_omega_<k>`, `test_prop_<k>`, `ref_omega_<k>`, `ref_prop_<k>`), and `calibration` (`p_value:anticonservative_in_simulation` on tested rows: RELAX's p-values gave too many false positives in simulation; see `phylo_branch_omega` above). `_branches.tsv` adds `set` (`test`, `reference`, or `unclassified`).
 
 ## phylo_summarize
 
@@ -200,7 +201,7 @@ Experimental, development code. In `<output_dir>/<run_name>/` (default `summary`
 |---|---|
 | `_branch_ids.tsv` | One row per species-tree branch: `branch_id`, `tree_label`, `terminal`, `ape_node`, `parent_id`, `descendant_taxa`, `n_descendants`, `species_tree_length` |
 | `_species_tree_ids.nwk` | The species tree with internal nodes labelled by `tree_label` |
-| `_lineages.tsv` | One row per branch: `n_orthogroups_tested`, `n_estimated`, `n_merged_or_absent`, `n_reliable`, `n_pooled`, `pooled_omega` with `pooled_omega_lo` and `pooled_omega_hi` (bootstrap over orthogroups), `median_omega_reliable`, `q25_omega_reliable`, `q75_omega_reliable`, `frac_reliable_omega_gt1`, `median_ds`, `median_branch_length`, `sum_syn_changes`, `frac_high_ds`, `frac_few_synonymous`, `frac_omega_upper_bound`, `frac_zero_length`, `frac_starts_disagree`; with an aBSREL run, `absrel_n_tested`, `absrel_n_sig_lineage`, `absrel_n_sig_holm`, `absrel_median_baseline_omega` |
+| `_lineages.tsv` | One row per branch: `n_orthogroups_tested`, `n_estimated`, `n_merged_or_absent` (split into `n_merged`, in a gene where pruning joined the branch to a neighbour, and `n_absent`, where its taxa are missing so the branch does not exist), `n_reliable`, `n_pooled`, `pooled_omega` with `pooled_omega_lo` and `pooled_omega_hi` (bootstrap over orthogroups), `median_omega_reliable`, `q25_omega_reliable`, `q75_omega_reliable`, `frac_reliable_omega_gt1`, `median_ds`, `median_branch_length`, `sum_syn_changes`, `frac_high_ds`, `frac_few_synonymous`, `frac_omega_upper_bound`, `frac_zero_length`, `frac_starts_disagree`; with an aBSREL run, `absrel_n_tested`, `absrel_n_sig_lineage`, `absrel_n_sig_holm`, `absrel_median_baseline_omega` |
 | `_lineage_pairs.tsv` | Matched comparisons on shared reliable orthogroups: `branch_a`, `branch_b`, `n_shared`, `pooled_omega_a`, `pooled_omega_b`, `median_log2_ratio`, `n_a_higher`, `n_b_higher`, `sign_test_p`, `sign_test_p_adj` |
 | `_orthogroup_branches.tsv` | One row per orthogroup and branch: the free-ratio estimates with `branch_id` (empty for merged branches), flags, and `reliable` |
 | `_foreground.tsv` | Two-ratio summary: genes tested, significant with the foreground higher or lower, `p_fg_omega_gt1` count, median log2 foreground/background omega, pooled foreground and background omega |

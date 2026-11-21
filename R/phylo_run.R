@@ -378,6 +378,7 @@
     at <- match("p_best_fits", rest)
     results <- results[, c(rest[seq_len(at)], "p_best_fits_adj", rest[-seq_len(at)]), drop = FALSE]
   }
+  results <- .calibration_column(results, method)
   branches <- .phylo_bind_rows(lapply(res, `[[`, "branches"))
   if (!is.null(m$adjust_branches) && nrow(branches)) branches <- m$adjust_branches(branches, results)
   sequences <- .phylo_bind_rows(lapply(res, `[[`, "sequences"))
@@ -411,6 +412,7 @@
                               family_size = sum(tested)), m$testing),
     counts = as.list(table(label)), exclusions_by_basis = as.list(table(results$exclusion_basis[!tested])),
     tested_orthogroups_per_taxon = as.list(presence),
+    calibration = .calibration_notes(method, results),
     ascertainment = "Only single-copy orthogroups that pass QC and keep the foreground identifiable are tested. Excluded and failed orthogroups are listed with reasons; conclusions apply to the tested set only."
   )
   writeLines(jsonlite::toJSON(prov, auto_unbox = TRUE, pretty = TRUE, digits = NA, null = "null"), out_file("provenance", "json"))
@@ -425,5 +427,6 @@
     warning(sum(results$status == "failed"), " orthogroup(s) failed and are not in the multiple-testing family. See ",
             out_file("results"), call. = FALSE)
   }
+  if (any(tested)) .calibration_warn(method, results)
   invisible(results)
 }

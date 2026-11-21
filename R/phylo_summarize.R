@@ -216,6 +216,9 @@ phylo_summarize <- function(branch_omega_dir = NULL,
   starts <- res$qc_flags[match(long$orthogroup, res$orthogroup)]
   long$starts_disagree <- grepl("starts_disagree:free", starts, fixed = TRUE)
   usable <- long[!is.na(long$branch_id), , drop = FALSE]
+  # Which species-tree branches each orthogroup has only inside a merged branch.
+  mg <- long[merged, , drop = FALSE]
+  mg_parts <- strsplit(mg$species_tree_branches, "+", fixed = TRUE)
   q <- function(x, p) if (length(x)) unname(stats::quantile(x, p, na.rm = TRUE)) else NA_real_
   old_seed <- if (exists(".Random.seed", envir = globalenv())) get(".Random.seed", envir = globalenv()) else NULL
   on.exit(if (is.null(old_seed)) rm(list = ".Random.seed", envir = globalenv()) else assign(".Random.seed", old_seed, envir = globalenv()), add = TRUE)
@@ -231,11 +234,14 @@ phylo_summarize <- function(branch_omega_dir = NULL,
       ci <- unname(stats::quantile(boots, c(0.025, 0.975), na.rm = TRUE))
     }
     has <- function(f) if (nrow(x)) mean(grepl(f, x$flags)) else NA_real_
+    n_mg <- length(unique(mg$orthogroup[vapply(mg_parts, function(p) id %in% p, logical(1))]))
     data.frame(
       branch_id = id,
       n_orthogroups_tested = length(tested),
       n_estimated = nrow(x),
       n_merged_or_absent = length(tested) - nrow(x),
+      n_merged = n_mg,
+      n_absent = length(tested) - nrow(x) - n_mg,
       n_reliable = nrow(rel),
       n_pooled = nrow(pool),
       pooled_omega = pooled, pooled_omega_lo = ci[1], pooled_omega_hi = ci[2],
@@ -330,7 +336,7 @@ phylo_summarize <- function(branch_omega_dir = NULL,
     n_intensification_sig = sum(t$p_adj <= alpha & t$k > 1, na.rm = TRUE),
     median_log2_k = if (nrow(t)) stats::median(log2(pmax(t$k, 1e-8))) else NA_real_,
     alpha = alpha,
-    note = "RELAX k scales omega classes of test relative to reference branches; it is not a test of positive selection.",
+    note = "RELAX k scales omega classes of test relative to reference branches; it is not a test of positive selection. Counts of significant genes use p_adj, whose false-discovery rate exceeded nominal in simulation (docs/validation/phylo-lineage-calibration.md).",
     stringsAsFactors = FALSE
   )
 }
