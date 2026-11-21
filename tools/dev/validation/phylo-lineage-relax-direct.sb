@@ -1,47 +1,57 @@
 #!/bin/bash --login
 # RELAX run directly through HyPhy, without dndsR, on the simulated C0 genes of the lineage
-# calibration (docs/dev/phylo-lineage-followup.md, part R1). The tree is written by hand below;
-# alignments are the simulator's FASTA files. HyPhy gets the settings dndsR gives it (Minimal,
-# 3 rates, no SRV, no multiple hits, grid 250, seed 1, one CPU), with 1 or more starting points.
-#   sbatch --export=ALL,UNIT=<calibration unit folder>,OUT=<output folder>,HYPHY=<hyphy>,STARTS="1 10" phylo-lineage-relax-direct.sb
+# calibration (docs/dev/phylo-lineage-followup.md, part R). HyPhy gets the settings dndsR gives
+# it (Minimal, 3 rates, no SRV, no multiple hits, grid 250, one starting point, one CPU).
+#   MODE=hand:  the simulator's FASTA files and the tree written by hand below.
+#   MODE=dndsr: the alignment and tree dndsR wrote for each gene, from the unit's hyphy.tar.gz.
+#   sbatch --export=ALL,UNIT=<calibration unit folder>,OUT=<output folder>,HYPHY=<hyphy>,MODE=hand,SEEDS="1 2 3"[,N=<genes>] phylo-lineage-relax-direct.sb
+# Writes <OUT>/direct_<MODE>_seed<k>.tsv per seed.
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --job-name=relax-direct
 set -euo pipefail
 : "${UNIT:?}" "${OUT:?}" "${HYPHY:?}"
-STARTS=${STARTS:-1 10}
-mkdir -p "$OUT/aln"
-tar -xzf "$UNIT/sim/alignments.tar.gz" -C "$OUT/aln" --strip-components=1
-# The balanced 16-taxon species tree of the calibration, unrooted; test = t1, t2, and their stem.
-R='{REFERENCE}'
-cat > "$OUT/tree.nwk" <<EOF
+MODE=${MODE:-hand}; SEEDS=${SEEDS:-1}
+W="$OUT/$MODE"; mkdir -p "$W/in"
+if [ "$MODE" = hand ]; then
+  tar -xzf "$UNIT/sim/alignments.tar.gz" -C "$W/in" --strip-components=1
+  for f in "$W"/in/*.fasta; do g=$(basename "$f" .fasta); mkdir -p "$W/in/$g"; mv "$f" "$W/in/$g/alignment.fas"; done
+  # The balanced 16-taxon species tree of the calibration, unrooted; test = t1, t2, and their stem.
+  R='{REFERENCE}'
+  for d in "$W"/in/*/; do cat > "$d/tree.nwk" <<EOF
 (((t1{TEST},t2{TEST}){TEST},(t3$R,t4$R)$R)$R,((t5$R,t6$R)$R,(t7$R,t8$R)$R)$R,(((t9$R,t10$R)$R,(t11$R,t12$R)$R)$R,((t13$R,t14$R)$R,(t15$R,t16$R)$R)$R)$R);
 EOF
-one() { # gene file, starts
-  local g; g=$(basename "$1" .fasta); local d="$OUT/s$2/$g"; mkdir -p "$d"
+  done
+else
+  tar -xzf "$UNIT/relax/hyphy.tar.gz" -C "$W/in" --strip-components=1 --wildcards '*/alignment.fas' '*/tree.nwk'
+fi
+# N=<genes> (optional): only the first N, for a smoke test.
+if [ -n "${N:-}" ]; then ls -d "$W"/in/*/ | sort | tail -n +$((N + 1)) | xargs -r rm -rf; fi
+one() { # gene folder, seed
+  local g; g=$(basename "$1"); local d="$W/seed$2/$g"; mkdir -p "$d"
   [ -s "$d/relax.json" ] && return 0
-  (cd "$d" && "$HYPHY" CPU=1 ENV=RANDOM_SEED=1 relax --alignment "$1" --tree "$OUT/tree.nwk" --test TEST --reference REFERENCE \
-    --code Universal --models Minimal --rates 3 --srv No --multiple-hits None --grid-size 250 --starting-points "$2" \
-    --output "$d/relax.json" > "$d/hyphy.log" 2>&1) || echo "failed: $g starts $2"
+  (cd "$d" && "$HYPHY" CPU=1 ENV=RANDOM_SEED="$2" relax --alignment "$1/alignment.fas" --tree "$1/tree.nwk" --test TEST --reference REFERENCE \
+    --code Universal --models Minimal --rates 3 --srv No --multiple-hits None --grid-size 250 --starting-points 1 \
+    --output "$d/relax.json" > "$d/hyphy.log" 2>&1) || echo "failed: $g seed $2"
 }
-export -f one; export OUT HYPHY
-for s in $STARTS; do
-  ls "$OUT"/aln/*.fasta | xargs -P "$SLURM_CPUS_PER_TASK" -I{} bash -c "one {} $s"
-  python3 - "$OUT/s$s" > "$OUT/direct_s$s.tsv" <<'PY'
+export -f one; export W HYPHY
+for s in $SEEDS; do
+  ls -d "$W"/in/*/ | sed 's#/$##' | xargs -P "$SLURM_CPUS_PER_TASK" -I{} bash -c "one {} $s"
+  python3 - "$W/seed$s" > "$OUT/direct_${MODE}_seed$s.tsv" <<'PY'
 import json, os, sys
 d = sys.argv[1]
 print("orthogroup\tlrt\tp_value\tk\tlnl_null\tlnl_alternative")
 for g in sorted(os.listdir(d)):
     try:
         j = json.load(open(os.path.join(d, g, "relax.json")))
+        t, f = j["test results"], j["fits"]
+        print(f"{g}\t{t['LRT']}\t{t['p-value']}\t{t['relaxation or intensification parameter']}\t"
+              f"{f['RELAX null']['Log Likelihood']}\t{f['RELAX alternative']['Log Likelihood']}")
     except Exception:
-        print(f"{g}\tNA\tNA\tNA\tNA\tNA"); continue
-    t, f = j["test results"], j["fits"]
-    print(f"{g}\t{t['LRT']}\t{t['p-value']}\t{t['relaxation or intensification parameter']}\t"
-          f"{f['RELAX null']['Log Likelihood']}\t{f['RELAX alternative']['Log Likelihood']}")
+        print(f"{g}\tNA\tNA\tNA\tNA\tNA")
 PY
-  tar -czf "$OUT/s$s.tar.gz" -C "$OUT" "s$s" && rm -rf "$OUT/s$s"
+  tar -czf "$OUT/${MODE}_seed$s.tar.gz" -C "$W" "seed$s" && rm -rf "$W/seed$s"
 done
-rm -rf "$OUT/aln"
+rm -rf "$W"
 echo DONE

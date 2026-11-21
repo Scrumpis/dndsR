@@ -1,9 +1,6 @@
 cell	tree	n	method	seed	settings
-D0	T5	300	branch_omega	101	models=M0,two_ratio,two_ratio_null
 D0	T8b	600	branch_omega	102	models=M0,two_ratio,two_ratio_null
 D0	T16	600	branch_omega	103	models=M0,two_ratio,two_ratio_null
-D0	T16m	300	branch_omega	104	models=M0,two_ratio,two_ratio_null
 C0	T16	600	relax	105	-
-C0	T16	600	relax	105	starting_points=10
 C0i	T16	600	relax	107	-
 A0	T16m	300	branch_omega	108	models=M0,free

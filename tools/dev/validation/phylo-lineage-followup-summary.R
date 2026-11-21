@@ -85,18 +85,35 @@ if (!is.null(one) && !is.null(ten)) {
 # R1 and R2 on the first study's genes, run directly through HyPhy.
 if (!is.na(direct)) {
   ref <- utils::read.delim(file.path(first, "units", "C0_T16", "relax", "relax_results.tsv"))
-  rows <- list()
-  for (s in c(1, 10)) {
-    f <- file.path(direct, sprintf("direct_s%d.tsv", s))
-    if (!file.exists(f)) next
-    x <- utils::read.delim(f); x <- x[match(ref$orthogroup, x$orthogroup), ]
-    rows[[length(rows) + 1]] <- cbind(rate_row(sprintf("direct C0_T16, %d start(s)", s), "relax p_value", x$p_value),
-      max_abs_lrt_diff_vs_dndsR = max(abs(x$lrt - ref$lrt), na.rm = TRUE), n_missing = sum(is.na(x$lrt)),
-      mean_lrt = mean(pmax(x$lrt, 0), na.rm = TRUE),
-      null_improved = if (s == 10) sum(x$lnl_null - ref$lnl_null > 0.01, na.rm = TRUE) else NA,
-      alt_improved = if (s == 10) sum(x$lnl_alternative - ref$lnl_alternative > 0.01, na.rm = TRUE) else NA,
-      first_positives_still_sig = if (s == 10) sum(ref$p_value <= 0.05 & x$p_value <= 0.05, na.rm = TRUE) else NA)
+  rd <- function(mode, s) {
+    f <- file.path(direct, sprintf("direct_%s_seed%d.tsv", mode, s))
+    if (!file.exists(f)) return(NULL)
+    x <- utils::read.delim(f); x[match(ref$orthogroup, x$orthogroup), ]
   }
-  if (length(rows)) out(rows, "direct.tsv")
+  rows <- list()
+  add <- function(label, lrt, p, extra = list()) {
+    rows[[length(rows) + 1]] <<- cbind(rate_row(label, "relax p_value", p), mean_lrt = mean(pmax(lrt, 0), na.rm = TRUE),
+      n_missing = sum(is.na(p)), max_abs_lrt_diff_vs_dndsR = max(abs(lrt - ref$lrt), na.rm = TRUE),
+      n_lrt_diff_gt_0.01 = sum(abs(lrt - ref$lrt) > 0.01, na.rm = TRUE), as.data.frame(extra))
+  }
+  add("dndsR, first study (seed 1)", ref$lrt, ref$p_value)
+  x <- rd("dndsr", 1); if (!is.null(x)) add("direct, dndsR's inputs, seed 1 (R1)", x$lrt, x$p_value)
+  hs <- Filter(Negate(is.null), lapply(1:3, function(s) rd("hand", s)))
+  for (i in seq_along(hs)) add(sprintf("direct, hand-written inputs, seed %d", i), hs[[i]]$lrt, hs[[i]]$p_value)
+  if (length(hs) == 3) {
+    nul <- do.call(pmax, c(lapply(hs, `[[`, "lnl_null"), na.rm = TRUE))
+    alt <- do.call(pmax, c(lapply(hs, `[[`, "lnl_alternative"), na.rm = TRUE))
+    lrt <- pmax(2 * (alt - nul), 0)
+    spread_null <- do.call(pmax, c(lapply(hs, `[[`, "lnl_null"), na.rm = TRUE)) - do.call(pmin, c(lapply(hs, `[[`, "lnl_null"), na.rm = TRUE))
+    spread_alt <- do.call(pmax, c(lapply(hs, `[[`, "lnl_alternative"), na.rm = TRUE)) - do.call(pmin, c(lapply(hs, `[[`, "lnl_alternative"), na.rm = TRUE))
+    add("direct, hand-written inputs, best of seeds 1-3 per model (R2)", lrt, stats::pchisq(lrt, 1, lower.tail = FALSE),
+        list(genes_null_spread_gt_0.01 = sum(spread_null > 0.01, na.rm = TRUE), genes_alt_spread_gt_0.01 = sum(spread_alt > 0.01, na.rm = TRUE),
+             median_null_spread = stats::median(spread_null, na.rm = TRUE), median_alt_spread = stats::median(spread_alt, na.rm = TRUE)))
+  }
+  if (length(rows)) {
+    cols <- unique(unlist(lapply(rows, names)))
+    rows <- lapply(rows, function(r) { for (c in setdiff(cols, names(r))) r[[c]] <- NA; r[cols] })
+    out(rows, "direct.tsv")
+  }
 }
 cat("units:", length(units), "\n")
