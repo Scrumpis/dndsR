@@ -68,7 +68,11 @@ for (d in units) {
       codeml_warning_free = sum(grepl("codeml_warning:free", r$qc_flags)), starts_disagree_free = sum(grepl("starts_disagree:free", r$qc_flags)))
   }
 }
-out <- function(x, f) utils::write.table(do.call(rbind, x), file.path(root, "summary", f), sep = "\t", quote = FALSE, row.names = FALSE)
+out <- function(x, f) { # rows may have different columns (one set per cell); missing ones are NA
+  cols <- unique(unlist(lapply(x, names)))
+  x <- lapply(x, function(r) { for (c in setdiff(cols, names(r))) r[[c]] <- NA; r[cols] })
+  utils::write.table(do.call(rbind, x), file.path(root, "summary", f), sep = "\t", quote = FALSE, row.names = FALSE)
+}
 out(size, "size.tsv"); out(diag, "diagnostics.tsv")
 # R2 through dndsR: the same genes (same seed) with 1 and 10 starting points.
 one <- relax[["C0_T16"]]; ten <- relax[["C0_T16-starting_points_10"]]
@@ -92,9 +96,10 @@ if (!is.na(direct)) {
   }
   rows <- list()
   add <- function(label, lrt, p, extra = list()) {
-    rows[[length(rows) + 1]] <<- cbind(rate_row(label, "relax p_value", p), mean_lrt = mean(pmax(lrt, 0), na.rm = TRUE),
+    r <- cbind(rate_row(label, "relax p_value", p), mean_lrt = mean(pmax(lrt, 0), na.rm = TRUE),
       n_missing = sum(is.na(p)), max_abs_lrt_diff_vs_dndsR = max(abs(lrt - ref$lrt), na.rm = TRUE),
-      n_lrt_diff_gt_0.01 = sum(abs(lrt - ref$lrt) > 0.01, na.rm = TRUE), as.data.frame(extra))
+      n_lrt_diff_gt_0.01 = sum(abs(lrt - ref$lrt) > 0.01, na.rm = TRUE))
+    rows[[length(rows) + 1]] <<- if (length(extra)) cbind(r, as.data.frame(extra)) else r
   }
   add("dndsR, first study (seed 1)", ref$lrt, ref$p_value)
   x <- rd("dndsr", 1); if (!is.null(x)) add("direct, dndsR's inputs, seed 1 (R1)", x$lrt, x$p_value)

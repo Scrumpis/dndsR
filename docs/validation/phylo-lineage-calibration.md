@@ -41,7 +41,7 @@ False-positive rate at 0.05 under each method's null (300 genes per cell; T16m t
 | B1 T8b, unselected branches | 1.7% (1.0-2.6) calibrated | | |
 | B1 T16, unselected branches | 1.4% (1.0-1.9) calibrated | | |
 
-aBSREL's branch test is conservative in every condition tried (about 1.5-2.6% at 0.05), and its corrections hold their level.
+aBSREL's branch test (`p_raw`) is conservative in every condition tried (about 1.5-2.6% at 0.05), and `p_bh_lineage` is far below 0.05: both meet the size criterion on every tree. The gene-level `p_value` meets it on T5 only; on T8b, T8p, and T16 it is consistent with nominal (3-4%, upper bounds 5.2-6.9%), which does not show a rate at most 0.05.
 
 ### RELAX (`phylo_relax`), cell C0 (k = 1)
 
@@ -103,9 +103,66 @@ The pooled omega is within about 3-6% of the truth on a typical branch and withi
 
 ## What this establishes, and what it does not
 
-- **Calibrated in this simulation** (the size criterion was met on every tree tried): aBSREL's `p_raw`, gene `p_value`, and `p_bh_lineage`; Benjamini-Hochberg-corrected branch-model tests; `p_fg_omega_gt1` on genes under purifying selection.
+- **Calibrated in this simulation** (the size criterion was met on every tree tried): aBSREL's `p_raw` and `p_bh_lineage`; Benjamini-Hochberg-corrected branch-model tests; `p_fg_omega_gt1` on genes under purifying selection only (foreground omega 0.2, far from its null boundary). aBSREL's gene-level `p_value` met it on T5 and was consistent with nominal on the other trees.
 - **Close to nominal, not significantly above it**: `p_two_vs_m0` and `p_free_vs_m0` with complete taxon sampling (rates up to 7%), and RELAX on 5 and 8 taxa.
-- **Anticonservative**: `p_free_vs_m0` with missing taxa (8% on T16m) and **RELAX on 16 taxa (9%)**. Documented as limitations.
-- **Not measured**: the size of `p_fg_omega_gt1` at a foreground omega of 1; anything about real genomes (alignment and orthology errors, multinucleotide substitutions, recombination, gene-tree discordance), which in the BUSTED calibration were the main source of false positives; trees other than these five; genes other than 300 codons.
+- **Anticonservative**: `p_free_vs_m0` with missing taxa (8% on T16m) and **RELAX on 16 taxa (9%)**. Documented as limitations. The follow-up below reproduced RELAX's excess but not the free-ratio one.
+- **Not measured here** (see the follow-up for the first): the size of `p_fg_omega_gt1` at a foreground omega of 1; anything about real genomes (alignment and orthology errors, multinucleotide substitutions, recombination, gene-tree discordance), which in the BUSTED calibration were the main source of false positives; trees other than these five; genes other than 300 codons.
 
 All four commands remain **experimental**. Their tests are reasonably calibrated under the model, and their estimates are accurate when pooled; whether conclusions drawn from them on real genomes are right is not something simulation can show.
+
+## Follow-up study: the omega = 1 boundary, RELAX, and the free-ratio test with missing taxa
+
+A separate study, designed after the results above were read and fixed before it ran: [dev/phylo-lineage-followup.md](../dev/phylo-lineage-followup.md) (hypotheses, nulls, criteria, new seeds 102-108, and a change log of what the smoke test changed). The criteria of the first study are unchanged, and a second is added: Bradley's liberal criterion, **within tolerance** when the 95% interval lies within 2.5-7.5%.
+
+**Run.** dndsR at `c9123a5` (package code unchanged since), driver and summary scripts at `cd46b65`, summary script's table writer fixed afterwards (columns differ between cells; no number changed). Same image and engines as above. 5 simulation units and 2 direct-HyPhy jobs, 8 cores each, all completed, 0 genes failed, 110.6 core-hours (limit 120). Trimmed before running, in the prespecified order: D0 on T5, D0 on T16m, and the 10-start RELAX refit. So the boundary was not tested with missing taxa.
+
+### Foreground omega exactly 1 (`p_fg_omega_gt1`), cell D0
+
+Foreground omega 1 at every site, background 0.2, 600 genes per tree. The null model is two-ratio with omega_fg fixed at 1; the test is one-sided, from the signed root of the LRT (checked in `R/phylo_branch_omega.R`; see the design's table of tests).
+
+| Unit | `p_fg_omega_gt1` at 0.05 | Bradley | LRT (fixed = 1) two-sided, chi-square(1) | omega_fg > 1 | mean LRT (expected 1) | var LRT (expected 2) |
+|---|---|---|---|---|---|---|
+| D0 T8b | 6.8% (4.9-9.2), above nominal, n.s. | inconclusive | 5.5% (3.8-7.6) | 53.5% | 1.04 | 2.29 |
+| D0 T16 | 5.5% (3.8-7.6), above nominal, n.s. | inconclusive | 4.5% (3.0-6.5), within tolerance | 52.3% | 1.03 | 2.25 |
+
+**Hypothesis D (size 0.05, within tolerance on T8b and T16) is not met**: on neither tree does the interval lie within tolerance, and on neither is it outside. Pooled (not prespecified), 74 of 1,200, 6.2% (4.9-7.7%). The direction is consistent: slightly more than half the estimates fall above 1, and the LRT's variance is about 13% above the chi-square's. The test is close to its level at the boundary, perhaps slightly above it; calibration there is not established. The difference test `p_two_vs_m0` was significant in 100% of these genes: a foreground at omega 1 differs plainly from a background at 0.2, and that is no evidence of omega above 1. No gene significant for `p_fg_omega_gt1` had a codeml warning or a negative LRT. `p_adj_fg_omega_gt1` gave 0 of 600 (every gene null, so it is a family-wise rate here; not judged).
+
+### RELAX's false-positive rate, cell C0 (k = 1) on T16
+
+| Part | Data | `p_value` at 0.05 | Verdict, Bradley | Mean LRT (expected 1) |
+|---|---|---|---|---|
+| First study | 300 genes, seed 1 | 9.0% (6.0-12.8) | anticonservative, inconclusive | 1.26 |
+| R1: HyPhy directly on the files dndsR wrote | the same 300 | 9.0% (6.0-12.8) | anticonservative | 1.26 |
+| R1': HyPhy directly, simulator's FASTA and a hand-written tree | the same 300, seeds 1, 2, 3 | 9.0%, 9.0%, 8.7% | anticonservative | 1.22-1.28 |
+| R2: best of seeds 1-3 per model | the same 300 | 9.3% (6.3-13.2) | anticonservative | 1.32 |
+| R3: new genes, new seed | 600 genes, seed 105 | 8.3% (6.2-10.8) | anticonservative, inconclusive | 1.28 |
+| R4: classes drawn per branch (RELAX's own assumption) | 600 genes, seed 107 | 8.5% (6.4-11.0) | anticonservative, inconclusive | 1.28 |
+
+- **R1 failed as specified.** The criterion was the LRT within 1e-3 of dndsR's for every gene: 286 of 300 agree to machine precision (median difference 5e-16), 14 do not (up to 0.60, gene 195), with the null and the alternative log-likelihoods each moving in both directions. No gene's significance changed, and the rate is the same. The same HyPhy version, inputs, settings, and seed reaching different optima on 5% of genes is optimizer non-determinism (whether it depends on the node's hardware was not tested). dndsR's handling of the data is not implicated; RELAX's optimum is not reproducible to 1e-3. The tolerance was not loosened.
+- **R2: optimization is not implicated.** Across three seeds, 208 genes' null and 259 genes' alternative log-likelihoods spread by more than 0.01 (medians 0.022 and 0.036): the optimizer stops at slightly different points from run to run. Taking the best fit of each model raised the rate a little (9.3%), not lowered it. HyPhy's `--starting-points 10` could not be used (it stops with an error on some genes in 2.5.103; change log).
+- **R3: the excess reproduces** with new genes and a new seed: anticonservative (lower bound 6.2%), so reproduced by the design's criterion.
+- **R4: the simulator is not implicated.** Drawing each site's class independently on each branch, as RELAX assumes, gave the same rate (8.5%) as drawing it once for all branches (8.3%).
+- **What remains is the reference distribution.** Over the 1,200 new genes the LRT averages 1.28 and its 95th percentile is 4.78, against 1 and 3.84 for chi-square(1). Pooled over the three independent sets, 128 of 1,500 genes, 8.5% (7.2-10.1%). Significant genes split between relaxation (36) and intensification (65). A likely reason, not tested here, is that `k` acts on omega classes that are weakly identified with three test branches of 29 and no selection, so the chi-square(1) approximation is poor at this design. As an illustration only, dividing each LRT by their mean (1.28) gives 4.7%; that is a property of this simulation, not a correction dndsR applies.
+
+**Conclusion for RELAX**: `p_value` is anticonservative on 16 taxa under the conditions tried, reproducibly, and not because of dndsR, the simulator, or the starting point. dndsR flags it in every results table (below). A calibrated test would need a different null distribution (for example a parametric bootstrap per gene); that is a change to the method, not made.
+
+### The free-ratio test with missing taxa (`p_free_vs_m0`), cell A0 on T16m
+
+| Data | `p_free_vs_m0` at 0.05 | Verdict, Bradley |
+|---|---|---|
+| First study, 300 genes | 8.0% (5.2-11.7) | anticonservative |
+| Replicate, 300 new genes, seed 108 | 4.0% (2.1-6.9) | consistent with nominal, inconclusive |
+| Both, 600 genes | 6.0% (4.2-8.2) | above nominal, n.s., inconclusive |
+
+**Hypothesis F (the excess is reproducible) is not supported**: the replicate is at 4%, its LRT/df averages 1.01, and its variance is 1.02 times the chi-square's (first study: 1.05 and 1.17). By the prespecified subgroup, genes with 3, 4, and 5 merged branches gave 3.2%, 4.3%, and 4.0%, with no trend. Codeml warnings on the free-ratio fit: 5 genes; starts disagreeing: 0. The first study's 8% is most consistently read as chance high, though at 600 genes calibration is not established either. Branch identifiability and missingness, as measured by merged branches, are not associated with it; nothing points to the model comparison itself.
+
+### What the follow-up changes
+
+| Output | Before | After | Flag in dndsR's tables |
+|---|---|---|---|
+| `p_fg_omega_gt1` | calibrated far below the boundary; boundary not measured | close to nominal at omega 1 (5.5%, 6.8%), calibration not established | `p_fg_omega_gt1:not_established_in_simulation` |
+| RELAX `p_value` (and `p_adj`) | anticonservative on T16 (9%) | anticonservative, reproduced (8.3-9.3% in every check), cause not dndsR, simulator, or starts | `p_value:anticonservative_in_simulation` |
+| `p_free_vs_m0` | anticonservative with missing taxa (8%) | not reproduced (4%; 6% pooled), calibration not established | `p_free_vs_m0:not_established_in_simulation` |
+
+The flags are in a `calibration` column on tested rows of `branch_omega_results.tsv` and `relax_results.tsv`, a warning at the end of the run, and a `calibration` entry in the provenance. Per-branch omega from the free-ratio model, `omega_fg`, and RELAX's `k` are model-based estimates, not tests, and carry no flag; their accuracy is in *Estimation* above.
+

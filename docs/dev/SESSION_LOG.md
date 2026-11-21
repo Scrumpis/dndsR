@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-21 (later): lineage follow-up study, calibration flags
+
+- **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
+- **Done:** audit of the first report (aBSREL gene `p_value` was claimed calibrated on every tree; true on T5 only, corrected); follow-up designed and fixed before running (`phylo-lineage-followup.md`), smoke-tested, run (110.6 core-hours of 120), and reported; `calibration` column, warning, and provenance entry for flagged tests; `n_merged`/`n_absent` in `_lineages.tsv`; three-kinds-of-output section and single-copy limitation in the docs.
+- **Verified:** `test-phylo-lineage.R` and `test-phylo-lineage-engines.R` in the candidate image with this code, 0 failed, 0 skipped; fast gate on intel18, 243 tests, 1,030 expectations, 0 failed (6 skips: slow or fast-mode).
+- **Found:** RELAX's excess reproduced and not explained by dndsR, the simulator, or starts; `p_fg_omega_gt1` 5.5-6.8% at omega 1; free-ratio excess not reproduced. HyPhy's `--starting-points 10` errors in 2.5.103; RELAX optima differ by up to 0.6 in LRT on 14 of 300 genes between identical runs (R1 failed as specified).
+- **Not done:** push, pull request, CI, candidate image rebuilt from the final commit; nothing merged, tagged, or published.
+
 ## 2026-11-21: lineage-level analyses implemented and calibrated
 
 - **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
