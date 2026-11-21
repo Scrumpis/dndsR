@@ -18,7 +18,7 @@ PAML 4.10.10 and HyPhy 2.5.103 from Bioconda, with the v0.4.0 image (R 4.6.2) an
 
 For OG0004, the foreground of the two-ratio model is spA's branch, named `spA` with `species_tree_branches` joining spA and the clade's stem, as the hand-written direct tree has it.
 
-Result at the commit that adds this page: 12 tests, 166 expectations, 0 failed, none skipped.
+Result at the commit that adds this page: 12 tests, 166 expectations, 0 failed, none skipped. The likelihood comparisons had used testthat's `scale = 1`, which its third edition ignores, so they were relative (about 2 log-likelihood units); since `4ba2f1d` they check an absolute difference below 1e-3, and pass in the candidate image (PAML 4.10.10, HyPhy 2.5.103 inside), with no warnings. In that image the whole package suite gave 248 tests, 1,192 expectations, 0 failed, 0 skipped (`DNDSR_FAIL_ON_SKIP=1`), and `container-checks.sh` ran all four commands.
 
 ## Without the engines
 
@@ -32,4 +32,4 @@ The image checks (`tools/dev/container-checks.sh`) run the same four commands in
 
 ## Not covered here
 
-Statistical calibration, real biological data beyond a demonstration, and other engine versions. A different PAML or HyPhy version is announced with a note when run.
+Statistical calibration (in simulation: [phylo-lineage-calibration.md](phylo-lineage-calibration.md)), real biological data beyond a demonstration, and other engine versions. A different PAML or HyPhy version is announced with a note when run.

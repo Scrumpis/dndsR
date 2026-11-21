@@ -18,7 +18,15 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 | `main` | `957cfe1` | `v0.4.0` |
 | `dev` | See `git log` | `main` was merged into it at `3f86d42`, by the maintainer |
 
-## Resume here: v0.5.0
+## Resume here: lineage-level analyses (`feat/lineage-selection`)
+
+Updated 2026-11-21. The maintainer held v0.5.0 until the lineage analyses are implemented, tested, documented, and usable (`DECISIONS.md`). They are, on `feat/lineage-selection` (not pushed; the maintainer pushes and opens a pull request into `dev`): `phylo_branch_omega` (codeml), `phylo_absrel`, `phylo_relax`, `phylo_summarize`, CLI and R, PAML 4.10.10 in the Dockerfile and conda environment.
+
+- Engine equivalence: [validation/phylo-lineage.md](../validation/phylo-lineage.md). Candidate image built from `0c7c813` with PAML and HyPhy inside: container checks pass, 248 tests, 0 failed, 0 skipped.
+- Calibration in simulation, complete (27 of 27 units, 234.6 core-hours): [validation/phylo-lineage-calibration.md](../validation/phylo-lineage-calibration.md). aBSREL calibrated; branch-model tests near nominal; RELAX on 16 taxa (9%) and `p_free_vs_m0` with missing taxa (8%) anticonservative, documented as limitations. Size of `p_fg_omega_gt1` at omega 1 not measured.
+- Still open: CI on the pushed branch; the version number; whether to add a boundary cell for `p_fg_omega_gt1` (a new cell after results, so the maintainer's call). The untracked `rst`, `rst1`, `rub` in the clone root are codeml leftovers from an earlier session, kept until the maintainer approves deleting them.
+
+## Resume here: v0.5.0 (on hold)
 
 Updated 2026-11-20. The maintainer approved the v0.5.0 scope and its preparation; the checklist is in [RELEASE-READINESS.md](RELEASE-READINESS.md). Nothing is merged, tagged, or published.
 

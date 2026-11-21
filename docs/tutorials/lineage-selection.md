@@ -2,7 +2,7 @@
 
 From species genomes, orthogroups, and a species tree to branch-level dN/dS, branch tests of episodic selection, tests of relaxed or intensified selection, and one table per lineage that you can join to lineage traits such as LTR activity or genome-size change. Read [lineage-selection.md](../lineage-selection.md) for what each method tests before interpreting anything.
 
-**Status: experimental, development code.** dndsR reproduces codeml and HyPhy run directly; the methods' error rates were measured only in simulation. The example below is synthetic: its numbers show how to read the outputs, not anything about real genomes.
+**Status: experimental, development code.** dndsR reproduces codeml and HyPhy run directly; the methods' error rates were measured only in simulation ([results](../validation/phylo-lineage-calibration.md)), where RELAX on 16 taxa and the free-ratio test with missing taxa gave more false positives than their level. The example below is synthetic: its numbers show how to read the outputs, not anything about real genomes.
 
 ## 1. Get dndsR, HyPhy, and PAML
 

@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-21: lineage-level analyses implemented and calibrated
+
+- **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
+- **Done:** `phylo_branch_omega`, `phylo_absrel`, `phylo_relax`, `phylo_summarize` with CLI, tests, tutorial, methods, skill, outputs; PAML in the image; calibration designed in advance and run in full; report written.
+- **Verified:** engine comparisons against codeml and HyPhy run directly; candidate image (`0c7c813`) container checks and 248 package tests, 0 failed, 0 skipped; tutorial commands; 300 public Brassicaceae orthogroups; calibration 27 of 27 units.
+- **Found:** the engine test's `scale = 1` was ignored by testthat 3e (relative tolerance); fixed at `4ba2f1d`. The first calibration launch filled the scratch file quota (about 140 files per orthogroup); the package now keeps about 25, or none with `keep_runs = FALSE`. RELAX and the free-ratio test with missing taxa are anticonservative in simulation.
+- **Not done:** push, pull request, CI on the branch, version choice; nothing merged, tagged, or published.
+
 ## 2026-11-20 (final): v0.5.0 release preparation
 
 - **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
