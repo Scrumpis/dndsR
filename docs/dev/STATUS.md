@@ -18,6 +18,18 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 | `main` | `957cfe1` | `v0.4.0` |
 | `dev` | See `git log` | `main` was merged into it at `3f86d42`, by the maintainer |
 
+## Resume here: study B completion, alignment pilot, multiple-testing study (2026-11-22)
+
+The maintainer's seven rulings on the study B core results are in `DECISIONS.md` (2026-11-22). Running on Slurm (intel18), results not yet read:
+
+| Work | Design | Root | Job |
+|---|---|---|---|
+| Study B, remaining arms: 16-taxon units, every BUSTED arm, BE3h for the unrun indel arms (about 950 core-hour ceiling) | `lineage-robustness-study.md`, amendment of 2026-11-22 | `study-B3` (lib `49fd39f`), units `phylo-study-B-units-rest.tsv` | array 21578592 |
+| Alignment pilot: MAFFT (A0) against PRANK codon (A1) and MACSE (A2), true alignment for diagnosis; BE3h genes 1-150 (151-300 held out) and BE3hS (seed 321) | `alignment-pilot.md` (40 core-hour ceiling) | `aln-pilot` (lib `6962b4a`) | array 21580170 |
+| Multiple-testing mixture study: BMIX and BMIXh, 1,000 genes each, plus aBSREL on BMIXh's true alignments | `lineage-multiple-testing.md` (50 core-hour ceiling) | `study-Q` (lib `48aa75d`) | arrays 21579083, 21581106 |
+
+Summaries: `phylo-study-B-summary.R` and `phylo-study-B-exclude.R` (B), `aln-pilot-summary.R`, `lineage-mt-summary.R`. Done this session: scoped `Alignment check` warning and provenance entry (`820abf3`); docs on input errors, masking and the aBSREL p-value families; two corrections to the study B core report: `p_bh_lineage` and aBSREL's gene `p_adj` do not control false discoveries under realignment error (`48aa75d`), and the mixture's per-branch truth (`81a3007`). Not approved: full study L, the RELAX confirmation.
+
 ## Resume here: lineage-level analyses (`feat/lineage-selection`)
 
 Updated 2026-11-21. The four lineage commands go into v0.5.0, keeping that number (maintainer, 2026-11-21, `DECISIONS.md`). They are, on `feat/lineage-selection` (not pushed; the maintainer pushes and opens a pull request into `dev`): `phylo_branch_omega` (codeml), `phylo_absrel`, `phylo_relax`, `phylo_summarize`, CLI and R, PAML 4.10.10 in the Dockerfile and conda environment.

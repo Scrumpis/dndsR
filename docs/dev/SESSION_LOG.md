@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-22 (later still): maintainer's rulings on study B; three runs launched; corrections
+
+- **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (continued)
+- **Done:** rulings recorded (`6d108a9`); remaining study B arms amended (BE3h for unrun indel arms) and launched; alignment pilot designed, smoke-tested and launched; p-value audit and multiple-testing mixture design, launched; `Alignment check` warning with tests and docs (`820abf3`).
+- **Verified:** `tools/dev/check.sh` 251 tests, 0 failed, 7 skipped (engines not in the image); `test-phylo-lineage-engines.R` with HyPhy and codeml, 0 failed.
+- **Found, and corrected:** (1) `p_bh_lineage` was judged by its per-test rate; in BE3h it made false discoveries in 11 of 13 lineage families and the gene `p_adj` 30 in 300 null genes. (2) Study B's mixture used aBSREL's `foreground` column (TRUE for every branch with all branches tested) as truth: per-branch FDP 66.3% was 74.4%, power 16% was 53%; classifications unchanged. (3) HyPhy's Holm omits the running maximum, so the gene `p_value` is Hochberg's global test; documented.
+- **Not done:** results of the three runs; full L and the R confirmation (held); push.
+
 ## 2026-11-22 (later): study B core report, BE3h
 
 - **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (resumed from `49fd39f`)
