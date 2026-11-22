@@ -38,6 +38,7 @@ for (u in units) {
   tr <- U$truth
   # Truth of `rel`: the branch's truth over the tree-wide truth, length-weighted, as M0's pooled counts weight branches
   tw <- sum(tr$length_codon * tr$omega_mean) / sum(tr$length_codon)
+  med_factor <- if (all(abs(U$genes$gene_effect - 1) < 1e-12)) 1 else exp(-0.7^2 / 2)
   g0 <- stats::aggregate(cbind(NdN = NdN_m0, N = N_m0, SdS = SdS_m0, S = S_m0) ~ orthogroup, U$b_all, sum)
   genes <- sample(U$tested)
   for (n in sizes) {
@@ -52,14 +53,18 @@ for (u in units) {
         est <- estimates(x, gx)
         boot <- replicate(B, { i <- sample.int(nrow(x), replace = TRUE); estimates(x[i, ], gx[i, ])[c("pool", "median", "rel")] })
         t_pop <- tr$omega_mean[tr$branch_id == id]
-        t_smp <- mean(U$gtruth$omega_mean[U$gtruth$branch_id == id & U$gtruth$gene %in% x$orthogroup])
+        gb <- U$gtruth$omega_mean[U$gtruth$branch_id == id & U$gtruth$gene %in% x$orthogroup]
+        t_smp <- mean(gb)
         for (e in c("pool", "median", "rel")) {
           bo <- boot[e, ]; bo <- bo[is.finite(bo)]
           pct <- stats::quantile(bo, c(0.025, 0.975), names = FALSE)
           se <- stats::sd(log(bo[bo > 0])); tq <- stats::qt(0.975, nrow(x) - 1)
           logt <- if (is.finite(est[[e]]) && est[[e]] > 0) exp(log(est[[e]]) + c(-1, 1) * tq * se) else c(NA, NA)
-          tp <- if (e == "rel") t_pop / tw else t_pop
-          ts <- if (e == "rel") NA else t_smp
+          # Estimands: pool, the opportunity-weighted mean over genes; median, the median gene (the gene
+          # effect is lognormal with sd 0.7 and mean 1 when it varies, so its median is exp(-0.245));
+          # rel, the branch's truth over the tree's length-weighted truth.
+          tp <- switch(e, rel = t_pop / tw, median = t_pop * med_factor, t_pop)
+          ts <- switch(e, rel = NA, median = stats::median(gb), t_smp)
           intervals[[length(intervals) + 1L]] <- data.frame(unit = u, n = n, set = g, branch_id = id, length = tr$length_codon[tr$branch_id == id],
             estimator = e, n_genes = nrow(x), est = est[[e]], truth_pop = tp, truth_sample = ts,
             pct_lo = pct[1], pct_hi = pct[2], logt_lo = logt[1], logt_hi = logt[2], ds = est[["ds"]])

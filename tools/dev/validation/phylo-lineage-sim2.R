@@ -71,11 +71,13 @@ swap_rows <- function(aln, a, b, cols = seq_len(ncol(aln))) {
   tmp <- aln[a, cols]; aln[a, cols] <- aln[b, cols]; aln[b, cols] <- tmp; aln
 }
 
-#' A gene on `tree` plus a paralog of tip 1 that split at the root: a new root joins the
-#' species tree (stem 10% of t1's depth) and the paralog (t1's depth plus that stem).
+#' A gene on `tree` plus a paralog of tip 1 that split before the root: a new root joins the
+#' species tree (stem half of t1's depth) and the paralog (t1's depth plus that stem). The stem was
+#' 10% of the depth in the pilot, where t1's branch reached 3 times the median in only 75% of genes
+#' (gate: 90%); changed before the main runs (docs/dev/lineage-robustness-study.md).
 paralog_tree <- function(tree) {
   depth <- ape::node.depth.edgelength(tree)[1]
-  stem <- 0.1 * depth
+  stem <- 0.5 * depth
   sp <- ape::write.tree(tree); sp <- sub(";$", "", sp)
   ape::read.tree(text = sprintf("(%s:%.10g,t1p:%.10g);", sp, stem, depth + stem))
 }

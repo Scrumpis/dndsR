@@ -62,3 +62,14 @@ The maintainer asked for defensible input-quality safeguards: evaluate incorrect
 **Pilot arms.** The pilot runs aBSREL and the branch models on every unit, and BUSTED only on the two error-free units, to measure its cost (the smoke test showed BUSTED with double hits and three starts at about 100-500 core-seconds per gene on 8 taxa, far above aBSREL's 20).
 
 **Pilot gates (fixed now).** (1) every unit completes; (2) errors are generated as planned: one logged segment per alignment in E1 and E2; at least 95% of E3 orthogroups realigned and tested; in E4, t1's M0 branch length at least 3 times the median of the other terminal branches in at least 90% of genes; corruption rates in the mixture's log consistent with the planned rates (reported); (3) measured cost projects the full study at no more than 250 core-hours. If it projects above, arms are dropped in this order, keeping every aBSREL and branch-model arm: BUSTED masked runs on E2, E4, E5, E6, E7; then BUSTED unmasked on E5 and E7; and what was dropped is reported as not run.
+
+## Pilot outcome (2026-11-21, development data; gates as fixed above)
+
+`phylo-study-pilot-gates.R B` on the 12 pilot units (seeds 351-362), 9bea53a:
+
+- **Passed:** all units complete; one segment per alignment in E1 and E2 (T8b, T16); 100% of E3 orthogroups realigned and tested (T8b, T16).
+- **Failed, generator: E4.** The paralog's branch reached 3 times the median terminal branch in 75% of 20 genes (gate 90%). The split was too recent (stem 10% of t1's depth). Changed to half the depth before the main runs, and the E4 pilot is rerun (`phylo-study-B-pilot2-units.tsv`, the same seed) to check the gate again. No other cell's generator is affected.
+- **Failed, cost:** 1,090 core-hours projected, against 250. Measured per gene (unmasked; masked about the same): aBSREL 28 core-seconds on 8 taxa and 89 on 16; branch models 36 and 228; BUSTED C1 226 and 536. The design had not projected branch models on 16 taxa, and BUSTED is 8-10 times aBSREL. After the drop order fixed above (BUSTED masked on E2, E4-E7, then unmasked on E5 and E7), it is still about 930; with no BUSTED at all, about 303.
+- Mixture (20 genes): no gene selected (2 expected), corruption shares t3 0.05, t4 0.05, t6 0.15, t7 0.05: too few genes to compare with the planned rates; reported, not gated.
+
+**Staged execution, pending the maintainer's decision on the rest.** Run now, within budget: every aBSREL and branch-model arm, unmasked and masked, on the 8-taxon and T16m units except E4 (`phylo-study-B-units-core.tsv`, the main seeds; about 144 core-hours). Held: E4 until its generator passes; the 16-taxon units (about 160 core-hours for aBSREL and branch models); every BUSTED arm (about 790 core-hours as designed, about 630 after the drop order). The held arms keep their seeds, so running them later reproduces the same simulated genes.

@@ -65,7 +65,7 @@ Made after the maintainer's approval, which asked that estimator validity come f
 | Name | Definition | Interpretation |
 |---|---|---|
 | `pool` | current `pooled_omega`: (sum NdN / sum N) / (sum SdS / sum S), high_ds excluded | ratio of pooled substitution counts per site |
-| `median` | median over genes of the branch's free-ratio omega | typical gene |
+| `median` | median over genes of the branch's free-ratio omega | typical gene; its estimand is the median gene's omega (0.2 x e_b x exp(-0.245) in the cells with gene effects), not the mean |
 | `rel` | `pool` of the branch divided by `pool` of M0 over the same genes | lineage omega relative to the tree-wide omega of its own gene set (cancels gene-set composition, which L4 tests) |
 | `pool_adj` | `pool`, with log branch dS as a covariate in the trait model (L5 only) | remedy by adjustment rather than by a new estimator |
 
@@ -73,6 +73,15 @@ aBSREL's per-branch omega distribution was considered and not included: on the f
 
 **L5, made concrete.** On L-P1 (T8p, branch lengths 0.005-0.25) and L-G1, with disjoint gene sets of 100: 10,000 trait draws per gene set, each trait correlated 0.5 with the part of log branch length that is uncorrelated with the true log omega of the branches (so that the trait is exactly unrelated to the truth, even though one fixed draw of branch effects can correlate with length by chance), plus normal noise; ordinary least squares across branches of log estimate on the trait, with and without log branch dS as a covariate; false-positive rate at 0.05. The trait's noise varies independently among branches, so the test has its nominal size when the estimator has no length-dependent bias; the same regression on the true omegas is reported as the reference.
 
+**Correction before the main runs (2026-11-21, from the pilot's development data).** The summary first compared `median` with the population mean, which builds in a bias wherever gene effects vary; `median` is now compared with its own estimand, as in the table. No threshold changed.
+
 **Decision rule for the stable API (fixed now).** An estimator may be documented for comparative trait models only if it meets L2 (bias) and L5 (false positives at most 5%) on every cell with site or gene variation. If none does, but adjustment (`pool_adj`) meets L5, the documented use is the adjusted model, and the limitation is stated. If neither, the documentation says that no genome-wide single-number lineage omega from these models is safe for trait association, and the summary stays descriptive.
 
 **Pilot gates (fixed now; the full study starts only if all hold).** (1) every unit completes, with at least 95% of genes tested; (2) the simulator does what is planned: mean of m_g within 3 standard errors of 1, the gamma classes average 0.2, and in L-A1 t1 is absent only in genes above the cutoff (a logical check; the share, planned 16.7%, is reported, since 40 genes cannot pin it down); (3) on LS0 the pooled omega lies within 10% of 0.2 on every branch class (the first study found 3-6%); (4) measured cost per gene projects the full study at no more than 290 core-hours; if it projects above, the cells are run in the order L-G1, L-P1, L-S1, L-S2, L-A1, L-S0, L-M1 and the remainder reported as not run, without reducing any cell's genes.
+
+## Pilot outcome (2026-11-21, development data; gates as fixed above)
+
+`phylo-study-pilot-gates.R L` on the 7 pilot units (40 genes each, seeds 291-297), 760ca03:
+
+- **Passed:** every unit complete, 100% of genes tested; mean gene effect 1.045 (standard error 0.064, 160 genes); gamma classes average 0.2 exactly; in L-A1, t1 lost only above the cutoff (7 of 40 genes, 17.5%, planned 16.7%); projected cost 196 core-hours (budget 290; measured 101 core-seconds per gene on T8b, 142 on T8p, 323 on T16m).
+- **Failed: gate 3**, pooled omega within 10% of 0.2 on every branch of LS0: 12 branches from 0.179 to 0.211, so t7 (0.179, -10.5%) is outside. Every branch's 95% bootstrap interval contains 0.2 (the intervals are 12-15% wide either side at 40 genes), and the mean over branches is 0.195 (-2.4%), in line with the first study's 3-6% at 300 genes. The gate, applied to point estimates of 12 branches at 40 genes, could fail by sampling alone. It failed as written, so **the full study is not started**; the maintainer decides whether to proceed. No threshold was changed.

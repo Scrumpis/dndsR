@@ -1,0 +1,9 @@
+unit	cell	tree	n	codons	seed	methods	post	mask	settings
+B-E0-T8b	BE0	T8b	300	300	301	absrel,branch_omega	none	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-E1-T8b	BE0	T8b	600	300	302	absrel,branch_omega	corrupt:internal:t1	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-E2-T8b	BE0	T8b	300	300	303	absrel,branch_omega	corrupt:internal:t8	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-E3-T8b	BE3	T8b	300	300	304	absrel,branch_omega	prepare	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-E5-T8b	BE5	T8b	300	300	306	absrel,branch_omega	none	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-E6-T16m	BE0	T16m	300	300	307	absrel,branch_omega	none	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-E7-T8b	BE7	T8b	300	300	308	absrel,branch_omega	none	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3
+B-MIX-T8b	BMIX	T8b	1000	300	312	absrel,branch_omega	pool:t1=0.032,t2=0.020,t3=0.056,t4=0.083,t5=0.154,t6=0.056,t7=0.083,t8=0.032	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3

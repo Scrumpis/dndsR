@@ -32,8 +32,8 @@ Status words: **Pass** (meets a stated criterion, with the evidence linked), **F
 
 | Method | Correctness | Calibration | Power | Robustness | Status for stable |
 |---|---|---|---|---|---|
-| `go_enrichment`, `term_enrichment`, `ipr_enrichment` (Fisher/hypergeometric) | **Pass**: exact hypergeometric, BH | **Fail**: false terms in up to 43-70% of runs under estimator-noise nulls linked to length and dS ([enrichment-confounding](../validation/enrichment-confounding.md)); warn on every run | Comparable to `covariate_enrichment` | Pair-dependent excess | **Fails calibration within its intended use.** Not to be described as validated; the maintainer's open question on defaults stands (DECISIONS, open questions) |
-| `covariate_enrichment` (`pb_floor`) | **Pass**: independent recomputation | **Pass** on 4 plant pairs, 2 families, selection + confirmation + held-out pair (worst cell 5.0%, upper bound 11.2% at 100 runs) | 61-100% of spiked terms | **Insufficient** beyond: polyploids, other clades, quantile thresholds, annotation completeness | Supportable as validated for the tested scope; the 5.0% (2.2-11.2) worst cell is at the edge, see gaps |
+| `go_enrichment`, `term_enrichment`, `ipr_enrichment` (Fisher/hypergeometric) | **Pass**: exact hypergeometric, BH | **Pass for the hypothesis they test** (call rate differs between term and universe): FWER 0-1.3% and mixed-null FDP at most 2.5% under exchangeable labels, despite nested terms ([study N](../validation/enrichment-error-calibration.md)). **Fail for selection related to terms**, by confounding with length and dS: 21-42% of null runs with a false term, FDP 20-34%; the false terms truly have higher call rates (median relative risk 5-10) | Comparable to `covariate_enrichment` | Pair-dependent size of the confounding | **Supportable as a test of call-term association, with that wording; not for inferring selection.** `covariate_enrichment` is the validated correction. Wording and defaults are the maintainer's decision |
+| `covariate_enrichment` (`pb_floor`) | **Pass**: independent recomputation | **Pass** on 4 plant pairs, 2 families, selection + confirmation + held-out pair (worst cell 5.0%, upper bound 11.2% at 100 runs); with exact covariate-driven labels (study N), FWER 0.3-1.0% and mixed-null FDP at most 1.7% | 61-100% of spiked terms | **Insufficient** beyond: polyploids, other clades, quantile thresholds, annotation completeness | Supportable as validated for the tested scope; the 5.0% (2.2-11.2) worst cell is at the edge, see gaps |
 | `dnds_summary`, contrasts, ideograms | Pass (base-R recomputation) | `dnds_state_contrast` zero cells and suppressed warnings open; gene level disabled | n/a | n/a | Descriptive tools ready; `dnds_state_contrast` exploratory |
 
 ### Phylogenetic module
@@ -80,7 +80,7 @@ Ranked by how much each could change a scientific conclusion in the central use 
 7. **Covariate enrichment at its edge** (worst cell 5.0%, 2.2-11.2): more runs in that cell would show whether it holds. Lower priority for the lineage use case.
 8. **BUSTED beyond five taxa**: the lineage use case runs on larger trees. Folded into study B.
 
-Fails that are documented and not proposed for more work now: the Fisher-type enrichment commands (calibration fails by design; the remedy exists as `covariate_enrichment`; whether they stay is the maintainer's open question).
+Resolved by study N ([enrichment-error-calibration.md](../validation/enrichment-error-calibration.md)): the Fisher-type enrichment commands control error for the hypothesis they test; their excess for the scientific question is confounding by length and dS, which `covariate_enrichment` corrects. What remains is the maintainer's decision on wording and defaults.
 
 ## Studies
 
