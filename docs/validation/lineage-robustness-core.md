@@ -6,7 +6,7 @@
 
 **Answer.**
 - **A corrupted segment in one sequence** (E1 foreground, E2 background) breaks both methods. It is detected in every affected gene by the window profile dndsR already reports (`dissimilar_windows`), which flags none of the error-free genes. Masking the flagged windows restores calibration.
-- **Realigned indels** inflate aBSREL's raw branch p-values and its gene p-value; `p_bh_lineage` stays within tolerance. Masking does not fix this, and no signal detects it. With correctly simulated (homologous) insertions, BE3h, the excess is smaller (`p_raw` 7.1%, gene `p_value` 21%) and disappears on the true alignment (2.3%, 3.0%): it comes from alignment error introduced by realignment. E3's larger excess also included a simulator defect (below).
+- **Realigned indels** inflate aBSREL's raw branch p-values and its gene p-value. `p_bh_lineage` does not control false discoveries here either: see the correction below. Masking does not fix this, and no signal detects it. With correctly simulated (homologous) insertions, BE3h, the excess is smaller (`p_raw` 7.1%, gene `p_value` 21%) and disappears on the true alignment (2.3%, 3.0%): it comes from alignment error introduced by realignment. E3's larger excess also included a simulator defect (below).
 - **Paralogs, gene-tree discordance, missing taxa and recombination** (E4-E7) leave both methods within or below 5%. For discordance and paralogs this holds partly because dndsR's existing zero-length-foreground exclusion removes many of the affected genes.
 - **Engine or dndsR:** wherever size was outside tolerance, HyPhy and codeml run directly on dndsR's files reproduce dndsR's statistics. These failures belong to the models on that input, not to dndsR.
 
@@ -101,7 +101,7 @@ On E3, 7 and 11 branch LRTs differed, in 3 and 4 genes. Rerun three times on the
 | Error | aBSREL per branch (`p_bh_lineage`) | aBSREL gene `p_value` | Branch models (`p_two_vs_m0`) |
 |---|---|---|---|
 | E1, E2 corrupted segment | not robust; detectable; masking restores at a cost within the rule → **mask** (warn when flagged) | not robust; detectable; masking restores size but loses more power than the rule allows → **warn** | not robust; detectable; masking restores and gains power → **mask** (warn when flagged) |
-| E3, BE3h realigned indels | robust (`p_bh_lineage` within tolerance in E3, calibrated in BE3h); raw `p_raw` is not, and is not detectable → **limitation** for `p_raw` | not robust, not detectable → **limitation** | robust (inconclusive, not anticonservative) |
+| E3, BE3h realigned indels | robust by the preregistered per-test rate (`p_bh_lineage` 5.1% in E3, 0.8% in BE3h), but false discoveries in 11 of 13 lineage families (correction below); `p_raw` not robust; not detectable → **limitation** | not robust, not detectable → **limitation** | robust (inconclusive, not anticonservative) |
 | E4 paralog | robust | robust (inconclusive, not anticonservative) | robust |
 | E5 discordance | robust; most genes excluded by the existing rule | robust on the 49 tested | robust |
 | E6 missing taxa | robust | robust | robust |
@@ -119,7 +119,25 @@ After the core results, aBSREL on E3's *true* alignments (no realignment; a diag
 | true alignment (diagnostic) | 2.3% (1.9-2.8) | 1.8% (1.3-2.4) | 3.1% (2.3-4.1) | 3.0% (1.4-5.6) |
 | E0, no error | 2.1% (1.6-2.5) | 1.8% | 2.4% | 2.3% |
 
-On the true alignment BE3h matches E0: gaps themselves do not inflate aBSREL. The excess after realignment is therefore alignment error, spread over terminal and internal branches alike, and HyPhy run directly on dndsR's files reproduces it exactly (previous section). Masking does not remove it, because the window profile flags almost none of these genes (0.3%). `p_bh_lineage` stays calibrated (0.8%) and the branch models stay at baseline (`p_two_vs_m0` 5.3%, E0 4.3%). Which aligner step causes the error, and whether another aligner would avoid it, was not tested.
+On the true alignment BE3h matches E0: gaps themselves do not inflate aBSREL. The excess after realignment is therefore alignment error, spread over terminal and internal branches alike, and HyPhy run directly on dndsR's files reproduces it exactly (previous section). Masking does not remove it, because the window profile flags almost none of these genes (0.3%). `p_bh_lineage`'s per-test rate is 0.8%, but it made false discoveries in 11 of 13 lineage families (correction below); the branch models stay at baseline (`p_two_vs_m0` 5.3%, E0 4.3%). Which aligner step causes the error, and whether another aligner would avoid it, was not tested.
+
+## Correction (2026-11-22, after the maintainer's review): what the BH outputs' rates mean
+
+The size tables above apply the preregistered per-test rule to every output, including `p_bh_lineage` and the BH-adjusted gene `p_adj`. For an output already corrected by Benjamini-Hochberg, that rate is not an error-rate guarantee. When every gene is null, every rejection is false, so the false-discovery rate of a BH family equals the probability that the family has any rejection, which BH holds at or below 0.05. The right check is how many families made any rejection. The preregistered numbers stay as they are; this check is added after the results and is labelled as such.
+
+| Cell | `p_bh_lineage`: families (one per species-tree branch) with any rejection | rejections | aBSREL gene `p_adj` (one family): rejections | branch models' `p_adj_*`: rejections |
+|---|---:|---:|---:|---:|
+| E0 | 0 of 13 | 0 | 0 | 0 |
+| E1 | 1 of 13 (t1) | 600 | | |
+| E2 | 1 of 13 (t8) | 300 | | |
+| E3 | 11 of 13 | 200 | 120 | 0 |
+| BE3h | **11 of 13** | 33 | **30** | 0 |
+| E4 | 0 of 13 | 0 | 0 | 0 |
+| E5 | 1 of 13 | 1 | 0 | 0 |
+| E6 | 0 of 65 | 0 | 0 | 0 |
+| E7 | 0 of 13 | 0 | 0 | 0 |
+
+So in BE3h `p_bh_lineage` made false discoveries in 11 of the 13 lineages tested, and aBSREL's gene-level `p_adj` made 30 false discoveries among 300 null genes: neither controls false discoveries under realignment error. The statement in the first version of this report that `p_bh_lineage` "stays within tolerance" and is "the output to use" was wrong. The branch models' adjusted p-values made no rejection in any null cell. The definitions of each p-value, and a mixture study of false-discovery control and power, are in [the multiple-testing design](../dev/lineage-multiple-testing.md); its report will be `lineage-multiple-testing.md`.
 
 ## Recommendations, for the maintainer's decision
 
@@ -127,7 +145,7 @@ None of these is implemented; each changes behaviour or output and needs approva
 
 1. **Warn on the window profile.** dndsR already reports `dissimilar_windows` per orthogroup. A gene with any flagged window should carry a warning in aBSREL and branch-model results, because in the mixture 66-78% of unmasked discoveries were false and the profile flagged 99.5% of corrupted genes with no false flags. This is a warning, not an exclusion: excluding flagged genes failed the power rule for every test.
 2. **Offer masking as the documented safeguard** for aBSREL branch tests and the branch models (non-inferior power, FDP 4-5% against 25-66%). It should stay a sensitivity analysis, not a default, unless you decide otherwise. For aBSREL's gene-level `p_value`, masking restores size but costs 22 points of power, so present it with the warning, not as a fix.
-3. **Document E3 as a limitation of aBSREL's raw branch and gene p-values after realignment.** `p_bh_lineage` stays within tolerance there. With correctly simulated indels (BE3h) the excess is about 7% per branch and 21% per gene, and comes from realignment, not from gaps: aBSREL on the true alignments is calibrated. The documentation should say that aBSREL's unadjusted branch and gene p-values are sensitive to alignment error in gapped genes, that dndsR's window profile does not detect this, and that `p_bh_lineage` is the output to use. Testing other aligners or alignment filters would be a separate study.
+3. **Document E3 as a limitation of aBSREL's raw branch and gene p-values after realignment.** *Withdrawn in part, see the correction below: `p_bh_lineage` is not a safe alternative here.* With correctly simulated indels (BE3h) the excess is about 7% per branch and 21% per gene, and comes from realignment, not from gaps: aBSREL on the true alignments is calibrated. The documentation should say that aBSREL's unadjusted branch and gene p-values are sensitive to alignment error in gapped genes, that dndsR's window profile does not detect this. Testing other aligners or alignment filters would be a separate study.
 4. **No new safeguard for paralogs, discordance, missing taxa or recombination** on these trees. The existing zero-length-foreground exclusion is doing real work for discordance and should be described as such in the outputs documentation. The tip-dS ratio detects the paralog in every case and could be reported as an informational flag, but the tests stayed calibrated without it.
 
 ## Not run (held for the maintainer's decision)

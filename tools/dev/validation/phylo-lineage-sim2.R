@@ -21,6 +21,7 @@
 #     BE0  no error                            BE3  codon indels (rate 0.02 per codon per unit length, mean 2 codons)
 #     BE3h as BE3, with insertions homologous across the inserting branch's descendants (add_indels(homologous = TRUE))
 #     BE3hS as BE3h, with every gene selected on the foreground (classes 0.05/0.3/10 there; alignment pilot)
+#     BMIXh BMIX's selection (10% of genes on the foreground) with BE3h's indels, no corruption (multiple-testing study)
 #     BE4  t1 replaced by a paralog that split from the species lineage at the root
 #     BE5  gene tree discordant: t2 and t3 exchanged (one NNI at the stem of the foreground clade)
 #     BE7  recombination: the second half of the codons has BE5's gene tree
@@ -59,7 +60,7 @@ cell2 <- function(cell) {
     LS2 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0, branch_sd = FALSE),
     LG1 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0.7, branch_sd = TRUE),
     LA1 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0.7, branch_sd = TRUE, loss = TRUE),
-    BE0 = c(b0, error = "none"), BE3 = c(b0, error = "indel"), BE3h = c(b0, error = "indel_h"), BE3hS = c(b0, error = "indel_h", select_all = TRUE), BE4 = c(b0, error = "paralog"),
+    BE0 = c(b0, error = "none"), BE3 = c(b0, error = "indel"), BE3h = c(b0, error = "indel_h"), BE3hS = c(b0, error = "indel_h", select_all = TRUE), BMIXh = c(b0, error = "indel_h", mix = TRUE), BE4 = c(b0, error = "paralog"),
     BE5 = c(b0, error = "discordant"), BE7 = c(b0, error = "recombination"), BMIX = c(b0, error = "mixture"),
     NULL)
 }
@@ -122,7 +123,7 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
     } else {
       if (spec$gene_sd > 0) m <- exp(stats::rnorm(1, -spec$gene_sd^2 / 2, spec$gene_sd))
       om <- lapply(seq_len(n_nodes), function(k) spec$om * m * eff[k]); prop <- spec$prop; per_branch <- FALSE
-      if (identical(spec$error, "mixture") && stats::runif(1) < 0.1) {
+      if ((identical(spec$error, "mixture") || isTRUE(spec$mix)) && stats::runif(1) < 0.1) {
         selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10))
       }
       if (isTRUE(spec$select_all)) { selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10)) }
