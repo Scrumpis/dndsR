@@ -7,7 +7,7 @@
 a <- commandArgs(TRUE); root <- a[1]; prefix <- a[2]
 set.seed(20261124)
 cp <- function(x, n) if (n == 0) c(NA, NA) else stats::binom.test(x, n)$conf.int[1:2]
-bradley <- function(x, n) { ci <- cp(x, n); if (ci[1] >= 0.025 && ci[2] <= 0.075) "within tolerance" else if (ci[1] > 0.05) "anticonservative" else if (ci[2] <= 0.05) "calibrated" else "outside tolerance or inconclusive" }
+bradley <- function(x, n) { if (n == 0) return("no data"); ci <- cp(x, n); if (ci[1] >= 0.025 && ci[2] <= 0.075) "within tolerance" else if (ci[1] > 0.05) "anticonservative" else if (ci[2] <= 0.05) "calibrated" else "outside tolerance or inconclusive" }
 res <- function(u) {
   f <- file.path(root, "units", u, "relax", "relax_results.tsv")
   if (!file.exists(f)) return(NULL)
@@ -84,5 +84,19 @@ if (all(c("R-N16", "R-K05", "R-K2") %in% names(dat)) && !is.null(dat[["R-N16"]]$
   }))
   m6 <- data.frame(statistic = colnames(mix), mean = colMeans(mix), lo = apply(mix, 2, stats::quantile, 0.025), hi = apply(mix, 2, stats::quantile, 0.975))
   utils::write.table(m6, paste0(prefix, "_mixture.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
+}
+# RD1: HyPhy versions, run directly on R-N16's dndsR inputs (phylo-lineage-relax-direct.sb, MODE=dndsr, seed 1)
+if (!is.null(dat[["R-N16"]])) {
+  ver <- list()
+  for (f in Sys.glob(file.path(root, "direct", "*", "direct_dndsr_seed1.tsv"))) {
+    v <- basename(dirname(f)); d <- utils::read.delim(f, stringsAsFactors = FALSE)
+    m <- merge(dat[["R-N16"]]$r[, c("orthogroup", "lrt")], d[, c("orthogroup", "lrt")], by = "orthogroup", suffixes = c("_dndsr", "_direct"))
+    m$lrt_direct <- suppressWarnings(as.numeric(m$lrt_direct)); ok <- is.finite(m$lrt_direct)
+    x <- sum(m$lrt_direct[ok] > 3.84); ci <- cp(x, sum(ok))
+    ver[[v]] <- data.frame(version = v, genes = nrow(m), failed = sum(!ok), share_gt_3.84 = x / sum(ok), lo = ci[1], hi = ci[2],
+      dndsr_share_gt_3.84 = mean(m$lrt_dndsr[ok] > 3.84), mean_lrt = mean(pmax(0, m$lrt_direct[ok])),
+      agree_0.01 = mean(abs(m$lrt_direct[ok] - m$lrt_dndsr[ok]) < 0.01), max_abs_diff = max(abs(m$lrt_direct[ok] - m$lrt_dndsr[ok])))
+  }
+  if (length(ver)) utils::write.table(do.call(rbind, ver), paste0(prefix, "_versions.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 }
 for (f in Sys.glob(paste0(prefix, "_*.tsv"))) { cat("\n==", basename(f), "\n"); print(utils::read.delim(f), row.names = FALSE) }

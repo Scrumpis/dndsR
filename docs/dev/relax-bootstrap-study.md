@@ -1,6 +1,6 @@
 # Study R: calibrating RELAX by parametric bootstrap (design)
 
-Status: **pilot done; stage 1 (diagnostic, below) approved by the maintainer 2026-11-21; the main study's remaining ~930 core-hours are not approved and wait on stage 1's go/no-go.** RELAX's `p_value` (chi-square(1) on the LRT) is anticonservative on 16 taxa: 8.3-9.3% at 0.05 in every check of the follow-up ([report](../validation/phylo-lineage-calibration.md)); the LRT behaves like about 1.27 times chi-square(1) (audit, E2).
+Status: **pilot done; stage 1 done ([results](../validation/relax-calibration-stage1.md)): no-go for the ~930 core-hour main design; both genome-scale p-values pass, and a ~60 core-hour confirmation is recommended, not yet approved.** RELAX's `p_value` (chi-square(1) on the LRT) is anticonservative on 16 taxa: 8.3-9.3% at 0.05 in every check of the follow-up ([report](../validation/phylo-lineage-calibration.md)); the LRT behaves like about 1.27 times chi-square(1) (audit, E2).
 
 ## Procedure under test
 

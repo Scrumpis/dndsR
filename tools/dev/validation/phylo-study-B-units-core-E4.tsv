@@ -1,0 +1,2 @@
+unit	cell	tree	n	codons	seed	methods	post	mask	settings
+B-E4-T8b	BE4	T8b	300	300	305	absrel,branch_omega	none	yes	branch_omega:models=M0,two_ratio,two_ratio_null|busted:multiple_hits=Double;starting_points=3

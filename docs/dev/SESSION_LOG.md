@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-22: validation studies N, L, B, R stage 1
+
+- **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
+- **Done:** designs for N, L, B, R stage 1 fixed before running, and drafts for P and E (`760ca03`); study N run and reported; L and B pilots with gates; B paralog generator fixed and re-piloted; R stage 1 run and reported with its go/no-go.
+- **Verified:** fast gate on intel18 at each commit, 243 tests, 0 failed (6 skips: slow or fast-mode).
+- **Found:** the enrichment excess is confounding, not FDR failure; RELAX's excess is HyPhy's, present in 2.5.62/103/104, finite-sample, shared within a dataset; a shared scaled chi-square or pooled bootstrap p restores size with size-adjusted power kept; L gate 3 failed narrowly; B costs about 4 times its budget, mostly BUSTED.
+- **Not done:** full L (held), B's 16-taxon and BUSTED arms (held), R confirmation (not approved), P and E (drafts); push; nothing merged, tagged, or published.
+
 ## 2026-11-21 (later): lineage follow-up study, calibration flags
 
 - **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
