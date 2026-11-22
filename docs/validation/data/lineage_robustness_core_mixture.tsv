@@ -1,0 +1,11 @@
+unit	run	test	correction	discoveries	false	fdp	lo	hi	power	true_tests
+B-MIX-T8b	absrel	absrel p_raw per branch	BH across genes	716	480	0.670391061452514	0.634612495616192	0.704758279143423	0.156498673740053	1508
+B-MIX-T8b	absrel	absrel p_bh_lineage per branch	BH per lineage (dndsR)	722	479	0.663434903047091	0.627660317166376	0.697867306927231	0.161140583554377	1508
+B-MIX-T8b	absrel	absrel p_value per gene	BH across genes	494	387	0.783400809716599	0.744420256901215	0.818949842896423	0.922413793103448	116
+B-MIX-T8b	absrel_mask	absrel p_raw per branch	BH across genes	137	9	0.0656934306569343	0.0304768144456785	0.121043032801062	0.0848806366047745	1508
+B-MIX-T8b	absrel_mask	absrel p_bh_lineage per branch	BH per lineage (dndsR)	192	10	0.0520833333333333	0.0252553276984428	0.0936953602695078	0.120689655172414	1508
+B-MIX-T8b	absrel_mask	absrel p_value per gene	BH across genes	89	7	0.0786516853932584	0.0322070633043511	0.155359459123339	0.706896551724138	116
+B-MIX-T8b	branch_omega	p_two_vs_m0	BH across genes	116	29	0.25	0.17426037146437	0.338920835898921	0.75	116
+B-MIX-T8b	branch_omega	p_fg_omega_gt1	BH across genes	0	0	NA	NA	NA	0	116
+B-MIX-T8b	branch_omega_mask	p_two_vs_m0	BH across genes	99	4	0.0404040404040404	0.011116748798576	0.100227906568749	0.818965517241379	116
+B-MIX-T8b	branch_omega_mask	p_fg_omega_gt1	BH across genes	0	0	NA	NA	NA	0	116

@@ -1,0 +1,101 @@
+unit	run	masked	test	n	positives	rate	lo	hi	category
+B-E0-T8b	absrel	FALSE	absrel p_raw per branch	3900	80	0.0205128205128205	0.0162980655286528	0.0254657242476425	calibrated
+B-E0-T8b	absrel	FALSE	absrel p_bh_lineage per branch	3900	0	0	0	0.000945419335958081	calibrated
+B-E0-T8b	absrel	FALSE	absrel p_value per gene	300	7	0.0233333333333333	0.00943150206179464	0.0474825650297819	calibrated
+B-E0-T8b	absrel_mask	TRUE	absrel p_raw per branch	3900	80	0.0205128205128205	0.0162980655286528	0.0254657242476425	calibrated
+B-E0-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	3900	0	0	0	0.000945419335958081	calibrated
+B-E0-T8b	absrel_mask	TRUE	absrel p_value per gene	300	7	0.0233333333333333	0.00943150206179464	0.0474825650297819	calibrated
+B-E0-T8b	branch_omega	FALSE	p_two_vs_m0	300	13	0.0433333333333333	0.0232718410046824	0.072961464220282	inconclusive
+B-E0-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E0-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	13	0.0433333333333333	0.0232718410046824	0.072961464220282	inconclusive
+B-E0-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E1-T8b	absrel	FALSE	absrel p_raw per branch	7800	739	0.0947435897435897	0.0883325660811729	0.101459225229348	anticonservative
+B-E1-T8b	absrel	FALSE	absrel p_bh_lineage per branch	7800	600	0.0769230769230769	0.0711043331098271	0.0830602294481813	anticonservative
+B-E1-T8b	absrel	FALSE	absrel p_value per gene	600	598	0.996666666666667	0.988011166041348	0.999596062639557	anticonservative
+B-E1-T8b	absrel_mask	TRUE	absrel p_raw per branch	7800	162	0.0207692307692308	0.017720334422373	0.0241831568447527	calibrated
+B-E1-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	7800	0	0	0	0.000472821448039905	calibrated
+B-E1-T8b	absrel_mask	TRUE	absrel p_value per gene	600	6	0.01	0.00367841644565225	0.0216379557094016	calibrated
+B-E1-T8b	branch_omega	FALSE	p_two_vs_m0	600	270	0.45	0.409690600010403	0.490803832689301	anticonservative
+B-E1-T8b	branch_omega	FALSE	p_fg_omega_gt1	600	0	0	0	0.00612927133066925	calibrated
+B-E1-T8b	branch_omega_mask	TRUE	p_two_vs_m0	600	20	0.0333333333333333	0.0204774239002063	0.0510126524365248	inconclusive
+B-E1-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	600	0	0	0	0.00612927133066925	calibrated
+B-E2-T8b	absrel	FALSE	absrel p_raw per branch	3900	386	0.098974358974359	0.0897769189898006	0.108777523208221	anticonservative
+B-E2-T8b	absrel	FALSE	absrel p_bh_lineage per branch	3900	300	0.0769230769230769	0.068751229624866	0.085735306909408	anticonservative
+B-E2-T8b	absrel	FALSE	absrel p_value per gene	300	300	1	0.987779025305706	1	anticonservative
+B-E2-T8b	absrel_mask	TRUE	absrel p_raw per branch	3900	87	0.0223076923076923	0.0179051932668646	0.0274445273693181	calibrated
+B-E2-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	3900	0	0	0	0.000945419335958081	calibrated
+B-E2-T8b	absrel_mask	TRUE	absrel p_value per gene	300	5	0.0166666666666667	0.00543320531510525	0.0384637449649964	calibrated
+B-E2-T8b	branch_omega	FALSE	p_two_vs_m0	300	28	0.0933333333333333	0.0629176592687208	0.132064825849649	anticonservative
+B-E2-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E2-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	16	0.0533333333333333	0.0307883197734781	0.0851667649095142	inconclusive
+B-E2-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E3-T8b	absrel	FALSE	absrel p_raw per branch	3900	560	0.143589743589744	0.132725904816694	0.154990514444043	anticonservative
+B-E3-T8b	absrel	FALSE	absrel p_bh_lineage per branch	3900	200	0.0512820512820513	0.0445697391986474	0.0586763175399718	within tolerance
+B-E3-T8b	absrel	FALSE	absrel p_value per gene	300	144	0.48	0.422242030391117	0.538156778971137	anticonservative
+B-E3-T8b	absrel_mask	TRUE	absrel p_raw per branch	3900	539	0.138205128205128	0.127519706533089	0.149435725683522	anticonservative
+B-E3-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	3900	181	0.0464102564102564	0.0400217378569392	0.0534889165268	within tolerance
+B-E3-T8b	absrel_mask	TRUE	absrel p_value per gene	300	133	0.443333333333333	0.38625765261967	0.501539206015328	anticonservative
+B-E3-T8b	branch_omega	FALSE	p_two_vs_m0	300	17	0.0566666666666667	0.0333533115166846	0.0891804044341631	inconclusive
+B-E3-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E3-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	16	0.0533333333333333	0.0307883197734781	0.0851667649095142	inconclusive
+B-E3-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E4-T8b-pilot2	absrel	FALSE	absrel p_raw per branch	182	4	0.021978021978022	0.00601998324441074	0.0553137990301372	inconclusive
+B-E4-T8b-pilot2	absrel	FALSE	absrel p_bh_lineage per branch	182	0	0	0	0.0200645417640249	calibrated
+B-E4-T8b-pilot2	absrel	FALSE	absrel p_value per gene	14	0	0	0	0.231635761650116	inconclusive
+B-E4-T8b-pilot2	absrel_mask	TRUE	absrel p_raw per branch	182	4	0.021978021978022	0.00601998324441074	0.0553137990301372	inconclusive
+B-E4-T8b-pilot2	absrel_mask	TRUE	absrel p_bh_lineage per branch	182	0	0	0	0.0200645417640249	calibrated
+B-E4-T8b-pilot2	absrel_mask	TRUE	absrel p_value per gene	14	0	0	0	0.231635761650116	inconclusive
+B-E4-T8b-pilot2	branch_omega	FALSE	p_two_vs_m0	20	1	0.05	0.00126508949794981	0.248732762772028	inconclusive
+B-E4-T8b-pilot2	branch_omega	FALSE	p_fg_omega_gt1	20	0	0	0	0.168433470983085	inconclusive
+B-E4-T8b-pilot2	branch_omega_mask	TRUE	p_two_vs_m0	20	1	0.05	0.00126508949794981	0.248732762772028	inconclusive
+B-E4-T8b-pilot2	branch_omega_mask	TRUE	p_fg_omega_gt1	20	0	0	0	0.168433470983085	inconclusive
+B-E4-T8b	absrel	FALSE	absrel p_raw per branch	2769	74	0.0267244492596605	0.0210413735358859	0.0334351135413473	calibrated
+B-E4-T8b	absrel	FALSE	absrel p_bh_lineage per branch	2769	0	0	0	0.001331319382644	calibrated
+B-E4-T8b	absrel	FALSE	absrel p_value per gene	213	5	0.0234741784037559	0.00766494125329046	0.0539277818909772	inconclusive
+B-E4-T8b	absrel_mask	TRUE	absrel p_raw per branch	2769	74	0.0267244492596605	0.0210413735358859	0.0334351135413473	calibrated
+B-E4-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	2769	0	0	0	0.001331319382644	calibrated
+B-E4-T8b	absrel_mask	TRUE	absrel p_value per gene	213	5	0.0234741784037559	0.00766494125329046	0.0539277818909772	inconclusive
+B-E4-T8b	branch_omega	FALSE	p_two_vs_m0	300	13	0.0433333333333333	0.0232718410046824	0.072961464220282	inconclusive
+B-E4-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E4-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	13	0.0433333333333333	0.0232718410046824	0.072961464220282	inconclusive
+B-E4-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E5-T8b	absrel	FALSE	absrel p_raw per branch	637	9	0.0141287284144427	0.00648036690998682	0.0266506899519943	calibrated
+B-E5-T8b	absrel	FALSE	absrel p_bh_lineage per branch	637	1	0.00156985871271586	3.97445916137954e-05	0.00871537060613892	calibrated
+B-E5-T8b	absrel	FALSE	absrel p_value per gene	49	2	0.0408163265306122	0.0049818418349713	0.139787187022464	inconclusive
+B-E5-T8b	absrel_mask	TRUE	absrel p_raw per branch	637	9	0.0141287284144427	0.00648036690998682	0.0266506899519943	calibrated
+B-E5-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	637	1	0.00156985871271586	3.97445916137954e-05	0.00871537060613892	calibrated
+B-E5-T8b	absrel_mask	TRUE	absrel p_value per gene	49	2	0.0408163265306122	0.0049818418349713	0.139787187022464	inconclusive
+B-E5-T8b	branch_omega	FALSE	p_two_vs_m0	300	8	0.0266666666666667	0.0115815677543339	0.051865811960931	inconclusive
+B-E5-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E5-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	8	0.0266666666666667	0.0115815677543339	0.051865811960931	inconclusive
+B-E5-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E6-T16m	absrel	FALSE	absrel p_raw per branch	6300	131	0.0207936507936508	0.0174139561603759	0.0246265347210638	calibrated
+B-E6-T16m	absrel	FALSE	absrel p_bh_lineage per branch	6300	0	0	0	0.000585365028291512	calibrated
+B-E6-T16m	absrel	FALSE	absrel p_value per gene	300	4	0.0133333333333333	0.00364451405206653	0.0337848962619178	calibrated
+B-E6-T16m	absrel_mask	TRUE	absrel p_raw per branch	6300	131	0.0207936507936508	0.0174139561603759	0.0246265347210638	calibrated
+B-E6-T16m	absrel_mask	TRUE	absrel p_bh_lineage per branch	6300	0	0	0	0.000585365028291512	calibrated
+B-E6-T16m	absrel_mask	TRUE	absrel p_value per gene	300	4	0.0133333333333333	0.00364451405206653	0.0337848962619178	calibrated
+B-E6-T16m	branch_omega	FALSE	p_two_vs_m0	279	12	0.043010752688172	0.0224187543147955	0.0739253009954643	inconclusive
+B-E6-T16m	branch_omega	FALSE	p_fg_omega_gt1	279	0	0	0	0.0131347662501198	calibrated
+B-E6-T16m	branch_omega_mask	TRUE	p_two_vs_m0	279	12	0.043010752688172	0.0224187543147955	0.0739253009954643	inconclusive
+B-E6-T16m	branch_omega_mask	TRUE	p_fg_omega_gt1	279	0	0	0	0.0131347662501198	calibrated
+B-E7-T8b	absrel	FALSE	absrel p_raw per branch	3900	105	0.0269230769230769	0.022072004651299	0.0324992101433685	calibrated
+B-E7-T8b	absrel	FALSE	absrel p_bh_lineage per branch	3900	0	0	0	0.000945419335958081	calibrated
+B-E7-T8b	absrel	FALSE	absrel p_value per gene	300	11	0.0366666666666667	0.0184434608124598	0.0646585181962982	inconclusive
+B-E7-T8b	absrel_mask	TRUE	absrel p_raw per branch	3900	105	0.0269230769230769	0.022072004651299	0.0324992101433685	calibrated
+B-E7-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	3900	0	0	0	0.000945419335958081	calibrated
+B-E7-T8b	absrel_mask	TRUE	absrel p_value per gene	300	11	0.0366666666666667	0.0184434608124598	0.0646585181962982	inconclusive
+B-E7-T8b	branch_omega	FALSE	p_two_vs_m0	300	13	0.0433333333333333	0.0232718410046824	0.072961464220282	inconclusive
+B-E7-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E7-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	13	0.0433333333333333	0.0232718410046824	0.072961464220282	inconclusive
+B-E7-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E3h-T8b	absrel	FALSE	absrel p_raw per branch	3900	277	0.071025641025641	0.0631595125072885	0.0795415536887143	anticonservative
+B-E3h-T8b	absrel	FALSE	absrel p_bh_lineage per branch	3900	33	0.00846153846153846	0.0058314874983438	0.011862798463338	calibrated
+B-E3h-T8b	absrel	FALSE	absrel p_value per gene	300	63	0.21	0.165309217141474	0.260520661298686	anticonservative
+B-E3h-T8b	absrel_mask	TRUE	absrel p_raw per branch	3900	276	0.0707692307692308	0.0629167470051929	0.0792719091099993	anticonservative
+B-E3h-T8b	absrel_mask	TRUE	absrel p_bh_lineage per branch	3900	32	0.00820512820512821	0.00561887712428838	0.0115636122905991	calibrated
+B-E3h-T8b	absrel_mask	TRUE	absrel p_value per gene	300	62	0.206666666666667	0.162278496739015	0.256953242540974	anticonservative
+B-E3h-T8b	branch_omega	FALSE	p_two_vs_m0	300	16	0.0533333333333333	0.0307883197734781	0.0851667649095142	inconclusive
+B-E3h-T8b	branch_omega	FALSE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated
+B-E3h-T8b	branch_omega_mask	TRUE	p_two_vs_m0	300	16	0.0533333333333333	0.0307883197734781	0.0851667649095142	inconclusive
+B-E3h-T8b	branch_omega_mask	TRUE	p_fg_omega_gt1	300	0	0	0	0.0122209746942935	calibrated

@@ -1,0 +1,6 @@
+signal	affected	sensitivity	false_flag_unaffected
+dissimilar_window	428	0.995327102803738	0
+high_ds	428	0.00233644859813084	0
+few_synonymous	428	0	0
+tip_ds_3x_median	428	0.259345794392523	0
+qc_flag	428	0.995327102803738	0.0227272727272727

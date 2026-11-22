@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-22 (later): study B core report, BE3h
+
+- **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (resumed from `49fd39f`)
+- **Done:** BE3h (E3 with homologous insertions, seed 304) summarized; direct HyPhy reruns of its 20 most significant genes; aBSREL on its true alignments as a diagnostic; core report completed (`docs/validation/lineage-robustness-core.md`) with tables in `docs/validation/data/`.
+- **Found:** BE3h `p_raw` 7.1% and gene `p_value` 21% after realignment, 2.3% and 3.0% on the true alignment: the excess is alignment error, not gaps. Direct reruns 260 of 260 agree (5e-14). `p_bh_lineage` 0.8%, `p_two_vs_m0` 5.3%.
+- **Not done:** the four recommendations (maintainer); 16-taxon units and BUSTED arms (held); which aligner step causes the error, not tested; push; nothing merged, tagged, or published. Documentation only, so no package tests were rerun.
+
 ## 2026-11-22: validation studies N, L, B, R stage 1
 
 - **Session:** `d6fcae14-1433-4af7-9831-a319a98cd839` (continued)
