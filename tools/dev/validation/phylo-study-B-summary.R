@@ -19,8 +19,12 @@ tests <- function(u, run) {
   t <- r[r$status == "tested", ]
   if (m == "absrel") {
     b <- rd(u, run, "branches"); b <- b[b$orthogroup %in% t$orthogroup & !is.na(b$p_raw), ]
-    out[["absrel p_raw per branch"]] <- list(p = b$p_raw, og = b$orthogroup, fg = b$foreground)
-    out[["absrel p_bh_lineage per branch"]] <- list(p = b$p_bh_lineage, og = b$orthogroup, fg = b$foreground)
+  # Truth per branch comes from the simulator (sim/branch_truth.tsv), not from the branches table's
+  # `foreground` column, which is TRUE for every tested branch when aBSREL tests all branches.
+    bt <- utils::read.delim(file.path(root, "units", u, "sim", "branch_truth.tsv"), stringsAsFactors = FALSE)
+    fg <- b$species_tree_branches %in% bt$branch_id[bt$foreground]
+    out[["absrel p_raw per branch"]] <- list(p = b$p_raw, og = b$orthogroup, fg = fg)
+    out[["absrel p_bh_lineage per branch"]] <- list(p = b$p_bh_lineage, og = b$orthogroup, fg = fg)
     out[["absrel p_value per gene"]] <- list(p = t$p_value, og = t$orthogroup)
   } else if (m == "branch_omega") {
     out[["p_two_vs_m0"]] <- list(p = t$p_two_vs_m0, og = t$orthogroup)

@@ -67,9 +67,9 @@ E1 and E2 are detectable by the window profile; E4 by the tip-dS ratio; E5 by `f
 
 | Test | Arm | Discoveries | FDP (95% CI) | Power | Power difference (95% CI) |
 |---|---|---:|---:|---:|---:|
-| aBSREL per branch | as given | 722 | **66.3%** (62.8-69.8) | 16.1% | |
-| | masked | 192 | 5.2% (2.5-9.4) | 12.1% | −4.0 (−5.3 to −3.1), **non-inferior** |
-| | flagged excluded | 117 | 5.1% (1.9-10.8) | 7.4% | −8.8 (−11.2 to −6.4), not |
+| aBSREL per branch | as given | 722 | **74.4%** (71.0-77.5) | 53.2% | |
+| | masked | 192 | 5.2% (2.5-9.4) | 52.3% | −0.9 (−4.5 to +1.1), **non-inferior** |
+| | flagged excluded | 117 | 5.1% (1.9-10.8) | 31.9% | −21.3 (−28.5 to −14.4), not |
 | aBSREL gene `p_value` | as given | 494 | **78.3%** (74.4-81.9) | 92.2% | |
 | | masked | 89 | 7.9% (3.2-15.5) | 70.7% | −21.6 (−30.1 to −10.1), not |
 | | flagged excluded | 53 | 5.7% (1.2-15.7) | 43.1% | −49.1 (−58.9 to −36.4), not |
@@ -77,6 +77,8 @@ E1 and E2 are detectable by the window profile; E4 by the tip-dS ratio; E5 by `f
 | | masked | 99 | 4.0% (1.1-10.0) | 81.9% | +6.9 (+2.6 to +11.9), **non-inferior** |
 | | flagged excluded | 62 | 4.8% (1.0-13.5) | 50.9% | −24.1 (−32.0 to −16.3), not |
 | `p_fg_omega_gt1` | as given, masked | 0 | — | 0% | |
+
+*Corrected 2026-11-22:* the first version of this table counted every branch of a selected gene as a true test for aBSREL per branch (the branches table's `foreground` column is TRUE for every tested branch when all branches are tested). The true tests are the foreground branches (t1, t2, their stem) of selected genes, 348 rather than 1,508. That raised the as-given FDP from 66.3% to 74.4%, and power from 16.1% to 53.2% (masked 12.1% to 52.3%; excluded 7.4% to 31.9%). The classifications did not change. The gene-level and branch-model rows were unaffected. Fixed in `phylo-study-B-summary.R` and `phylo-study-B-exclude.R`, which now read the truth from `sim/branch_truth.tsv`.
 
 The as-given arm's power is inflated by corruption, which also produces true discoveries in corrupted selected genes. So the power differences overstate what masking costs on clean data. Read them as the non-inferiority rule specifies, not as clean-data power. `p_fg_omega_gt1` found nothing: with 10% of sites at ω = 10, the foreground's whole-gene ω is about 1.1, too close to 1 for 300 codons.
 
@@ -143,8 +145,8 @@ So in BE3h `p_bh_lineage` made false discoveries in 11 of the 13 lineages tested
 
 None of these is implemented; each changes behaviour or output and needs approval.
 
-1. **Warn on the window profile.** dndsR already reports `dissimilar_windows` per orthogroup. A gene with any flagged window should carry a warning in aBSREL and branch-model results, because in the mixture 66-78% of unmasked discoveries were false and the profile flagged 99.5% of corrupted genes with no false flags. This is a warning, not an exclusion: excluding flagged genes failed the power rule for every test.
-2. **Offer masking as the documented safeguard** for aBSREL branch tests and the branch models (non-inferior power, FDP 4-5% against 25-66%). It should stay a sensitivity analysis, not a default, unless you decide otherwise. For aBSREL's gene-level `p_value`, masking restores size but costs 22 points of power, so present it with the warning, not as a fix.
+1. **Warn on the window profile.** dndsR already reports `dissimilar_windows` per orthogroup. A gene with any flagged window should carry a warning in aBSREL and branch-model results, because in the mixture 74-78% of unmasked discoveries were false and the profile flagged 99.5% of corrupted genes with no false flags. This is a warning, not an exclusion: excluding flagged genes failed the power rule for every test.
+2. **Offer masking as the documented safeguard** for aBSREL branch tests and the branch models (non-inferior power, FDP 4-5% against 25-74%). It should stay a sensitivity analysis, not a default, unless you decide otherwise. For aBSREL's gene-level `p_value`, masking restores size but costs 22 points of power, so present it with the warning, not as a fix.
 3. **Document E3 as a limitation of aBSREL's raw branch and gene p-values after realignment.** *Withdrawn in part, see the correction below: `p_bh_lineage` is not a safe alternative here.* With correctly simulated indels (BE3h) the excess is about 7% per branch and 21% per gene, and comes from realignment, not from gaps: aBSREL on the true alignments is calibrated. The documentation should say that aBSREL's unadjusted branch and gene p-values are sensitive to alignment error in gapped genes, that dndsR's window profile does not detect this. Testing other aligners or alignment filters would be a separate study.
 4. **No new safeguard for paralogs, discordance, missing taxa or recombination** on these trees. The existing zero-length-foreground exclusion is doing real work for discordance and should be described as such in the outputs documentation. The tip-dS ratio detects the paralog in every case and could be reported as an informational flag, but the tests stayed calibrated without it.
 

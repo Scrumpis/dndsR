@@ -88,7 +88,9 @@ for (set in sets) {
         size[[length(size) + 1L]] <- data.frame(arm = arm, test = x[[1]], n = n, positives = k, rate = k / n, lo = ci[1], hi = ci[2], category = category(k, n))
       }
     } else {
-      fgdet <- tapply(b$p_raw[b$foreground %in% TRUE] <= 0.05, b$orthogroup[b$foreground %in% TRUE], any)
+      bt <- utils::read.delim(file.path(u, "sim", "branch_truth.tsv"), stringsAsFactors = FALSE)
+      isfg <- b$species_tree_branches %in% bt$branch_id[bt$foreground]   # not b$foreground: TRUE for every tested branch
+      fgdet <- tapply(b$p_raw[isfg] <= 0.05, b$orthogroup[isfg], any)
       for (x in list(list("absrel foreground p_raw (any fg branch)", fgdet[genes$gene]), list("absrel p_value per gene", (t$p_value <= 0.05)[match(genes$gene, t$orthogroup)]),
                      list("p_two_vs_m0", (bo$p_two_vs_m0 <= 0.05)[match(genes$gene, bo$orthogroup)]), list("p_fg_omega_gt1", (bo$p_fg_omega_gt1 <= 0.05)[match(genes$gene, bo$orthogroup)]))) {
         d <- x[[2]]; d[is.na(d)] <- FALSE; k <- sum(d); n <- length(d); ci <- cp(k, n)
@@ -122,7 +124,8 @@ if (!is.null(per_gene$null)) {
 }
 if (!is.null(per_gene$selected)) {
   g <- unique(per_gene$selected$A0$genes$orthogroup)
-  det <- function(b) { x <- tapply(b$p_raw[b$foreground %in% TRUE] <= 0.05, factor(b$orthogroup[b$foreground %in% TRUE], levels = g), any); x[is.na(x)] <- FALSE; x }
+  bt <- utils::read.delim(file.path(root, "units", "selected", "sim", "branch_truth.tsv"), stringsAsFactors = FALSE)
+  det <- function(b) { isfg <- b$species_tree_branches %in% bt$branch_id[bt$foreground]; x <- tapply(b$p_raw[isfg] <= 0.05, factor(b$orthogroup[isfg], levels = g), any); x[is.na(x)] <- FALSE; x }
   d0 <- det(per_gene$selected$A0$branches)
   for (arm in c("A1", "A2", "T")) {
     d1 <- det(per_gene$selected[[arm]]$branches)

@@ -22,6 +22,10 @@ det <- data.frame(signal = sig, affected = length(affected),
 utils::write.table(det, paste0(prefix, "_mix_detection.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 flagged <- dt$gene[dt$dissimilar_window]
 sel <- genes$gene[genes$selected]
+# Truth per branch comes from the simulator (sim/branch_truth.tsv), not from the branches table's
+# `foreground` column, which is TRUE for every tested branch when aBSREL tests all branches.
+bt <- utils::read.delim(file.path(ud, "sim", "branch_truth.tsv"), stringsAsFactors = FALSE)
+fg_ids <- bt$branch_id[bt$foreground]
 
 rd <- function(run, what) utils::read.delim(file.path(ud, run, sprintf("%s_%s.tsv", run, what)), stringsAsFactors = FALSE)
 get <- function(run, test) {
@@ -29,7 +33,7 @@ get <- function(run, test) {
   if (test == "p_two_vs_m0") return(data.frame(og = t$orthogroup, p = t$p_two_vs_m0, true = t$orthogroup %in% sel))
   if (test == "absrel p_value per gene") return(data.frame(og = t$orthogroup, p = t$p_value, true = t$orthogroup %in% sel))
   b <- rd(run, "branches"); b <- b[b$orthogroup %in% t$orthogroup & !is.na(b$p_raw), ]
-  data.frame(og = b$orthogroup, p = b$p_raw, true = b$orthogroup %in% sel & b$foreground %in% TRUE, branch = b$species_tree_branches)
+  data.frame(og = b$orthogroup, p = b$p_raw, true = b$orthogroup %in% sel & b$species_tree_branches %in% fg_ids, branch = b$species_tree_branches)
 }
 # The documented corrections: BH across genes; for aBSREL branches, BH per species-tree branch (p_bh_lineage).
 adjust <- function(x) if (is.null(x$branch)) stats::p.adjust(x$p, "BH") else ave(x$p, x$branch, FUN = function(v) stats::p.adjust(v, "BH"))
