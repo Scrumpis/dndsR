@@ -413,6 +413,7 @@
     counts = as.list(table(label)), exclusions_by_basis = as.list(table(results$exclusion_basis[!tested])),
     tested_orthogroups_per_taxon = as.list(presence),
     calibration = .calibration_notes(method, results),
+    alignment_check = .alignment_check(results),
     ascertainment = "Only single-copy orthogroups that pass QC and keep the foreground identifiable are tested. Excluded and failed orthogroups are listed with reasons; conclusions apply to the tested set only."
   )
   writeLines(jsonlite::toJSON(prov, auto_unbox = TRUE, pretty = TRUE, digits = NA, null = "null"), out_file("provenance", "json"))
@@ -428,5 +429,6 @@
             out_file("results"), call. = FALSE)
   }
   if (any(tested)) .calibration_warn(method, results)
+  if (any(tested)) .alignment_check_warn(method, results)
   invisible(results)
 }

@@ -160,3 +160,23 @@ test_that("known calibration problems are flagged on tested rows of the outputs 
   # BUSTED's outputs are unchanged.
   expect_false("calibration" %in% names(dndsR:::.calibration_column(res, "busted")))
 })
+
+test_that("the alignment check counts flagged tested orthogroups and warns without implying the rest are aligned", {
+  res <- data.frame(orthogroup = c("g1", "g2", "g3", "g4"), status = c("tested", "tested", "tested", "excluded"),
+                    qc_flags = c("dissimilar_window:t1", "gappy_columns;dissimilar_window:t2;high_divergence", "", "dissimilar_window:t3"),
+                    p_value = c(0.001, 0.2, 0.001, NA), p_adj = c(0.01, 0.3, 0.01, NA), p_adj_method = "BH")
+  chk <- dndsR:::.alignment_check(res)
+  expect_identical(c(chk$tested, chk$flagged, chk$flagged_significant), c(3L, 2L, 1L))   # the excluded g4 is not counted
+  expect_identical(chk$significant_columns, "p_adj")
+  w <- tryCatch(dndsR:::.alignment_check_warn("absrel", res), warning = function(w) conditionMessage(w))
+  expect_match(w, "2 of 3 tested orthogroups have a dissimilar_window flag", fixed = TRUE)
+  expect_match(w, "1 of them with an adjusted p-value <= 0.05", fixed = TRUE)
+  expect_match(w, "not shown to be correctly aligned", fixed = TRUE)
+  # Branch models: any of their adjusted p-values counts.
+  bo <- data.frame(orthogroup = c("g1", "g2"), status = "tested", qc_flags = c("dissimilar_window:t1", "dissimilar_window:t2"),
+                   p_adj_two_vs_m0 = c(0.5, 0.5), p_adj_fg_omega_gt1 = c(0.01, NA))
+  expect_identical(dndsR:::.alignment_check(bo)$flagged_significant, 1L)
+  # No flag, no warning; nothing tested, no entry.
+  expect_silent(dndsR:::.alignment_check_warn("busted", res[3, ]))
+  expect_null(dndsR:::.alignment_check(res[4, ]))
+})

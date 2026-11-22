@@ -2,7 +2,7 @@
 
 Four commands compare selection among the branches of a species tree, from the same `phylo_prepare` folder: `phylo_branch_omega` (PAML codeml branch models), `phylo_absrel` (HyPhy aBSREL), `phylo_relax` (HyPhy RELAX), and `phylo_summarize`, which turns their per-gene results into one row per lineage. Tutorial: [tutorials/lineage-selection.md](tutorials/lineage-selection.md). BUSTED, for episodic selection on a fixed foreground, is in [phylo-methods.md](phylo-methods.md).
 
-**Status: experimental, new in this release.** dndsR reproduces each engine run directly ([evidence](validation/phylo-lineage.md)). Their error rates and estimates were measured only in simulation, on five designed trees ([calibration](#calibration-in-simulation)): aBSREL's tests held their level everywhere, the branch-model tests were close to it, RELAX on 16 taxa was anticonservative, reproducibly, and the calibration of `p_fg_omega_gt1` at a foreground omega of 1 and of `p_free_vs_m0` with missing taxa is not established. Those outputs carry a `calibration` flag in every results table. The methods have run on one small set of public Brassicaceae genes, which shows they work on real data, not that their conclusions are right. They are not validated for biological inference across arbitrary phylogenies.
+**Status: experimental, new in this release.** dndsR reproduces each engine run directly ([evidence](validation/phylo-lineage.md)). Their error rates and estimates were measured only in simulation, on five designed trees ([calibration](#calibration-in-simulation)): aBSREL's tests held their level on simulated error-free alignments but not after sequences with indels were realigned ([input errors](#input-errors)), the branch-model tests were close to it, RELAX on 16 taxa was anticonservative, reproducibly, and the calibration of `p_fg_omega_gt1` at a foreground omega of 1 and of `p_free_vs_m0` with missing taxa is not established. Those outputs carry a `calibration` flag in every results table. The methods have run on one small set of public Brassicaceae genes, which shows they work on real data, not that their conclusions are right. They are not validated for biological inference across arbitrary phylogenies.
 
 ## Which question each answers
 
@@ -52,7 +52,17 @@ Per-branch flags in `_branches.tsv`, from the free-ratio fit: `zero_length`, `fe
 
 aBSREL (Smith et al. 2015) fits a variable number of omega classes per branch and tests each branch for a class above 1. `branches = "all"` (default) tests every branch, the exploratory analysis for comparing lineages; `"foreground"` tests only the foreground, with more power for a hypothesis fixed in advance. `baseline_omega`, from aBSREL's first stage, is one MG94 omega per branch for every branch; it is on a different scale from codeml's GY94 omega and is not interchangeable with it.
 
-Multiple testing, three levels: `p_raw` (per branch), `p_holm` (HyPhy's Holm-Bonferroni across the branches tested in one gene), and per gene `p_value` (the smallest `p_holm`, a valid test that some branch was selected) with `p_adj` (Benjamini-Hochberg across genes). For lineages, `p_bh_lineage` applies Benjamini-Hochberg to `p_raw` across the orthogroups in which that species-tree branch was tested: the count of genes with `p_bh_lineage <= 0.05` on a branch is the lineage-level count to report.
+Multiple testing. Each output answers a different question, over a different family:
+
+| Output | Question | Family corrected over |
+|---|---|---|
+| `p_raw` | Was this branch, in this gene, selected? | none |
+| `p_holm` | the same, within this gene | the branches tested in the gene. HyPhy multiplies the k-th smallest p by (m − k + 1) without Holm's running maximum, so it lies between Holm's and Hochberg's procedures, valid when the branches' p-values are independent or positively dependent |
+| `p_value` (per gene) | Was any tested branch of this gene selected? | the smallest `p_holm`: in effect Hochberg's global test, under the same condition |
+| `p_adj` (per gene) | the same, across many genes | Benjamini-Hochberg across tested genes |
+| `p_bh_lineage` | In which genes was this particular branch selected? | Benjamini-Hochberg across the genes in which that species-tree branch was tested, one family per branch. Nothing corrects across branches: counting discoveries over several lineages is not covered by it |
+
+Each correction is valid only if `p_raw` is. Which output suits branch-level and gene-level conclusions, and how they behave with selected and unselected genes mixed, is being measured ([design](dev/lineage-multiple-testing.md)); until then dndsR does not recommend one of them for lineage counts. With realigned indels in simulation, `p_raw`, `p_value`, `p_adj`, and `p_bh_lineage` all made excess false discoveries ([input errors](#input-errors)).
 
 ## phylo_relax
 
@@ -79,7 +89,7 @@ Lineage-level hypotheses ("lineages with more LTR activity have higher omega") n
 
 - **Single-copy genes only.** `phylo_prepare` excludes orthogroups with paralogs. Gene families that expand or contract, the ones genome expansion is made of, are therefore under-represented, and more so in lineages with more duplication. Conclusions about genome expansion from these tables apply to the single-copy genes tested.
 - **Branch length.** Short branches carry few substitutions, so their omega is noisy; long branches saturate. The flags and the dS columns show both; neither is corrected.
-- **Model assumptions.** Branch models assume one omega per branch for all sites; site-to-site variation is ignored (it is measured in the calibration). aBSREL and RELAX assume the tree, the codon model, and correct alignments. Multinucleotide substitutions, alignment errors, and misassigned orthologs inflate positives, as in the BUSTED calibration ([phylo-methods.md](phylo-methods.md#calibration-in-simulation)).
+- **Model assumptions.** Branch models assume one omega per branch for all sites; site-to-site variation is ignored (it is measured in the calibration). aBSREL and RELAX assume the tree, the codon model, and correct alignments. Alignment errors inflate positives ([input errors](#input-errors)); multinucleotide substitutions do too, as in the BUSTED calibration ([phylo-methods.md](phylo-methods.md#calibration-in-simulation)).
 - **Calibration.** RELAX's `p_value` was anticonservative on 16 taxa (8.3-9.3% at 0.05 in every check); `p_fg_omega_gt1` at omega exactly 1 (5.5-6.8%) and `p_free_vs_m0` with missing taxa (8%, then 4% in a replicate) are not established as calibrated. Rows carry the `calibration` flag; treat single-gene positives from them with caution. Single-gene free-ratio estimates are noisy even when unflagged; compare lineages through pooled values.
 - **Gene-tree discordance** is reported per orthogroup (`gene_tree_discordant`), not corrected.
 - **Ascertainment.** Only orthogroups that pass QC are analysed; counts by reason are in each run's provenance.
@@ -93,7 +103,19 @@ Design fixed before any simulation: [dev/phylo-lineage-calibration.md](dev/phylo
 - **RELAX** (`Minimal`): 5.0% on 8 taxa, 7.0% on 5, **9.0% (6.0-12.8) on 16 taxa: anticonservative**, reproduced in a follow-up with new genes (8.3%), with sites' classes drawn per branch as RELAX assumes (8.5%), with HyPhy run directly (9.0%), and with the best of three seeds (9.3%). Its likelihood-ratio statistic is larger than chi-square(1) assumes (mean 1.28); dndsR does not correct it. Power: 59-62% for k = 0.5, 35-38% for k = 2, with the direction of `k` right in 95-100% of detections.
 - **Estimates**: a single unflagged free-ratio omega is off by a median of 1.3- to 1.4-fold, and more than 2-fold in about one case in five; flagged ones by 8-fold or more, but the flags fire on at most 2.5% of branches. The **pooled omega** is within 3-6% of the truth on a typical branch (at most 15%), better than the median of per-gene values and far better than their mean, which reached 5-fold on a short branch.
 
-These are properties under the simulation model. Alignment and orthology errors, multinucleotide substitutions, and gene-tree discordance, which are not simulated here, inflate false positives on real data.
+These are properties under the simulation model, with correct alignments. Input errors are the next section.
+
+## Input errors
+
+A second simulation study (study B, criteria fixed before running; [report](validation/lineage-robustness-core.md)) added one error at a time to null genes on an 8-taxon tree, and one 16-taxon tree with 4 taxa missing per gene, for aBSREL and the branch models (M0, two-ratio). Its 16-taxon and BUSTED arms are still running; these findings are for the configurations named, not a general guarantee.
+
+- **A corrupted or misaligned segment in one sequence** gave aBSREL 9.5-9.9% false positives per branch and 99.7-100% per gene, and the two-ratio test 9-45%. The `dissimilar_window` flag marked every affected gene and none of the error-free ones.
+- **Realigning sequences with indels** (`phylo_prepare`'s MAFFT step), with insertions simulated correctly, gave aBSREL 7.1% per branch (`p_raw`) and 21% per gene (`p_value`); on the true alignments the same genes gave 2.3% and 3.0%. So the excess is alignment error. After correction, `p_adj` made 30 false discoveries among 300 null genes, and `p_bh_lineage` made at least one in 11 of 13 lineages. **The `dissimilar_window` flag missed these errors (0.3% of genes).** The branch models were unaffected (`p_two_vs_m0` 5.3%, against 4.3% without errors). HyPhy run directly on dndsR's files gave the same statistics. A comparison of aligners is in progress ([design](dev/alignment-pilot.md)).
+- **A paralog in place of an ortholog, a gene tree differing from the species tree, missing taxa, and recombination** did not raise either method above its error-free rate in the configurations tested: one paralog split at half the tree's depth, one exchange of two taxa, four of 16 taxa missing, one breakpoint. For discordance and paralogs this held partly because dndsR already excludes genes whose foreground branch has zero length (251 of 300 discordant genes for aBSREL). These configurations do not establish robustness to other forms or degrees of these errors, which are not screened.
+
+**The alignment check.** When `dissimilar_window` flags tested orthogroups, aBSREL, BUSTED, RELAX and the branch models end with a warning giving the number flagged and how many of them are significant, and the run's `_provenance.json` records the same under `alignment_check`. The flag is worth acting on: review those alignments. An unflagged orthogroup is not shown to be correctly aligned.
+
+**Masking** the flagged windows is an optional sensitivity analysis, not a default and not a supported dndsR command (the studies used `tools/dev/validation/phylo-windows.py`). In study B it restored aBSREL's and the branch models' false-positive rates for corrupted segments, at a power cost of 4 points for aBSREL branch tests and 22 points for aBSREL's gene `p_value`. It did nothing for realignment error, because the flag does not find those errors. It does not protect against false inference of selection in general: compare masked and unmasked results, and treat a gene significant only unmasked with a flagged window as a likely artifact.
 
 ## References
 

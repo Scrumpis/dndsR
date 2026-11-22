@@ -56,3 +56,39 @@
   notes <- vapply(cal, `[[`, character(1), "note")
   warning(sprintf("[%s] Calibration: %s See docs/validation/phylo-lineage-calibration.md.", method, paste(notes, collapse = " ")), call. = FALSE)
 }
+
+# Alignment check (maintainer's decision of 2026-11-22, DECISIONS.md): a warning when the
+# window profile flags tested orthogroups. It names what the flag shows and what it does not:
+# in simulation it caught every corrupted segment in one sequence, but almost none of the
+# errors left by realigning indels (docs/validation/lineage-robustness-core.md).
+
+.alignment_check_note <- paste(
+  "In simulation, a misaligned or corrupted segment in one sequence made aBSREL, BUSTED, and the branch models report",
+  "selection in most affected genes, and this flag caught those segments. Review flagged alignments, or compare with a",
+  "masked rerun as a sensitivity analysis. An unflagged orthogroup is not shown to be correctly aligned: the flag missed",
+  "almost all of the alignment errors left by realigning sequences with indels, which also inflated aBSREL's p-values.")
+
+#' Tested orthogroups with a dissimilar_window flag, and how many are significant
+#' @keywords internal
+.alignment_check <- function(results) {
+  tested <- results$status == "tested"
+  if (!any(tested) || is.null(results$qc_flags)) return(NULL)
+  flagged <- tested & grepl("(^|;)dissimilar_window:", results$qc_flags)
+  adj <- setdiff(grep("^p_adj($|_)|_adj$", names(results), value = TRUE), "p_adj_method")
+  sig <- if (length(adj)) {
+    m <- as.matrix(results[, adj, drop = FALSE])
+    rowSums(!is.na(m) & m <= 0.05) > 0
+  } else rep(FALSE, nrow(results))
+  list(tested = sum(tested), flagged = sum(flagged), flagged_significant = sum(flagged & sig),
+       significant_columns = adj, note = .alignment_check_note)
+}
+
+#' Warn when the window profile flags tested orthogroups
+#' @keywords internal
+.alignment_check_warn <- function(method, results) {
+  chk <- .alignment_check(results)
+  if (is.null(chk) || chk$flagged == 0L) return(invisible(NULL))
+  warning(sprintf(paste("[%s] Alignment check: %d of %d tested orthogroups have a dissimilar_window flag (taxa in qc_flags),",
+                        "%d of them with an adjusted p-value <= 0.05. %s See docs/phylo-methods.md."),
+                  method, chk$flagged, chk$tested, chk$flagged_significant, chk$note), call. = FALSE)
+}

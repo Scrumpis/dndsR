@@ -170,6 +170,7 @@ phylo_branch_omega <- function(prepared_dir = NULL,
                             tests = c("p_two_vs_m0", "p_free_vs_m0", "p_fg_omega_gt1")),
     counts = as.list(table(label)),
     calibration = .calibration_notes("branch_omega", results),
+    alignment_check = .alignment_check(results),
     interpretation = "Branch-model omega averages over all sites of a gene. Omega above 1 on a branch is not by itself evidence of positive selection."
   )
   writeLines(jsonlite::toJSON(prov, auto_unbox = TRUE, pretty = TRUE, digits = NA, null = "null"), out_file("provenance", "json"))
@@ -183,6 +184,7 @@ phylo_branch_omega <- function(prepared_dir = NULL,
     warning(sum(results$status == "failed"), " orthogroup(s) failed. See ", out_file("results"), call. = FALSE)
   }
   if (any(tested)) .calibration_warn("branch_omega", results)
+  if (any(tested)) .alignment_check_warn("branch_omega", results)
   invisible(results)
 }
 

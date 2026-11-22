@@ -58,7 +58,7 @@ The foreground's gene-wide omega is higher in the three selected genes, signific
 | spF | 0 | NA | NA | 0 |
 
 - `pooled_omega` sums substitutions over genes; its interval resamples genes. The median of per-gene omegas answers a different question (the typical gene) and can differ, as for `spA`.
-- `absrel_n_sig_lineage` counts genes with aBSREL evidence of episodic selection on that branch after the per-lineage correction (`p_bh_lineage`).
+- `absrel_n_sig_lineage` counts genes with aBSREL evidence of episodic selection on that branch after the per-lineage correction (`p_bh_lineage`). That correction is within one lineage, not across lineages, and holds only if the alignments are right: see [what each p-value corrects](../lineage-selection.md#phylo_absrel) and [input errors](../lineage-selection.md#input-errors).
 - `spF` and `mrca(spA,spD)` are the two branches at the root. Every analysis uses an unrooted tree, so they always join, and no estimate can be attributed to either; both are left out (`n_estimated` 0). This is why your species tree needs an outgroup.
 - `summary_lineage_pairs.tsv` compares lineages on the genes both share; `summary_foreground.tsv` counts 3 of 8 genes with a significantly higher foreground omega, none significantly lower.
 

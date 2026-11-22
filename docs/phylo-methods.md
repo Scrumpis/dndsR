@@ -132,7 +132,7 @@ These are reported in `qc_flags` and the sequences tables, but change nothing. T
 | `hyphy_refit_after_negative_lrt` | HyPhy reported a convergence problem and refitted |
 | `hyphy_deleted_zero_length_branches:<n>` | HyPhy deleted n background internal branches as zero-length |
 
-Look at flagged alignments before interpreting their results. Alignment errors are a known cause of false positives in selection tests (for example, Markova-Raina and Petrov 2011, *Genome Res* 21:863; Jordan and Goldman 2012, *Mol Biol Evol* 29:1125).
+When `dissimilar_window` flags tested orthogroups, the run ends with a warning (counts, and how many are significant) and records them in `_provenance.json` under `alignment_check`. The flag catches a corrupted or misaligned segment in one sequence, but missed almost all errors left by realigning sequences with indels ([lineage methods](lineage-selection.md#input-errors)): an unflagged orthogroup is not shown to be correctly aligned. Look at flagged alignments before interpreting their results. Alignment errors are a known cause of false positives in selection tests (for example, Markova-Raina and Petrov 2011, *Genome Res* 21:863; Jordan and Goldman 2012, *Mol Biol Evol* 29:1125).
 
 ## Calibration in simulation
 
