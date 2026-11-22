@@ -1,0 +1,78 @@
+#!/bin/bash --login
+# Alignment-method pilot (docs/dev/alignment-pilot.md): one data set per array task. Simulates with
+# phylo-lineage-sim2.R, aligns the unaligned CDS with A0 (phylo_prepare, MAFFT L-INS-i), A1 (PRANK
+# codon mode on the species topology) and A2 (MACSE alignSequences), keeps T (the true alignment)
+# for diagnosis, and runs aBSREL and the branch models on each.
+#   sbatch --array=1-2 --constraint=intel18 --export=ALL,ROOT=<root>,IMAGE=<sif>,ENVS=<envs>[,N=<genes, smoke test only>] aln-pilot.sb
+# ROOT holds lib/ (dndsR from one commit; lib/COMMIT), src/ (that commit's tree) and params.json.
+#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=24G
+#SBATCH --job-name=aln-pilot
+set -euo pipefail
+: "${ROOT:?}" "${IMAGE:?}" "${ENVS:?}"
+case "$SLURM_ARRAY_TASK_ID" in
+  1) name=null; cell=BE3h; seed=304 ;;
+  2) name=selected; cell=BE3hS; seed=321 ;;
+  *) echo "unknown task"; exit 1 ;;
+esac
+n=${N:-150}; codons=300; th=$SLURM_CPUS_PER_TASK
+v="$ROOT/src/tools/dev/validation"; out="$ROOT/units/$name"
+[ -f "$out/DONE" ] && { echo "already done: $out"; exit 0; }
+rm -rf "$out"; mkdir -p "$out"
+run() { singularity exec --cleanenv --bind "$ROOT" --bind "$ENVS" --env R_LIBS_USER="$ROOT/lib" \
+  --env PATH="$ENVS/hyphy-2.5.103/bin:$ENVS/ref/bin:/opt/conda/envs/tools/bin:/usr/local/bin:/usr/bin:/bin" "$IMAGE" "$@"; }
+AL="$ENVS/aligners/bin"
+run Rscript --vanilla "$v/phylo-lineage-sim2.R" "$ROOT/params.json" "$cell" T8b "$n" "$seed" "$out/sim" "$codons"
+s="$out/sim"
+# T and the unaligned inputs, both from the true alignments (the CDS are the true rows without gaps).
+mkdir -p "$out/T" "$out/unaligned"
+for f in "$s"/alignments/*.true.fasta; do
+  og=$(basename "$f" .true.fasta); cp "$f" "$out/T/$og.fasta"; sed '/^>/!s/-//g' "$f" > "$out/unaligned/$og.fasta"
+done
+sed -E 's/\)[A-Za-z0-9_]+/)/g' "$s/species_tree.nwk" > "$out/species_topology.nwk"
+# A0: phylo_prepare as users run it.
+t0=$SECONDS
+(cd "$s" && run Rscript --vanilla -e 'suppressMessages(library(dndsR)); phylo_prepare(orthogroup_file = "orthogroup_table.tsv",
+   cds_file = "cds_table.tsv", species_tree_file = "species_tree.nwk", foreground_file = "foreground.tsv", output_dir = ".",
+   threads = as.integer(commandArgs(TRUE)[1]))' "$th" > "$s/prepare.log" 2>&1)
+printf "arm\tgene\tseconds\nA0\tall\t%s\n" "$((SECONDS - t0))" > "$out/align_seconds.tsv"
+mkdir -p "$out/A0"; cp "$s"/prepared/alignments/*.fasta "$out/A0/"
+# A1 and A2, one core per gene, timed per gene.
+align_one() {
+  og=$1; out=$2; AL=$3; d="$out/work/$og"; mkdir -p "$d"; cd "$d"
+  t0=$(date +%s.%N)
+  "$AL/prank" -d="$out/unaligned/$og.fasta" -o=pr -codon -once -t="$out/species_topology.nwk" > prank.log 2>&1
+  t1=$(date +%s.%N)
+  "$AL/macse" -prog alignSequences -seq "$out/unaligned/$og.fasta" -out_NT mc_NT.fasta -out_AA mc_AA.fasta > macse.log 2>&1
+  t2=$(date +%s.%N)
+  cp pr.best.fas "$out/A1/$og.fasta"
+  printf "%s\t%s\n" "$og" "$(grep -v '^>' mc_NT.fasta | tr -cd '!' | wc -c)" > frameshifts.tsv
+  sed '/^>/!s/!/-/g' mc_NT.fasta > "$out/A2/$og.fasta"
+  awk -v og="$og" -v a="$t0" -v b="$t1" -v c="$t2" 'BEGIN { printf "A1\t%s\t%.3f\nA2\t%s\t%.3f\n", og, b - a, og, c - b }' > seconds.tsv
+}
+export -f align_one
+mkdir -p "$out/A1" "$out/A2" "$out/work"
+ls "$out/unaligned" | sed 's/\.fasta$//' | PATH="$AL:$PATH" xargs -P "$th" -I{} bash -c 'align_one "$@"' _ {} "$out" "$AL"
+cat "$out"/work/*/seconds.tsv >> "$out/align_seconds.tsv"
+{ printf "orthogroup\tframeshift_chars\n"; cat "$out"/work/*/frameshifts.tsv; } > "$out/macse_frameshifts.tsv"
+tar -czf "$out/work.tar.gz" -C "$out" work && rm -rf "$out/work"
+# aBSREL and the branch models on each arm.
+for arm in A0 A1 A2 T; do
+  run Rscript --vanilla -e '
+    a <- commandArgs(TRUE); suppressMessages(library(dndsR)); d <- a[1]; arm <- a[2]; th <- as.integer(a[3])
+    args <- list(alignment_dir = file.path(d, arm), species_tree_file = file.path(d, "sim", "species_tree.nwk"), output_dir = d, threads = th)
+    do.call(phylo_absrel, c(args, list(run_name = paste0("absrel_", arm))))
+    do.call(phylo_branch_omega, c(args, list(run_name = paste0("branch_omega_", arm), foreground_file = file.path(d, "sim", "foreground.tsv"),
+      keep_runs = FALSE, models = c("M0", "two_ratio", "two_ratio_null"))))
+  ' "$out" "$arm" "$th" > "$out/methods_$arm.log" 2>&1
+  for x in absrel branch_omega; do
+    [ -d "$out/${x}_$arm/hyphy" ] && tar -czf "$out/${x}_$arm/hyphy.tar.gz" -C "$out/${x}_$arm" hyphy && rm -rf "$out/${x}_$arm/hyphy" || true
+  done
+done
+for x in A0 A1 A2 T unaligned; do tar -czf "$out/$x.tar.gz" -C "$out" "$x"; done
+for x in alignments prepared cds; do [ -d "$s/$x" ] && tar -czf "$s/$x.tar.gz" -C "$s" "$x" && rm -rf "$s/$x" || true; done
+rm -rf "$out/A0" "$out/A1" "$out/A2" "$out/T" "$out/unaligned"
+printf 'name\tcell\tseed\tn\tcommit\thost\tcpu\n%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$cell" "$seed" "$n" "$(cat "$ROOT/lib/COMMIT")" \
+  "$(hostname)" "$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //')" > "$out/provenance.tsv"
+touch "$out/DONE"
