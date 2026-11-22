@@ -123,7 +123,11 @@ sim_gene <- function(tree, n_sites, pi, kappa, omega_bg, omega_fg, prop, srv, de
 
 #' Codon indels with the true alignment kept. Insertions add columns present only below the
 #' branch where they happen; deletions gap existing columns below their branch.
-add_indels <- function(aln, tree, ord, lens, rate, mean_len, pi) {
+# homologous = FALSE (the stage 2 M4 generator, kept for its frozen studies) gives each descendant
+# of an inserting branch its own random codons, so an insertion on an internal branch is not
+# homologous across those descendants. homologous = TRUE draws one inserted sequence and copies it
+# to every descendant (identical by descent; it does not evolve further).
+add_indels <- function(aln, tree, ord, lens, rate, mean_len, pi, homologous = FALSE) {
   n_tip <- ape::Ntip(tree)
   desc <- function(node) {
     if (node <= n_tip) return(node)
@@ -140,7 +144,8 @@ add_indels <- function(aln, tree, ord, lens, rate, mean_len, pi) {
         aln[below, cols] <- "---"
       } else {
         new <- matrix("---", nrow(aln), len)
-        new[below, ] <- sample(sense, length(below) * len, TRUE, prob = pi)
+        new[below, ] <- if (homologous) matrix(sample(sense, len, TRUE, prob = pi), length(below), len, byrow = TRUE) else
+          sample(sense, length(below) * len, TRUE, prob = pi)
         aln <- cbind(aln[, seq_len(at), drop = FALSE], new, aln[, -seq_len(at), drop = FALSE])
       }
     }

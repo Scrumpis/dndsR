@@ -19,6 +19,7 @@
 #     LA1  LG1, and genes with a gene effect in the top third of its distribution lose t1 with probability 0.5
 #   Study B (null; site classes 0.05/0.3/1 at 0.6/0.3/0.1 on every branch, as B0):
 #     BE0  no error                            BE3  codon indels (rate 0.02 per codon per unit length, mean 2 codons)
+#     BE3h as BE3, with insertions homologous across the inserting branch's descendants (add_indels(homologous = TRUE))
 #     BE4  t1 replaced by a paralog that split from the species lineage at the root
 #     BE5  gene tree discordant: t2 and t3 exchanged (one NNI at the stem of the foreground clade)
 #     BE7  recombination: the second half of the codons has BE5's gene tree
@@ -57,7 +58,7 @@ cell2 <- function(cell) {
     LS2 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0, branch_sd = FALSE),
     LG1 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0.7, branch_sd = TRUE),
     LA1 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0.7, branch_sd = TRUE, loss = TRUE),
-    BE0 = c(b0, error = "none"), BE3 = c(b0, error = "indel"), BE4 = c(b0, error = "paralog"),
+    BE0 = c(b0, error = "none"), BE3 = c(b0, error = "indel"), BE3h = c(b0, error = "indel_h"), BE4 = c(b0, error = "paralog"),
     BE5 = c(b0, error = "discordant"), BE7 = c(b0, error = "recombination"), BMIX = c(b0, error = "mixture"),
     NULL)
 }
@@ -135,12 +136,12 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
     dropped <- character()
     if (tree_name == "T16m") dropped <- sample(tree$tip.label, 4L)
     if (m > loss_cut && stats::runif(1) < 0.5) dropped <- union(dropped, "t1")
-    if (!legacy && identical(spec$error, "indel")) {
+    if (!legacy && spec$error %in% c("indel", "indel_h")) {
       tr <- ape::reorder.phylo(tree, "cladewise")
-      aln <- add_indels(aln, tree, tr$edge, tr$edge.length, 0.02, 2, pi)
+      aln <- add_indels(aln, tree, tr$edge, tr$edge.length, 0.02, 2, pi, homologous = identical(spec$error, "indel_h"))
     }
     aln <- aln[setdiff(tree$tip.label, dropped), , drop = FALSE]
-    if (!legacy && identical(spec$error, "indel")) {
+    if (!legacy && spec$error %in% c("indel", "indel_h")) {
       write_fasta(aln, file.path(out, "alignments", paste0(id, ".true.fasta")))
       seqs <- apply(aln, 1, paste, collapse = "")
       for (tx in names(seqs)) cds[[length(cds) + 1L]] <- data.frame(orthogroup = id, taxon = tx, gene_id = paste0(tx, "_", id), seq = gsub("-", "", seqs[[tx]]))
