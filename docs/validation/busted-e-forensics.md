@@ -8,7 +8,7 @@ Status: **exploratory analysis of existing results plus small direct HyPhy rerun
 
 ## Findings
 
-**1. Not a dndsR integration error in the settings passed (verified).** The HyPhy JSON of each gene records `error-sink: 1`, `multiple-hit: Double`, `srv: Yes` and HyPhy 2.5.103; the foreground tree is `((t1{FG},t2{FG})Node2{FG},…)`; dndsR's provenance records `error_sink = "Yes"`, three starting points, seed 1. The fitted test-branch distribution has four classes, the first being the error sink (ω 100). Codex checked these from the archived JSON and provenance independently. (Whether HyPhy run directly gives the same statistics on these inputs is being checked: *open, below*.)
+**1. Not a dndsR integration error in the settings passed (verified).** The HyPhy JSON of each gene records `error-sink: 1`, `multiple-hit: Double`, `srv: Yes` and HyPhy 2.5.103; the foreground tree is `((t1{FG},t2{FG})Node2{FG},…)`; dndsR's provenance records `error_sink = "Yes"`, three starting points, seed 1. The fitted test-branch distribution has four classes, the first being the error sink (ω 100). Codex checked these from the archived JSON and provenance independently. HyPhy run directly reproduces dndsR's statistics (reruns below).
 
 **2. The error sink's design limits (verified).** In HyPhy 2.5.103's `BUSTED.bf` (lines 207-223) the error class has ω ≥ 100 (`--error-sink-bound`) and a maximum weight of 0.01 (`--error-sink-weight`). The method's authors describe it as a heuristic for *residual* alignment errors, expected to miss many real errors and to flag some real variation, with the error weight well below 1% on average in their data ([Minus the Error, eLife reviewed preprint](https://elifesciences.org/reviewed-preprints/106921); [bioRxiv](https://www.biorxiv.org/content/10.1101/2024.11.13.620707v2.full.pdf)).
 
@@ -38,18 +38,32 @@ Only the 41 are candidate optimisation shortfalls; their deficits are mostly sma
 
 | Explanation | Assessment |
 |---|---|
-| dndsR implementation or integration error | Settings, foreground and parsing verified; direct-HyPhy equivalence pending (below). No evidence for it so far. |
+| dndsR implementation or integration error | **Excluded**: settings, foreground and parsing verified; HyPhy run directly reproduces dndsR's LRT in 30 of 30 genes (5e-14). |
 | Wrong HyPhy configuration, model, foreground, interpretation | Configuration matches the documented BUSTED-E; foreground is the intended clade; p-values read from `test results`. No evidence. |
-| Optimisation or convergence | **Not established.** Of 117 lower BUSTED-E fits, 76 are not comparable (different parameter spaces); 41 nested cases are candidate shortfalls, mostly small, being checked with a second seed (finding 4). |
-| Failure under conditions outside the method's assumptions | **Largely this.** The corruption is a whole non-homologous segment of 10-121 codons in one sequence, which the authors' design (residual error, a class capped at 1%) does not claim to absorb; false positives are low for the shortest segments and near total for the longest. |
+| Optimisation or convergence | **Minor, not the cause.** Of 117 lower BUSTED-E fits, 76 are not comparable (different parameter spaces); among the 6 nested cases rerun, 4 small shortfalls persist with a second seed; no call changed between seeds. |
+| Failure under conditions outside the method's assumptions | **Largely this.** The corruption is a whole non-homologous segment of 10-121 codons in one sequence. It is fitted as moderate positive selection (ω about 8-12), not as the extreme-ω error the sink models (ω ≥ 100); raising the sink's weight cap barely helps (reruns). The authors' design targets residual misalignment, not such segments. False positives are low for the shortest segments and near total for the longest. |
 | Limitation within the intended scope | Possible for the shortest segments (5% at ≤ 10 codons, near the nominal rate); not established. |
 | Unrealistically severe test | No: segment lengths come from windows flagged in real public alignments (stage 2B), so such errors occur in real data; but they are a different error class from the residual misalignment BUSTED-E targets. |
 
-## Open questions (being checked, or proposed)
+## Direct HyPhy reruns (exploratory; 20 most significant false positives and 10 nonsignificant controls)
 
-1. **Direct HyPhy equivalence and optimisation** (running, exploratory, about 8 core-hours): the 20 most significant BUSTED-E false positives and 10 nonsignificant controls rerun in HyPhy 2.5.103 directly on dndsR's files with (a) dndsR's exact settings and seed, (b) seed 2, (c) error-sink weight cap 5%, (d) 20%. (a) tests the wrapper; (b) the optimiser; (c-d) whether the cap is what forces the segment into the ω > 1 class. The 5% and 20% caps are sensitivity analyses only, not candidate settings.
-2. **The 41 nested shortfalls** (queued reruns): whether seed 2 reaches or exceeds BUSTED's likelihood; no further study is proposed unless they persist.
-3. **Masking and power on clean, block-selected genes** (existing stage 2B evidence; a confirmation would need new runs).
+HyPhy 2.5.103 run directly on the alignments and trees dndsR wrote (`busted-e-forensic.sb`), four ways:
+
+| Run | False positives significant (of 20) | Controls significant (of 10) | Median error-class weight, false positives |
+|---|---:|---:|---:|
+| (a) dndsR's settings, seed 1 | 20 | 0 | 0 |
+| (b) seed 2 | 20 | 0 | 0 |
+| (c) error-sink cap 5% (sensitivity only) | 17 | 0 | 0 |
+| (d) error-sink cap 20% (sensitivity only) | 16 | 0 | 0 |
+
+- **Wrapper fidelity:** (a) reproduces dndsR's LRT in 30 of 30 genes (largest difference 5e-14). No dndsR defect.
+- **Optimisation:** the second seed changes no call, but the alternative fit's log-likelihood moves by more than 0.01 between seeds in 19 of 30 genes, in both directions. Of the 6 nested shortfalls (finding 4) among these genes, seed 2 closes 1; 4 persist (0.04 to 1.66 units, all in nonsignificant genes). A small optimiser shortfall therefore exists in some BUSTED-E alternative fits; its effect on calls here was nil, and its general effect is not established.
+- **The cap is not the mechanism.** Raising the error class's maximum weight to 5% or 20% removes only 3-4 of 20 false positives, and the false positives still put no weight in the error class. The finding 3 interpretation (that a 1% cap forces the segment into the ω > 1 class) is **not supported**. What the fits show instead is that a non-homologous segment looks like moderate positive selection (the ordinary class at ω about 8-12, on about the segment's share of sites), which an error class constrained to ω ≥ 100 cannot represent. These caps are sensitivity analyses, not candidate settings.
+
+## Open questions
+
+1. Whether BUSTED-E's alternative-fit variability (19 of 30 genes moving between seeds) affects calls on other data; not studied further without approval.
+2. Masking and power on clean, block-selected genes rests on stage 2B; a confirmation would need new runs.
 
 ## What this means for dndsR now
 
