@@ -1,0 +1,34 @@
+#!/bin/bash --login
+# Builds one genome pair's annotated dN/dS table for the enrichment-correction study
+# (docs/dev/enrichment-correction-study.md), with the dndsR CLI as users run it: extract_cds,
+# calculate_dnds (defaults), append_annotations. Every GFF is reduced to nuclear sequences (plastid and
+# mitochondrial seqids removed, as the recorded potato "nuclear GFF"). A UniProt-annotated query gets GO
+# and InterPro from annotate-gff-uniprot.py; A. thaliana uses its existing annotated GFF.
+#   sbatch --array=<rows> --export=ALL,ROOT=<root>,PAIRS=<tsv: pair query subject query_annotation>,IMAGE=<sif>,ATGFF=<At annotated GFF>,ATFA=<At FASTA> enrich-corr-pairs.sb
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
+#SBATCH --job-name=enrich-pairs
+set -uo pipefail
+: "${ROOT:?}" "${PAIRS:?}" "${IMAGE:?}"
+row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$PAIRS")
+IFS=$'\t' read -r pair q s qa <<<"$row"
+D="$ROOT/data"; out="$ROOT/pairs/$pair"; mkdir -p "$out/inputs"; cd "$out"
+[ -f DONE ] && { echo "already done"; exit 0; }
+nuclear() { org=$(grep -P "\tregion\t" "$1" | grep -i -E "genome=chloroplast|genome=mitochondrion|genome=plastid" | cut -f1 | sort -u | paste -sd'|')
+  if [ -n "$org" ]; then grep -v -E "^($org)[[:space:]]" "$1"; else cat "$1"; fi; }
+if [ "$q" = Athaliana ]; then ln -sfn "$ATFA" inputs/q.fasta; ln -sfn "$ATGFF" inputs/q.gff
+else
+  ln -sfn "$D/$q/genome.fna" inputs/q.fasta; nuclear "$D/$q/genomic.gff" > inputs/q_nuclear.gff
+  python3 -I "$ROOT/src/tools/dev/validation/annotate-gff-uniprot.py" inputs/q_nuclear.gff "$D/$q/protein.faa" "$D/$qa/uniprot.tsv" inputs/q.gff annotation_report.tsv
+fi
+ln -sfn "$D/$s/genome.fna" inputs/s.fasta; nuclear "$D/$s/genomic.gff" > inputs/s.gff
+printf '%s inputs/q.fasta inputs/q.gff inputs/s.fasta inputs/s.gff\n' "$pair" > comparison.txt
+run() { singularity exec --cleanenv --bind "$ROOT" --bind /mnt/gs21 --env R_LIBS_USER="$ROOT/lib" "$IMAGE" Rscript -e 'dndsR::cli_main()' -- "$@"; echo "rc=$? $*"; }
+t0=$SECONDS
+run extract_cds -c comparison.txt -t 4
+run calculate_dnds -c comparison.txt -t "$SLURM_CPUS_PER_TASK"
+run append_annotations -c comparison.txt -t 8
+echo "seconds $((SECONDS - t0)) cpus $SLURM_CPUS_PER_TASK" > timing.txt
+sha256sum inputs/*.gff "$pair/${pair}_dnds_annot.tsv" 2>/dev/null | cut -c1-16,65- > sha256.txt
+[ -s "$pair/${pair}_dnds_annot.tsv" ] && touch DONE

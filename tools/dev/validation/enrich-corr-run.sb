@@ -1,0 +1,30 @@
+#!/bin/bash --login
+# Enrichment-correction study (docs/dev/enrichment-correction-study.md): one array task runs one block
+# of seeds: labels (enrich-corr-labels.R for kind exact, sim-genome.R for kind estimator), then every
+# candidate (enrich-corr-methods.R, GOseq through envs/comparators).
+#   sbatch --array=1-<blocks> --export=ALL,ROOT=<root>,BLOCKS=<tsv>,IMAGE=<sif>,GOSEQ=<comparators Rscript>[,TAG=<runs subfolder>] enrich-corr-run.sb
+# BLOCKS columns: pair annot cds custom kind scenario rate_or_thresholds div first_seed runs
+#   exact: rate_or_thresholds is the positive share (obs, 0.05, 0.10); estimator: a comma list of thresholds.
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=12G
+#SBATCH --job-name=enrich-corr
+set -uo pipefail
+: "${ROOT:?}" "${BLOCKS:?}" "${IMAGE:?}" "${GOSEQ:?}"
+row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$BLOCKS")
+IFS=$'\t' read -r pair annot cds custom kind scenario rt div first runs <<<"$row"
+v="$ROOT/src/tools/dev/validation"; go="$ROOT/inputs/go_ancestors.tsv"
+out="$ROOT/runs${TAG:+-$TAG}/$pair/$kind-$scenario-$rt-div$div"; mkdir -p "$out"
+run() { singularity exec --cleanenv --bind "$ROOT" --bind /mnt/gs21 --env R_LIBS_USER="$ROOT/lib" --env DNDSR_SIM_DIV="$div" "$IMAGE" "$@"; }
+for ((k = 0; k < runs; k++)); do
+  s=$((first + k)); [ -s "$out/terms_$s.tsv" ] && continue
+  t0=$SECONDS
+  if [ "$kind" = exact ]; then
+    run Rscript --vanilla "$v/enrich-corr-labels.R" "$annot" "$scenario" "$rt" "$s" "$out/labels_$s.tsv.gz"; thr=1
+  else
+    run Rscript --vanilla "$v/sim-genome.R" "$annot" "$cds" "$scenario" "$s" "$out/labels_$s.tsv.gz"; thr=$rt
+  fi
+  t1=$SECONDS
+  run Rscript --vanilla "$v/enrich-corr-methods.R" "$annot" "$go" "$custom" "$out/labels_$s.tsv.gz" "$thr" "$out/terms_$s.tmp" "$GOSEQ" && mv "$out/terms_$s.tmp" "$out/terms_$s.tsv"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pair" "$kind" "$scenario" "$s" "$((t1 - t0))" "$((SECONDS - t1))" >> "$out/timing.tsv"
+done
