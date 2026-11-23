@@ -38,7 +38,7 @@ On each pair's real gene table (genes, lengths, observed dS, GO with ancestors, 
 - **Estimator labels** (`sim-genome.R`): `long`, `bylen`, and `bylen` at divergence ×0.5 and ×2 (dS scaled), with dndsR's real Comeron estimator, so labels carry the estimator's own dependence on length and dS, extreme dS included.
 - **Planted enrichment:** spikes of 2%, 5% and 20% of genes in 5 terms (20-300 genes) to omega 3 (estimator labels) or to positive (exact labels); and **signal with dS**: spiked terms whose genes also have lower true dS (Q2: does adjustment remove genuine signal?). Power is compared with the oracle's.
 - **Missing or noisy covariates (Q2):** the tests given length with 20% multiplicative noise, or dS from a different estimator (NG86 from the same alignments), against labels generated from the true ones.
-- **Term families:** GO (all three ontologies, ancestors propagated: hierarchical and overlapping), InterPro, and a **custom family**: 500 random gene sets (sizes 5-500, so sparse terms are included) plus 100 nested and overlapping sets built from InterPro clans.
+- **Term families:** GO (all three ontologies, ancestors propagated: hierarchical and overlapping), InterPro, and a **custom family**: 500 random gene sets (sizes 5-500, so sparse terms are included) plus 100 overlapping sets, each the union of 2 or 3 InterPro entries' gene sets (amended before any run: InterPro clan data are not part of the inputs, and unions give the intended overlap and nesting with the InterPro family).
 - **Thresholds:** `dNdS > 1`, `q0.9`, `q0.95`.
 
 ## Phase D: development (exploratory)
@@ -93,3 +93,12 @@ Exact-label runs: about 80 core-seconds each for the current candidates, plus GO
 ## Records
 
 Every run records the seed, generator, pair, commit, image digest, comparator environment, and the full term table; summaries per cell with intervals go to `docs/validation/data/`. Development and confirmatory results are reported separately: `docs/validation/enrichment-correction-development.md` and `enrichment-correction-confirmation.md`.
+
+## Setup record (before any phase D or phase C result)
+
+- Comparators: `envs/comparators` (micromamba; bioconductor-goseq 1.58.0, r-biasedurn 2.0.12, R 4.4.3) plus geneLenDataBase 1.42.0 installed from Bioconductor 3.20's tarball (SHA-256 `f731cfa1ff83a38d`), because the conda data package left it uninstalled. GOseq runs with dndsR's library paths cleared.
+- GOglm is computed as the logistic score test of the term indicator given the covariates (null model fitted once per universe; asymptotically equivalent to the per-term likelihood-ratio test, and tractable for thousands of terms).
+- Inputs downloaded by `enrich-corr-download.sb` (`enrich-corr-genomes.tsv`), hashes in the run folder's `sha256.tsv`. Development genomes match the hashes recorded in `enrichment-confounding.md` (*C. rubella*, *B. rapa*, tomato, potato; the potato GFF after removing its plastid sequence, NC_008096.2, as the recorded "nuclear GFF").
+- `sim-genome.R` gained `tlds`, `spikeds_F_W` and a divergence factor; existing scenarios regenerate byte for byte (`bylen` on 300 genes and `spike_0.2_3` on 3,000 genes, seed 4242, old against new).
+- Exact-label quantile counterparts: with binary labels a quantile threshold cannot be applied, so the exact-label generator sets the positive share directly (observed, 5%, 10%) as the counterpart of `dNdS > 1`, `q0.95` and `q0.9`; estimator-label runs apply the real thresholds.
+

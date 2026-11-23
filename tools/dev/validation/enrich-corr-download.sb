@@ -1,0 +1,29 @@
+#!/bin/bash --login
+# Public inputs of the enrichment-correction study (docs/dev/enrichment-correction-study.md): RefSeq
+# genomes (FASTA, GFF3, protein FASTA) by accession from NCBI Datasets, and UniProt reference
+# proteomes (accession, RefSeq, GeneID, GO IDs, InterPro, sequence) from the UniProt REST API.
+# Writes <DATA>/<name>/ and <DATA>/sha256.tsv.
+#   sbatch --export=ALL,DATA=<dir>,LIST=<tsv: name accession uniprot_proteome_or_-> enrich-corr-download.sb
+#SBATCH --time=6:00:00
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+#SBATCH --job-name=enrich-dl
+set -euo pipefail
+: "${DATA:?}" "${LIST:?}"
+mkdir -p "$DATA"
+while IFS=$'\t' read -r name acc up; do
+  [ "$name" = name ] && continue
+  d="$DATA/$name"; mkdir -p "$d"
+  if [ ! -s "$d/genomic.gff" ]; then
+    curl -sfL -o "$d/pkg.zip" "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/$acc/download?include_annotation_type=GENOME_FASTA&include_annotation_type=GENOME_GFF&include_annotation_type=PROT_FASTA"
+    (cd "$d" && unzip -q -o pkg.zip && find ncbi_dataset -name '*.fna' -exec mv {} genome.fna \; && find ncbi_dataset -name 'genomic.gff' -exec mv {} genomic.gff \; \
+      && find ncbi_dataset -name 'protein.faa' -exec mv {} protein.faa \; && rm -rf ncbi_dataset pkg.zip README.md md5sum.txt)
+  fi
+  if [ "$up" != "-" ] && [ ! -s "$d/uniprot.tsv" ]; then
+    curl -sfL -o "$d/uniprot.tsv" "https://rest.uniprot.org/uniprotkb/stream?query=proteome:$up&fields=accession,xref_refseq,xref_geneid,go_id,xref_interpro,sequence&format=tsv"
+    echo "$up $(date -u +%Y-%m-%dT%H:%MZ)" > "$d/uniprot_release.txt"
+    curl -sfI "https://rest.uniprot.org/uniprotkb/search?query=proteome:$up&size=1" | grep -i '^x-uniprot-release' >> "$d/uniprot_release.txt" || true
+  fi
+  echo "$name $acc $up done: $(ls "$d" | tr '\n' ' ')"
+done < "$LIST"
+(cd "$DATA" && find . -type f \( -name genome.fna -o -name genomic.gff -o -name protein.faa -o -name uniprot.tsv \) | sort | xargs sha256sum) > "$DATA/sha256.tsv"

@@ -6,6 +6,12 @@
 #   long     omega drawn from observed dN/dS of long genes, whatever the gene's length
 #   bylen    the same, scaled by the median dN/dS of the gene's length decile
 #   spike_F_W  bylen, then fraction F of the genes in 5 chosen InterPro terms get omega W
+#   tlds     bylen, and every gene of 5 chosen InterPro terms (20-300 genes) has its true dS halved, omega
+#            unchanged: a null for selection whose call rate rises only through the estimator (added 2026-11-23)
+#   spikeds_F_W  spike_F_W, and the 5 spiked terms' genes also have their true dS halved (genuine signal
+#            together with low dS; added 2026-11-23)
+# DNDSR_SIM_DIV (default 1) multiplies every gene's true dS: divergence x0.5 or x2 (added 2026-11-23).
+# Existing scenarios draw the same random numbers as before these additions.
 # A chosen term's true status is in the output's comment line, so that enrichment can be scored.
 # Limits: no indels, no recombination, one omega per gene, stationary codon usage.
 a <- commandArgs(TRUE)
@@ -38,17 +44,25 @@ scale_bin <- tapply(d$dNdS, decile, stats::median) / stats::median(long)
 omega <- sample(long, ng, TRUE)
 spiked <- character(0); spiked_genes <- integer(0)
 if (scenario != "long") omega <- omega * scale_bin[decile]
-if (startsWith(scenario, "spike_")) {
+halved <- integer(0)
+if (startsWith(scenario, "spike_") || startsWith(scenario, "spikeds_") || scenario == "tlds") {
   parts <- strsplit(scenario, "_", fixed = TRUE)[[1]]
-  frac <- as.numeric(parts[2]); w <- as.numeric(parts[3])
+  frac <- if (scenario == "tlds") 0 else as.numeric(parts[2]); w <- if (scenario == "tlds") NA else as.numeric(parts[3])
   members <- split(rep(seq_len(ng), lengths(strsplit(ifelse(is.na(d$q_ipr), "", d$q_ipr), ";", fixed = TRUE))),
                    unlist(strsplit(ifelse(is.na(d$q_ipr), "", d$q_ipr), ";", fixed = TRUE)))
   size <- lengths(members)
   pool <- names(size)[size >= 20L & size <= 300L]
   spiked <- sample(pool, 5L)
-  spiked_genes <- unique(unlist(lapply(members[spiked], function(g) sample(g, ceiling(frac * length(g))))))
-  omega[spiked_genes] <- w
+  if (scenario == "tlds") {
+    halved <- unique(unlist(members[spiked]))
+  } else {
+    spiked_genes <- unique(unlist(lapply(members[spiked], function(g) sample(g, ceiling(frac * length(g))))))
+    omega[spiked_genes] <- w
+    if (startsWith(scenario, "spikeds_")) halved <- unique(unlist(members[spiked]))
+  }
 }
+div <- as.numeric(Sys.getenv("DNDSR_SIM_DIV", "1"))
+true_ds <- d$dS * div; true_ds[halved] <- true_ds[halved] * 0.5
 omega <- pmax(omega, 0.001)
 
 # Cached by rounded omega: the eigen decomposition is the slow part.
@@ -68,7 +82,7 @@ wd <- tempfile("sim"); dir.create(wd); setwd(wd)
 est <- matrix(NA_real_, ng, 2L)
 for (g in seq_len(ng)) {
   m <- model(bin[g])
-  t <- pmax(d$dS[g], 0.002) / m$ds_per_t
+  t <- pmax(true_ds[g], 0.002) / m$ds_per_t
   p <- Re(m$v %*% (exp(m$l * t) * m$inv)); p[p < 0] <- 0
   x <- ancestors[[g]]; y <- integer(length(x))
   for (i in unique(x)) { w <- which(x == i); y[w] <- sample.int(n, length(w), TRUE, prob = p[i, ]) }
@@ -76,10 +90,11 @@ for (g in seq_len(ng)) {
   r <- tryCatch(orthologr::substitutionrate("p.fa", est.method = "Comeron", quiet = TRUE), error = function(e) NULL)
   if (!is.null(r)) est[g, ] <- c(r$dN, r$dS)
 }
-res <- data.frame(query_id = d$query_id, true_omega = signif(grid[bin], 4), true_dS = pmax(d$dS, 0.002),
+res <- data.frame(query_id = d$query_id, true_omega = signif(grid[bin], 4), true_dS = pmax(true_ds, 0.002),
                   n_codons = n_aa, dN = est[, 1], dS = est[, 2], spiked = seq_len(ng) %in% spiked_genes)
 res$dNdS <- ifelse(res$dS > 0, res$dN / res$dS, NA_real_)
 con <- gzfile(out, "w")
-writeLines(paste0("# scenario=", scenario, " seed=", seed, " kappa=", kappa, " spiked_terms=", paste(spiked, collapse = ",")), con)
+writeLines(paste0("# scenario=", scenario, " seed=", seed, " kappa=", kappa, " spiked_terms=", if (scenario == "tlds") "" else paste(spiked, collapse = ","),
+                  if (div != 1 || length(halved)) paste0(" div=", div, " halved_terms=", if (length(halved)) paste(spiked, collapse = ",") else "") else ""), con)
 write.table(res, con, sep = "\t", quote = FALSE, row.names = FALSE)
 close(con)
