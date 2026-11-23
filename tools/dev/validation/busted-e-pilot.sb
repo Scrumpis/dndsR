@@ -1,0 +1,38 @@
+#!/bin/bash --login
+# BUSTED-E pilot (docs/dev/busted-e-pilot.md): BUSTED-E (--error-sink Yes) on study B's exact inputs,
+# with study B's BUSTED settings otherwise (C1: --multiple-hits Double, --starting-points 3, seed 1).
+# BUSTED and masked BUSTED are not rerun: their results are study B's (study-B3, frozen at 49fd39f).
+#   sbatch --array=<rows> --constraint=intel18 --export=ALL,ROOT=<root>,B3=<study-B3 root>,UNITS=<units file>,IMAGE=<sif>,ENVS=<envs>[,N=<genes>] busted-e-pilot.sb
+# Units file (tab-separated, header): name source_unit input max_genes
+#   input: alignments | corrupted | masked (the study B unit's sim/<input>.tar.gz); max_genes: keep the
+#   first max_genes alignments in name order (0 = all).
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --job-name=busted-e
+set -euo pipefail
+: "${ROOT:?}" "${B3:?}" "${UNITS:?}" "${IMAGE:?}" "${ENVS:?}"
+row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$UNITS")
+IFS=$'\t' read -r name src input max <<<"$row"
+max=${N:-$max}; th=$SLURM_CPUS_PER_TASK
+out="$ROOT/units/$name"
+[ -f "$out/DONE" ] && { echo "already done: $out"; exit 0; }
+rm -rf "$out"; mkdir -p "$out/in"
+sim="$B3/units/$src/sim"
+tar -xzf "$sim/$input.tar.gz" -C "$out/in"
+d=$(find "$out/in" -mindepth 1 -maxdepth 1 -type d | head -1)
+if [ "$max" -gt 0 ]; then ls "$d" | grep '\.fasta$' | sort | tail -n +$((max + 1)) | while read -r f; do rm -f "$d/$f"; done; fi
+cp "$sim/species_tree.nwk" "$sim/foreground.tsv" "$sim/genes.tsv" "$out/"
+start=$SECONDS
+singularity exec --cleanenv --bind "$ROOT" --bind "$B3" --bind "$ENVS" --env R_LIBS_USER="$ROOT/lib" \
+  --env PATH="$ENVS/hyphy-2.5.103/bin:$ENVS/ref/bin:/opt/conda/envs/tools/bin:/usr/local/bin:/usr/bin:/bin" "$IMAGE" \
+  Rscript --vanilla -e '
+    a <- commandArgs(TRUE); suppressMessages(library(dndsR))
+    phylo_busted(alignment_dir = a[1], species_tree_file = a[2], foreground_file = a[3], output_dir = a[4], run_name = "busted_e",
+                 threads = as.integer(a[5]), multiple_hits = "Double", starting_points = 3L, error_sink = "Yes")
+  ' "$d" "$out/species_tree.nwk" "$out/foreground.tsv" "$out" "$th" > "$out/busted_e.log" 2>&1
+[ -d "$out/busted_e/hyphy" ] && tar -czf "$out/busted_e/hyphy.tar.gz" -C "$out/busted_e" hyphy && rm -rf "$out/busted_e/hyphy" || true
+rm -rf "$out/in"
+printf 'name\tsource_unit\tinput\tmax_genes\tcommit\thost\tcpu\tseconds\tcpus\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$src" "$input" "$max" \
+  "$(cat "$ROOT/lib/COMMIT")" "$(hostname)" "$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //')" "$((SECONDS - start))" "$th" > "$out/provenance.tsv"
+touch "$out/DONE"

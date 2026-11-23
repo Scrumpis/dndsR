@@ -63,6 +63,10 @@ cell2 <- function(cell) {
     LA1 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0.7, branch_sd = TRUE, loss = TRUE),
     BE0 = c(b0, error = "none"), BE3 = c(b0, error = "indel"), BE3h = c(b0, error = "indel_h"), BE3hS = c(b0, error = "indel_h", select_all = TRUE), BMIXh = c(b0, error = "indel_h", mix = TRUE), BE4 = c(b0, error = "paralog"),
     BE5 = c(b0, error = "discordant"), BE7 = c(b0, error = "recombination"), BMIX = c(b0, error = "mixture"),
+    # Multiple-testing stage 2 (lineage-multiple-testing.md): 10% of genes selected, each on one random
+    # branch (probability 0.7) or two (0.3), any lineage; classes 0.05/0.3/10 there. Truth per branch:
+    # omega_mean > 1 in gene_branch_truth.tsv. No alignment error.
+    BMIXv = c(b0, error = "none", random_lineages = TRUE),
     # RELAX confirmation (relax-bootstrap-study.md, "Confirmation"): gamma site classes (shape 0.5,
     # mean 0.3, 8 classes), every class raised to the power k on the test branches (foreground).
     RG0 = list(om = gamma_classes(0.5, 0.3, 8L), prop = rep(1 / 8, 8), gene_sd = 0, branch_sd = FALSE, relax_k = 1),
@@ -133,6 +137,9 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
         selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10))
       }
       if (isTRUE(spec$select_all)) { selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10)) }
+      if (isTRUE(spec[["random_lineages"]]) && stats::runif(1) < 0.1) {
+        selected <- TRUE; br <- sample(child, if (stats::runif(1) < 0.7) 1L else 2L); om[br] <- list(c(0.05, 0.3, 10))
+      }
       if (!is.null(spec$relax_k) && spec$relax_k != 1) om[fg_nodes] <- lapply(om[fg_nodes], function(w) w^spec$relax_k)
     }
     if (!is.null(ptree)) {

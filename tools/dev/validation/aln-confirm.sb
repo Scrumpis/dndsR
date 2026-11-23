@@ -1,0 +1,87 @@
+#!/bin/bash --login
+# Alignment confirmation (docs/dev/alignment-confirmation.md): one data set per array task, from a
+# units file. Simulates with phylo-lineage-sim2.R; A0 = phylo_prepare (MAFFT L-INS-i on translations,
+# back-translated), A1 = PRANK codon mode on the species topology, T = the true alignment (diagnostic
+# only); aBSREL (defaults) on each arm. Records per-gene alignment time and peak memory
+# (/usr/bin/time), validity, and a reproducibility rerun of both aligners on the first 20 genes.
+#   sbatch --array=<rows> --constraint=intel18 --export=ALL,ROOT=<root>,UNITS=<units file>,IMAGE=<sif>,ENVS=<envs>[,N=<genes>] aln-confirm.sb
+# Units file (tab-separated, header): name cell tree n seed first
+#   first: index of the first gene kept (genes before it are simulated, so the seed's stream is the
+#   same as the unit that used them, then dropped before alignment: held-out genes 151-300 of BE3h).
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --job-name=aln-confirm
+set -euo pipefail
+: "${ROOT:?}" "${UNITS:?}" "${IMAGE:?}" "${ENVS:?}"
+row=$(awk -v i="$SLURM_ARRAY_TASK_ID" 'NR == i + 1' "$UNITS")
+IFS=$'\t' read -r name cell tree n seed first <<<"$row"
+n=${N:-$n}; codons=300; th=$SLURM_CPUS_PER_TASK
+v="$ROOT/src/tools/dev/validation"; out="$ROOT/units/$name"
+[ -f "$out/DONE" ] && { echo "already done: $out"; exit 0; }
+rm -rf "$out"; mkdir -p "$out"
+run() { singularity exec --cleanenv --bind "$ROOT" --bind "$ENVS" --env R_LIBS_USER="$ROOT/lib" \
+  --env PATH="$ENVS/hyphy-2.5.103/bin:$ENVS/ref/bin:/opt/conda/envs/tools/bin:/usr/local/bin:/usr/bin:/bin" "$IMAGE" "$@"; }
+AL="$ENVS/aligners/bin"
+start=$SECONDS
+run Rscript --vanilla "$v/phylo-lineage-sim2.R" "$ROOT/params.json" "$cell" "$tree" "$n" "$seed" "$out/sim" "$codons"
+s="$out/sim"
+mkdir -p "$out/T" "$out/unaligned"
+for f in "$s"/alignments/*.true.fasta; do
+  og=$(basename "$f" .true.fasta); cp "$f" "$out/T/$og.fasta"; sed '/^>/!s/-//g' "$f" > "$out/unaligned/$og.fasta"
+done
+sed -E 's/\)[A-Za-z0-9_]+/)/g' "$s/species_tree.nwk" > "$out/species_topology.nwk"
+# A0: phylo_prepare as users run it, timed and measured as a whole.
+PREP='suppressMessages(library(dndsR)); phylo_prepare(orthogroup_file = "orthogroup_table.tsv", cds_file = "cds_table.tsv",
+  species_tree_file = "species_tree.nwk", foreground_file = "foreground.tsv", output_dir = ".", threads = as.integer(commandArgs(TRUE)[1]))'
+export PREP ROOT ENVS IMAGE; export -f run
+/usr/bin/time -f "%e\t%M" -o "$out/A0_time.tsv" bash -c 'cd "$1" && run Rscript --vanilla -e "$PREP" "$2" > prepare.log 2>&1' _ "$s" "$th"
+mkdir -p "$out/A0"; cp "$s"/prepared/alignments/*.fasta "$out/A0/"
+# Held-out subsets: drop genes before `first` from every arm.
+if [ "$first" -gt 1 ]; then
+  for i in $(seq 1 $((first - 1))); do og=$(printf "%s_%s_%04d" "$cell" "$tree" "$i"); rm -f "$out"/{T,unaligned,A0}/"$og".fasta; done
+fi
+# A1: PRANK, one core per gene, wall seconds and peak resident memory (KB) per gene.
+align_one() {
+  og=$1; out=$2; AL=$3; tag=$4; d="$out/work$tag/$og"; mkdir -p "$d"; cd "$d"
+  /usr/bin/time -f "%e\t%M" -o time.tsv "$AL/prank" -d="$out/unaligned/$og.fasta" -o=pr -codon -once -seed=1 -t="$out/species_topology.nwk" > prank.log 2>&1 || true
+  [ -f pr.best.fas ] && cp pr.best.fas "$out/A1$tag/$og.fasta"
+  printf "A1\t%s\t%s\n" "$og" "$(cat time.tsv | tail -1)" > seconds.tsv
+}
+export -f align_one
+mkdir -p "$out/A1" "$out/work"
+ls "$out/unaligned" | sed 's/\.fasta$//' | xargs -P "$th" -I{} bash -c 'align_one "$@"' _ {} "$out" "$AL" ""
+{ printf "arm\tgene\tseconds\tmax_rss_kb\n"; printf "A0\tall\t%s\n" "$(tail -1 "$out/A0_time.tsv")"; cat "$out"/work/*/seconds.tsv; } > "$out/align_cost.tsv"
+tar -czf "$out/work.tar.gz" -C "$out" work && rm -rf "$out/work"
+# Reproducibility: both aligners again on the first 20 kept genes, compared byte for byte.
+mkdir -p "$out/A1rep" "$out/workrep" "$out/rep"
+ls "$out/unaligned" | sed 's/\.fasta$//' | head -20 > "$out/rep/genes.txt"
+xargs -P "$th" -I{} bash -c 'align_one "$@"' _ {} "$out" "$AL" rep < "$out/rep/genes.txt"
+rm -rf "$out/workrep"
+mkdir -p "$out/rep/sim"; cp "$s"/{orthogroup_table.tsv,cds_table.tsv,species_tree.nwk,foreground.tsv} "$out/rep/sim/"
+[ -d "$s/cds" ] && cp -r "$s/cds" "$out/rep/sim/" || true
+(cd "$out/rep/sim" && run Rscript --vanilla -e "$PREP" "$th" > "$out/rep/prepare.log" 2>&1) || true
+{ printf "arm\tgene\tidentical\n"
+  while read -r og; do
+    printf "A1\t%s\t%s\n" "$og" "$(cmp -s "$out/A1/$og.fasta" "$out/A1rep/$og.fasta" && echo TRUE || echo FALSE)"
+    printf "A0\t%s\t%s\n" "$og" "$(cmp -s "$out/A0/$og.fasta" "$out/rep/sim/prepared/alignments/$og.fasta" && echo TRUE || echo FALSE)"
+  done < "$out/rep/genes.txt"; } > "$out/reproducibility.tsv"
+rm -rf "$out/A1rep" "$out/rep/sim"
+# aBSREL on each arm.
+printf "arm\tgenes\tseconds\tcpus\n" > "$out/absrel_seconds.tsv"
+for arm in A0 A1 T; do
+  t0=$SECONDS
+  run Rscript --vanilla -e '
+    a <- commandArgs(TRUE); suppressMessages(library(dndsR)); d <- a[1]; arm <- a[2]; th <- as.integer(a[3])
+    phylo_absrel(alignment_dir = file.path(d, arm), species_tree_file = file.path(d, "sim", "species_tree.nwk"), output_dir = d,
+                 threads = th, run_name = paste0("absrel_", arm))
+  ' "$out" "$arm" "$th" > "$out/methods_$arm.log" 2>&1
+  printf "%s\t%s\t%s\t%s\n" "$arm" "$(ls "$out/$arm" | wc -l)" "$((SECONDS - t0))" "$th" >> "$out/absrel_seconds.tsv"
+  [ -d "$out/absrel_$arm/hyphy" ] && tar -czf "$out/absrel_$arm/hyphy.tar.gz" -C "$out/absrel_$arm" hyphy && rm -rf "$out/absrel_$arm/hyphy" || true
+done
+for x in A0 A1 T unaligned; do tar -czf "$out/$x.tar.gz" -C "$out" "$x"; done
+for x in alignments prepared cds; do [ -d "$s/$x" ] && tar -czf "$s/$x.tar.gz" -C "$s" "$x" && rm -rf "$s/$x" || true; done
+rm -rf "$out/A0" "$out/A1" "$out/T" "$out/unaligned"
+printf 'name\tcell\ttree\tseed\tn\tfirst\tcommit\thost\tcpu\tseconds\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$cell" "$tree" "$seed" "$n" "$first" \
+  "$(cat "$ROOT/lib/COMMIT")" "$(hostname)" "$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //')" "$((SECONDS - start))" > "$out/provenance.tsv"
+touch "$out/DONE"

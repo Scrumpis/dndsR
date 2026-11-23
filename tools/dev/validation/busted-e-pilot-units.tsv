@@ -1,0 +1,4 @@
+name	source_unit	input	max_genes
+E-E0	B-E0-T8b-busted	alignments	0
+E-E1	B-E1-T8b-busted	corrupted	300
+E-MIX	B-MIX-T8b-busted	corrupted	0
