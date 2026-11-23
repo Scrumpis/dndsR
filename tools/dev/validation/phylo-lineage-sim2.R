@@ -21,6 +21,7 @@
 #     BE0  no error                            BE3  codon indels (rate 0.02 per codon per unit length, mean 2 codons)
 #     BE3h as BE3, with insertions homologous across the inserting branch's descendants (add_indels(homologous = TRUE))
 #     BE3hS as BE3h, with every gene selected on the foreground (classes 0.05/0.3/10 there; alignment pilot)
+#     RG0, RG05, RG2  RELAX confirmation: gamma classes (0.5, mean 0.3, 8), k = 1, 0.5, 2 on the test branches
 #     BMIXh BMIX's selection (10% of genes on the foreground) with BE3h's indels, no corruption (multiple-testing study)
 #     BE4  t1 replaced by a paralog that split from the species lineage at the root
 #     BE5  gene tree discordant: t2 and t3 exchanged (one NNI at the stem of the foreground clade)
@@ -62,6 +63,11 @@ cell2 <- function(cell) {
     LA1 = list(om = g8, prop = rep(1 / 8, 8), gene_sd = 0.7, branch_sd = TRUE, loss = TRUE),
     BE0 = c(b0, error = "none"), BE3 = c(b0, error = "indel"), BE3h = c(b0, error = "indel_h"), BE3hS = c(b0, error = "indel_h", select_all = TRUE), BMIXh = c(b0, error = "indel_h", mix = TRUE), BE4 = c(b0, error = "paralog"),
     BE5 = c(b0, error = "discordant"), BE7 = c(b0, error = "recombination"), BMIX = c(b0, error = "mixture"),
+    # RELAX confirmation (relax-bootstrap-study.md, "Confirmation"): gamma site classes (shape 0.5,
+    # mean 0.3, 8 classes), every class raised to the power k on the test branches (foreground).
+    RG0 = list(om = gamma_classes(0.5, 0.3, 8L), prop = rep(1 / 8, 8), gene_sd = 0, branch_sd = FALSE, relax_k = 1),
+    RG05 = list(om = gamma_classes(0.5, 0.3, 8L), prop = rep(1 / 8, 8), gene_sd = 0, branch_sd = FALSE, relax_k = 0.5),
+    RG2 = list(om = gamma_classes(0.5, 0.3, 8L), prop = rep(1 / 8, 8), gene_sd = 0, branch_sd = FALSE, relax_k = 2),
     NULL)
 }
 
@@ -127,6 +133,7 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
         selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10))
       }
       if (isTRUE(spec$select_all)) { selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10)) }
+      if (!is.null(spec$relax_k) && spec$relax_k != 1) om[fg_nodes] <- lapply(om[fg_nodes], function(w) w^spec$relax_k)
     }
     if (!is.null(ptree)) {
       aln <- sim_gene_nodes(ptree, codons, pi, par$kappa, rep(list(spec$om), ape::Ntip(ptree) + ptree$Nnode), prop)
@@ -139,12 +146,12 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
     dropped <- character()
     if (tree_name == "T16m") dropped <- sample(tree$tip.label, 4L)
     if (m > loss_cut && stats::runif(1) < 0.5) dropped <- union(dropped, "t1")
-    if (!legacy && spec$error %in% c("indel", "indel_h")) {
+    if (!legacy && isTRUE(spec$error %in% c("indel", "indel_h"))) {
       tr <- ape::reorder.phylo(tree, "cladewise")
       aln <- add_indels(aln, tree, tr$edge, tr$edge.length, 0.02, 2, pi, homologous = identical(spec$error, "indel_h"))
     }
     aln <- aln[setdiff(tree$tip.label, dropped), , drop = FALSE]
-    if (!legacy && spec$error %in% c("indel", "indel_h")) {
+    if (!legacy && isTRUE(spec$error %in% c("indel", "indel_h"))) {
       write_fasta(aln, file.path(out, "alignments", paste0(id, ".true.fasta")))
       seqs <- apply(aln, 1, paste, collapse = "")
       for (tx in names(seqs)) cds[[length(cds) + 1L]] <- data.frame(orthogroup = id, taxon = tx, gene_id = paste0(tx, "_", id), seq = gsub("-", "", seqs[[tx]]))

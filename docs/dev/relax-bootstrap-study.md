@@ -81,3 +81,31 @@ The maintainer approved R in stages: first establish that a bootstrap correction
 ### Cost
 
 Plain RELAX on the held-out cells: about 15 core-hours; RD2: about 36; calibration sets (5 datasets x 1,000 fits): about 64; RD1: about 8. **About 125 core-hours.** Units: `phylo-study-R-units.tsv` (seeds 401-405, 411-412) and a 10-gene smoke copy (`phylo-study-R-pilot-units.tsv`, seeds 491-497); calibration sets by `phylo-relax-calib.sb`.
+
+## Confirmation (approved 2026-11-23; fixed before running)
+
+The maintainer approved the bounded confirmation recommended by stage 1 ([results](../validation/relax-calibration-stage1.md)) on independent held-out genes, not the ~930 core-hour study. It asks whether stage 1's two genome-scale p-values (`p_scaled`, `p_pool`, each from one calibration set of 50 genes × 20 null replicates per dataset) keep their properties in a configuration that differs from stage 1 in tree and in omega distribution. Nothing in it is chosen from stage 1's genes, and none of its results is seen before the criteria below were committed.
+
+**Configuration.** Tree T16m (16 taxa, 4 dropped at random per gene, so genes differ in taxon set; stage 1 used the complete T16). Site omegas from a gamma distribution (shape 0.5, mean 0.3, 8 equal-probability classes, conditional means), with every class raised to the power k on the test branches (t1, t2 and their stem); stage 1 used three fixed classes (0.05, 0.3, 1.5). RELAX's own model (3 classes) is misspecified for these data, as it would be for real genes. Cells `RG0`, `RG05`, `RG2` in `phylo-lineage-sim2.R`, 300 codons. RELAX through `phylo_relax()` with dndsR's settings, HyPhy 2.5.103.
+
+| Unit | Truth | Genes | Seed |
+|---|---|---:|---:|
+| R-N16 | k = 1 | 600 | 421 |
+| R-K05 | k = 0.5 | 200 | 422 |
+| R-K2 | k = 2 | 200 | 423 |
+
+The units keep stage 1's names so that the stage 1 summary (`phylo-study-R-summary.R`) runs unchanged on the new root `study-R2`; units file `phylo-study-R-conf-units.tsv`. Each unit gets its own calibration set (`phylo-relax-calib.sb`, K = 50, B = 20, sample seed from the unit name).
+
+**Criteria (as stage 1, applied to these held-out cells).**
+
+- **C-size.** On R-N16, each new p-value's size at 0.05 within Bradley's tolerance (95% Clopper-Pearson interval inside 2.5-7.5%). HyPhy's `p_value` reported beside it.
+- **C-power.** On R-K05 and R-K2, each new p-value's power at least the size-adjusted power of HyPhy's chi-square (at the critical LRT giving 5% in this R-N16) minus 5 points. Direction reported.
+- **C-FDR.** In 2,000 resampled mixtures of all R-N16 genes plus 30 each of R-K05 and R-K2, scored against R-N16's calibration set, BH at q = 0.05: mean false-discovery proportion at most 5%. Power reported.
+- **C-shared.** The heterogeneity test of stage 1 (RD3) reported; p < 0.01 with excess variance would mean one factor per dataset is not exact here, and is reported as a limitation.
+- **C-upstream.** HyPhy 2.5.103 run directly on dndsR's inputs for R-N16 (`phylo-lineage-relax-direct.sb`, `MODE=dndsr`, seed 1): LRTs agree within 1e-3 in at least 95% of genes (stage 1's RELAX optimum was not reproducible to 1e-3 in 14 of 300 genes between identical runs, so exact agreement is not required).
+
+**Outcome rule.** A p-value is *confirmed* if it meets C-size, C-power on both cells and C-FDR. A confirmed p-value is then proposed to the maintainer as an additional, optional column beside HyPhy's `p_value` (an interface change, needing approval); its cost per dataset (the calibration set) is stated. If neither is confirmed, RELAX stays flagged and its use limited to descriptive k. The ~930 core-hour study is not proposed in either case: stage 1 showed by arithmetic that per-gene Monte Carlo p-values cannot support genome-wide BH.
+
+**Cost.** RELAX on 1,000 genes on 16 taxa about 10 core-hours; three calibration sets (3,000 null fits at about 60 core-seconds) about 50; direct reruns about 3: **about 63 core-hours, ceiling 75**. Intel nodes only.
+
+**Simulator note.** Adding these cells exposed a defect introduced at `49fd39f`: `spec$error %in% ...` on a cell with no error type gave a zero-length condition, so the study L cells (`LS*`, `LG1`, `LA1`) would no longer run in the current script. Study L's frozen copy (`760ca03`) predates it and is unaffected. Fixed with `isTRUE()`; BE3h regenerated from seed 304 is byte-identical to study B's (300 of 300 alignments).

@@ -1,0 +1,4 @@
+unit	cell	tree	n	codons	seed	methods	post	mask	settings
+R-N16	RG0	T16m	600	300	421	relax	none	no	-
+R-K05	RG05	T16m	200	300	422	relax	none	no	-
+R-K2	RG2	T16m	200	300	423	relax	none	no	-
