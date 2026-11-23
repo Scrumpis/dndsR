@@ -98,9 +98,9 @@ paralog_tree <- function(tree) {
 run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
   par <- jsonlite::read_json(params_file, simplifyVector = TRUE)
   RNGversion("4.0.0"); set.seed(seed)
-  pi <- f3x4(matrix(unlist(par$nuc_f3x4), 3, byrow = TRUE))
+  pi <- f3x4(matrix(unlist(par[["nuc_f3x4"]]), 3, byrow = TRUE))
   tree <- ape::read.tree(text = lineage_trees(par)[[tree_name]])
-  tree$edge.length <- tree$edge.length * par$c
+  tree$edge.length <- tree$edge.length * par[["c"]]
   tree$node.label <- paste0("n", seq_len(tree$Nnode))
   n_nodes <- ape::Ntip(tree) + tree$Nnode
   fg_tips <- tree$tip.label[1:2]
@@ -114,16 +114,16 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
   writeLines(c("scope\ttaxa", paste0("clade\t", paste(fg_tips, collapse = ","))), file.path(out, "foreground.tsv"))
   names_all <- c(tree$tip.label, tree$node.label)
   child <- tree$edge[, 2]
-  eff <- if (!legacy && isTRUE(spec$branch_sd)) branch_effects(n_nodes) else rep(1, n_nodes)
-  base_mean <- if (legacy) vapply(spec0$om, function(w) sum(w * spec0$prop[seq_along(w)]), numeric(1)) else rep(sum(spec$om * spec$prop), n_nodes)
+  eff <- if (!legacy && isTRUE(spec[["branch_sd"]])) branch_effects(n_nodes) else rep(1, n_nodes)
+  base_mean <- if (legacy) vapply(spec0$om, function(w) sum(w * spec0$prop[seq_along(w)]), numeric(1)) else rep(sum(spec[["om"]] * spec[["prop"]]), n_nodes)
   # Population truth: the gene effect has mean 1, so the opportunity-weighted mean omega of a
   # branch over the gene population is its base mean times its branch effect.
   truth <- data.frame(branch_id = names_all[child], length_codon = tree$edge.length,
                       omega_mean = base_mean[child] * eff[child], branch_effect = eff[child],
                       foreground = child %in% fg_nodes)
   utils::write.table(truth, file.path(out, "branch_truth.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
-  loss_cut <- if (!legacy && isTRUE(spec$loss)) stats::qlnorm(2 / 3, -spec$gene_sd^2 / 2, spec$gene_sd) else Inf
-  ptree <- if (!legacy && identical(spec$error, "paralog")) paralog_tree(tree) else NULL
+  loss_cut <- if (!legacy && isTRUE(spec[["loss"]])) stats::qlnorm(2 / 3, -spec[["gene_sd"]]^2 / 2, spec[["gene_sd"]]) else Inf
+  ptree <- if (!legacy && identical(spec[["error"]], "paralog")) paralog_tree(tree) else NULL
   genes <- list(); gbt <- list(); cds <- list()
   for (i in seq_len(n)) {
     id <- sprintf("%s_%s_%04d", cell, tree_name, i)
@@ -131,34 +131,34 @@ run_cell2 <- function(params_file, cell, tree_name, n, seed, out, codons) {
     if (legacy) {
       om <- spec0$om; prop <- spec0$prop; per_branch <- spec0$per_branch
     } else {
-      if (spec$gene_sd > 0) m <- exp(stats::rnorm(1, -spec$gene_sd^2 / 2, spec$gene_sd))
-      om <- lapply(seq_len(n_nodes), function(k) spec$om * m * eff[k]); prop <- spec$prop; per_branch <- FALSE
-      if ((identical(spec$error, "mixture") || isTRUE(spec$mix)) && stats::runif(1) < 0.1) {
+      if (spec[["gene_sd"]] > 0) m <- exp(stats::rnorm(1, -spec[["gene_sd"]]^2 / 2, spec[["gene_sd"]]))
+      om <- lapply(seq_len(n_nodes), function(k) spec[["om"]] * m * eff[k]); prop <- spec[["prop"]]; per_branch <- FALSE
+      if ((identical(spec[["error"]], "mixture") || isTRUE(spec[["mix"]])) && stats::runif(1) < 0.1) {
         selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10))
       }
-      if (isTRUE(spec$select_all)) { selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10)) }
+      if (isTRUE(spec[["select_all"]])) { selected <- TRUE; om[fg_nodes] <- list(c(0.05, 0.3, 10)) }
       if (isTRUE(spec[["random_lineages"]]) && stats::runif(1) < 0.1) {
         selected <- TRUE; br <- sample(child, if (stats::runif(1) < 0.7) 1L else 2L); om[br] <- list(c(0.05, 0.3, 10))
       }
-      if (!is.null(spec$relax_k) && spec$relax_k != 1) om[fg_nodes] <- lapply(om[fg_nodes], function(w) w^spec$relax_k)
+      if (!is.null(spec[["relax_k"]]) && spec[["relax_k"]] != 1) om[fg_nodes] <- lapply(om[fg_nodes], function(w) w^spec[["relax_k"]])
     }
     if (!is.null(ptree)) {
-      aln <- sim_gene_nodes(ptree, codons, pi, par$kappa, rep(list(spec$om), ape::Ntip(ptree) + ptree$Nnode), prop)
+      aln <- sim_gene_nodes(ptree, codons, pi, par[["kappa"]], rep(list(spec[["om"]]), ape::Ntip(ptree) + ptree$Nnode), prop)
       aln["t1", ] <- aln["t1p", ]; aln <- aln[tree$tip.label, , drop = FALSE]
     } else {
-      aln <- sim_gene_nodes(tree, codons, pi, par$kappa, om, prop, per_branch)
+      aln <- sim_gene_nodes(tree, codons, pi, par[["kappa"]], om, prop, per_branch)
     }
-    if (!legacy && identical(spec$error, "discordant")) aln <- swap_rows(aln, "t2", "t3")
-    if (!legacy && identical(spec$error, "recombination")) aln <- swap_rows(aln, "t2", "t3", (codons %/% 2 + 1):codons)
+    if (!legacy && identical(spec[["error"]], "discordant")) aln <- swap_rows(aln, "t2", "t3")
+    if (!legacy && identical(spec[["error"]], "recombination")) aln <- swap_rows(aln, "t2", "t3", (codons %/% 2 + 1):codons)
     dropped <- character()
     if (tree_name == "T16m") dropped <- sample(tree$tip.label, 4L)
     if (m > loss_cut && stats::runif(1) < 0.5) dropped <- union(dropped, "t1")
-    if (!legacy && isTRUE(spec$error %in% c("indel", "indel_h"))) {
+    if (!legacy && isTRUE(spec[["error"]] %in% c("indel", "indel_h"))) {
       tr <- ape::reorder.phylo(tree, "cladewise")
-      aln <- add_indels(aln, tree, tr$edge, tr$edge.length, 0.02, 2, pi, homologous = identical(spec$error, "indel_h"))
+      aln <- add_indels(aln, tree, tr$edge, tr$edge.length, 0.02, 2, pi, homologous = identical(spec[["error"]], "indel_h"))
     }
     aln <- aln[setdiff(tree$tip.label, dropped), , drop = FALSE]
-    if (!legacy && isTRUE(spec$error %in% c("indel", "indel_h"))) {
+    if (!legacy && isTRUE(spec[["error"]] %in% c("indel", "indel_h"))) {
       write_fasta(aln, file.path(out, "alignments", paste0(id, ".true.fasta")))
       seqs <- apply(aln, 1, paste, collapse = "")
       for (tx in names(seqs)) cds[[length(cds) + 1L]] <- data.frame(orthogroup = id, taxon = tx, gene_id = paste0(tx, "_", id), seq = gsub("-", "", seqs[[tx]]))

@@ -24,7 +24,7 @@ balanced <- function(n, term, inner) {
 }
 
 lineage_trees <- function(par) list(
-  T5 = par$tree,
+  T5 = par[["tree"]],
   T8b = balanced(8, 0.03, 0.02),
   T8p = "(((((((t1:0.005,t2:0.01):0.02,t3:0.03):0.02,t4:0.06):0.02,t5:0.1):0.02,t6:0.15):0.02,t7:0.25):0.02,t8:0.03);",
   T16 = balanced(16, 0.03, 0.015),
@@ -59,7 +59,7 @@ cell_omegas <- function(cell, tree, fg_nodes) {
     C0i = list(om = one(c(0.05, 0.3, 1.5)), prop = prop3, per_branch = TRUE),
     stop("Unknown cell: ", cell)
   )
-  if (is.null(out$per_branch)) out$per_branch <- FALSE
+  if (is.null(out[["per_branch"]])) out[["per_branch"]] <- FALSE
   out
 }
 
@@ -93,9 +93,9 @@ sim_gene_nodes <- function(tree, n_sites, pi, kappa, om, prop, per_branch = FALS
 run_lineage_cell <- function(params_file, cell, tree_name, n, seed, out) {
   par <- jsonlite::read_json(params_file, simplifyVector = TRUE)
   RNGversion("4.0.0"); set.seed(seed)
-  pi <- f3x4(matrix(unlist(par$nuc_f3x4), 3, byrow = TRUE))
+  pi <- f3x4(matrix(unlist(par[["nuc_f3x4"]]), 3, byrow = TRUE))
   tree <- ape::read.tree(text = lineage_trees(par)[[tree_name]])
-  tree$edge.length <- tree$edge.length * par$c
+  tree$edge.length <- tree$edge.length * par[["c"]]
   tree$node.label <- paste0("n", seq_len(tree$Nnode))
   fg_tips <- tree$tip.label[1:2]
   fg_nodes <- c(match(fg_tips, tree$tip.label), ape::getMRCA(tree, fg_tips))
@@ -107,14 +107,14 @@ run_lineage_cell <- function(params_file, cell, tree_name, n, seed, out) {
   names_all <- c(tree$tip.label, tree$node.label)
   child <- tree$edge[, 2]
   truth <- data.frame(branch_id = names_all[child], length_codon = tree$edge.length,
-                      omega_classes = vapply(spec$om[child], function(w) paste(signif(w, 4), collapse = ","), character(1)),
-                      omega_mean = vapply(spec$om[child], function(w) sum(w * spec$prop[seq_along(w)]), numeric(1)),
+                      omega_classes = vapply(spec[["om"]][child], function(w) paste(signif(w, 4), collapse = ","), character(1)),
+                      omega_mean = vapply(spec[["om"]][child], function(w) sum(w * spec[["prop"]][seq_along(w)]), numeric(1)),
                       foreground = child %in% fg_nodes, selected = cell == "B1" & child == 3L)
   utils::write.table(truth, file.path(out, "branch_truth.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
   genes <- list()
   for (i in seq_len(n)) {
     id <- sprintf("%s_%s_%04d", cell, tree_name, i)
-    aln <- sim_gene_nodes(tree, 300L, pi, par$kappa, spec$om, spec$prop, spec$per_branch)
+    aln <- sim_gene_nodes(tree, 300L, pi, par[["kappa"]], spec[["om"]], spec[["prop"]], spec[["per_branch"]])
     dropped <- character()
     if (tree_name == "T16m") dropped <- sample(tree$tip.label, 4L)
     aln <- aln[setdiff(tree$tip.label, dropped), , drop = FALSE]

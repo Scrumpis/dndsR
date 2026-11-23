@@ -9,7 +9,8 @@
 # which catches what only check sees, such as a namespace note or a documentation mismatch.
 # --regression adds the real-genome fixture regression (tools/dev/regression.sh, about 2-4 min):
 # the full pipeline on ~540 public Arabidopsis genes, compared with the committed baseline.
-# Always includes an import check: every pkg::fun in R/ must be declared in DESCRIPTION,
+# Always includes the validation simulator's regression test (tools/dev/test-simulator.sh: design
+# checks with partial-matching warnings as errors, and golden checksums), and an import check: every pkg::fun in R/ must be declared in DESCRIPTION,
 # which is what R CMD check reports and what CI caught on 2026-11-14.
 # Exits nonzero if any check fails, and prints the end of its output.
 set -u
@@ -38,6 +39,7 @@ check_skill() { start skill "$here/in-container.sh" Rscript --vanilla "$here/val
 check_safeguards() { start safeguards "$here/test-safeguards.sh"; }
 check_tutorial() { start tutorial "$here/test-tutorial.sh"; }
 check_rcmd() { start rcmdcheck "$here/rcmd-check.sh"; }
+check_simulator() { start simulator "$here/in-container.sh" bash "$here/test-simulator.sh"; }
 check_regression() { start regression "$here/regression.sh" --threads "${DNDSR_TEST_CPUS:-${SLURM_CPUS_PER_TASK:-4}}"; }
 
 if [ -n "$serial" ]; then
@@ -46,11 +48,12 @@ if [ -n "$serial" ]; then
   check_tests; wait
   check_skill; wait
   check_safeguards; wait
+  check_simulator; wait
   [ -n "$fast" ] || { check_tutorial; wait; }
   [ -z "$rcmd" ] || { check_rcmd; wait; }
   [ -z "$regress" ] || { check_regression; wait; }
 else
-  check_imports; check_tests; check_skill; check_safeguards
+  check_imports; check_tests; check_skill; check_safeguards; check_simulator
   [ -n "$fast" ] || check_tutorial
   [ -z "$rcmd" ] || check_rcmd
   [ -z "$regress" ] || check_regression
