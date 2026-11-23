@@ -8,7 +8,10 @@
 #' This test does not adjust for gene length or dS, and short genes or genes with small dS pass a dN/dS
 #' threshold far more often. In simulated evolution with annotation unrelated to omega, default settings
 #' reported at least one false term in up to 43% of runs at one plant pair, and much less at others:
-#' `docs/validation/enrichment-confounding.md`. Treat terms as exploratory. Defaults are unchanged.
+#' `docs/validation/enrichment-confounding.md`. With every term null, that rate is both the family-wise
+#' error rate and the false discovery rate. It comes from confounding by length and dS: when the call did
+#' not depend on them, the correction held (`docs/validation/enrichment-error-calibration.md`). Treat
+#' terms as exploratory. Defaults are unchanged.
 #' Each run gives a warning, and writes it with its settings to `<comparison>_go_enrichment_notice.json`.
 #' `covariate_enrichment()` adjusts for length and dS, and has its own limits.
 #'

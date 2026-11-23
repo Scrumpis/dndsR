@@ -13,7 +13,9 @@
   )[[command]]
   paste0("[", command, "] Calibration notice: this test does not adjust for gene length or dS. In simulated evolution ",
          "with annotation unrelated to omega, ", rate, " at one plant pair (A. thaliana against A. lyrata), and ",
-         "much less at others. Treat its terms as exploratory. covariate_enrichment adjusts for length and dS, and ",
+         "much less at others. With every term null, that is both the chance of any false term and the false discovery ",
+         "rate; it comes from confounding by length and dS, not from the multiple-testing correction, which held when ",
+         "the dN/dS call did not depend on them. Treat its terms as exploratory. covariate_enrichment adjusts for length and dS, and ",
          "has its own limits. Evidence: docs/validation/enrichment-confounding.md.")
 }
 

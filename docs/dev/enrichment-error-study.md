@@ -47,3 +47,7 @@ Universe (genes with at least one term of the family, per GO ontology as in topG
 ## Cost
 
 About 1,400 runs of `enrichment-methods.R`, measured in the smoke test below; projected under 50 core-hours.
+
+## Follow-up: the worst cell (2026-11-23, fixed before running)
+
+The audit's gap 7: `covariate_enrichment`'s worst null cell in the confirmation, InterPro under the `strata5` reassignment at *A. thaliana*-*A. lyrata*, was 5.0% (2.2-11.2) on 100 runs, meeting the rule with no margin. The maintainer asked that the remaining enrichment calibration be finished. **Design:** 1,000 new runs of that cell (`strata5:S`, seeds 970,000-970,999, never used), through the frozen study N code (`760ca03`) with `enrichment-methods.R`, so every candidate is computed on the same labels; `pb_floor` is `covariate_enrichment`. Runner `enrichment-worstcell.sb`. **Measure:** share of runs with at least one significant InterPro term (BH 0.05; in a reassignment null every term is false, so this is both the family-wise error rate and the FDR), Wilson 95% interval; GO family and Fisher's test reported beside it. **Criterion:** holds if the point estimate is at most 5% and the upper bound at most 7.5%; exceeds if the lower bound is above 5%; otherwise inconclusive. **Cost:** about 78 core-seconds per run, about 22 core-hours.

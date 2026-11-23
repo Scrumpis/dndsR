@@ -24,7 +24,7 @@ A significant BUSTED result and a pairwise dN/dS above 1 are not interchangeable
 1. **`phylo_prepare`** builds codon alignments and trees from genomes or CDS and an orthogroup table.
 2. **`phylo_busted --prepared-dir`** runs BUSTED on them and corrects across orthogroups.
 
-Codon alignments made elsewhere can go straight to `phylo_busted --alignment-dir`.
+Codon alignments made elsewhere can go straight to `phylo_busted --alignment-dir` (and to the lineage commands' `--alignment-dir`). dndsR checks that they are codon alignments (in frame, no internal stop) and flags dissimilar windows, but **an alignment that is in frame is not thereby correct**: codons can be in frame and still not homologous. In simulation, realigned indels inflated aBSREL's false positives without any frame error and without being flagged ([input errors](lineage-selection.md#input-errors)). A codon-aware aligner (PRANK) reduced that excess in an exploratory pilot ([alignment pilot](validation/alignment-pilot.md)); a confirmation is running. Say which aligner made supplied alignments when you report results.
 
 ## Inputs
 
