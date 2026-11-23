@@ -2,6 +2,17 @@
 
 Status: **exploratory analysis of existing results plus small direct HyPhy reruns, requested by the maintainer on 2026-11-23; not confirmatory.** It explains the BUSTED-E pilot's failed gate 1 ([design](../dev/busted-e-pilot.md)); the pilot's preregistered outcome stands unchanged. Findings and open questions are separated. Part of the checking was done independently by a second agent (OpenAI Codex CLI 0.171.0, read-only sandbox), which recomputed the key table from the raw files; its transcript is kept outside the repository with the run folder.
 
+## Conclusions in brief (finalized 2026-11-23, after the maintainer's review)
+
+1. **Integration fidelity, in the examined cases.** HyPhy 2.5.103 run directly on the files dndsR wrote reproduces dndsR's LRT for all 30 genes rerun (largest difference 5e-14). This supports the integration's fidelity for those genes and settings; it is not a proof for every input.
+2. **The 20 false positives are a diagnostic subset.** They were chosen as the 20 most significant genes, with 10 nonsignificant controls, to examine mechanism and reproducibility. They are not an independent estimate of the false-positive rate, which remains the pilot's 32.3% (27.1-37.9) on all 300 genes.
+3. **Mechanism.** The error-sink weight cap does not explain the persistent false positives: raising it from 1% to 5% or 20% removes only 3-4 of 20, and those genes still put no weight in the error class. The fits instead place the segment in the ordinary positive class at moderate ω (about 8-12), which the error class, bounded below at ω = 100, cannot represent. That is the more convincing explanation on this evidence; it was not tested by a designed experiment.
+4. **Optimisation variability exists, calls were stable where tested.** The alternative fit's log-likelihood moved by more than 0.01 between two seeds in 19 of 30 genes, and 4 small nested shortfalls persisted; no significance call changed between seeds for these 30 genes. That stability is not generalized beyond them.
+5. **Scope of the limitation.** These experiments show that BUSTED-E does not protect against substantial corruption by a non-homologous segment in one foreground sequence. They do not show that BUSTED-E is unreliable in general, nor test the residual misalignment it was designed for.
+6. **Realism of the corruption.** That such segments occur is biologically and technically plausible, and their lengths were taken from windows flagged in real public alignments (stage 2B). But the synthetic procedure (replacing a stretch of one sequence with another gene's sequence) has not been shown to reproduce the mechanisms that generate real anomalies (misassembly, misannotated exons, contamination, misalignment); the false-positive rates apply to this procedure, not necessarily to real errors of similar length.
+
+The pilot's preregistered result (gate 1 failed) is unchanged. No further BUSTED-E experiment, default change or upstream modification is planned (maintainer, 2026-11-23).
+
 ## The result being explained
 
 300 null genes, 8 taxa, foreground t1, t2 and their stem; one foreground sequence (t1) per gene carries a contiguous segment from a different gene (non-homologous), with lengths drawn from stage 2B's empirical flagged windows. At 0.05: BUSTED 95.0%, BUSTED-E 32.3% (27.1-37.9), BUSTED on masked alignments 0.7%; on error-free genes BUSTED-E 0% (0-1.2).
@@ -65,7 +76,7 @@ HyPhy 2.5.103 run directly on the alignments and trees dndsR wrote (`busted-e-fo
 1. Whether BUSTED-E's alternative-fit variability (19 of 30 genes moving between seeds) affects calls on other data; not studied further without approval.
 2. Masking and power on clean, block-selected genes rests on stage 2B; a confirmation would need new runs.
 
-## What this means for dndsR now
+## What this means for dndsR now (documentation only; no default or setting changes)
 
 - BUSTED-E is not a substitute for masking or for review of flagged alignments when the error is a non-homologous segment; dndsR's documentation should say so with these numbers.
 - Nothing is reported upstream unless the nested shortfalls persist in the reruns.
