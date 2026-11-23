@@ -1,0 +1,5 @@
+criterion	pass	detail
+1 gate: E-E1 upper bound <= 7.5%	FALSE	32.3% (27.1-37.9)
+1 gate: E-E0 not anticonservative	TRUE	0.0% (0.0-1.2)
+2 FDR: FDP upper bound <= 7.5%	FALSE	FDP 0.556 (0.212-0.863), 9 discoveries
+3 power above masked BUSTED, interval excluding 0	FALSE	0.034 against 0.138; difference -0.103 (-0.164 to -0.051)

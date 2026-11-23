@@ -1,0 +1,4 @@
+unit	genes	seconds	cpus	core_s_per_gene
+E-E0	300	3428	16	182.826666666667
+E-E1	300	4242	16	226.24
+E-MIX	1000	13154	16	210.464
