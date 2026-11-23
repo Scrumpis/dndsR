@@ -1,0 +1,23 @@
+#!/bin/bash --login
+# BUSTED-E forensic check (exploratory; docs/validation/busted-e-forensics.md). For chosen genes of the
+# pilot's E-E1 unit, HyPhy 2.5.103 run directly on the alignment and tree dndsR wrote: (a) dndsR's exact
+# settings and seed 1 (wrapper fidelity), (b) seed 2 (optimisation), (c) error-sink maximum weight 0.05 and
+# (d) 0.2 (is the 1% cap why the corruption goes to the omega > 1 class?).
+#   sbatch --export=ALL,UNIT=<busted-e unit>,GENES=<file>,OUT=<dir>,HYPHY=<hyphy> busted-e-forensic.sb
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --constraint=intel18
+#SBATCH --job-name=busted-e-forensic
+set -uo pipefail
+: "${UNIT:?}" "${GENES:?}" "${OUT:?}" "${HYPHY:?}"
+one() { g=$1; v=$2; OUT=$3; UNIT=$4; HYPHY=$5; d="$OUT/$g/$v"; mkdir -p "$d"; cd "$d"
+  tar -xzf "$UNIT/busted_e/hyphy.tar.gz" --strip-components=2 "hyphy/$g/alignment.fas" "hyphy/$g/tree.nwk"
+  seed=1; extra=()
+  case $v in seed2) seed=2 ;; w05) extra=(--error-sink-weight 0.05) ;; w20) extra=(--error-sink-weight 0.2) ;; esac
+  "$HYPHY" CPU=1 ENV=RANDOM_SEED=$seed busted --alignment alignment.fas --tree tree.nwk --branches FG --code Universal --srv Yes --rates 3 --syn-rates 3 \
+    --multiple-hits Double --error-sink Yes "${extra[@]}" --grid-size 250 --starting-points 3 --output busted.json > hyphy.log 2>&1
+  rm -f alignment.fas; }
+export -f one
+for g in $(cat "$GENES"); do for v in seed1 seed2 w05 w20; do echo "$g $v"; done; done | xargs -P "$SLURM_CPUS_PER_TASK" -n 2 bash -c 'one "$0" "$1" "'"$OUT"'" "'"$UNIT"'" "'"$HYPHY"'"'
+touch "$OUT/DONE"
