@@ -86,7 +86,7 @@ Within a gene, branch tests share one alignment and tree, so they are dependent 
 
 - Per data set and procedure, at q = 0.05: discoveries, FDP with 95% gene-bootstrap interval (2,000 resamples, seed 1), power (share of true gene-by-branch hypotheses discovered), and for P-BB the average within-selected-gene FDP.
 - A procedure **controls** F-all in a data set if its FDP upper bound is at most 0.075; **fails** if the lower bound exceeds 0.05.
-- **Proposal rule:** among P-BH, P-BY and P-BB, those that control F-all on every error-free data set; of these, the one with the highest power averaged over the data sets is proposed to the maintainer as a candidate optional column. If none controls everywhere, nothing is proposed and the documentation says F-all has no validated procedure. Nothing is implemented in this stage.
+- **Proposal rule:** among P-BH, P-BY and P-BB, those that control F-all on every error-free data set; of these, the one with the highest power averaged over the data sets is proposed (a tie within 1 point goes to the simplest: P-BH, then P-BB, then P-BY; added before any stage 2 data were read, after testing the summary on stage 1's Q-MIX, where P-BH and P-BB tied) to the maintainer as a candidate optional column. If none controls everywhere, nothing is proposed and the documentation says F-all has no validated procedure. Nothing is implemented in this stage.
 - F-gene (`p_adj`) and F-lineage (`p_bh_lineage` per family) are re-evaluated on the new data with stage 1's criteria.
 
 ### Cost
