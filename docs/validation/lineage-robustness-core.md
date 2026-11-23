@@ -222,3 +222,8 @@ Nothing of study B's design: the remaining arms ran in full (above), with BE3h i
 ## Limits
 
 One simulator; one 8-taxon tree for most cells; 300 codons; one omega distribution. The mixture's power figures are confounded by corruption (above). Gene-tree topology comparison was not evaluated. E5 and E7 use a single nearest-neighbour interchange; deeper discordance was not simulated.
+
+## Note added 2026-11-23: what the mixture power differences measure (preregistered results unchanged)
+
+The non-inferiority comparisons above compared power *after* Benjamini-Hochberg correction between the unmasked arm and the masked or excluded arms. Those results and the classifications that follow from them stand as recorded. A later exploratory reanalysis ([busted-e-forensics.md](busted-e-forensics.md), finding 5) shows that masking changed almost none of the selected genes' own tests: aBSREL gene `p_value` 110 against 107 of 116 selected genes before correction (82 against 107 after); BUSTED identical LRTs on the 72 selected genes without corruption (36 of 72 below 0.05 in both arms), and 24 against 27 on those with background-only corruption. The lower adjusted power with masking comes from BH's adaptivity: the unmasked arm's invalid discoveries (494 aBSREL gene discoveries, 78% false; 32 false of 62 for BUSTED) loosen the threshold for every gene. So the measured "power loss" of masking in these mixtures is not suppressed true signal. Masking's genuine power cost, when selected sites form one block, was shown separately in stage 2B (about 20 points). The rule's comparison of adjusted power between arms with very different false-discovery counts is a weakness of the design, recorded here rather than corrected retroactively.
+
