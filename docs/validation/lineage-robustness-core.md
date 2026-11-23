@@ -1,8 +1,8 @@
-# Lineage tests under input errors: aBSREL and branch models (study B, core arms)
+# Lineage tests under input errors: aBSREL, branch models and BUSTED (study B)
 
 **Question.** Which input errors break aBSREL (`phylo_absrel`) and the branch models (`phylo_branch_omega`)? Which errors can be detected from the input? For each, should dndsR warn, exclude, mask, or document a limitation? And is a failure upstream (HyPhy or codeml on that input) or a dndsR defect? Design, criteria and classification rules, fixed before running: [docs/dev/lineage-robustness-study.md](../dev/lineage-robustness-study.md).
 
-**Scope of this report.** These are the core arms only: every aBSREL and branch-model arm, as given and masked, on the 8-taxon tree and on 16 taxa with 4 missing. The maintainer has not yet decided on the 16-taxon units and the BUSTED arms (cost, below), so nothing here applies to BUSTED, or to 16 complete taxa.
+**Scope of this report.** The core arms (every aBSREL and branch-model arm, as given and masked, on the 8-taxon tree and on 16 taxa with 4 missing) are reported first. The remaining arms, approved 2026-11-22 (the 16-taxon units and every BUSTED arm), are in [Remaining arms](#remaining-arms-16-taxa-and-busted-2026-11-23); with them study B is complete.
 
 **Answer.**
 - **A corrupted segment in one sequence** (E1 foreground, E2 background) breaks both methods. It is detected in every affected gene by the window profile dndsR already reports (`dissimilar_windows`), which flags none of the error-free genes. Masking the flagged windows restores calibration.
@@ -141,6 +141,71 @@ The size tables above apply the preregistered per-test rule to every output, inc
 
 So in BE3h `p_bh_lineage` made false discoveries in 11 of the 13 lineages tested, and aBSREL's gene-level `p_adj` made 30 false discoveries among 300 null genes: neither controls false discoveries under realignment error. The statement in the first version of this report that `p_bh_lineage` "stays within tolerance" and is "the output to use" was wrong. The branch models' adjusted p-values made no rejection in any null cell. The definitions of each p-value, and a mixture study of false-discovery control and power, are in [the multiple-testing design](../dev/lineage-multiple-testing.md); its report will be `lineage-multiple-testing.md`.
 
+## Remaining arms: 16 taxa and BUSTED (2026-11-23)
+
+Run to the amendment of 2026-11-22 ([design](../dev/lineage-robustness-study.md)): BE3h (homologous insertions) replaces E3 for every unrun indel arm; criteria, classification rules, mixture analysis and direct-rerun rule unchanged. 15 units (`phylo-study-B-units-rest.tsv`), frozen library `49fd39f`, root `study-B3`, Intel nodes only, 668 core-hours (ceiling about 950). BUSTED is C1: `--multiple-hits Double`, `--starting-points 3`, other settings HyPhy's defaults, so its output is `p_value` and `p_adj`. Every BUSTED-only unit regenerated its genes from the same seed as its earlier unit; all 12 were checked byte-identical (simulated alignments and `genes.tsv`), as were the mixture's corruption log and window profile. Tables: `data/lineage_robustness_rest_*.tsv`.
+
+### 16 taxa (balanced tree; foreground t1, t2 and their stem; 300 genes each)
+
+Size at 0.05, as given [masked where it differs].
+
+| Cell | aBSREL `p_raw`, per branch | aBSREL gene `p_value` | `p_bh_lineage`: families with any rejection / gene `p_adj` rejections | `p_two_vs_m0` | `p_fg_omega_gt1` |
+|---|---|---|---|---|---|
+| E0-T16 | 2.0% calibrated | 1.3% calibrated | 1 of 29 / 0 | 6.7% (4.1-10.1) inconclusive | 0% |
+| E1-T16 (corrupted segment in t1) | 5.0% within tolerance [1.6% calibrated] | **99.3% anticons.** [2.0% calibrated] | **1 of 29 (t1, 299 rejections) / 298** [0 / 0] | **51% anticons.** [5.7% inconclusive] | 0% |
+| BE3h-T16 (realigned indels) | 5.2% within tolerance [5.2%] | **26.3% anticons.** [25.7%] | **24 of 29 / 52** [23 / 51] | 2.7% inconclusive | 0% |
+| BE3h-T16, true alignment (diagnostic, not a prespecified arm) | 1.5% (1.2-1.7) | 0.7% (0.1-2.4) | 0 of 29 / 0 | | |
+
+On 16 taxa the per-branch rate of `p_raw` is diluted by the 29 branches, but the gene-level and per-lineage false discoveries are as on 8 taxa: a corrupted segment is called in nearly every gene, and after realignment of indels aBSREL's gene `p_value` is false in 26% of null genes and `p_bh_lineage` makes false discoveries in 24 of 29 lineages. On the true alignments of the same genes everything is calibrated, so again the excess comes from realignment. The window profile flags 100% of E1-T16's genes, 0% of E0-T16's, and 1.7% of BE3h-T16's. The branch models' `p_two_vs_m0` on error-free 16 taxa is inconclusive at 6.7% (20 of 300), with no `p_adj_two_vs_m0` rejection.
+
+### BUSTED (C1)
+
+| Cell | `p_value` as given | masked | `p_adj` rejections (as given) |
+|---|---|---|---|
+| E0-T8b | 0.3% calibrated | 0.3% | 0 |
+| E0-T16 | 0.7% calibrated | 0.7% | 0 |
+| E1-T8b (600 genes) | **94.8% anticons.** | 0.5% calibrated | 568 |
+| E1-T16 | **96.0% anticons.** | 0% calibrated | 288 |
+| E2-T8b (background segment) | 1.0% calibrated | 1.0% | 0 |
+| BE3h-T8b | 6.0% (3.6-9.3) inconclusive | 5.7% | 0 |
+| BE3h-T16 | 6.0% (3.6-9.3) inconclusive | 5.7% | 3 |
+| E4-T8b paralog (213 tested) | 0.9% calibrated | 0.9% | 0 |
+| E5-T8b discordance (110 tested) | 0.9% calibrated | 0.9% | 0 |
+| E6-T16m missing taxa (279 tested) | 0% calibrated | 0% | 0 |
+| E7-T8b recombination | 1.0% calibrated | 1.0% | 0 |
+
+Mixture (B-MIX-T8b, the same 1,000 genes and corruption as the core mixture; 116 selected; window profile flags 426 genes, sensitivity 99.5%, no false flags):
+
+| BUSTED `p_adj` | Discoveries | FDP (95% CI) | Power | Power difference (95% CI) |
+|---|---:|---:|---:|---:|
+| as given | 62 | **51.6%** (38.6-64.5) | 25.9% | |
+| masked | 16 | 0% (0-20.6) | 13.8% | −12.1 (−20.0 to −5.3), not non-inferior |
+| flagged excluded | 10 | 0% (0-30.8) | 8.6% | −17.2 (−25.6 to −9.4), not non-inferior |
+
+### Direct reruns (design rule)
+
+Every cell outside tolerance, 20 most significant genes each, HyPhy or codeml run directly on the files dndsR wrote (`phylo-study-B-direct.R`, extended for BUSTED and the 16-taxon tree on 2026-11-23 without changing its existing cases):
+
+| Cell, run | Statistics | Agree | Largest difference |
+|---|---:|---:|---:|
+| E1-T16 aBSREL | 580 branch LRTs | 580 | 4e-13 |
+| BE3h-T16 aBSREL | 580 | 580 | 5e-14 |
+| E1-T16 `p_two_vs_m0` | 20 | 20 | 5e-14 |
+| E1-T8b BUSTED | 20 | 20 | 5e-14 |
+| E1-T16 BUSTED | 20 | 20 | 4e-14 |
+
+No dndsR defect: these failures belong to the models on those inputs.
+
+### Classification of the remaining arms (rules fixed in advance)
+
+| Error | aBSREL, 16 taxa | Branch models, 16 taxa | BUSTED |
+|---|---|---|---|
+| Corrupted segment (E1; E2 for BUSTED) | as on 8 taxa: not robust, detectable, masking restores size; per-lineage and gene classifications as in the core table | not robust; detectable; masking restores (5.7%, inconclusive) | foreground segment: not robust; detectable; masking restores size but costs 12 points of power, beyond the rule, and so does exclusion → **warn**. Background segment (E2): robust |
+| Realigned indels (BE3h) | `p_raw` within tolerance per branch, gene `p_value` not robust, `p_bh_lineage` false in 24 of 29 lineages; not detectable → **limitation**, as on 8 taxa | robust | robust by the size rule (6.0%, inconclusive on 8 and 16 taxa, not anticonservative); `p_adj` 0 and 3 false rejections |
+| Paralog, discordance, missing taxa, recombination | (core arms) | (core arms) | robust (0-1%) |
+
+Overall, the 16-taxon units change none of the core conclusions, and BUSTED behaves like the other methods under a corrupted foreground segment (detected; masking restores size at a power cost) but is the least affected of the three by realigned indels.
+
 ## Recommendations, for the maintainer's decision
 
 None of these is implemented; each changes behaviour or output and needs approval.
@@ -150,10 +215,9 @@ None of these is implemented; each changes behaviour or output and needs approva
 3. **Document E3 as a limitation of aBSREL's raw branch and gene p-values after realignment.** *Withdrawn in part, see the correction below: `p_bh_lineage` is not a safe alternative here.* With correctly simulated indels (BE3h) the excess is about 7% per branch and 21% per gene, and comes from realignment, not from gaps: aBSREL on the true alignments is calibrated. The documentation should say that aBSREL's unadjusted branch and gene p-values are sensitive to alignment error in gapped genes, that dndsR's window profile does not detect this. Testing other aligners or alignment filters would be a separate study.
 4. **No new safeguard for paralogs, discordance, missing taxa or recombination** on these trees. The existing zero-length-foreground exclusion is doing real work for discordance and should be described as such in the outputs documentation. The tip-dS ratio detects the paralog in every case and could be reported as an informational flag, but the tests stayed calibrated without it.
 
-## Not run (held for the maintainer's decision)
+## Not run
 
-- The 16-taxon units E0, E1 and E3 (about 160 core-hours for aBSREL and branch models).
-- Every BUSTED arm: about 790 core-hours as designed, about 630 after the drop order fixed in advance. BUSTED costs 226 core-seconds per gene on 8 taxa and 536 on 16, 8-10 times aBSREL.
+Nothing of study B's design: the remaining arms ran in full (above), with BE3h in place of E3 for the unrun indel arms, as the maintainer ruled. The original E3 generator was not run on 16 taxa or with BUSTED.
 
 ## Limits
 

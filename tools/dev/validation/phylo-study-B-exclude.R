@@ -8,13 +8,17 @@
 #    and each arm's power difference from the unmasked arm, with a 95% interval from 2,000
 #    bootstrap resamples of genes; power counts every selected test of the unmasked arm, so an
 #    excluded gene counts as not found (the non-inferiority rule: loss under 5 points, lower bound above -10).
-#   Rscript --vanilla phylo-study-B-exclude.R <results root> <summary prefix of phylo-study-B-summary.R> <out prefix>
+#   Rscript --vanilla phylo-study-B-exclude.R <results root> <summary prefix of phylo-study-B-summary.R> <out prefix> [unit] [detection unit]
+# unit defaults to B-MIX-T8b. For the BUSTED-only unit B-MIX-T8b-busted (same seed, genes checked
+# byte-identical), the window profile comes from B-MIX-T8b's detection table (second optional argument).
+# Arms are run only for the methods present in the unit (added 2026-11-23 with BUSTED's p_value).
 a <- commandArgs(TRUE); root <- a[1]; sprefix <- a[2]; prefix <- a[3]
-u <- "B-MIX-T8b"; ud <- file.path(root, "units", u)
+u <- if (length(a) >= 4) a[4] else "B-MIX-T8b"; du <- if (length(a) >= 5) a[5] else u
+ud <- file.path(root, "units", u)
 genes <- utils::read.delim(file.path(ud, "sim", "genes.tsv"), stringsAsFactors = FALSE)
 log <- utils::read.delim(pipe(sprintf("tar -xzOf %s corrupted/corrupt_log.tsv", file.path(ud, "sim", "corrupted.tar.gz"))), stringsAsFactors = FALSE)
 affected <- unique(sub("\\.fasta$", "", log$alignment))
-dt <- utils::read.delim(paste0(sprefix, "_detection_genes.tsv"), stringsAsFactors = FALSE); dt <- dt[dt$unit == u, ]
+dt <- utils::read.delim(paste0(sprefix, "_detection_genes.tsv"), stringsAsFactors = FALSE); dt <- dt[dt$unit == du, ]
 sig <- c("dissimilar_window", "high_ds", "few_synonymous", "tip_ds_3x_median", "qc_flag")
 det <- data.frame(signal = sig, affected = length(affected),
   sensitivity = vapply(sig, function(s) mean(dt[[s]][dt$gene %in% affected]), 0),
@@ -31,6 +35,7 @@ rd <- function(run, what) utils::read.delim(file.path(ud, run, sprintf("%s_%s.ts
 get <- function(run, test) {
   r <- rd(run, "results"); t <- r[r$status == "tested", ]
   if (test == "p_two_vs_m0") return(data.frame(og = t$orthogroup, p = t$p_two_vs_m0, true = t$orthogroup %in% sel))
+  if (test == "busted p_value") return(data.frame(og = t$orthogroup, p = t$p_value, true = t$orthogroup %in% sel))
   if (test == "absrel p_value per gene") return(data.frame(og = t$orthogroup, p = t$p_value, true = t$orthogroup %in% sel))
   b <- rd(run, "branches"); b <- b[b$orthogroup %in% t$orthogroup & !is.na(b$p_raw), ]
   data.frame(og = b$orthogroup, p = b$p_raw, true = b$orthogroup %in% sel & b$species_tree_branches %in% fg_ids, branch = b$species_tree_branches)
@@ -42,7 +47,9 @@ score <- function(x, ntrue = NULL) { x <- x[!is.na(x$p), ]; d <- adjust(x) <= 0.
   if (is.null(ntrue)) ntrue <- sum(x$true); c(disc = sum(d), false = sum(d & !x$true), power = sum(d[x$true]) / ntrue, ntrue = ntrue) }
 arms <- list(
   absrel = list(tests = c("absrel p_raw per branch (p_bh_lineage)", "absrel p_value per gene"), runs = c("absrel", "absrel_mask")),
-  branch_omega = list(tests = "p_two_vs_m0", runs = c("branch_omega", "branch_omega_mask")))
+  branch_omega = list(tests = "p_two_vs_m0", runs = c("branch_omega", "branch_omega_mask")),
+  busted = list(tests = "busted p_value", runs = c("busted", "busted_mask")))
+arms <- arms[vapply(arms, function(x) dir.exists(file.path(ud, x$runs[1])), TRUE)]
 set.seed(20261122)
 out <- list()
 for (m in names(arms)) for (tn in arms[[m]]$tests) {

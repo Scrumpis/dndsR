@@ -2,6 +2,13 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-23: study B complete
+
+- **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (continued)
+- **Done:** remaining arms summarised and added to the study B report: 16-taxon E0, E1 and BE3h for aBSREL and branch models, every BUSTED arm, the BUSTED mixture arms; direct reruns of the five cells outside tolerance (all agree); BE3h-T16 true-alignment diagnostic (calibrated). Docs, phylo-methods and skill updated with the 16-taxon and BUSTED findings.
+- **Verified:** 12 regenerated units byte-identical to their earlier units; exclusion script with default arguments reproduces the core mixture table byte for byte; `tools/dev/check.sh` on Intel: 251 tests, 0 failed, 7 skipped (engines not in the image).
+- **Not done:** maintainer decisions on the pilot and multiple-testing proposals; full L and R confirmation held; push.
+
 ## 2026-11-22 (evening): alignment pilot and multiple-testing study reported
 
 - **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (continued)

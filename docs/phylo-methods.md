@@ -158,6 +158,8 @@ report `p_best_fits_adj`, and check flagged alignments before believing any posi
 - **Model averaging of BUSTED and BUSTED-E** did not protect against alignment artifacts.
 - Weak selection (ω ≤ 3 on up to 20% of foreground sites) was nearly undetectable under every setting with five taxa.
 
+A later study of input errors (study B, [report](validation/lineage-robustness-core.md#remaining-arms-16-taxa-and-busted-2026-11-23)) ran BUSTED with `--multiple-hits Double --starting-points 3` on 8- and 16-taxon trees, 300 null genes per cell. Without errors it gave 0.3-0.7% false positives. A corrupted segment in a foreground sequence gave 95-96%, flagged in every gene; masking restored 0-0.5% but, in a 1,000-gene mixture, cut the share of selected genes found after correction from 26% to 14%. A background-sequence segment, realigned indels (6.0%, inconclusive), a paralog, discordance, missing taxa and recombination did not make BUSTED anticonservative. HyPhy run directly on dndsR's files gave the same statistics. These are single configurations, as above.
+
 ## Limits and interpretation
 
 - **Calibrated in one simulated configuration only** (above). Real data can differ in ways the simulation does not capture.
