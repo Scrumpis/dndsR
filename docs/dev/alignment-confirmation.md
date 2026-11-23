@@ -63,3 +63,18 @@ Measured in the pilot on 8 taxa: PRANK about 55, aBSREL about 28 core-seconds pe
 
 - **PRANK needs a fixed seed to be reproducible.** Without one, PRANK reran 3 of 10 smoke genes to a different alignment (its default seed varies between runs); MAFFT reran all 10 identically. With `-seed=1`, 4 of 4 16-taxon genes reran byte-identically. A1 therefore uses `-seed=1`, and any optional mode would set a seed and record it. The pilot ran without a seed; its results stand as one realization.
 - **Measured cost.** PRANK on 16 taxa: about 115 core-seconds per gene (8 taxa: about 49), peak memory under 10 MB; `phylo_prepare` (MAFFT) peak about 260 MB for the whole step. Against aBSREL's measured 28 (8 taxa) and 64 (16 taxa) core-seconds per gene, PRANK is about 1.75-1.8 times aBSREL, so criterion 6 (at most 1 times) is projected to fail; as fixed above, the cost then goes to the maintainer for decision rather than ending the proposal. Projection for the whole study: about 60 core-hours on 8 taxa and 80 on 16, about 145 in all (ceiling 200).
+
+## Maintainer's rulings of 2026-11-23, applied before any confirmatory result is read
+
+**Cost criterion (6) unchanged, reported, not decisive.** Its outcome will be reported exactly as preregistered. Following the maintainer's ruling that runtime is not a scientific acceptance criterion (`DECISIONS.md`), the **decision rule for proposing an optional mode is criteria 1-5**; criterion 6 is reported beside it. This is a documented revision of the decision rule, made before the confirmatory results, not a reinterpretation of them.
+
+**Practical utility assessment (separate from the gate; fixed now).** Reported from the confirmation's own measurements:
+
+- per-gene and genome-scale cost: PRANK's core-seconds per gene on 8 and 16 taxa, projected to 10,000 orthogroups, beside the cost of the lineage workflow that follows (aBSREL, branch models, BUSTED C1, RELAX on the same trees, from the measured times of the studies), so the alignment's share of an end-to-end analysis is explicit;
+- reuse: `phylo_prepare` writes alignments once and every method reads them, so the alignment cost is paid once per data set, not per model;
+- reliability gained per unit of compute: false positives removed per 1,000 null genes (A0 − A1, `p_raw` and gene `p_value`), false discoveries removed in the mixtures, against PRANK's extra core-hours;
+- power: any genuine selection signal lost (foreground `p_raw` and gene `p_value` in the selected units, gene `p_adj` and `p_bh_lineage` power in the mixtures), A1 against A0 and against T.
+
+If A1 meets criteria 1-5, it is proposed as an **optional high-confidence alignment mode**, with this assessment; the default stays MAFFT until the maintainer decides and the mode has its own tests and documentation.
+
+**Seed sensitivity (diagnostic, not part of the criteria).** On the pilot's development genes only (BE3h genes 1-150, already reported; not the held-out or confirmatory data): PRANK at seeds 1-5 and aBSREL on each (`prank-seeds.sb`, about 13 core-hours). Reported: share of genes whose alignment differs between seeds, sum-of-pairs against the truth per seed, the `p_raw` and gene `p_value` false-positive rates per seed, and how many gene-level calls change between seeds.

@@ -1,0 +1,29 @@
+#!/bin/bash --login
+# PRANK seed sensitivity (docs/dev/alignment-confirmation.md, "Seed sensitivity"; diagnostic only).
+# The alignment pilot's development genes (BE3h, seed 304, genes 1-150: its unaligned inputs and true
+# alignments from aln-pilot/units/null), aligned with PRANK codon mode at seeds 1-5, aBSREL on each.
+#   sbatch --constraint=intel18 --export=ALL,ROOT=<root>,PILOT=<aln-pilot root>,IMAGE=<sif>,ENVS=<envs> prank-seeds.sb
+#SBATCH --time=23:59:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --job-name=prank-seeds
+set -euo pipefail
+: "${ROOT:?}" "${PILOT:?}" "${IMAGE:?}" "${ENVS:?}"
+out="$ROOT/units/seeds"; mkdir -p "$out"; th=$SLURM_CPUS_PER_TASK; AL="$ENVS/aligners/bin"
+tar -xzf "$PILOT/units/null/unaligned.tar.gz" -C "$out"; tar -xzf "$PILOT/units/null/T.tar.gz" -C "$out"
+cp "$PILOT/units/null/species_topology.nwk" "$PILOT/units/null/sim/species_tree.nwk" "$out/"
+mkdir -p "$out/sim"; cp "$PILOT/units/null/sim/"{genes.tsv,gene_branch_truth.tsv,branch_truth.tsv} "$out/sim/"
+one() { og=$1; seed=$2; out=$3; AL=$4; d="$out/work/s$seed/$og"; mkdir -p "$d" "$out/S$seed"; cd "$d"
+  "$AL/prank" -d="$out/unaligned/$og.fasta" -o=pr -codon -once -seed="$seed" -t="$out/species_topology.nwk" > prank.log 2>&1 && cp pr.best.fas "$out/S$seed/$og.fasta"; }
+export -f one
+for seed in 1 2 3 4 5; do ls "$out/unaligned" | sed 's/\.fasta$//' | xargs -P "$th" -I{} bash -c 'one "$@"' _ {} "$seed" "$out" "$AL"; done
+rm -rf "$out/work"
+for seed in 1 2 3 4 5; do
+  singularity exec --cleanenv --bind "$ROOT" --bind "$ENVS" --env R_LIBS_USER="$ROOT/lib" \
+    --env PATH="$ENVS/hyphy-2.5.103/bin:$ENVS/ref/bin:/opt/conda/envs/tools/bin:/usr/local/bin:/usr/bin:/bin" "$IMAGE" Rscript --vanilla -e '
+      a <- commandArgs(TRUE); suppressMessages(library(dndsR))
+      phylo_absrel(alignment_dir = a[1], species_tree_file = a[2], output_dir = a[3], threads = as.integer(a[4]), run_name = a[5])' \
+    "$out/S$seed" "$out/species_tree.nwk" "$out" "$th" "absrel_S$seed" > "$out/absrel_S$seed.log" 2>&1
+  rm -rf "$out/absrel_S$seed/hyphy"
+done
+touch "$out/DONE"
