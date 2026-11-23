@@ -60,3 +60,14 @@ Under exchangeable labels, FDP is controlled for both. Under covariate-driven la
 ## Limits
 
 One pair (*A. thaliana*-*A. lyrata*). Labels are independent across genes (no tandem families). The covariate effect is one smooth function. The earlier study's hard case, few positive genes in a divergent pair (*B. rapa*), was not repeated here. Small spikes only. `qvalue`, IHW and quantile thresholds were not tested.
+
+## Follow-up: `covariate_enrichment`'s worst cell (2026-11-23)
+
+Design fixed before running ([enrichment-error-study.md](../dev/enrichment-error-study.md), "Follow-up"): 1,000 new runs (seeds 970,000-970,999) of the cell where `covariate_enrichment` sat exactly at the limit in the confirmation (InterPro, `strata5` reassignment, *A. thaliana*-*A. lyrata*, `dNdS > 1`: 5.0%, 2.2-11.2, 100 runs), with the frozen study N code (`760ca03`). Share of runs with any significant term (every term null here, so the family-wise error rate and the FDR), Wilson 95% intervals ([data/enrichment_worstcell.tsv](data/enrichment_worstcell.tsv)):
+
+| Family | `covariate_enrichment` (`pb_floor`) | Fisher (`term_enrichment`, `ipr_enrichment`, classic GO) | `cmh_10x10` |
+|---|---:|---:|---:|
+| InterPro | **1.2% (0.7-2.1)** | 18.3% (16.0-20.8) | 1.1% (0.6-2.0) |
+| GO | 0.1% (0.0-0.6) | 7.4% (5.9-9.2) | 0.3% (0.1-0.9) |
+
+**The criterion holds** (point estimate at most 5%, upper bound at most 7.5%). The confirmation's 5.0% in this cell was a high draw from 100 runs. This settles the cell; it does not extend `covariate_enrichment`'s validation beyond the tested pairs and `dNdS > 1` (its `q0.95` threshold remains not calibrated). The same runs show Fisher's test anticonservative in this cell for the selection question, as before.
