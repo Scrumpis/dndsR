@@ -20,9 +20,12 @@
 #'
 #' @section Multiple testing:
 #' Three levels, all reported. `p_raw` is HyPhy's uncorrected p-value for a branch.
-#' `p_holm` is HyPhy's Holm-Bonferroni correction across the branches tested in that
-#' orthogroup. Per orthogroup, `p_value` is the smallest `p_holm`, a valid test that some
-#' tested branch was under selection, and `p_adj` applies Benjamini-Hochberg to it across
+#' `p_holm` is HyPhy's correction across the branches tested in that orthogroup: the k-th
+#' smallest of m p-values times (m - k + 1), without Holm's running maximum, so it lies
+#' between Holm's and Hochberg's procedures. Per orthogroup, `p_value` is the smallest
+#' `p_holm`, in effect Hochberg's test that some tested branch was under selection (valid
+#' when the branches' p-values are independent or positively dependent), and `p_adj`
+#' applies Benjamini-Hochberg to it across
 #' orthogroups. Per lineage, `p_bh_lineage` applies Benjamini-Hochberg to `p_raw` across the
 #' orthogroups in which that species-tree branch was tested: use it to ask in how many genes
 #' a given lineage shows episodic selection.

@@ -147,8 +147,9 @@
       list(
         n_branches_tested = nrow(t),
         n_branches_holm_005 = sum(t$p_holm <= 0.05),
-        # Holm controls the family-wise error within the gene, so its smallest value is a valid
-        # p-value for "some tested branch evolved under episodic positive selection".
+        # HyPhy's p_holm omits Holm's running maximum, so its smallest value is Hochberg's global
+        # test that "some tested branch evolved under episodic positive selection" (valid when the
+        # branches' p-values are independent or positively dependent).
         p_value = min(t$p_holm),
         branch_min_p = t$branch[which.min(t$p_holm)],
         lnl_baseline = .json_num(j$fits[["Baseline MG94xREV"]][["Log Likelihood"]]),
@@ -161,7 +162,7 @@
     },
     adjust_branches = function(branches, results) .absrel_adjust(branches, results),
     testing = list(
-      within_gene = "p_holm: HyPhy's Holm-Bonferroni correction across the branches tested in each orthogroup; p_value (per orthogroup) is its smallest value, and p_adj applies BH to p_value across orthogroups",
+      within_gene = "p_holm: HyPhy's correction across the branches tested in each orthogroup (k-th smallest p times m - k + 1, without Holm's running maximum); p_value (per orthogroup) is its smallest value, and p_adj applies BH to p_value across orthogroups",
       per_lineage = "p_bh_lineage: BH over p_raw, across the tested orthogroups in which that species-tree branch was tested (one family per species-tree branch)"
     )
   ),
@@ -216,7 +217,7 @@
 #'
 #' Every branch has the baseline MG94xREV fit (one omega per branch, no site variation)
 #' and the adaptive model's rate classes; tested branches also have the likelihood ratio,
-#' HyPhy's uncorrected p-value, and HyPhy's Holm-Bonferroni p-value across the branches
+#' HyPhy's uncorrected p-value, and HyPhy's corrected p-value (Holm's step without the running maximum) across the branches
 #' tested in this gene.
 #' @keywords internal
 .absrel_branches <- function(j) {

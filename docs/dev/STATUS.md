@@ -20,7 +20,7 @@ dndsR is a real R package, fit for CRAN one day, and a containerized CLI, for pe
 
 ## Resume here: study B completion, alignment pilot, multiple-testing study (2026-11-22)
 
-The maintainer's seven rulings on the study B core results are in `DECISIONS.md` (2026-11-22). Running on Slurm (intel18), results not yet read:
+The maintainer's seven rulings on the study B core results are in `DECISIONS.md` (2026-11-22). Reported, with proposals awaiting the maintainer: the alignment pilot ([report](../validation/alignment-pilot.md): no aligner nominated, cost criterion; option of documenting codon-aware user alignments) and the multiple-testing study ([report](../validation/lineage-multiple-testing.md): per-lineage `p_bh_lineage` and gene `p_adj` control false discoveries on correct alignments, every aBSREL output fails after realigning indels; proposed optional pooled-BH column, not implemented). Still running: study B's remaining arms. Jobs:
 
 | Work | Design | Root | Job |
 |---|---|---|---|

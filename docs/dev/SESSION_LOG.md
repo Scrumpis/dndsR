@@ -2,6 +2,14 @@
 
 Summaries only. Full transcripts are local: see `RUNBOOK.md`. Newest first.
 
+## 2026-11-22 (evening): alignment pilot and multiple-testing study reported
+
+- **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (continued)
+- **Done:** alignment pilot ([report](../validation/alignment-pilot.md)): PRANK codon mode cut aBSREL's `p_raw` false positives on BE3h genes from 7.3% to 3.6% and gene `p_value` from 18.7% to 2.7% with no power loss, MACSE to 5.4% and 9.3%; neither nominated, both fail the preregistered cost criterion (76-83 and 25-29 times MAFFT); aligner disagreement is not a usable per-gene flag. Multiple-testing study ([report](../validation/lineage-multiple-testing.md)): on error-free mixtures `p_bh_lineage` and gene `p_adj` control false discoveries; on realigned indels every aBSREL output fails (FDP 47-60%), while `p_adj_two_vs_m0` controls (1.4%). Documentation of which output answers which question; `p_holm`/`p_value` wording corrected in roxygen, `man/phylo_absrel.Rd` (edited by hand to match, roxygen2 not in the image), a code comment, and the provenance `testing.within_gene` string.
+- **Verified:** pilot null genes byte-identical to study B's BE3h (150/150); `tools/dev/check.sh` on an Intel node 251 tests, 0 failed, 7 skipped (an AMD node gave `Illegal instruction` from git in the safeguard test, and 16 GB ran out of memory).
+- **Corrected:** I had told the maintainer PRANK was within the cost rule, taking MAFFT to cost about 8 core-seconds per gene; it measured 0.64-0.75.
+- **Not done:** study B remaining arms (array 21578592, 8 of 15 tasks still running); proposals in both reports await the maintainer; full L and the R confirmation held; push.
+
 ## 2026-11-22 (later still): maintainer's rulings on study B; three runs launched; corrections
 
 - **Session:** `36176ebf-ed04-471c-8141-7042748b4b80` (continued)

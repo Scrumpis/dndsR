@@ -1,6 +1,6 @@
 # Multiple testing in the lineage outputs: definitions and a mixture study (design)
 
-Status: **the audit of definitions is done (below). The mixture study answers the maintainer's item 3 of 2026-11-22 (`DECISIONS.md`); its design is fixed before any run.** It is a follow-up to study B, labelled as such. Its preregistered criteria are not changed after results.
+Status: **the audit of definitions is done (below). The mixture study answers the maintainer's item 3 of 2026-11-22 (`DECISIONS.md`); its design is fixed before any run.** Results: [validation/lineage-multiple-testing.md](../validation/lineage-multiple-testing.md). It is a follow-up to study B, labelled as such. Its preregistered criteria are not changed after results.
 
 ## Why
 

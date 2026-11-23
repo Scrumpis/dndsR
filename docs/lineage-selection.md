@@ -62,7 +62,16 @@ Multiple testing. Each output answers a different question, over a different fam
 | `p_adj` (per gene) | the same, across many genes | Benjamini-Hochberg across tested genes |
 | `p_bh_lineage` | In which genes was this particular branch selected? | Benjamini-Hochberg across the genes in which that species-tree branch was tested, one family per branch. Nothing corrects across branches: counting discoveries over several lineages is not covered by it |
 
-Each correction is valid only if `p_raw` is. Which output suits branch-level and gene-level conclusions, and how they behave with selected and unselected genes mixed, is being measured ([design](dev/lineage-multiple-testing.md)); until then dndsR does not recommend one of them for lineage counts. With realigned indels in simulation, `p_raw`, `p_value`, `p_adj`, and `p_bh_lineage` all made excess false discoveries ([input errors](#input-errors)).
+Each correction is valid only if `p_raw` is. In a simulated mixture of 1,000 genes (8 taxa, 10% selected on two terminal branches and their stem; [results](validation/lineage-multiple-testing.md)), with error-free alignments, `p_bh_lineage` kept the false-discovery proportion at or below 2.4% within each selected lineage. Lineages without selection made no rejections, and gene `p_adj` kept them at 2.3%. After realigning sequences with indels, about half of the discoveries from every aBSREL output were false, and every lineage without selection made some. The branch models' `p_adj_two_vs_m0` stayed at 1.4%. Which output to use, on correct alignments:
+
+| Question | Output |
+|---|---|
+| Is this gene under episodic selection on some branch? | gene `p_adj` (`p_value` is not corrected across genes) |
+| In which genes is lineage X selected, for a lineage chosen in advance? | `p_bh_lineage` within that lineage |
+| Which branches of which genes, with no lineage chosen in advance? | no output guarantees this. Summing `p_bh_lineage` discoveries over lineages held in that simulation only because lineages without selection made no rejections; treat such counts as exploratory |
+| One branch of one gene, planned in advance | `p_raw` |
+
+`p_holm` corrects only across the branches of one gene, not across genes. One simulated design is limited evidence: other tree sizes, selection rates, or alignment problems may behave differently ([input errors](#input-errors)).
 
 ## phylo_relax
 

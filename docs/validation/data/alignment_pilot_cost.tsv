@@ -1,0 +1,7 @@
+set	arm	core_seconds_per_gene	note
+null	A0	0.64	wall time of phylo_prepare on 8 threads x 8 / genes (upper bound: includes start-up)
+null	A1	48.88956	one core per gene, 8 in parallel
+null	A2	15.9224333333333	one core per gene, 8 in parallel
+selected	A0	0.746666666666667	wall time of phylo_prepare on 8 threads x 8 / genes (upper bound: includes start-up)
+selected	A1	62.4877333333333	one core per gene, 8 in parallel
+selected	A2	21.86462	one core per gene, 8 in parallel

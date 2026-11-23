@@ -1,0 +1,7 @@
+set	measure	arm	diff	lo	hi
+null	absrel p_raw false-positive rate	A1	-0.0374358974358974	-0.0461538461538461	-0.0292307692307692
+null	absrel p_raw false-positive rate	A2	-0.0194871794871795	-0.0271794871794872	-0.0123076923076923
+null	absrel p_raw false-positive rate	T	-0.0466666666666667	-0.0558974358974359	-0.0374358974358974
+selected	absrel foreground power	A1	0	0	0
+selected	absrel foreground power	A2	0	0	0
+selected	absrel foreground power	T	0	0	0

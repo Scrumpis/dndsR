@@ -1,0 +1,40 @@
+unit	run	output	tests	true_tests	discoveries	false	fdp	fdp_lo	fdp_hi	judgement	power	family	has_alternative
+Q-MIX-T8b	absrel	p_bh_lineage family n3	1000	111	42	1	0.0238095238095238	0	0.0810948703805846	inconclusive	0.369369369369369	n3	TRUE
+Q-MIX-T8b	absrel	p_bh_lineage family n4	1000	0	0	0	NA	NA	NA	no discoveries	NA	n4	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family n2+n5	1000	0	0	0	NA	NA	NA	no discoveries	NA	n2+n5	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family n6	1000	0	0	0	NA	NA	NA	no discoveries	NA	n6	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family n7	1000	0	0	0	NA	NA	NA	no discoveries	NA	n7	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family t1	1000	111	71	1	0.0140845070422535	0	0.0459814323607427	controls	0.630630630630631	t1	TRUE
+Q-MIX-T8b	absrel	p_bh_lineage family t2	1000	111	68	0	0	0	0	controls	0.612612612612613	t2	TRUE
+Q-MIX-T8b	absrel	p_bh_lineage family t3	1000	0	0	0	NA	NA	NA	no discoveries	NA	t3	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family t4	1000	0	0	0	NA	NA	NA	no discoveries	NA	t4	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family t5	1000	0	0	0	NA	NA	NA	no discoveries	NA	t5	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family t6	1000	0	0	0	NA	NA	NA	no discoveries	NA	t6	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family t7	1000	0	0	0	NA	NA	NA	no discoveries	NA	t7	FALSE
+Q-MIX-T8b	absrel	p_bh_lineage family t8	1000	0	0	0	NA	NA	NA	no discoveries	NA	t8	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family n3	1000	87	23	3	0.130434782608696	0	0.277777777777778	inconclusive	0.229885057471264	n3	TRUE
+Q-MIXh-T8b	absrel	p_bh_lineage family n4	1000	0	10	10	1	1	1	fails	NA	n4	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family n2+n5	1000	0	9	9	1	1	1	fails	NA	n2+n5	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family n6	1000	0	9	9	1	1	1	fails	NA	n6	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family n7	1000	0	17	17	1	1	1	fails	NA	n7	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family t1	1000	87	67	13	0.194029850746269	0.101449275362319	0.3	fails	0.620689655172414	t1	TRUE
+Q-MIXh-T8b	absrel	p_bh_lineage family t2	1000	87	68	10	0.147058823529412	0.0677966101694915	0.238095238095238	fails	0.666666666666667	t2	TRUE
+Q-MIXh-T8b	absrel	p_bh_lineage family t3	1000	0	8	8	1	1	1	fails	NA	t3	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family t4	1000	0	7	7	1	1	1	fails	NA	t4	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family t5	1000	0	4	4	1	1	1	fails	NA	t5	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family t6	1000	0	14	14	1	1	1	fails	NA	t6	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family t7	1000	0	5	5	1	1	1	fails	NA	t7	FALSE
+Q-MIXh-T8b	absrel	p_bh_lineage family t8	1000	0	7	7	1	1	1	fails	NA	t8	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family n3	1000	87	18	0	0	0	0	controls	0.206896551724138	n3	TRUE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family n4	1000	0	0	0	NA	NA	NA	no discoveries	NA	n4	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family n2+n5	1000	0	0	0	NA	NA	NA	no discoveries	NA	n2+n5	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family n6	1000	0	0	0	NA	NA	NA	no discoveries	NA	n6	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family n7	1000	0	0	0	NA	NA	NA	no discoveries	NA	n7	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t1	1000	87	46	1	0.0217391304347826	0	0.0754716981132075	inconclusive	0.517241379310345	t1	TRUE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t2	1000	87	55	0	0	0	0	controls	0.632183908045977	t2	TRUE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t3	1000	0	0	0	NA	NA	NA	no discoveries	NA	t3	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t4	1000	0	0	0	NA	NA	NA	no discoveries	NA	t4	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t5	1000	0	0	0	NA	NA	NA	no discoveries	NA	t5	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t6	1000	0	0	0	NA	NA	NA	no discoveries	NA	t6	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t7	1000	0	0	0	NA	NA	NA	no discoveries	NA	t7	FALSE
+Q-MIXh-T8b	absrel_true	p_bh_lineage family t8	1000	0	0	0	NA	NA	NA	no discoveries	NA	t8	FALSE

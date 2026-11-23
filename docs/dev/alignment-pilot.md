@@ -1,6 +1,6 @@
 # Alignment-method pilot (design)
 
-Status: **bounded exploratory pilot, approved by the maintainer 2026-11-22 (`DECISIONS.md`, item 6); this design is fixed before any run.** It is not confirmatory. Its only possible outcomes are a report and, at most, a proposal for a confirmatory study on held-out data. No change to `phylo_prepare` follows from it alone.
+Status: **bounded exploratory pilot, approved by the maintainer 2026-11-22 (`DECISIONS.md`, item 6); this design is fixed before any run.** Results: [validation/alignment-pilot.md](../validation/alignment-pilot.md) (no aligner nominated). It is not confirmatory. Its only possible outcomes are a report and, at most, a proposal for a confirmatory study on held-out data. No change to `phylo_prepare` follows from it alone.
 
 ## Why
 
